@@ -100,21 +100,100 @@ def _is_concept_node(G: nx.Graph, node_id: str) -> bool:
     return False
 
 
+_CODE_EXTENSIONS = {"py", "ts", "tsx", "js", "go", "rs", "java", "rb", "cpp", "c", "h", "cs", "kt", "scala", "php"}
+_DOC_EXTENSIONS = {"md", "txt", "rst"}
+_PAPER_EXTENSIONS = {"pdf"}
+_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif", "svg"}
+
+
+def _file_category(path: str) -> str:
+    ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    if ext in _CODE_EXTENSIONS:
+        return "code"
+    if ext in _PAPER_EXTENSIONS:
+        return "paper"
+    if ext in _IMAGE_EXTENSIONS:
+        return "image"
+    return "doc"
+
+
+def _top_level_dir(path: str) -> str:
+    """Return the first path component — used to detect cross-repo edges."""
+    return path.split("/")[0] if "/" in path else path
+
+
+def _surprise_score(
+    G: nx.Graph,
+    u: str,
+    v: str,
+    data: dict,
+    node_community: dict[str, int],
+    u_source: str,
+    v_source: str,
+) -> tuple[int, list[str]]:
+    """Score how surprising a cross-file edge is. Returns (score, reasons)."""
+    score = 0
+    reasons: list[str] = []
+
+    # 1. Confidence weight — uncertain connections are more noteworthy
+    conf = data.get("confidence", "EXTRACTED")
+    conf_bonus = {"AMBIGUOUS": 3, "INFERRED": 2, "EXTRACTED": 1}.get(conf, 1)
+    score += conf_bonus
+    if conf in ("AMBIGUOUS", "INFERRED"):
+        reasons.append(f"{conf.lower()} connection — not explicitly stated in source")
+
+    # 2. Cross file-type bonus — code↔paper or code↔image is non-obvious
+    cat_u = _file_category(u_source)
+    cat_v = _file_category(v_source)
+    if cat_u != cat_v:
+        score += 2
+        reasons.append(f"crosses file types ({cat_u} ↔ {cat_v})")
+
+    # 3. Cross-repo bonus — different top-level directory
+    if _top_level_dir(u_source) != _top_level_dir(v_source):
+        score += 2
+        reasons.append("connects across different repos/directories")
+
+    # 4. Cross-community bonus — Leiden says these are structurally distant
+    cid_u = node_community.get(u)
+    cid_v = node_community.get(v)
+    if cid_u is not None and cid_v is not None and cid_u != cid_v:
+        score += 1
+        reasons.append("bridges separate communities")
+
+    # 5. Peripheral→hub: a low-degree node connecting to a high-degree one
+    deg_u = G.degree(u)
+    deg_v = G.degree(v)
+    if min(deg_u, deg_v) <= 2 and max(deg_u, deg_v) >= 5:
+        score += 1
+        peripheral = G.nodes[u].get("label", u) if deg_u <= 2 else G.nodes[v].get("label", v)
+        hub = G.nodes[v].get("label", v) if deg_u <= 2 else G.nodes[u].get("label", u)
+        reasons.append(f"peripheral node `{peripheral}` unexpectedly reaches hub `{hub}`")
+
+    return score, reasons
+
+
 def _cross_file_surprises(G: nx.Graph, communities: dict[int, list[str]], top_n: int) -> list[dict]:
     """
-    Cross-file edges between real code/doc entities.
-    Excludes concept nodes, file hub nodes, and plain import edges.
-    Sorted AMBIGUOUS → INFERRED → EXTRACTED.
+    Cross-file edges between real code/doc entities, ranked by a composite
+    surprise score rather than confidence alone.
+
+    Surprise score accounts for:
+    - Confidence (AMBIGUOUS > INFERRED > EXTRACTED)
+    - Cross file-type (code↔paper is more surprising than code↔code)
+    - Cross-repo (different top-level directory)
+    - Cross-community (Leiden says structurally distant)
+    - Peripheral→hub (low-degree node reaching a god node)
+
+    Each result includes a 'why' field explaining what makes it non-obvious.
     """
-    surprises = []
-    order = {"AMBIGUOUS": 0, "INFERRED": 1, "EXTRACTED": 2}
+    node_community = {n: cid for cid, nodes in communities.items() for n in nodes}
+    candidates = []
 
     for u, v, data in G.edges(data=True):
-        # Skip structural scaffolding — not insights
         relation = data.get("relation", "")
         if relation in ("imports", "imports_from", "contains", "method"):
             continue
-        # Skip if either endpoint is a concept or file-level node
         if _is_concept_node(G, u) or _is_concept_node(G, v):
             continue
         if _is_file_node(G, u) or _is_file_node(G, v):
@@ -123,28 +202,32 @@ def _cross_file_surprises(G: nx.Graph, communities: dict[int, list[str]], top_n:
         u_source = G.nodes[u].get("source_file", "")
         v_source = G.nodes[v].get("source_file", "")
 
-        if u_source and v_source and u_source != v_source:
-            # Respect original edge direction stored in _src/_tgt (if present),
-            # otherwise fall back to u/v which may be in arbitrary order.
-            src_id = data.get("_src", u)
-            tgt_id = data.get("_tgt", v)
-            surprises.append({
-                "source": G.nodes[src_id].get("label", src_id),
-                "target": G.nodes[tgt_id].get("label", tgt_id),
-                "source_files": [
-                    G.nodes[src_id].get("source_file", ""),
-                    G.nodes[tgt_id].get("source_file", ""),
-                ],
-                "confidence": data.get("confidence", "EXTRACTED"),
-                "relation": relation,
-            })
+        if not u_source or not v_source or u_source == v_source:
+            continue
 
-    surprises.sort(key=lambda x: order.get(x["confidence"], 3))
-    if surprises:
-        return surprises[:top_n]
+        score, reasons = _surprise_score(G, u, v, data, node_community, u_source, v_source)
+        src_id = data.get("_src", u)
+        tgt_id = data.get("_tgt", v)
+        candidates.append({
+            "_score": score,
+            "source": G.nodes[src_id].get("label", src_id),
+            "target": G.nodes[tgt_id].get("label", tgt_id),
+            "source_files": [
+                G.nodes[src_id].get("source_file", ""),
+                G.nodes[tgt_id].get("source_file", ""),
+            ],
+            "confidence": data.get("confidence", "EXTRACTED"),
+            "relation": relation,
+            "why": "; ".join(reasons) if reasons else "cross-file semantic connection",
+        })
 
-    # Fallback: no semantic cross-file edges found (pure AST corpus).
-    # Surface cross-community bridge edges as structural surprises instead.
+    candidates.sort(key=lambda x: x["_score"], reverse=True)
+    for c in candidates:
+        c.pop("_score")
+
+    if candidates:
+        return candidates[:top_n]
+
     return _cross_community_surprises(G, communities, top_n)
 
 

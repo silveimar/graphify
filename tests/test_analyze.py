@@ -4,7 +4,7 @@ import networkx as nx
 from pathlib import Path
 from graphify.build import build_from_json
 from graphify.cluster import cluster
-from graphify.analyze import god_nodes, surprising_connections, _is_concept_node, graph_diff
+from graphify.analyze import god_nodes, surprising_connections, _is_concept_node, graph_diff, _surprise_score, _file_category
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -85,14 +85,58 @@ def test_surprising_connections_single_file_uses_community_bridges():
     assert len(surprises) > 0
 
 
-def test_surprising_connections_ambiguous_first():
+def test_surprising_connections_ambiguous_scores_higher_than_extracted():
+    """AMBIGUOUS edge should score higher than an otherwise identical EXTRACTED edge."""
+    G = nx.Graph()
+    for nid, label, src in [
+        ("a", "Alpha", "repo1/model.py"),
+        ("b", "Beta", "repo2/train.py"),
+        ("c", "Gamma", "repo1/data.py"),
+        ("d", "Delta", "repo2/eval.py"),
+    ]:
+        G.add_node(nid, label=label, source_file=src, file_type="code")
+    G.add_edge("a", "b", relation="calls", confidence="AMBIGUOUS", weight=1.0, source_file="repo1/model.py")
+    G.add_edge("c", "d", relation="calls", confidence="EXTRACTED", weight=1.0, source_file="repo1/data.py")
+    communities = {0: ["a", "c"], 1: ["b", "d"]}
+    nc = {"a": 0, "c": 0, "b": 1, "d": 1}
+    score_amb, _ = _surprise_score(G, "a", "b", G.edges["a", "b"], nc, "repo1/model.py", "repo2/train.py")
+    score_ext, _ = _surprise_score(G, "c", "d", G.edges["c", "d"], nc, "repo1/data.py", "repo2/eval.py")
+    assert score_amb > score_ext
+
+
+def test_surprising_connections_cross_type_scores_higher():
+    """Code↔paper edge should score higher than code↔code edge."""
+    G = nx.Graph()
+    for nid, label, src in [
+        ("a", "Transformer", "code/model.py"),
+        ("b", "FlashAttn", "papers/flash.pdf"),
+        ("c", "Trainer", "code/train.py"),
+        ("d", "Dataset", "code/data.py"),
+    ]:
+        G.add_node(nid, label=label, source_file=src, file_type="code")
+    G.add_edge("a", "b", relation="references", confidence="EXTRACTED", weight=1.0, source_file="code/model.py")
+    G.add_edge("c", "d", relation="calls", confidence="EXTRACTED", weight=1.0, source_file="code/train.py")
+    nc = {"a": 0, "b": 1, "c": 0, "d": 0}
+    score_cross, reasons_cross = _surprise_score(G, "a", "b", G.edges["a", "b"], nc, "code/model.py", "papers/flash.pdf")
+    score_same, _ = _surprise_score(G, "c", "d", G.edges["c", "d"], nc, "code/train.py", "code/data.py")
+    assert score_cross > score_same
+    assert any("code" in r and "paper" in r for r in reasons_cross)
+
+
+def test_surprising_connections_have_why_field():
     G = make_graph()
     communities = cluster(G)
-    surprises = surprising_connections(G, communities)
-    if len(surprises) >= 2:
-        order = {"AMBIGUOUS": 0, "INFERRED": 1, "EXTRACTED": 2}
-        confidences = [order[s["confidence"]] for s in surprises]
-        assert confidences == sorted(confidences)
+    for s in surprising_connections(G, communities):
+        assert "why" in s
+        assert isinstance(s["why"], str)
+        assert len(s["why"]) > 0
+
+
+def test_file_category():
+    assert _file_category("model.py") == "code"
+    assert _file_category("flash.pdf") == "paper"
+    assert _file_category("diagram.png") == "image"
+    assert _file_category("notes.md") == "doc"
 
 
 def test_is_concept_node_empty_source():
