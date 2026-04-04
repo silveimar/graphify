@@ -1,9 +1,14 @@
 # assemble node+edge dicts into a NetworkX graph, preserving edge direction
 from __future__ import annotations
+import sys
 import networkx as nx
+from .validate import validate_extraction
 
 
 def build_from_json(extraction: dict) -> nx.Graph:
+    errors = validate_extraction(extraction)
+    if errors:
+        print(f"[graphify] Extraction warning ({len(errors)} issues): {errors[0]}", file=sys.stderr)
     G = nx.Graph()
     for node in extraction.get("nodes", []):
         G.add_node(node["id"], **{k: v for k, v in node.items() if k != "id"})

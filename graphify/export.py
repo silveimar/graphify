@@ -1,7 +1,9 @@
 # write graph to HTML, JSON, SVG, Obsidian vault, and Neo4j Cypher
 from __future__ import annotations
 import json
+import math
 import re
+from collections import Counter
 from pathlib import Path
 import networkx as nx
 from networkx.readwrite import json_graph
@@ -156,6 +158,23 @@ def to_obsidian(
             seen_names[base] = 0
             node_filename[node_id] = base
 
+    # Helper: compute dominant confidence for a node across all its edges
+    def _dominant_confidence(node_id: str) -> str:
+        confs = []
+        for u, v, edata in G.edges(node_id, data=True):
+            confs.append(edata.get("confidence", "EXTRACTED"))
+        if not confs:
+            return "EXTRACTED"
+        return Counter(confs).most_common(1)[0][0]
+
+    # Map file_type → graphify tag
+    _FTYPE_TAG = {
+        "code": "graphify/code",
+        "document": "graphify/document",
+        "paper": "graphify/paper",
+        "image": "graphify/image",
+    }
+
     # Write one .md file per node
     for node_id, data in G.nodes(data=True):
         label = data.get("label", node_id)
@@ -166,17 +185,29 @@ def to_obsidian(
             else f"Community {cid}"
         )
 
+        # Build tags for this node
+        ftype = data.get("file_type", "")
+        ftype_tag = _FTYPE_TAG.get(ftype, f"graphify/{ftype}" if ftype else "graphify/document")
+        dom_conf = _dominant_confidence(node_id)
+        conf_tag = f"graphify/{dom_conf}"
+        comm_tag = f"community/{community_name.replace(' ', '_')}"
+        node_tags = [ftype_tag, conf_tag, comm_tag]
+
         lines: list[str] = []
 
         # YAML frontmatter — readable in Obsidian's properties panel
         lines += [
             "---",
             f'source_file: "{data.get("source_file", "")}"',
-            f'type: "{data.get("file_type", "")}"',
+            f'type: "{ftype}"',
             f'community: "{community_name}"',
         ]
         if data.get("source_location"):
             lines.append(f'location: "{data["source_location"]}"')
+        # Add tags list to frontmatter
+        lines.append("tags:")
+        for tag in node_tags:
+            lines.append(f"  - {tag}")
         lines += ["---", "", f"# {label}", ""]
 
         # Outgoing edges as wikilinks
@@ -189,6 +220,11 @@ def to_obsidian(
                 relation = edge_data.get("relation", "")
                 confidence = edge_data.get("confidence", "EXTRACTED")
                 lines.append(f"- [[{neighbor_label}]] — `{relation}` [{confidence}]")
+            lines.append("")
+
+        # Inline tags at bottom of note body (for Obsidian tag panel)
+        inline_tags = " ".join(f"#{t}" for t in node_tags)
+        lines.append(inline_tags)
 
         fname = node_filename[node_id] + ".md"
         (out / fname).write_text("\n".join(lines), encoding="utf-8")
@@ -265,6 +301,16 @@ def to_obsidian(
             lines.append(entry)
         lines.append("")
 
+        # Dataview live query (improvement 2)
+        comm_tag_name = community_name.replace(" ", "_")
+        lines.append("## Live Query (requires Dataview plugin)")
+        lines.append("")
+        lines.append("```dataview")
+        lines.append(f"TABLE source_file, type FROM #community/{comm_tag_name}")
+        lines.append("SORT file.name ASC")
+        lines.append("```")
+        lines.append("")
+
         # Connections to other communities
         cross = inter_community_edges.get(cid, {})
         if cross:
@@ -301,7 +347,178 @@ def to_obsidian(
         (out / fname).write_text("\n".join(lines), encoding="utf-8")
         community_notes_written += 1
 
+    # Improvement 4: write .obsidian/graph.json to color nodes by community in graph view
+    obsidian_dir = out / ".obsidian"
+    obsidian_dir.mkdir(exist_ok=True)
+    graph_config = {
+        "colorGroups": [
+            {
+                "query": f"tag:#community/{label.replace(' ', '_')}",
+                "color": {"a": 1, "rgb": int(COMMUNITY_COLORS[cid % len(COMMUNITY_COLORS)].lstrip('#'), 16)}
+            }
+            for cid, label in sorted((community_labels or {}).items())
+        ]
+    }
+    (obsidian_dir / "graph.json").write_text(json.dumps(graph_config, indent=2))
+
     return G.number_of_nodes() + community_notes_written
+
+
+def to_canvas(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    output_path: str,
+    community_labels: dict[int, str] | None = None,
+    node_filenames: dict[str, str] | None = None,
+) -> None:
+    """Export graph as an Obsidian Canvas file — communities as groups, nodes as cards.
+
+    Generates a structured layout: communities arranged in a grid, nodes within
+    each community arranged in rows. Edges shown between connected nodes.
+    Opens in Obsidian as an infinite canvas with community groupings visible.
+    """
+    # Obsidian canvas color codes (cycle through for communities)
+    CANVAS_COLORS = ["1", "2", "3", "4", "5", "6"]  # red, orange, yellow, green, cyan, purple
+
+    def safe_name(label: str) -> str:
+        return re.sub(r'[\\/*?:"<>|#^[\]]', "", label).strip() or "unnamed"
+
+    # Build node_filenames if not provided (same dedup logic as to_obsidian)
+    if node_filenames is None:
+        node_filenames = {}
+        seen_names: dict[str, int] = {}
+        for node_id, data in G.nodes(data=True):
+            base = safe_name(data.get("label", node_id))
+            if base in seen_names:
+                seen_names[base] += 1
+                node_filenames[node_id] = f"{base}_{seen_names[base]}"
+            else:
+                seen_names[base] = 0
+                node_filenames[node_id] = base
+
+    num_communities = len(communities)
+    cols = math.ceil(math.sqrt(num_communities)) if num_communities > 0 else 1
+    rows = math.ceil(num_communities / cols) if num_communities > 0 else 1
+
+    canvas_nodes: list[dict] = []
+    canvas_edges: list[dict] = []
+
+    # Lay out communities in a grid
+    gap = 80
+    group_x_offsets: list[int] = []
+    group_y_offsets: list[int] = []
+
+    # Precompute group sizes so we can calculate offsets
+    sorted_cids = sorted(communities.keys())
+    group_sizes: dict[int, tuple[int, int]] = {}
+    for cid in sorted_cids:
+        members = communities[cid]
+        n = len(members)
+        w = max(600, 220 * math.ceil(math.sqrt(n)) if n > 0 else 600)
+        h = max(400, 100 * math.ceil(n / 3) + 120 if n > 0 else 400)
+        group_sizes[cid] = (w, h)
+
+    # Compute cumulative row heights and col widths for grid placement
+    # Each grid cell uses the max width/height in its col/row
+    col_widths: list[int] = []
+    row_heights: list[int] = []
+    for col_idx in range(cols):
+        max_w = 0
+        for row_idx in range(rows):
+            linear = row_idx * cols + col_idx
+            if linear < len(sorted_cids):
+                cid = sorted_cids[linear]
+                w, _ = group_sizes[cid]
+                max_w = max(max_w, w)
+        col_widths.append(max_w)
+
+    for row_idx in range(rows):
+        max_h = 0
+        for col_idx in range(cols):
+            linear = row_idx * cols + col_idx
+            if linear < len(sorted_cids):
+                cid = sorted_cids[linear]
+                _, h = group_sizes[cid]
+                max_h = max(max_h, h)
+        row_heights.append(max_h)
+
+    # Map from cid → (group_x, group_y, group_w, group_h)
+    group_layout: dict[int, tuple[int, int, int, int]] = {}
+    for idx, cid in enumerate(sorted_cids):
+        col_idx = idx % cols
+        row_idx = idx // cols
+        gx = sum(col_widths[:col_idx]) + col_idx * gap
+        gy = sum(row_heights[:row_idx]) + row_idx * gap
+        gw, gh = group_sizes[cid]
+        group_layout[cid] = (gx, gy, gw, gh)
+
+    # Build set of all node_ids in canvas for edge filtering
+    all_canvas_nodes: set[str] = set()
+    for members in communities.values():
+        all_canvas_nodes.update(members)
+
+    # Generate group and node canvas entries
+    for idx, cid in enumerate(sorted_cids):
+        members = communities[cid]
+        community_name = (
+            community_labels.get(cid, f"Community {cid}")
+            if community_labels and cid is not None
+            else f"Community {cid}"
+        )
+        gx, gy, gw, gh = group_layout[cid]
+        canvas_color = CANVAS_COLORS[idx % len(CANVAS_COLORS)]
+
+        # Group node
+        canvas_nodes.append({
+            "id": f"g{cid}",
+            "type": "group",
+            "label": community_name,
+            "x": gx,
+            "y": gy,
+            "width": gw,
+            "height": gh,
+            "color": canvas_color,
+        })
+
+        # Node cards inside the group — rows of 3
+        sorted_members = sorted(members, key=lambda n: G.nodes[n].get("label", n))
+        for m_idx, node_id in enumerate(sorted_members):
+            col = m_idx % 3
+            row = m_idx // 3
+            nx_x = gx + 20 + col * (180 + 20)
+            nx_y = gy + 80 + row * (60 + 20)
+            fname = node_filenames.get(node_id, safe_name(G.nodes[node_id].get("label", node_id)))
+            canvas_nodes.append({
+                "id": f"n_{node_id}",
+                "type": "file",
+                "file": f"graphify/obsidian/{fname}.md",
+                "x": nx_x,
+                "y": nx_y,
+                "width": 180,
+                "height": 60,
+            })
+
+    # Generate edges — only between nodes both in canvas, cap at 200 highest-weight
+    all_edges_weighted: list[tuple[float, str, str, str]] = []
+    for u, v, edata in G.edges(data=True):
+        if u in all_canvas_nodes and v in all_canvas_nodes:
+            weight = edata.get("weight", 1.0)
+            relation = edata.get("relation", "")
+            conf = edata.get("confidence", "EXTRACTED")
+            label = f"{relation} [{conf}]" if relation else f"[{conf}]"
+            all_edges_weighted.append((weight, u, v, label))
+
+    all_edges_weighted.sort(key=lambda x: -x[0])
+    for weight, u, v, label in all_edges_weighted[:200]:
+        canvas_edges.append({
+            "id": f"e_{u}_{v}",
+            "fromNode": f"n_{u}",
+            "toNode": f"n_{v}",
+            "label": label,
+        })
+
+    canvas_data = {"nodes": canvas_nodes, "edges": canvas_edges}
+    Path(output_path).write_text(json.dumps(canvas_data, indent=2), encoding="utf-8")
 
 
 def push_to_neo4j(

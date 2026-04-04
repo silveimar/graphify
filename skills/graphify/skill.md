@@ -412,7 +412,7 @@ Replace INPUT_PATH with the actual path.
 python3 -c "
 import sys, json
 from graphify.build import build_from_json
-from graphify.export import to_obsidian
+from graphify.export import to_obsidian, to_canvas
 from pathlib import Path
 
 extraction = json.loads(Path('.graphify_extract.json').read_text())
@@ -421,11 +421,19 @@ labels_raw = json.loads(Path('.graphify_labels.json').read_text()) if Path('.gra
 
 G = build_from_json(extraction)
 communities = {int(k): v for k, v in analysis['communities'].items()}
+cohesion = {int(k): v for k, v in analysis['cohesion'].items()}
 labels = {int(k): v for k, v in labels_raw.items()}
 
 n = to_obsidian(G, communities, '.graphify/obsidian', community_labels=labels or None, cohesion=cohesion)
 print(f'Obsidian vault: {n} notes in .graphify/obsidian/')
-print('Open .graphify/obsidian/ as a vault in Obsidian to explore the graph.')
+
+to_canvas(G, communities, '.graphify/obsidian/graph.canvas', community_labels=labels or None)
+print('Canvas: .graphify/obsidian/graph.canvas — open in Obsidian for structured community layout')
+print()
+print('Open .graphify/obsidian/ as a vault in Obsidian.')
+print('  Graph view   — nodes colored by community (set automatically)')
+print('  graph.canvas — structured layout with communities as groups')
+print('  _COMMUNITY_* — overview notes with cohesion scores and dataview queries')
 "
 ```
 
@@ -856,6 +864,25 @@ print(output)
 
 Replace `QUESTION` with the user's actual question, `MODE` with `bfs` or `dfs`, and `BUDGET` with the token budget (default `2000`, or whatever `--budget N` specifies). Then answer based on the subgraph output above.
 
+After writing the answer, save it back into the graph so it improves future queries:
+
+```bash
+python3 -c "
+from graphify.ingest import save_query_result
+from pathlib import Path
+save_query_result(
+    question='QUESTION',
+    answer='ANSWER',
+    memory_dir=Path('.graphify/memory'),
+    query_type='query',
+    source_nodes=SOURCE_NODES,  # list of node labels cited, or []
+)
+print('Query result saved to .graphify/memory/')
+"
+```
+
+Replace `QUESTION` with the question, `ANSWER` with your full answer text, `SOURCE_NODES` with the list of node labels you cited. This closes the feedback loop: the next `--update` will extract this Q&A as a node in the graph.
+
 ---
 
 ## For /graphify path
@@ -912,6 +939,23 @@ except nx.NodeNotFound as e:
 
 Replace `NODE_A` and `NODE_B` with the actual concept names from the user. Then explain the path in plain language — what each hop means, why it's significant.
 
+After writing the explanation, save it back:
+
+```bash
+python3 -c "
+from graphify.ingest import save_query_result
+from pathlib import Path
+save_query_result(
+    question='Path from NODE_A to NODE_B',
+    answer='ANSWER',
+    memory_dir=Path('.graphify/memory'),
+    query_type='path_query',
+    source_nodes=PATH_NODES,  # list of node labels on the path
+)
+print('Path result saved to .graphify/memory/')
+"
+```
+
 ---
 
 ## For /graphify explain
@@ -960,6 +1004,23 @@ for neighbor in G.neighbors(nid):
 ```
 
 Replace `NODE_NAME` with the concept the user asked about. Then write a 3-5 sentence explanation of what this node is, what it connects to, and why those connections are significant. Use the source locations as citations.
+
+After writing the explanation, save it back:
+
+```bash
+python3 -c "
+from graphify.ingest import save_query_result
+from pathlib import Path
+save_query_result(
+    question='Explain NODE_NAME',
+    answer='ANSWER',
+    memory_dir=Path('.graphify/memory'),
+    query_type='explain',
+    source_nodes=['NODE_NAME'],
+)
+print('Explanation saved to .graphify/memory/')
+"
+```
 
 ---
 

@@ -165,6 +165,19 @@ def serve(graph_path: str = ".graphify/graph.json") -> None:
                 description="Return summary statistics: node count, edge count, communities, confidence breakdown.",
                 inputSchema={"type": "object", "properties": {}},
             ),
+            types.Tool(
+                name="shortest_path",
+                description="Find the shortest path between two concepts in the knowledge graph.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "source": {"type": "string", "description": "Source concept label or keyword"},
+                        "target": {"type": "string", "description": "Target concept label or keyword"},
+                        "max_hops": {"type": "integer", "default": 8, "description": "Maximum hops to consider"},
+                    },
+                    "required": ["source", "target"],
+                },
+            ),
         ]
 
     @server.call_tool()
@@ -252,6 +265,42 @@ def serve(graph_path: str = ".graphify/graph.json") -> None:
                 f"INFERRED: {round(confs.count('INFERRED')/total*100)}%\n"
                 f"AMBIGUOUS: {round(confs.count('AMBIGUOUS')/total*100)}%\n"
             )
+            return [types.TextContent(type="text", text=text)]
+
+        elif name == "shortest_path":
+            src_terms = [t.lower() for t in arguments["source"].split()]
+            tgt_terms = [t.lower() for t in arguments["target"].split()]
+            max_hops = int(arguments.get("max_hops", 8))
+            src_scored = _score_nodes(G, src_terms)
+            tgt_scored = _score_nodes(G, tgt_terms)
+            if not src_scored:
+                return [types.TextContent(type="text", text=f"No node matching source '{arguments['source']}' found.")]
+            if not tgt_scored:
+                return [types.TextContent(type="text", text=f"No node matching target '{arguments['target']}' found.")]
+            src_nid = src_scored[0][1]
+            tgt_nid = tgt_scored[0][1]
+            try:
+                path_nodes = nx.shortest_path(G, src_nid, tgt_nid)
+            except (nx.NetworkXNoPath, nx.NodeNotFound):
+                src_label = G.nodes[src_nid].get("label", src_nid)
+                tgt_label = G.nodes[tgt_nid].get("label", tgt_nid)
+                return [types.TextContent(type="text", text=f"No path found between '{src_label}' and '{tgt_label}'.")]
+            hops = len(path_nodes) - 1
+            if hops > max_hops:
+                return [types.TextContent(type="text", text=f"Path exceeds max_hops={max_hops} ({hops} hops found).")]
+            segments = []
+            for i in range(len(path_nodes) - 1):
+                u, v = path_nodes[i], path_nodes[i + 1]
+                u_label = G.nodes[u].get("label", u)
+                v_label = G.nodes[v].get("label", v)
+                edata = G.edges[u, v]
+                rel = edata.get("relation", "")
+                conf = edata.get("confidence", "")
+                conf_str = f" [{conf}]" if conf else ""
+                if i == 0:
+                    segments.append(f"{u_label}")
+                segments.append(f"--{rel}{conf_str}--> {v_label}")
+            text = f"Shortest path ({hops} hops):\n  " + " ".join(segments)
             return [types.TextContent(type="text", text=text)]
 
         return [types.TextContent(type="text", text=f"Unknown tool: {name}")]

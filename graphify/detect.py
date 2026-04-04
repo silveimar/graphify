@@ -144,13 +144,33 @@ def detect(root: Path) -> dict:
 
     skipped_sensitive: list[str] = []
 
-    for p in sorted(root.rglob("*")):
+    # Always include .graphify/memory/ — query results filed back into the graph
+    memory_dir = root / ".graphify" / "memory"
+    scan_paths = [root]
+    if memory_dir.exists():
+        scan_paths.append(memory_dir)
+
+    seen: set[Path] = set()
+    all_files: list[Path] = []
+    for scan_root in scan_paths:
+        for p in sorted(scan_root.rglob("*")):
+            if p not in seen:
+                seen.add(p)
+                all_files.append(p)
+
+    for p in all_files:
         if not p.is_file():
             continue
-        parts = p.relative_to(root).parts
-        # Skip hidden dirs and known noise dirs
-        if any(part.startswith(".") or _is_noise_dir(part) for part in parts):
-            continue
+        # For memory dir files, don't apply hidden/noise filtering
+        in_memory = memory_dir.exists() and str(p).startswith(str(memory_dir))
+        if not in_memory:
+            try:
+                parts = p.relative_to(root).parts
+            except ValueError:
+                continue
+            # Skip hidden dirs and known noise dirs
+            if any(part.startswith(".") or _is_noise_dir(part) for part in parts):
+                continue
         if _is_sensitive(p):
             skipped_sensitive.append(str(p))
             continue

@@ -221,6 +221,56 @@ def ingest(url: str, target_dir: Path, author: str | None = None, contributor: s
     return out_path
 
 
+def save_query_result(
+    question: str,
+    answer: str,
+    memory_dir: Path,
+    query_type: str = "query",
+    source_nodes: list[str] | None = None,
+) -> Path:
+    """Save a Q&A result as markdown so it gets extracted into the graph on next --update.
+
+    Files are stored in memory_dir (typically .graphify/memory/) with YAML frontmatter
+    that graphify's extractor reads as node metadata. This closes the feedback loop:
+    the system grows smarter from both what you add AND what you ask.
+    """
+    memory_dir = Path(memory_dir)
+    memory_dir.mkdir(parents=True, exist_ok=True)
+
+    now = datetime.now(timezone.utc)
+    slug = re.sub(r"[^\w]", "_", question.lower())[:50].strip("_")
+    filename = f"query_{now.strftime('%Y%m%d_%H%M%S')}_{slug}.md"
+
+    frontmatter_lines = [
+        "---",
+        f'type: "{query_type}"',
+        f'date: "{now.isoformat()}"',
+        f'question: "{question.replace(chr(34), chr(39))}"',
+        'contributor: "graphify"',
+    ]
+    if source_nodes:
+        nodes_str = ", ".join(f'"{n}"' for n in source_nodes[:10])
+        frontmatter_lines.append(f"source_nodes: [{nodes_str}]")
+    frontmatter_lines.append("---")
+
+    body_lines = [
+        "",
+        f"# Q: {question}",
+        "",
+        "## Answer",
+        "",
+        answer,
+    ]
+    if source_nodes:
+        body_lines += ["", "## Source Nodes", ""]
+        body_lines += [f"- {n}" for n in source_nodes]
+
+    content = "\n".join(frontmatter_lines + body_lines)
+    out_path = memory_dir / filename
+    out_path.write_text(content, encoding="utf-8")
+    return out_path
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Fetch a URL into a graphify /raw folder")
