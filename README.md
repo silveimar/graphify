@@ -1,5 +1,7 @@
 # graphify
 
+[![CI](https://github.com/safishamsi/graphify/actions/workflows/ci.yml/badge.svg?branch=v1)](https://github.com/safishamsi/graphify/actions/workflows/ci.yml)
+
     any folder of files → persistent knowledge graph → Obsidian vault, graph.json, audit report
 
 ```
@@ -98,8 +100,7 @@ Works with any mix of file types in the same folder:
 
 | Type | Extensions | How it's extracted |
 |------|-----------|-------------------|
-| Code | `.py .ts .tsx .js .go .rs` | AST (deterministic) + call-graph pass (INFERRED) |
-| Code | `.java .cpp .c .rb .swift .kt` | Claude semantic extraction |
+| Code | `.py .ts .tsx .js .go .rs .java .c .cpp .rb .cs .kt .scala .php` | AST via tree-sitter (deterministic) + call-graph pass (INFERRED) |
 | Documents | `.md .txt .rst` | Concepts + relationships via Claude |
 | Papers | `.pdf` | Citation mining + concept extraction |
 | Images | `.png .jpg .webp .gif .svg` | Claude vision — screenshots, charts, whiteboards, any language |
@@ -170,10 +171,11 @@ If corpora in your domain consistently contain structures graphify doesn't extra
 
 ## Worked examples
 
-| Corpus | Type | Eval report |
-|--------|------|-------------|
-| httpx (Python HTTP client) | Codebase | `tests/EVAL_httpx.md` + `tests/GRAPH_REPORT_httpx.md` |
-| Mixed corpus (code + paper + Arabic image) | Multi-type | `tests/EVAL_mixed_corpus.md` |
+| Corpus | Type | Reduction | Eval report |
+|--------|------|-----------|-------------|
+| Karpathy repos + 5 research papers + 4 images | Mixed (code + papers + images) | **71.5x** | [`worked/karpathy-repos/review.md`](worked/karpathy-repos/review.md) |
+| httpx (Python HTTP client) | Codebase | — | [`worked/httpx/review.md`](worked/httpx/review.md) + [`GRAPH_REPORT.md`](worked/httpx/GRAPH_REPORT.md) |
+| Mixed corpus (code + paper + Arabic image) | Multi-type | — | [`worked/mixed-corpus/review.md`](worked/mixed-corpus/review.md) |
 
 Each includes the full graph output and an honest evaluation of what the skill got right and wrong.
 
@@ -194,7 +196,7 @@ No Neo4j required. No dashboards. No server. Runs entirely locally.
 ```
 graphify/
 ├── detect.py     detect file types, auto-exclude venvs/caches/node_modules; scan .graphify/memory/
-├── extract.py    AST extraction (Python, TypeScript, JavaScript, Go, Rust) + call-graph pass
+├── extract.py    AST extraction (13 languages via tree-sitter) + call-graph pass (INFERRED edges)
 ├── build.py      assemble NetworkX graph from extraction JSON; schema-validates before assembly
 ├── cluster.py    Leiden community detection, cohesion scoring
 ├── analyze.py    god nodes, bridge nodes, surprising connections, suggested questions, graph diff
@@ -210,7 +212,9 @@ graphify/
 skills/graphify/
 └── skill.md      the Claude Code skill — the full pipeline the agent runs step by step
 
+ARCHITECTURE.md   module responsibilities, extraction schema, how to add a language
 SECURITY.md       threat model, mitigations, vulnerability reporting
-tests/            163 tests, one file per module
+worked/           eval reports from real corpora (httpx, mixed-corpus)
+tests/            212 tests, one file per module
 pyproject.toml    pip install graphify  |  pip install graphify[mcp,neo4j,pdf,watch]
 ```
