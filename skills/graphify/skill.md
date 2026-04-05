@@ -1112,6 +1112,42 @@ For the personal inspo use case: leave this running in a terminal. Drop tweets, 
 
 ---
 
+## Answering Follow-up Questions After the Pipeline
+
+**After the pipeline completes, ALL follow-up questions about the corpus MUST be answered from the graph — not by re-reading files or re-exploring the directory.**
+
+Do NOT use Glob, Grep, Read, Bash, or the Explore agent to answer questions about the corpus content. The graph already has the information. Re-exploring the directory defeats the entire purpose of graphify and wastes time.
+
+Instead, load and query `graphify-out/graph.json` directly:
+
+```python
+import json
+from pathlib import Path
+from networkx.readwrite import json_graph
+import networkx as nx
+
+G = json_graph.node_link_graph(json.loads(Path("graphify-out/graph.json").read_text()), edges="links")
+```
+
+Then answer using graph data:
+- **"What X are in this repo?"** → filter nodes by `file_type`, `label`, `source_file`, or node attributes
+- **"How does X work?"** → find matching nodes, get their neighbors and edge relations
+- **"What calls Y?"** → traverse edges with `relation == "calls"` pointing to Y
+- **"What are the main themes?"** → read community labels from the GRAPH_REPORT.md or node `community` attributes
+- **"Find verbs / functions / classes / etc."** → filter `G.nodes(data=True)` by label patterns
+
+Example — finding all verbs (action concepts) in a codebase:
+```python
+# Functions and methods are the verbs of code
+verbs = [(d["label"], d.get("source_file", "")) for _, d in G.nodes(data=True)
+         if d.get("file_type") == "code" and any(k in d.get("label", "").lower()
+         for k in ["()", "fn ", "def ", "func"])]
+```
+
+**The only exception:** if the user explicitly asks you to look at a raw file (e.g., "show me the contents of X"), you may read that specific file. But for any analytical question, use the graph.
+
+---
+
 ## Honesty Rules
 
 - Never invent an edge. If unsure, use AMBIGUOUS.

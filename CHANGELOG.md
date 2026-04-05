@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 (2026-04-05)
+
+- Fix: follow-up questions after pipeline now answered from graph.json, not by re-exploring the directory (was 25 tool calls / 1m30s; now instant)
+- Skill: added "Answering Follow-up Questions" section with graph query patterns
+
 ## 0.1.5 (2026-04-05)
 
 - Perf: semantic extraction chunks 12-15 → 20-25 files (fewer subagent round trips)
