@@ -25,6 +25,9 @@ def build_from_json(extraction: dict) -> nx.Graph:
         attrs["_src"] = src
         attrs["_tgt"] = tgt
         G.add_edge(src, tgt, **attrs)
+    hyperedges = extraction.get("hyperedges", [])
+    if hyperedges:
+        G.graph["hyperedges"] = hyperedges
     return G
 
 

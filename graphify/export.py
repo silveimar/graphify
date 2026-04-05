@@ -55,6 +55,58 @@ def _html_styles() -> str:
 </style>"""
 
 
+def _hyperedge_script(hyperedges_json: str) -> str:
+    return f"""<script>
+// Render hyperedges as shaded regions
+const hyperedges = {hyperedges_json};
+function drawHyperedges() {{
+    const canvas = network.canvas.frame.canvas;
+    const ctx = canvas.getContext('2d');
+    hyperedges.forEach(h => {{
+        const positions = h.nodes
+            .map(nid => network.getPositions([nid])[nid])
+            .filter(p => p !== undefined);
+        if (positions.length < 2) return;
+        // Draw convex hull as filled polygon
+        ctx.save();
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = '#6366f1';
+        ctx.strokeStyle = '#6366f1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const scale = network.getScale();
+        const offset = network.getViewPosition();
+        const toCanvas = (p) => ({{
+            x: (p.x - offset.x) * scale + canvas.width / 2,
+            y: (p.y - offset.y) * scale + canvas.height / 2
+        }});
+        const pts = positions.map(toCanvas);
+        // Expand hull slightly
+        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+        const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        const expanded = pts.map(p => ({{
+            x: cx + (p.x - cx) * 1.15,
+            y: cy + (p.y - cy) * 1.15
+        }}));
+        ctx.moveTo(expanded[0].x, expanded[0].y);
+        expanded.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 0.4;
+        ctx.stroke();
+        // Label
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = '#4f46e5';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(h.label, cx, cy - 5);
+        ctx.restore();
+    }});
+}}
+network.on('afterDrawing', drawHyperedges);
+</script>"""
+
+
 def _html_script(nodes_json: str, edges_json: str, legend_json: str) -> str:
     return f"""<script>
 const RAW_NODES = {nodes_json};
@@ -198,6 +250,17 @@ LEGEND.forEach(c => {{
 _CONFIDENCE_SCORE_DEFAULTS = {"EXTRACTED": 1.0, "INFERRED": 0.5, "AMBIGUOUS": 0.2}
 
 
+def attach_hyperedges(G: nx.Graph, hyperedges: list) -> None:
+    """Store hyperedges in the graph's metadata dict."""
+    existing = G.graph.get("hyperedges", [])
+    seen_ids = {h["id"] for h in existing}
+    for h in hyperedges:
+        if h.get("id") and h["id"] not in seen_ids:
+            existing.append(h)
+            seen_ids.add(h["id"])
+    G.graph["hyperedges"] = existing
+
+
 def to_json(G: nx.Graph, communities: dict[int, list[str]], output_path: str) -> None:
     node_community = _node_community_map(communities)
     data = json_graph.node_link_data(G, edges="links")
@@ -207,6 +270,7 @@ def to_json(G: nx.Graph, communities: dict[int, list[str]], output_path: str) ->
         if "confidence_score" not in link:
             conf = link.get("confidence", "EXTRACTED")
             link["confidence_score"] = _CONFIDENCE_SCORE_DEFAULTS.get(conf, 1.0)
+    data["hyperedges"] = getattr(G, "graph", {}).get("hyperedges", [])
     with open(output_path, "w") as f:
         json.dump(data, f, indent=2)
 
@@ -302,6 +366,7 @@ def to_html(
     nodes_json = json.dumps(vis_nodes)
     edges_json = json.dumps(vis_edges)
     legend_json = json.dumps(legend_data)
+    hyperedges_json = json.dumps(getattr(G, "graph", {}).get("hyperedges", []))
     title = sanitize_label(str(output_path))
     stats = f"{G.number_of_nodes()} nodes &middot; {G.number_of_edges()} edges &middot; {len(communities)} communities"
 
@@ -331,6 +396,7 @@ def to_html(
   <div id="stats">{stats}</div>
 </div>
 {_html_script(nodes_json, edges_json, legend_json)}
+{_hyperedge_script(hyperedges_json)}
 </body>
 </html>"""
 
