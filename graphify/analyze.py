@@ -166,6 +166,11 @@ def _surprise_score(
         score += 1
         reasons.append("bridges separate communities")
 
+    # 4b. Semantic similarity bonus - non-obvious conceptual links score higher
+    if data.get("relation") == "semantically_similar_to":
+        score = int(score * 1.5)
+        reasons.append("semantically similar concepts with no structural link")
+
     # 5. Peripheral→hub: a low-degree node connecting to a high-degree one
     deg_u = G.degree(u)
     deg_v = G.degree(v)

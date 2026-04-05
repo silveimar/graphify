@@ -66,8 +66,9 @@ def generate(
                 conf_tag = f"INFERRED {cscore:.2f}"
             else:
                 conf_tag = conf
+            sem_tag = " [semantically similar]" if relation == "semantically_similar_to" else ""
             lines += [
-                f"- `{s['source']}` --{relation}--> `{s['target']}`  [{conf_tag}]",
+                f"- `{s['source']}` --{relation}--> `{s['target']}`  [{conf_tag}]{sem_tag}",
                 f"  {files[0]} → {files[1]}" + (f"  _{note}_" if note else ""),
             ]
     else:
