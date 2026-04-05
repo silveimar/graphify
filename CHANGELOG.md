@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.5 (2026-04-05)
+
+- Perf: semantic extraction chunks 12-15 → 20-25 files (fewer subagent round trips)
+- Perf: code-only corpora skip semantic dispatch entirely (AST handles it)
+- Perf: print timing estimate before extraction so the wait feels intentional
+- Fix: 5 skill gaps - --graphml in Usage table, --update manifest timing, query/path/explain graph existence check, --no-viz clarity
+- Refactor: dead imports removed (shutil, sys, inline os); _node_community_map() helper replaces 8 copy-pasted dict comprehensions; to_html() split into _html_styles() + _html_script(); serve.py call_tool() if/elif chain replaced with dispatch table
+- Test: end-to-end pipeline integration test (detect → extract → build → cluster → analyze → report → export)
+
 ## 0.1.4 (2026-04-05)
 
 - Replace pyvis with custom vis.js HTML renderer - node size by degree, click-to-inspect panel with clickable neighbors, search box, community filter, physics clustering
