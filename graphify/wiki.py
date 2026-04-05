@@ -59,6 +59,9 @@ def _community_article(
         degree = G.degree(nid)
         src_str = f" — `{src}`" if src else ""
         lines.append(f"- **{node_label}** ({degree} connections){src_str}")
+    remaining = len(nodes) - len(top_nodes)
+    if remaining > 0:
+        lines.append(f"- *... and {remaining} more nodes in this community*")
     lines.append("")
 
     lines += ["## Relationships", ""]

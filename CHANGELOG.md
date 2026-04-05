@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.8 (2026-04-05)
+
+- Fix: follow-up questions now check for wiki first (graphify-out/wiki/index.md) before falling back to graph.json
+- Fix: --update now auto-regenerates wiki if graphify-out/wiki/ exists
+- Fix: community articles show truncation notice ("... and N more nodes") when > 25 nodes
+- UX: pipeline completion message now lists all available flags and commands so users know what graphify can do
+
 ## 0.1.7 (2026-04-05)
 
 - Add: `--wiki` flag — generates Wikipedia-style agent-crawlable wiki from the graph (index.md + community articles + god node articles)

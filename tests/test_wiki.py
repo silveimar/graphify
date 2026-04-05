@@ -123,3 +123,17 @@ def test_article_navigation_footer(tmp_path):
     to_wiki(G, COMMUNITIES, tmp_path, community_labels=LABELS)
     article = (tmp_path / "Parsing_Layer.md").read_text()
     assert "[[index]]" in article
+
+
+def test_community_article_truncation_notice(tmp_path):
+    """Communities with more than 25 nodes show a truncation notice."""
+    G = nx.Graph()
+    nodes = [f"n{i}" for i in range(30)]
+    for nid in nodes:
+        G.add_node(nid, label=f"concept_{nid}", file_type="code", source_file="a.py", community=0)
+    for i in range(len(nodes) - 1):
+        G.add_edge(nodes[i], nodes[i + 1], relation="calls", confidence="EXTRACTED", weight=1.0)
+    communities = {0: nodes}
+    to_wiki(G, communities, tmp_path, community_labels={0: "Big Community"})
+    article = (tmp_path / "Big_Community.md").read_text()
+    assert "and 5 more nodes" in article

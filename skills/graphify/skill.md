@@ -641,18 +641,25 @@ rm -f graphify-out/.needs_update 2>/dev/null || true
 
 Tell the user:
 ```
-Graph complete. Outputs are in a hidden folder called graphify-out/ inside the directory you ran this on.
-
-The folder is hidden (dot prefix) so it won't show in Finder or a normal ls.
-To see it:
-  Mac/Linux:  ls -la graphify-out/
-  VS Code:    the Explorer panel shows hidden files by default
-  Finder:     Cmd+Shift+. to toggle hidden files
+Graph complete. Outputs are in graphify-out/ inside the directory you ran this on.
 
 What's inside:
-  graphify-out/obsidian/        - open this folder as a vault in Obsidian (File > Open Vault)
-  graphify-out/GRAPH_REPORT.md  - full audit report, also readable here in Claude
-  graphify-out/graph.json       - persistent graph, query it later with /graphify query "..."
+  graphify-out/obsidian/        - open as a vault in Obsidian (File > Open Vault)
+  graphify-out/graph.html       - interactive graph, open in any browser
+  graphify-out/GRAPH_REPORT.md  - full audit report
+  graphify-out/graph.json       - raw graph data
+
+What you can do next:
+  /graphify <path> --wiki           build a Wikipedia-style wiki agents can navigate (index.md + articles)
+  /graphify <path> --update         re-extract only new/changed files, merge into existing graph
+  /graphify <path> --watch          auto-update graph whenever files change
+  /graphify add <url>               fetch a URL and add it to the corpus
+  /graphify query "<question>"      BFS search of the graph
+  /graphify path "ConceptA" "ConceptB"   shortest path between two concepts
+  /graphify explain "<node>"        plain-language explanation of any node
+  /graphify <path> --mcp            start MCP server so other agents can query the graph live
+  /graphify <path> --neo4j          export Cypher for Neo4j import
+  /graphify <path> --graphml        export GraphML for Gephi/yEd
 
 Full path: PATH_TO_DIR/graphify-out/
 ```
@@ -722,6 +729,34 @@ print(f'Merged: {G_existing.number_of_nodes()} nodes, {G_existing.number_of_edge
 ```
 
 Then run Steps 4–8 on the merged graph as normal.
+
+After Step 8, if `graphify-out/wiki/` already exists, regenerate the wiki automatically:
+
+```bash
+python3 -c "
+import json
+from graphify.build import build_from_json
+from graphify.analyze import god_nodes
+from graphify.wiki import to_wiki
+from pathlib import Path
+
+if not Path('graphify-out/wiki').exists():
+    raise SystemExit(0)  # wiki was never built, skip
+
+extraction = json.loads(Path('.graphify_extract.json').read_text())
+analysis   = json.loads(Path('.graphify_analysis.json').read_text())
+labels_raw = json.loads(Path('.graphify_labels.json').read_text()) if Path('.graphify_labels.json').exists() else {}
+
+G = build_from_json(extraction)
+communities = {int(k): v for k, v in analysis['communities'].items()}
+cohesion    = {int(k): v for k, v in analysis['cohesion'].items()}
+labels      = {int(k): v for k, v in labels_raw.items()}
+gods        = god_nodes(G, top_n=20)
+
+n = to_wiki(G, communities, 'graphify-out/wiki', community_labels=labels or None, cohesion=cohesion, god_nodes_data=gods)
+print(f'Wiki updated: {n} articles in graphify-out/wiki/')
+"
+```
 
 After Step 4, show the graph diff:
 
@@ -1154,7 +1189,11 @@ For the personal inspo use case: leave this running in a terminal. Drop tweets, 
 
 Do NOT use Glob, Grep, Read, Bash, or the Explore agent to answer questions about the corpus content. The graph already has the information. Re-exploring the directory defeats the entire purpose of graphify and wastes time.
 
-Instead, load and query `graphify-out/graph.json` directly:
+**If `graphify-out/wiki/index.md` exists, use the wiki — it is more readable than raw JSON.**
+
+Start at `index.md`, read the relevant community article(s), then drill into god node articles as needed. This is faster and more accurate than parsing graph.json because the articles are already structured for agent consumption.
+
+If the wiki does not exist, load and query `graphify-out/graph.json` directly:
 
 ```python
 import json
