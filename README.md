@@ -1,6 +1,6 @@
 # graphify
 
-[![CI](https://github.com/safishamsi/graphify/actions/workflows/ci.yml/badge.svg?branch=v1)](https://github.com/safishamsi/graphify/actions/workflows/ci.yml)
+[![CI](https://github.com/safishamsi/graphify/actions/workflows/ci.yml/badge.svg?branch=v2)](https://github.com/safishamsi/graphify/actions/workflows/ci.yml)
 
 **A Claude Code skill.** Type `/graphify` in Claude Code - it reads your files, builds a knowledge graph, and gives you back structure you didn't know was there. Understand a codebase faster. Find the "why" behind architectural decisions.
 
@@ -20,6 +20,12 @@ graphify-out/
 └── cache/           SHA256 cache - re-runs only process changed files
 ```
 
+## How it works
+
+graphify runs in two passes. First, a deterministic AST pass extracts structure from code files (classes, functions, imports, call graphs, docstrings, rationale comments) with no LLM needed. Second, Claude subagents run in parallel over docs, papers, and images to extract concepts, relationships, and design rationale. The results are merged into a NetworkX graph, clustered with Leiden community detection, and exported as interactive HTML, queryable JSON, and a plain-language audit report.
+
+Every relationship is tagged `EXTRACTED` (found directly in source), `INFERRED` (reasonable inference, with a confidence score), or `AMBIGUOUS` (flagged for review). You always know what was found vs guessed.
+
 ## Install
 
 **Requires:** [Claude Code](https://claude.ai/code) and Python 3.10+
@@ -36,12 +42,22 @@ Then open Claude Code in any directory and type:
 /graphify .
 ```
 
+### Make Claude always use the graph (recommended)
+
+After building a graph, run this once in your project:
+
+```bash
+graphify claude install
+```
+
+This writes a `CLAUDE.md` section and a `.claude/settings.json` PreToolUse hook. From that point on, Claude checks the knowledge graph before searching raw files - every Glob and Grep triggers a reminder to use the graph first. Uninstall with `graphify claude uninstall`.
+
 <details>
 <summary>Manual install (curl)</summary>
 
 ```bash
 mkdir -p ~/.claude/skills/graphify
-curl -fsSL https://raw.githubusercontent.com/safishamsi/graphify/v1/skills/graphify/skill.md \
+curl -fsSL https://raw.githubusercontent.com/safishamsi/graphify/v2/graphify/skill.md \
   > ~/.claude/skills/graphify/SKILL.md
 ```
 
@@ -78,14 +94,14 @@ When the user types `/graphify`, invoke the Skill tool with `skill: "graphify"` 
 /graphify ./raw --mcp              # start MCP stdio server
 
 graphify hook install              # git hooks - rebuilds graph on commit and branch switch
-graphify claude install            # write graphify rules to local CLAUDE.md + install PreToolUse hook
+graphify claude install            # always-on: CLAUDE.md + PreToolUse hook for this project
 ```
 
 Works with any mix of file types:
 
 | Type | Extensions | Extraction |
 |------|-----------|------------|
-| Code | `.py .ts .js .go .rs .java .c .cpp .rb .cs .kt .scala .php` | AST via tree-sitter + call-graph pass + docstring/comment rationale |
+| Code | `.py .ts .js .go .rs .java .c .cpp .rb .cs .kt .scala .php` | AST via tree-sitter + call-graph + docstring/comment rationale |
 | Docs | `.md .txt .rst` | Concepts + relationships + design rationale via Claude |
 | Papers | `.pdf` | Citation mining + concept extraction |
 | Images | `.png .jpg .webp .gif` | Claude vision - screenshots, diagrams, any language |
@@ -102,7 +118,7 @@ Works with any mix of file types:
 
 **Confidence scores** - every INFERRED edge has a `confidence_score` (0.0-1.0). You know not just what was guessed but how confident the model was. EXTRACTED edges are always 1.0.
 
-**Semantic similarity edges** - cross-file conceptual links that have no structural connection. Two functions solving the same problem without calling each other, a class in code and a concept in a paper describing the same algorithm.
+**Semantic similarity edges** - cross-file conceptual links with no structural connection. Two functions solving the same problem without calling each other, a class in code and a concept in a paper describing the same algorithm.
 
 **Hyperedges** - group relationships connecting 3+ nodes that pairwise edges can't express. All classes implementing a shared protocol, all functions in an auth flow, all concepts from a paper section forming one idea.
 
@@ -112,11 +128,7 @@ Works with any mix of file types:
 
 **Git hooks** (`graphify hook install`) - installs post-commit and post-checkout hooks. Graph rebuilds automatically after every commit and every branch switch. No background process needed.
 
-**Always-on for Claude** (`graphify claude install`) - writes a `CLAUDE.md` section so Claude checks the graph before answering architecture questions, plus a `.claude/settings.json` PreToolUse hook that fires before every Glob/Grep - Claude is reminded to check the graph before searching raw files.
-
 **Wiki** (`--wiki`) - Wikipedia-style markdown articles per community and god node, with an `index.md` entry point. Point any agent at `index.md` and it can navigate the knowledge base by reading files instead of parsing JSON.
-
-Every edge is tagged `EXTRACTED`, `INFERRED`, or `AMBIGUOUS` - you always know what was found vs guessed.
 
 ## Worked examples
 
