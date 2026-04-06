@@ -1,6 +1,23 @@
-"""Leiden community detection on NetworkX graphs. Splits oversized communities. Returns cohesion scores."""
+"""Community detection on NetworkX graphs. Uses Leiden (graspologic) if available, falls back to Louvain (networkx). Splits oversized communities. Returns cohesion scores."""
 from __future__ import annotations
 import networkx as nx
+
+
+def _partition(G: nx.Graph) -> dict[str, int]:
+    """Run community detection. Returns {node_id: community_id}.
+
+    Tries Leiden (graspologic) first — best quality.
+    Falls back to Louvain (built into networkx) if graspologic is not installed.
+    """
+    try:
+        from graspologic.partition import leiden
+        return leiden(G)
+    except ImportError:
+        pass
+
+    # Fallback: networkx louvain (available since networkx 2.7)
+    communities = nx.community.louvain_communities(G, seed=42)
+    return {node: cid for cid, nodes in enumerate(communities) for node in nodes}
 
 
 def build_graph(nodes: list[dict], edges: list[dict]) -> nx.Graph:
@@ -36,8 +53,6 @@ def cluster(G: nx.Graph) -> dict[int, list[str]]:
     if G.number_of_edges() == 0:
         return {i: [n] for i, n in enumerate(sorted(G.nodes))}
 
-    from graspologic.partition import leiden  # lazy - avoids 15s numba JIT on import
-
     # Leiden warns and drops isolates - handle them separately
     isolates = [n for n in G.nodes() if G.degree(n) == 0]
     connected_nodes = [n for n in G.nodes() if G.degree(n) > 0]
@@ -45,7 +60,7 @@ def cluster(G: nx.Graph) -> dict[int, list[str]]:
 
     raw: dict[int, list[str]] = {}
     if connected.number_of_nodes() > 0:
-        partition: dict[str, int] = leiden(connected)
+        partition = _partition(connected)
         for node, cid in partition.items():
             raw.setdefault(cid, []).append(node)
 
@@ -76,13 +91,11 @@ def _split_community(G: nx.Graph, nodes: list[str]) -> list[list[str]]:
         # No edges - split into individual nodes
         return [[n] for n in sorted(nodes)]
     try:
-        from graspologic.partition import leiden
-        sub_partition: dict[str, int] = leiden(subgraph)
+        sub_partition = _partition(subgraph)
         sub_communities: dict[int, list[str]] = {}
         for node, cid in sub_partition.items():
             sub_communities.setdefault(cid, []).append(node)
         if len(sub_communities) <= 1:
-            # Leiden couldn't split it - return as-is
             return [sorted(nodes)]
         return [sorted(v) for v in sub_communities.values()]
     except Exception:

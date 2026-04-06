@@ -12,7 +12,6 @@ keywords = ["claude", "claude-code", "knowledge-graph", "rag", "graphrag", "obsi
 requires-python = ">=3.10"
 dependencies = [
     "networkx",
-    "graspologic",
     "tree-sitter",
     "tree-sitter-python",
     "tree-sitter-javascript",
@@ -39,7 +38,8 @@ mcp = ["mcp"]
 neo4j = ["neo4j"]
 pdf = ["pypdf", "html2text"]
 watch = ["watchdog"]
-all = ["mcp", "neo4j", "pypdf", "html2text", "watchdog"]
+leiden = ["graspologic"]
+all = ["mcp", "neo4j", "pypdf", "html2text", "watchdog", "graspologic"]
 
 [project.scripts]
 graphify = "graphify.__main__:main"
