@@ -30,7 +30,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A profile with an invalid schema produces an actionable error message describing the failing field
   4. A profile-derived folder path containing `../` or pointing outside the vault directory is rejected before any file is written
   5. Re-running graphify against an existing vault no longer produces non-deterministic filenames, malformed YAML frontmatter, or wrong `graph.json` `tag:#` syntax
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Create profile.py module with profile loading, validation, deep merge, and safety helpers + tests
+- [ ] 01-02-PLAN.md — Patch export.py bugs using profile.py helpers, wire module into __init__.py, add obsidian optional dep
 
 ### Phase 2: Template Engine
 **Goal**: All six built-in note types render correctly from graph data using configurable templates, with proper frontmatter fields and wikilinks
@@ -86,7 +90,7 @@ Note: Phases 2 and 4 have no cross-module dependencies; they can be planned and 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 0/2 | Planning complete | - |
 | 2. Template Engine | 0/TBD | Not started | - |
 | 3. Mapping Engine | 0/TBD | Not started | - |
 | 4. Merge Engine | 0/TBD | Not started | - |
