@@ -10,6 +10,7 @@ import networkx as nx
 from networkx.readwrite import json_graph
 from graphify.security import sanitize_label
 from graphify.analyze import _node_community_map
+from graphify.profile import safe_filename, safe_frontmatter_value, safe_tag
 
 COMMUNITY_COLORS = [
     "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
@@ -459,13 +460,14 @@ def to_obsidian(
 
     # Map node_id → safe filename so wikilinks stay consistent.
     # Deduplicate: if two nodes produce the same filename, append a numeric suffix.
-    def safe_name(label: str) -> str:
-        return re.sub(r'[\\/*?:"<>|#^[\]]', "", label).strip() or "unnamed"
-
+    # FIX-02: Sort nodes for deterministic dedup across re-runs.
     node_filename: dict[str, str] = {}
     seen_names: dict[str, int] = {}
-    for node_id, data in G.nodes(data=True):
-        base = safe_name(data.get("label", node_id))
+    for node_id, data in sorted(
+        G.nodes(data=True),
+        key=lambda nd: (nd[1].get("source_file", ""), nd[1].get("label", nd[0]))
+    ):
+        base = safe_filename(data.get("label", node_id))
         if base in seen_names:
             seen_names[base] += 1
             node_filename[node_id] = f"{base}_{seen_names[base]}"
@@ -505,7 +507,7 @@ def to_obsidian(
         ftype_tag = _FTYPE_TAG.get(ftype, f"graphify/{ftype}" if ftype else "graphify/document")
         dom_conf = _dominant_confidence(node_id)
         conf_tag = f"graphify/{dom_conf}"
-        comm_tag = f"community/{community_name.replace(' ', '_')}"
+        comm_tag = f"community/{safe_tag(community_name)}"
         node_tags = [ftype_tag, conf_tag, comm_tag]
 
         lines: list[str] = []
@@ -513,12 +515,12 @@ def to_obsidian(
         # YAML frontmatter - readable in Obsidian's properties panel
         lines += [
             "---",
-            f'source_file: "{data.get("source_file", "")}"',
-            f'type: "{ftype}"',
-            f'community: "{community_name}"',
+            f'source_file: {safe_frontmatter_value(data.get("source_file", ""))}',
+            f'type: {safe_frontmatter_value(ftype)}',
+            f'community: {safe_frontmatter_value(community_name)}',
         ]
         if data.get("source_location"):
-            lines.append(f'location: "{data["source_location"]}"')
+            lines.append(f'location: {safe_frontmatter_value(data["source_location"])}')
         # Add tags list to frontmatter
         lines.append("tags:")
         for tag in node_tags:
@@ -636,7 +638,7 @@ def to_obsidian(
                     if community_labels and other_cid is not None
                     else f"Community {other_cid}"
                 )
-                other_safe = safe_name(other_name)
+                other_safe = safe_filename(other_name)
                 lines.append(f"- {edge_count} edge{'s' if edge_count != 1 else ''} to [[_COMMUNITY_{other_safe}]]")
             lines.append("")
 
@@ -657,24 +659,36 @@ def to_obsidian(
                     f"{'community' if reach == 1 else 'communities'}"
                 )
 
-        community_safe = safe_name(community_name)
+        community_safe = safe_filename(community_name)
         fname = f"_COMMUNITY_{community_safe}.md"
         (out / fname).write_text("\n".join(lines), encoding="utf-8")
         community_notes_written += 1
 
-    # Improvement 4: write .obsidian/graph.json to color nodes by community in graph view
+    # Write .obsidian/graph.json — read-merge-write to preserve user settings (OBS-02)
     obsidian_dir = out / ".obsidian"
     obsidian_dir.mkdir(exist_ok=True)
-    graph_config = {
-        "colorGroups": [
-            {
-                "query": f"tag:#community/{label.replace(' ', '_')}",
-                "color": {"a": 1, "rgb": int(COMMUNITY_COLORS[cid % len(COMMUNITY_COLORS)].lstrip('#'), 16)}
-            }
-            for cid, label in sorted((community_labels or {}).items())
-        ]
-    }
-    (obsidian_dir / "graph.json").write_text(json.dumps(graph_config, indent=2))
+    graph_json_path = obsidian_dir / "graph.json"
+    existing_config: dict = {}
+    if graph_json_path.exists():
+        try:
+            existing_config = json.loads(graph_json_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass  # corrupt or unreadable — overwrite cleanly
+
+    # Filter out graphify-owned community entries, keep user entries
+    user_color_groups = [
+        g for g in existing_config.get("colorGroups", [])
+        if not g.get("query", "").startswith("tag:community/")
+    ]
+    new_color_groups = [
+        {
+            "query": f"tag:community/{safe_tag(label)}",  # OBS-01: correct syntax
+            "color": {"a": 1, "rgb": int(COMMUNITY_COLORS[cid % len(COMMUNITY_COLORS)].lstrip('#'), 16)},
+        }
+        for cid, label in sorted((community_labels or {}).items())
+    ]
+    existing_config["colorGroups"] = user_color_groups + new_color_groups
+    graph_json_path.write_text(json.dumps(existing_config, indent=2), encoding="utf-8")
 
     return G.number_of_nodes() + community_notes_written
 
@@ -695,15 +709,16 @@ def to_canvas(
     # Obsidian canvas color codes (cycle through for communities)
     CANVAS_COLORS = ["1", "2", "3", "4", "5", "6"]  # red, orange, yellow, green, cyan, purple
 
-    def safe_name(label: str) -> str:
-        return re.sub(r'[\\/*?:"<>|#^[\]]', "", label).strip() or "unnamed"
-
     # Build node_filenames if not provided (same dedup logic as to_obsidian)
+    # FIX-02: Sort nodes for deterministic dedup across re-runs.
     if node_filenames is None:
         node_filenames = {}
         seen_names: dict[str, int] = {}
-        for node_id, data in G.nodes(data=True):
-            base = safe_name(data.get("label", node_id))
+        for node_id, data in sorted(
+            G.nodes(data=True),
+            key=lambda nd: (nd[1].get("source_file", ""), nd[1].get("label", nd[0]))
+        ):
+            base = safe_filename(data.get("label", node_id))
             if base in seen_names:
                 seen_names[base] += 1
                 node_filenames[node_id] = f"{base}_{seen_names[base]}"
@@ -802,11 +817,11 @@ def to_canvas(
             row = m_idx // 3
             nx_x = gx + 20 + col * (180 + 20)
             nx_y = gy + 80 + row * (60 + 20)
-            fname = node_filenames.get(node_id, safe_name(G.nodes[node_id].get("label", node_id)))
+            fname = node_filenames.get(node_id, safe_filename(G.nodes[node_id].get("label", node_id)))
             canvas_nodes.append({
                 "id": f"n_{node_id}",
                 "type": "file",
-                "file": f"graphify/obsidian/{fname}.md",
+                "file": f"{fname}.md",
                 "x": nx_x,
                 "y": nx_y,
                 "width": 180,
