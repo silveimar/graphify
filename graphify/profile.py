@@ -1,0 +1,230 @@
+"""Profile loading, validation, deep merge, and safety helpers for Obsidian export."""
+from __future__ import annotations
+
+import hashlib
+import re
+import sys
+import unicodedata
+from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Default profile — Ideaverse ACE folder structure (D-15)
+# ---------------------------------------------------------------------------
+
+_DEFAULT_PROFILE: dict = {
+    "folder_mapping": {
+        "moc": "Atlas/Maps/",
+        "thing": "Atlas/Dots/Things/",
+        "statement": "Atlas/Dots/Statements/",
+        "person": "Atlas/Dots/People/",
+        "source": "Atlas/Sources/",
+        "default": "Atlas/Dots/",
+    },
+    "naming": {"convention": "title_case"},
+    "merge": {
+        "strategy": "update",
+        "preserve_fields": ["rank", "mapState", "tags"],
+    },
+    "mapping_rules": [],
+    "obsidian": {},
+}
+
+_VALID_TOP_LEVEL_KEYS = {"folder_mapping", "naming", "merge", "mapping_rules", "obsidian"}
+
+_VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
+
+_VALID_MERGE_STRATEGIES = {"update", "skip", "replace"}
+
+_YAML_SPECIAL = set(':#[]{}')
+
+
+# ---------------------------------------------------------------------------
+# Deep merge (D-02)
+# ---------------------------------------------------------------------------
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge *override* into a copy of *base*. Override wins at leaf level."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Profile loading (PROF-01, PROF-02, D-04)
+# ---------------------------------------------------------------------------
+
+def load_profile(vault_dir: str | Path) -> dict:
+    """Discover and load a vault profile, merging over built-in defaults.
+
+    Returns the merged profile dict. Falls back to defaults when no
+    profile.yaml exists or when PyYAML is not installed.
+    """
+    profile_path = Path(vault_dir) / ".graphify" / "profile.yaml"
+    if not profile_path.exists():
+        return _deep_merge(_DEFAULT_PROFILE, {})
+
+    try:
+        import yaml  # type: ignore[import-untyped]
+    except ImportError:
+        print(
+            "[graphify] PyYAML not installed — cannot read profile.yaml. "
+            "Install with: pip install graphifyy[obsidian]",
+            file=sys.stderr,
+        )
+        return _deep_merge(_DEFAULT_PROFILE, {})
+
+    # Guard against empty YAML returning None (Pitfall 1)
+    user_data = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
+
+    errors = validate_profile(user_data)
+    if errors:
+        for err in errors:
+            print(f"[graphify] profile error: {err}", file=sys.stderr)
+        return _deep_merge(_DEFAULT_PROFILE, {})
+
+    return _deep_merge(_DEFAULT_PROFILE, user_data)
+
+
+# ---------------------------------------------------------------------------
+# Profile validation (PROF-04, D-03)
+# ---------------------------------------------------------------------------
+
+def validate_profile(profile: dict) -> list[str]:
+    """Validate a profile dict. Returns a list of error strings — empty means valid."""
+    if not isinstance(profile, dict):
+        return ["Profile must be a YAML mapping (dict)"]
+
+    errors: list[str] = []
+
+    # Unknown top-level keys
+    for key in profile:
+        if key not in _VALID_TOP_LEVEL_KEYS:
+            errors.append(f"Unknown profile key '{key}' — valid keys are: {sorted(_VALID_TOP_LEVEL_KEYS)}")
+
+    # naming section
+    naming = profile.get("naming")
+    if naming is not None:
+        if not isinstance(naming, dict):
+            errors.append("'naming' must be a mapping (dict)")
+        else:
+            convention = naming.get("convention")
+            if convention is not None and convention not in _VALID_NAMING_CONVENTIONS:
+                errors.append(
+                    f"Invalid naming convention '{convention}' — "
+                    f"valid values are: {sorted(_VALID_NAMING_CONVENTIONS)}"
+                )
+
+    # merge section
+    merge = profile.get("merge")
+    if merge is not None:
+        if not isinstance(merge, dict):
+            errors.append("'merge' must be a mapping (dict)")
+        else:
+            strategy = merge.get("strategy")
+            if strategy is not None and strategy not in _VALID_MERGE_STRATEGIES:
+                errors.append(
+                    f"Invalid merge strategy '{strategy}' — "
+                    f"valid values are: {sorted(_VALID_MERGE_STRATEGIES)}"
+                )
+            preserve = merge.get("preserve_fields")
+            if preserve is not None and not isinstance(preserve, list):
+                errors.append("'merge.preserve_fields' must be a list")
+
+    # folder_mapping section
+    folder_mapping = profile.get("folder_mapping")
+    if folder_mapping is not None:
+        if not isinstance(folder_mapping, dict):
+            errors.append("'folder_mapping' must be a mapping (dict)")
+        else:
+            for name, path_val in folder_mapping.items():
+                if not isinstance(path_val, str):
+                    errors.append(f"folder_mapping.{name} must be a string, got {type(path_val).__name__}")
+                elif ".." in path_val:
+                    errors.append(
+                        f"folder_mapping.{name} contains '..' — "
+                        "path traversal sequences are not allowed in folder mappings"
+                    )
+
+    # mapping_rules section
+    mapping_rules = profile.get("mapping_rules")
+    if mapping_rules is not None and not isinstance(mapping_rules, list):
+        errors.append("'mapping_rules' must be a list")
+
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Vault path validation (MRG-04)
+# ---------------------------------------------------------------------------
+
+def validate_vault_path(candidate: str | Path, vault_dir: str | Path) -> Path:
+    """Resolve *candidate* relative to *vault_dir* and verify it stays inside.
+
+    Raises ValueError if the resolved path escapes the vault directory.
+    """
+    vault_base = Path(vault_dir).resolve()
+    resolved = (vault_base / candidate).resolve()
+    try:
+        resolved.relative_to(vault_base)
+    except ValueError:
+        raise ValueError(
+            f"Profile-derived path {candidate!r} would escape vault directory {vault_base}. "
+            "Check folder_mapping values for path traversal sequences."
+        )
+    return resolved
+
+
+# ---------------------------------------------------------------------------
+# Safety helpers
+# ---------------------------------------------------------------------------
+
+def safe_frontmatter_value(value: str) -> str:
+    """Sanitize a value for use in YAML frontmatter.
+
+    Wraps in double quotes if value contains YAML-special characters.
+    Replaces newlines with spaces to prevent multi-line injection (Pitfall 3).
+    """
+    # Strip newlines/carriage returns
+    value = value.replace("\n", " ").replace("\r", " ")
+
+    # If any YAML-special char present, quote-wrap
+    if any(ch in _YAML_SPECIAL for ch in value):
+        # Escape internal double quotes
+        value = value.replace('"', '\\"')
+        return f'"{value}"'
+
+    return value
+
+
+def safe_tag(name: str) -> str:
+    """Slugify a community name into a valid Obsidian tag component.
+
+    Produces lowercase, hyphen-separated strings. Leading digits get
+    an 'x' prefix. Empty input returns 'community'.
+    """
+    slug = name.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    slug = slug.strip("-")
+    if slug and slug[0].isdigit():
+        slug = "x" + slug
+    return slug or "community"
+
+
+def safe_filename(label: str, max_len: int = 200) -> str:
+    """Sanitize a label for use as a filename.
+
+    Applies NFC Unicode normalization (FIX-04), strips OS-illegal characters,
+    and caps length with a hash suffix to avoid collisions (FIX-05, D-06).
+    """
+    name = unicodedata.normalize("NFC", label)
+    # Strip OS-illegal and Obsidian-problematic characters
+    name = re.sub(r'[\\/*?:"<>|#^[\]]', "", name).strip() or "unnamed"
+    if len(name) > max_len:
+        suffix = hashlib.sha256(name.encode()).hexdigest()[:8]
+        name = name[:max_len - 9] + "_" + suffix
+    return name
