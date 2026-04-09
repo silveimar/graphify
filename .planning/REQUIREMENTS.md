@@ -47,13 +47,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Obsidian Config
 
-- [ ] **OBS-01**: `.obsidian/graph.json` community color groups use correct `tag:community/Name` syntax (fix existing `tag:#` bug)
-- [ ] **OBS-02**: `graph.json` generation uses read-merge-write strategy to preserve user's existing color groups and settings
+- [x] **OBS-01**: `.obsidian/graph.json` community color groups use correct `tag:community/Name` syntax (fix existing `tag:#` bug)
+- [x] **OBS-02**: `graph.json` generation uses read-merge-write strategy to preserve user's existing color groups and settings
 
 ### Pre-existing Bug Fixes
 
 - [x] **FIX-01**: Fix YAML frontmatter injection via node labels containing special characters (`:`, `#`, `[`, `]`)
-- [ ] **FIX-02**: Fix non-deterministic filename deduplication (sort nodes by `(source_file, label)` before assignment)
+- [x] **FIX-02**: Fix non-deterministic filename deduplication (sort nodes by `(source_file, label)` before assignment)
 - [x] **FIX-03**: Fix shallow tag sanitization (handle `/`, `+`, digits-at-start in community names)
 - [x] **FIX-04**: Add NFC Unicode normalization to filenames to prevent cross-platform duplicates
 - [x] **FIX-05**: Cap filename length at 200 characters to prevent OS path limit issues
@@ -116,10 +116,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | MRG-05 | Phase 5 | Pending |
 | MRG-06 | Phase 4 | Pending |
 | MRG-07 | Phase 4 | Pending |
-| OBS-01 | Phase 1 | Pending |
-| OBS-02 | Phase 1 | Pending |
+| OBS-01 | Phase 1 | Complete |
+| OBS-02 | Phase 1 | Complete |
 | FIX-01 | Phase 1 | Complete |
-| FIX-02 | Phase 1 | Pending |
+| FIX-02 | Phase 1 | Complete |
 | FIX-03 | Phase 1 | Complete |
 | FIX-04 | Phase 1 | Complete |
 | FIX-05 | Phase 1 | Complete |

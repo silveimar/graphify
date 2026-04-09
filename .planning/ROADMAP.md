@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Create profile.py module with profile loading, validation, deep merge, and safety helpers + tests
-- [ ] 01-02-PLAN.md — Patch export.py bugs using profile.py helpers, wire module into __init__.py, add obsidian optional dep
+- [x] 01-02-PLAN.md — Patch export.py bugs using profile.py helpers, wire module into __init__.py, add obsidian optional dep
 
 ### Phase 2: Template Engine
 **Goal**: All six built-in note types render correctly from graph data using configurable templates, with proper frontmatter fields and wikilinks
