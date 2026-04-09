@@ -9,12 +9,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Profile System
 
-- [ ] **PROF-01**: User can place a `.graphify/profile.yaml` in their vault and graphify discovers it automatically
-- [ ] **PROF-02**: When no vault profile exists, graphify uses a built-in default profile producing Ideaverse ACE-compatible output
-- [ ] **PROF-03**: Vault profile merges over defaults (partial overrides work — user only specifies what differs)
-- [ ] **PROF-04**: Profile schema validation produces actionable error messages on invalid configuration
+- [x] **PROF-01**: User can place a `.graphify/profile.yaml` in their vault and graphify discovers it automatically
+- [x] **PROF-02**: When no vault profile exists, graphify uses a built-in default profile producing Ideaverse ACE-compatible output
+- [x] **PROF-03**: Vault profile merges over defaults (partial overrides work — user only specifies what differs)
+- [x] **PROF-04**: Profile schema validation produces actionable error messages on invalid configuration
 - [ ] **PROF-05**: User can run `graphify --validate-profile <vault-path>` to check profile validity without generating output
-- [ ] **PROF-06**: Profile YAML schema supports: folder_mapping, mapping_rules, merge behavior, naming conventions, obsidian config sections
+- [x] **PROF-06**: Profile YAML schema supports: folder_mapping, mapping_rules, merge behavior, naming conventions, obsidian config sections
 
 ### Note Generation
 
@@ -40,7 +40,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **MRG-01**: Re-running graphify on a vault with existing notes updates graphify-owned fields while preserving user-edited fields
 - [ ] **MRG-02**: `preserve_fields` list in profile specifies frontmatter fields that graphify never overwrites (default: `rank`, `mapState`, `tags`)
 - [ ] **MRG-03**: User can run `graphify --obsidian --dry-run` to preview all changes without writing any files
-- [ ] **MRG-04**: All profile-derived file paths are validated against path-traversal attacks (no writing outside vault directory)
+- [x] **MRG-04**: All profile-derived file paths are validated against path-traversal attacks (no writing outside vault directory)
 - [ ] **MRG-05**: When no vault profile exists, output is backward-compatible with current `to_obsidian()` behavior
 - [ ] **MRG-06**: Frontmatter field ordering is preserved on update to minimize git diff noise
 - [ ] **MRG-07**: User can configure merge strategy per profile: `update` (default), `skip` (don't touch existing), or `replace` (overwrite entirely)
@@ -52,11 +52,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Pre-existing Bug Fixes
 
-- [ ] **FIX-01**: Fix YAML frontmatter injection via node labels containing special characters (`:`, `#`, `[`, `]`)
+- [x] **FIX-01**: Fix YAML frontmatter injection via node labels containing special characters (`:`, `#`, `[`, `]`)
 - [ ] **FIX-02**: Fix non-deterministic filename deduplication (sort nodes by `(source_file, label)` before assignment)
-- [ ] **FIX-03**: Fix shallow tag sanitization (handle `/`, `+`, digits-at-start in community names)
-- [ ] **FIX-04**: Add NFC Unicode normalization to filenames to prevent cross-platform duplicates
-- [ ] **FIX-05**: Cap filename length at 200 characters to prevent OS path limit issues
+- [x] **FIX-03**: Fix shallow tag sanitization (handle `/`, `+`, digits-at-start in community names)
+- [x] **FIX-04**: Add NFC Unicode normalization to filenames to prevent cross-platform duplicates
+- [x] **FIX-05**: Cap filename length at 200 characters to prevent OS path limit issues
 
 ## v2 Requirements
 
@@ -90,12 +90,12 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROF-01 | Phase 1 | Pending |
-| PROF-02 | Phase 1 | Pending |
-| PROF-03 | Phase 1 | Pending |
-| PROF-04 | Phase 1 | Pending |
+| PROF-01 | Phase 1 | Complete |
+| PROF-02 | Phase 1 | Complete |
+| PROF-03 | Phase 1 | Complete |
+| PROF-04 | Phase 1 | Complete |
 | PROF-05 | Phase 5 | Pending |
-| PROF-06 | Phase 1 | Pending |
+| PROF-06 | Phase 1 | Complete |
 | GEN-01 | Phase 2 | Pending |
 | GEN-02 | Phase 2 | Pending |
 | GEN-03 | Phase 2 | Pending |
@@ -112,17 +112,17 @@ Deferred to future release. Tracked but not in current roadmap.
 | MRG-01 | Phase 4 | Pending |
 | MRG-02 | Phase 4 | Pending |
 | MRG-03 | Phase 5 | Pending |
-| MRG-04 | Phase 1 | Pending |
+| MRG-04 | Phase 1 | Complete |
 | MRG-05 | Phase 5 | Pending |
 | MRG-06 | Phase 4 | Pending |
 | MRG-07 | Phase 4 | Pending |
 | OBS-01 | Phase 1 | Pending |
 | OBS-02 | Phase 1 | Pending |
-| FIX-01 | Phase 1 | Pending |
+| FIX-01 | Phase 1 | Complete |
 | FIX-02 | Phase 1 | Pending |
-| FIX-03 | Phase 1 | Pending |
-| FIX-04 | Phase 1 | Pending |
-| FIX-05 | Phase 1 | Pending |
+| FIX-03 | Phase 1 | Complete |
+| FIX-04 | Phase 1 | Complete |
+| FIX-05 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 33 total
