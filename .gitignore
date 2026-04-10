@@ -22,3 +22,7 @@ docs/superpowers/
 .vscode/
 openspec/
 uv.lock
+
+input_docs/
+
+.DS_Store
