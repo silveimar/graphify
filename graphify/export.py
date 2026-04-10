@@ -285,7 +285,10 @@ def attach_hyperedges(G: nx.Graph, hyperedges: list) -> None:
 
 def to_json(G: nx.Graph, communities: dict[int, list[str]], output_path: str) -> None:
     node_community = _node_community_map(communities)
-    data = json_graph.node_link_data(G, edges="links")
+    try:
+        data = json_graph.node_link_data(G, edges="links")
+    except TypeError:
+        data = json_graph.node_link_data(G)
     for node in data["nodes"]:
         node["community"] = node_community.get(node["id"])
     for link in data["links"]:
@@ -460,7 +463,9 @@ def to_obsidian(
 
     # Map node_id → safe filename so wikilinks stay consistent.
     # Deduplicate: if two nodes produce the same filename, append a numeric suffix.
-    # FIX-02: Sort nodes for deterministic dedup across re-runs.
+    def safe_name(label: str) -> str:
+        return re.sub(r'[\\/*?:"<>|#^[\]]', "", label.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")).strip() or "unnamed"
+
     node_filename: dict[str, str] = {}
     seen_names: dict[str, int] = {}
     for node_id, data in sorted(
@@ -708,6 +713,9 @@ def to_canvas(
     """
     # Obsidian canvas color codes (cycle through for communities)
     CANVAS_COLORS = ["1", "2", "3", "4", "5", "6"]  # red, orange, yellow, green, cyan, purple
+
+    def safe_name(label: str) -> str:
+        return re.sub(r'[\\/*?:"<>|#^[\]]', "", label.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")).strip() or "unnamed"
 
     # Build node_filenames if not provided (same dedup logic as to_obsidian)
     # FIX-02: Sort nodes for deterministic dedup across re-runs.

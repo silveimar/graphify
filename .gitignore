@@ -23,6 +23,5 @@ docs/superpowers/
 openspec/
 uv.lock
 
-input_docs/
-
 .DS_Store
+input_docs/
