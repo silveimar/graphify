@@ -619,7 +619,7 @@ def to_obsidian(
         lines.append("")
 
         # Dataview live query (improvement 2)
-        comm_tag_name = community_name.replace(" ", "_")
+        comm_tag_name = safe_tag(community_name)
         lines.append("## Live Query (requires Dataview plugin)")
         lines.append("")
         lines.append("```dataview")
