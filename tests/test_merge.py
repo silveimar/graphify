@@ -227,6 +227,44 @@ class TestParseSentinelBlocks:
         assert "wayfinder" in result
         assert "connections" not in result
 
+    def test_merge_body_blocks_handles_marker_inner_whitespace(self):
+        """WR-01 regression: parser accepts `<!--   graphify:foo:start   -->`
+        (extra inner whitespace) via re.search; `_merge_body_blocks` must
+        rewrite the block successfully even when the marker line's spelling
+        differs from the canonical literal. Previously a literal .replace()
+        would silently no-op while reporting the block as changed.
+        """
+        from graphify.merge import _merge_body_blocks, _parse_sentinel_blocks
+        body = (
+            "<!--  graphify:wayfinder:start  -->\n"
+            "OLD WAYFINDER\n"
+            "<!-- graphify:wayfinder:end   -->\n"
+        )
+        existing_blocks = _parse_sentinel_blocks(body)
+        assert existing_blocks == {"wayfinder": "OLD WAYFINDER"}
+        new_blocks = {"wayfinder": "NEW WAYFINDER"}
+        result, changed = _merge_body_blocks(body, existing_blocks, new_blocks)
+        assert "NEW WAYFINDER" in result
+        assert "OLD WAYFINDER" not in result
+        assert changed == ["wayfinder"]
+        # Canonical spellings of the marker lines must survive user formatting.
+        assert "<!--  graphify:wayfinder:start  -->" in result
+        assert "<!-- graphify:wayfinder:end   -->" in result
+
+    def test_merge_body_blocks_reports_nothing_when_content_identical(self):
+        """Sanity check the fast-path: identical blocks are not listed in changed."""
+        from graphify.merge import _merge_body_blocks, _parse_sentinel_blocks
+        body = (
+            "<!-- graphify:wayfinder:start -->\n"
+            "SAME\n"
+            "<!-- graphify:wayfinder:end -->\n"
+        )
+        existing_blocks = _parse_sentinel_blocks(body)
+        new_blocks = {"wayfinder": "SAME"}
+        result, changed = _merge_body_blocks(body, existing_blocks, new_blocks)
+        assert changed == []
+        assert result == body
+
 
 # ---------------------------------------------------------------------------
 # Task 3 — Policy dispatcher tests (RED tests)

@@ -557,6 +557,38 @@ def _merge_frontmatter(
 # Body block merge helper (D-68)
 # ---------------------------------------------------------------------------
 
+def _locate_sentinel_block_ranges(body: str) -> dict[str, tuple[int, int]]:
+    """Return {block_name: (start_line_idx, end_line_idx)} for each paired block.
+
+    Line indices are the positions of the start and end marker lines in
+    `body.split("\n")`. Used by `_merge_body_blocks` to splice refreshed
+    content by line range, avoiding the regex-vs-literal asymmetry that
+    plagues string-replace-based body rewrites (WR-01).
+
+    Assumes `body` has already been validated by `_parse_sentinel_blocks`;
+    callers must guard against `_MalformedSentinel` before calling this.
+    """
+    lines = body.split("\n")
+    ranges: dict[str, tuple[int, int]] = {}
+    open_name: str | None = None
+    open_idx: int = -1
+    for idx, line in enumerate(lines):
+        start_match = _SENTINEL_START_RE.search(line)
+        end_match = _SENTINEL_END_RE.search(line)
+        if start_match and end_match and start_match.group(1) == end_match.group(1):
+            ranges[start_match.group(1)] = (idx, idx)
+            continue
+        if start_match:
+            open_name = start_match.group(1)
+            open_idx = idx
+            continue
+        if end_match and open_name == end_match.group(1):
+            ranges[open_name] = (open_idx, idx)
+            open_name = None
+            open_idx = -1
+    return ranges
+
+
 def _merge_body_blocks(
     existing_body: str,
     existing_blocks: dict[str, str],
@@ -568,21 +600,62 @@ def _merge_body_blocks(
     with its counterpart from new_blocks. Blocks in new_blocks not present
     in existing_blocks are D-68 "deleted, respected" and NOT re-inserted.
     Blocks in existing_blocks not in new_blocks are left unchanged.
+
+    Splicing is done by line index (from `_locate_sentinel_block_ranges`),
+    NOT by literal-string `.replace()`. This guarantees symmetry with the
+    regex-based `_parse_sentinel_blocks` parser: any marker line accepted by
+    the parser will be correctly rewritten here, regardless of surrounding
+    whitespace variations the regex tolerates (WR-01).
     """
     changed: list[str] = []
-    result = existing_body
+    if not existing_blocks:
+        return existing_body, changed
+
+    # Build list of (name, start_idx, end_idx) for blocks that need refresh,
+    # sorted by start_idx so the splice indices stay stable as we rebuild.
+    ranges = _locate_sentinel_block_ranges(existing_body)
+    to_refresh: list[tuple[str, int, int]] = []
     for name, existing_content in existing_blocks.items():
         if name not in new_blocks:
             continue
         if new_blocks[name] == existing_content:
             continue
-        start = f"<!-- graphify:{name}:start -->"
-        end = f"<!-- graphify:{name}:end -->"
-        old = f"{start}\n{existing_content}\n{end}"
-        replacement = f"{start}\n{new_blocks[name]}\n{end}"
-        result = result.replace(old, replacement, 1)
+        if name not in ranges:
+            # Parser accepted it but locator couldn't find a line range —
+            # shouldn't happen in practice, but fail loud rather than silently
+            # reporting a fake refresh.
+            raise _MalformedSentinel(
+                f"block {name!r} parsed but has no locatable line range"
+            )
+        start_idx, end_idx = ranges[name]
+        to_refresh.append((name, start_idx, end_idx))
+
+    if not to_refresh:
+        return existing_body, changed
+
+    # Sort by start_idx ascending, then rebuild line-by-line so that earlier
+    # splices don't invalidate later indices.
+    to_refresh.sort(key=lambda x: x[1])
+    lines = existing_body.split("\n")
+    out_lines: list[str] = []
+    cursor = 0
+    for name, start_idx, end_idx in to_refresh:
+        # Copy unchanged lines up to (but not including) the start marker line.
+        out_lines.extend(lines[cursor:start_idx])
+        # Preserve the original start-marker line verbatim (user formatting survives).
+        out_lines.append(lines[start_idx])
+        # Insert the refreshed content.
+        new_content = new_blocks[name]
+        if new_content:
+            out_lines.extend(new_content.split("\n"))
+        # Preserve the original end-marker line verbatim (or, for single-line
+        # blocks where start_idx == end_idx, skip — the single line acts as both).
+        if end_idx != start_idx:
+            out_lines.append(lines[end_idx])
+        cursor = end_idx + 1
         changed.append(name)
-    return result, changed
+    out_lines.extend(lines[cursor:])
+    return "\n".join(out_lines), changed
 
 
 # ---------------------------------------------------------------------------
