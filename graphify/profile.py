@@ -1,6 +1,7 @@
 """Profile loading, validation, deep merge, and safety helpers for Obsidian export."""
 from __future__ import annotations
 
+import datetime
 import hashlib
 import re
 import sys
@@ -27,7 +28,12 @@ _DEFAULT_PROFILE: dict = {
         "preserve_fields": ["rank", "mapState", "tags"],
     },
     "mapping_rules": [],
-    "obsidian": {},
+    "obsidian": {
+        "atlas_root": "Atlas",
+        "dataview": {
+            "moc_query": "TABLE file.folder as Folder, type, source_file\nFROM #community/${community_tag}\nSORT file.name ASC",
+        },
+    },
 }
 
 _VALID_TOP_LEVEL_KEYS = {"folder_mapping", "naming", "merge", "mapping_rules", "obsidian"}
@@ -228,3 +234,41 @@ def safe_filename(label: str, max_len: int = 200) -> str:
         suffix = hashlib.sha256(name.encode()).hexdigest()[:8]
         name = name[:max_len - 9] + "_" + suffix
     return name
+
+
+def _dump_frontmatter(fields: dict) -> str:
+    """Emit a YAML frontmatter block including --- delimiters.
+
+    Rules:
+      - Preserves dict insertion order
+      - None values are skipped (not emitted)
+      - list → YAML block list (`key:\\n  - item`) with every item passed
+        through safe_frontmatter_value(str(item))
+      - bool → `true` / `false` (lowercase); checked before int because
+        bool is a subclass of int in Python
+      - int → unquoted integer literal
+      - float → `f"{v:.2f}"` unquoted
+      - datetime.date → `v.isoformat()` unquoted (YYYY-MM-DD)
+      - str / other → `safe_frontmatter_value(str(value))`
+    """
+    lines: list[str] = ["---"]
+    for key, value in fields.items():
+        if value is None:
+            continue
+        if isinstance(value, list):
+            lines.append(f"{key}:")
+            for item in value:
+                lines.append(f"  - {safe_frontmatter_value(str(item))}")
+        elif isinstance(value, bool):
+            # bool before int: isinstance(True, int) is True in Python
+            lines.append(f"{key}: {'true' if value else 'false'}")
+        elif isinstance(value, int):
+            lines.append(f"{key}: {value}")
+        elif isinstance(value, float):
+            lines.append(f"{key}: {value:.2f}")
+        elif isinstance(value, datetime.date):
+            lines.append(f"{key}: {value.isoformat()}")
+        else:
+            lines.append(f"{key}: {safe_frontmatter_value(str(value))}")
+    lines.append("---")
+    return "\n".join(lines)
