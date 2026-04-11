@@ -25,7 +25,12 @@ _DEFAULT_PROFILE: dict = {
     "naming": {"convention": "title_case"},
     "merge": {
         "strategy": "update",
-        "preserve_fields": ["rank", "mapState", "tags"],
+        # D-27 + D-65: `created` must survive re-runs — set ONCE at first
+        # CREATE by Phase 2, never rewritten by Phase 4 merge UPDATE path.
+        "preserve_fields": ["rank", "mapState", "tags", "created"],
+        # D-65: user overrides merge-module's built-in _DEFAULT_FIELD_POLICIES
+        # table. Empty default means Plan 03's table wins unchanged.
+        "field_policies": {},
     },
     "mapping_rules": [],
     "obsidian": {
@@ -47,6 +52,12 @@ _VALID_TOP_LEVEL_KEYS = {
 _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
 
 _VALID_MERGE_STRATEGIES = {"update", "skip", "replace"}
+
+# Phase 4 D-64: per-key merge policy modes. `replace` overwrites scalar on
+# every UPDATE, `union` deduplicates list contributions from both sides,
+# `preserve` never touches the key. Unknown keys at dispatch time default to
+# `preserve` (conservative) — Plan 03's policy dispatcher enforces that.
+_VALID_FIELD_POLICY_MODES: frozenset[str] = frozenset({"replace", "union", "preserve"})
 
 # Characters that require quoting when present anywhere in a YAML scalar.
 # Covers flow-context indicators and structural chars (WR-01).
