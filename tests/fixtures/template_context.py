@@ -95,3 +95,110 @@ def make_min_graph() -> nx.Graph:
         confidence_score=0.85,
     )
     return G
+
+
+def make_classification_fixture() -> tuple[nx.Graph, dict[int, list[str]]]:
+    """Multi-community fixture for Phase 3 classify() tests.
+
+    Returns (G, communities) where:
+      - cid 0 = 4 real + 1 file-hub + 1 concept (above-threshold)
+      - cid 1 = 2 real (below-threshold, hosts attribute-rule tests)
+      - cid 2 = 1 isolate (size-1 below-threshold, no neighbors)
+
+    Degrees are engineered so n_transformer is the unique top god node
+    in cid 0 and n_auth is the unique top god node in cid 1.
+    """
+    G = nx.Graph()
+    # --- Community 0: above-threshold, 4 real + 2 synthetic ---
+    G.add_node(
+        "n_transformer",
+        label="Transformer",
+        file_type="code",
+        source_file="src/model.py",
+        source_location="L42",
+    )
+    G.add_node(
+        "n_attention",
+        label="Attention",
+        file_type="code",
+        source_file="src/model.py",
+        source_location="L101",
+    )
+    G.add_node(
+        "n_layernorm",
+        label="LayerNorm",
+        file_type="code",
+        source_file="src/model.py",
+        source_location="L150",
+    )
+    G.add_node(
+        "n_softmax",
+        label="Softmax",
+        file_type="code",
+        source_file="src/model.py",
+        source_location="L200",
+    )
+    # File hub: label == basename(source_file) → _is_file_node True
+    G.add_node(
+        "n_file_model",
+        label="model.py",
+        file_type="code",
+        source_file="src/model.py",
+    )
+    # Concept: empty source_file → _is_concept_node True
+    G.add_node(
+        "n_concept_attn",
+        label="AttentionConcept",
+        file_type="code",
+        source_file="",
+    )
+    # --- Community 1: below-threshold (size 2), person attribute ---
+    G.add_node(
+        "n_auth",
+        label="AuthService",
+        file_type="person",
+        source_file="src/auth.py",
+        source_location="L10",
+    )
+    G.add_node(
+        "n_token",
+        label="TokenValidator",
+        file_type="code",
+        source_file="src/auth.py",
+        source_location="L88",
+    )
+    # --- Community 2: size-1 isolate ---
+    G.add_node(
+        "n_isolate",
+        label="Orphan",
+        file_type="code",
+        source_file="src/orphan.py",
+    )
+
+    # Edges engineered so n_transformer has degree 5, n_attention 3,
+    # n_layernorm 2, n_softmax 1 (within cid 0 + 1 inter-community edge),
+    # n_auth has degree 2, n_token has degree 1.
+    G.add_edge("n_transformer", "n_attention", relation="contains", confidence="EXTRACTED")
+    G.add_edge("n_transformer", "n_layernorm", relation="contains", confidence="EXTRACTED")
+    G.add_edge("n_transformer", "n_softmax", relation="contains", confidence="EXTRACTED")
+    G.add_edge("n_transformer", "n_file_model", relation="contains", confidence="EXTRACTED")
+    G.add_edge("n_attention", "n_layernorm", relation="references", confidence="EXTRACTED")
+    G.add_edge("n_attention", "n_concept_attn", relation="references", confidence="INFERRED")
+    # Inter-community edge (cid 0 → cid 1): exactly 1 — n_transformer -- n_auth
+    G.add_edge("n_transformer", "n_auth", relation="calls", confidence="EXTRACTED")
+    # cid 1 internal
+    G.add_edge("n_auth", "n_token", relation="contains", confidence="EXTRACTED")
+
+    communities: dict[int, list[str]] = {
+        0: [
+            "n_transformer",
+            "n_attention",
+            "n_layernorm",
+            "n_softmax",
+            "n_file_model",
+            "n_concept_attn",
+        ],
+        1: ["n_auth", "n_token"],
+        2: ["n_isolate"],
+    }
+    return G, communities
