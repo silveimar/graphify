@@ -172,9 +172,26 @@ def load_templates(vault_dir: Path) -> dict[str, string.Template]:
     For each type, prefers a user override at
     `<vault_dir>/.graphify/templates/<type>.md` if it exists, validates, and
     falls back to the built-in on error (logging to stderr per D-22).
+
+    Raises FileNotFoundError if `vault_dir` does not exist or is not a
+    directory (IN-09). A non-existent vault_dir was previously silently
+    masked because every per-type lookup just fell back to the built-in
+    template — callers had no way to tell that their override directory
+    was being ignored.
     """
-    templates: dict[str, string.Template] = {}
     vault_path = Path(vault_dir)
+    if not vault_path.exists():
+        raise FileNotFoundError(
+            f"vault_dir does not exist: {vault_path} — "
+            "templates cannot be discovered. Pass a valid Obsidian vault path "
+            "or omit vault_dir to use the built-in defaults."
+        )
+    if not vault_path.is_dir():
+        raise FileNotFoundError(
+            f"vault_dir is not a directory: {vault_path} — "
+            "templates cannot be discovered."
+        )
+    templates: dict[str, string.Template] = {}
     templates_dir_rel = Path(".graphify") / "templates"
     for note_type in sorted(_NOTE_TYPES):
         required = _REQUIRED_PER_TYPE[note_type]

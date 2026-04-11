@@ -1899,6 +1899,61 @@ def test_validate_template_does_not_flag_known_placeholder():
     assert errors == []
 
 
+# ---------------------------------------------------------------------------
+# IN-09: load_templates raises on missing/invalid vault_dir
+# ---------------------------------------------------------------------------
+
+
+def test_load_templates_raises_on_missing_vault_dir(tmp_path):
+    """IN-09: load_templates raises FileNotFoundError when vault_dir does not exist.
+
+    Pre-fix, a typo'd vault_dir would silently fall through to built-in
+    templates, masking misconfiguration. The caller now learns immediately.
+    """
+    from graphify.templates import load_templates
+
+    bogus = tmp_path / "definitely-not-here"
+    with pytest.raises(FileNotFoundError, match="does not exist"):
+        load_templates(bogus)
+
+
+def test_load_templates_raises_when_vault_dir_is_a_file(tmp_path):
+    """IN-09: load_templates raises FileNotFoundError when vault_dir is not a directory."""
+    from graphify.templates import load_templates
+
+    file_path = tmp_path / "not-a-dir.txt"
+    file_path.write_text("hello", encoding="utf-8")
+    with pytest.raises(FileNotFoundError, match="not a directory"):
+        load_templates(file_path)
+
+
+def test_load_templates_succeeds_for_valid_vault_dir_without_overrides(tmp_path):
+    """IN-09: an existing empty vault directory is valid (built-ins used)."""
+    from graphify.templates import load_templates, _NOTE_TYPES
+
+    templates = load_templates(tmp_path)
+    assert set(templates.keys()) == set(_NOTE_TYPES)
+
+
+def test_render_note_propagates_missing_vault_dir(tmp_path):
+    """IN-09: render_note surfaces FileNotFoundError instead of silently falling back."""
+    from tests.fixtures.template_context import make_classification_context, make_min_graph
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    with pytest.raises(FileNotFoundError):
+        render_note(
+            "n_transformer",
+            G,
+            profile,
+            "thing",
+            ctx,
+            vault_dir=tmp_path / "missing-vault",
+        )
+
+
 def test_validate_template_builtin_templates_pass_validation():
     """IN-08 regression: every shipped built-in template must pass validate_template.
 
