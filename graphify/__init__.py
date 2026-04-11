@@ -21,6 +21,9 @@ def __getattr__(name):
         "to_wiki": ("graphify.wiki", "to_wiki"),
         "load_profile": ("graphify.profile", "load_profile"),
         "validate_profile": ("graphify.profile", "validate_profile"),
+        "resolve_filename": ("graphify.templates", "resolve_filename"),
+        "validate_template": ("graphify.templates", "validate_template"),
+        "load_templates": ("graphify.templates", "load_templates"),
     }
     if name in _map:
         import importlib
