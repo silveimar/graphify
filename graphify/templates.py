@@ -523,3 +523,143 @@ def render_note(
 
     filename = resolve_filename(label, convention) + ".md"
     return filename, text
+
+
+# ---------------------------------------------------------------------------
+# Public: render_moc + render_community_overview (D-31, D-41)
+# ---------------------------------------------------------------------------
+
+def _render_moc_like(
+    community_id: int,
+    G,
+    communities: dict,
+    profile: dict,
+    classification_context,
+    template_key: str,  # "moc" or "community"
+    vault_dir,
+) -> tuple[str, str]:
+    """Shared rendering body for MOC and Community Overview notes.
+
+    G is part of the D-41 public surface but is intentionally unused in Phase 2
+    MOC rendering. MOCs derive members from classification_context (populated by
+    Phase 3), not by walking the graph directly. G is reserved for future use:
+    - Phase 3 may consult G to compute cohesion scores before populating the ctx
+    - Future TMPL-xx work may emit bridge-node tables from G
+    If you find yourself reaching for G here, the right answer is almost always
+    "add the derived data to ClassificationContext in Phase 3 and consume it here."
+    """
+    _ = G  # silence unused-argument warning; intentional per comment above
+    ctx = classification_context if isinstance(classification_context, dict) else {}
+    convention = profile.get("naming", {}).get("convention", "title_case")
+
+    # Derive community display name. Preference order:
+    #   1. ctx["community_name"]  (explicit; Phase 3 populates for MOC/Community Overview)
+    #   2. ctx["parent_moc_label"] (fallback — Phase 3 may put MOC self-label here)
+    #   3. "Community {id}"
+    community_name: str = (
+        ctx.get("community_name")
+        or ctx.get("parent_moc_label")
+        or f"Community {community_id}"
+    )
+    community_tag = ctx.get("community_tag") or safe_tag(community_name)
+    folder = ctx.get("folder", "Atlas/Maps/")
+    members_by_type = ctx.get("members_by_type", {})
+    sub_communities = ctx.get("sub_communities", [])
+    sibling_labels = ctx.get("sibling_labels", [])
+    cohesion = ctx.get("cohesion")  # float | None
+
+    # Frontmatter
+    up_list: list[str] = [_emit_wikilink(
+        profile.get("obsidian", {}).get("atlas_root", "Atlas"),
+        convention,
+    )]
+    related_list = [_emit_wikilink(lab, convention) for lab in sibling_labels if lab]
+    tags = [f"community/{community_tag}", "graphify/moc"]
+    fm_fields = _build_frontmatter_fields(
+        up=up_list,
+        related=related_list,
+        collections=[],
+        tags=tags,
+        note_type="moc" if template_key == "moc" else "community",
+        file_type=None,
+        source_file=None,
+        source_location=None,
+        community=community_name,
+        created=datetime.date.today(),
+        cohesion=cohesion,
+    )
+    frontmatter = _dump_frontmatter(fm_fields)
+
+    # Sections
+    wayfinder = _build_wayfinder_callout(
+        note_type="moc",
+        parent_moc_label=None,
+        profile=profile,
+        convention=convention,
+    )
+    members_section = _build_members_section(members_by_type, convention)
+    sub_communities_callout = _build_sub_communities_callout(sub_communities, convention)
+    dataview_block = _build_dataview_block(profile, community_tag, folder)
+    metadata = _build_metadata_callout(
+        source_file=None,
+        source_location=None,
+        community=community_name,
+    )
+
+    substitution_ctx = {
+        "label": community_name,
+        "frontmatter": frontmatter,
+        "wayfinder_callout": wayfinder,
+        "connections_callout": "",  # not used in MOCs per D-31
+        "members_section": members_section,
+        "sub_communities_callout": sub_communities_callout,
+        "dataview_block": dataview_block,
+        "metadata_callout": metadata,
+        "body": "",
+    }
+
+    templates = (
+        load_templates(vault_dir)
+        if vault_dir is not None
+        else {
+            nt: _load_builtin_template(nt)
+            for nt in ("thing", "statement", "person", "source", "moc", "community")
+        }
+    )
+    template = templates[template_key]
+    text = template.safe_substitute(substitution_ctx)
+    filename = resolve_filename(community_name, convention) + ".md"
+    return filename, text
+
+
+def render_moc(
+    community_id: int,
+    G,
+    communities: dict,
+    profile: dict,
+    classification_context,
+    *,
+    vault_dir=None,
+) -> tuple[str, str]:
+    """Render a MOC note for a community. Returns (filename, rendered_text)."""
+    return _render_moc_like(
+        community_id, G, communities, profile, classification_context,
+        template_key="moc", vault_dir=vault_dir,
+    )
+
+
+def render_community_overview(
+    community_id: int,
+    G,
+    communities: dict,
+    profile: dict,
+    classification_context,
+    *,
+    vault_dir=None,
+) -> tuple[str, str]:
+    """Render a Community Overview note. Same signature as render_moc but
+    uses the `community.md` built-in template by default."""
+    return _render_moc_like(
+        community_id, G, communities, profile, classification_context,
+        template_key="community", vault_dir=vault_dir,
+    )
