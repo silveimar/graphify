@@ -49,10 +49,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Package-data + 6 built-in templates + _dump_frontmatter + obsidian profile defaults (BLOCKING foundation)
-- [ ] 02-02-PLAN.md — templates.py skeleton: resolve_filename + validate_template + load_templates + ClassificationContext + lazy imports
-- [ ] 02-03-PLAN.md — Section builders + render_note for Thing/Statement/Person/Source
-- [ ] 02-04-PLAN.md — render_moc + render_community_overview + members/sub-communities/dataview builders + VALIDATION binding
+- [x] 02-01-PLAN.md — Package-data + 6 built-in templates + _dump_frontmatter + obsidian profile defaults (BLOCKING foundation)
+- [x] 02-02-PLAN.md — templates.py skeleton: resolve_filename + validate_template + load_templates + ClassificationContext + lazy imports
+- [x] 02-03-PLAN.md — Section builders + render_note for Thing/Statement/Person/Source
+- [x] 02-04-PLAN.md — render_moc + render_community_overview + members/sub-communities/dataview builders + VALIDATION binding
 
 ### Phase 3: Mapping Engine
 **Goal**: Every graph node is classified into exactly one note type and assigned a folder location, driven by topology and attribute rules from the profile
