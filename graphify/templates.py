@@ -592,15 +592,20 @@ def _render_moc_like(
 ) -> tuple[str, str]:
     """Shared rendering body for MOC and Community Overview notes.
 
-    G is part of the D-41 public surface but is intentionally unused in Phase 2
-    MOC rendering. MOCs derive members from classification_context (populated by
-    Phase 3), not by walking the graph directly. G is reserved for future use:
+    G and `communities` are part of the D-41 public surface but are intentionally
+    unused in Phase 2 MOC rendering. MOCs derive members from classification_context
+    (populated by Phase 3), not by walking the graph directly. They are reserved
+    for future use (IN-02):
     - Phase 3 may consult G to compute cohesion scores before populating the ctx
     - Future TMPL-xx work may emit bridge-node tables from G
+    - `communities` may be needed when MOCs gain cross-community link sections
     If you find yourself reaching for G here, the right answer is almost always
     "add the derived data to ClassificationContext in Phase 3 and consume it here."
     """
-    _ = G  # silence unused-argument warning; intentional per comment above
+    # IN-02: silence unused-argument warnings; the parameters are part of the
+    # locked D-41 signature and reserved for future use per the docstring above.
+    _ = G
+    _ = communities
     ctx = classification_context if isinstance(classification_context, dict) else {}
     convention = profile.get("naming", {}).get("convention", "title_case")
 
