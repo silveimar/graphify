@@ -374,6 +374,12 @@ def _build_members_section(members_by_type: dict, convention: str) -> str:
 
     Empty groups are omitted. Each member is a bullet with an auto-aliased
     wikilink. Group order is locked: Things → Statements → People → Sources.
+
+    IN-06: only properly structured member dicts with a non-empty `label`
+    are rendered. Non-dict entries and dicts missing `label` are silently
+    dropped, matching `_build_sub_communities_callout`'s policy. This avoids
+    accidentally emitting `[[Filename|<repr-of-stub>]]` from raw node-id
+    strings if a Phase 3 caller passes a malformed members_by_type payload.
     """
     blocks: list[str] = []
     for type_key, display_name in _MEMBER_GROUP_ORDER:
@@ -382,10 +388,16 @@ def _build_members_section(members_by_type: dict, convention: str) -> str:
             continue
         lines = [f"> [!info] {display_name}"]
         for m in members:
-            label = m.get("label") if isinstance(m, dict) else str(m)
+            if not isinstance(m, dict):
+                continue
+            label = m.get("label")
             if not label:
                 continue
             lines.append(f"> - {_emit_wikilink(label, convention)}")
+        # Skip the group entirely if every member was dropped — otherwise we'd
+        # emit a lone `> [!info] <Group>` header with no bullets.
+        if len(lines) == 1:
+            continue
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 

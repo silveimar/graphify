@@ -1732,3 +1732,66 @@ def test_render_moc_uses_supplied_created_date():
     pinned = _dt.date(2025, 6, 30)
     _, text = render_moc(0, G, communities, profile, ctx, created=pinned)
     assert "created: 2025-06-30" in text
+
+
+# ---------------------------------------------------------------------------
+# IN-06: _build_members_section consistent member-dict handling
+# ---------------------------------------------------------------------------
+
+
+def test_build_members_section_drops_non_dict_entries():
+    """IN-06: non-dict member entries are silently dropped (not str()-coerced).
+
+    Pre-IN-06, _build_members_section fell through to `str(m)` for non-dicts,
+    while _build_sub_communities_callout dropped them. The two helpers now
+    share the same strict policy: dict-with-label or skip.
+    """
+    from graphify.templates import _build_members_section
+
+    members_by_type = {
+        "thing": [
+            "raw_string_member",  # bad: should be dropped
+            {"id": "n1", "label": "Real Thing"},  # good: rendered
+            None,  # bad: should be dropped
+            42,  # bad: should be dropped
+        ],
+    }
+    result = _build_members_section(members_by_type, "title_case")
+    assert "[[Real_Thing|Real Thing]]" in result
+    assert "raw_string_member" not in result
+    # Only the one valid bullet plus the header
+    assert result.count("> -") == 1
+
+
+def test_build_members_section_drops_dicts_missing_label():
+    """IN-06: member dicts with no `label` key are dropped, not rendered as ''."""
+    from graphify.templates import _build_members_section
+
+    members_by_type = {
+        "thing": [
+            {"id": "n1"},  # no label → drop
+            {"id": "n2", "label": ""},  # empty label → drop
+            {"id": "n3", "label": "Valid"},
+        ],
+    }
+    result = _build_members_section(members_by_type, "title_case")
+    assert "Valid" in result
+    assert result.count("> -") == 1
+
+
+def test_build_members_section_skips_group_when_all_dropped():
+    """IN-06: a group whose entries are all invalid produces no callout block.
+
+    Without this guard the function would emit a lone `> [!info] Things`
+    header with zero bullets — visually broken in Obsidian.
+    """
+    from graphify.templates import _build_members_section
+
+    members_by_type = {
+        "thing": ["bad", None, {"id": "x"}],
+        "statement": [{"id": "n1", "label": "Real Statement"}],
+    }
+    result = _build_members_section(members_by_type, "title_case")
+    assert "Things" not in result
+    assert "Statements" in result
+    assert "Real Statement" in result
