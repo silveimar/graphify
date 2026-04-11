@@ -38,6 +38,7 @@ created: 2026-04-11
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
+| 3-00-01 | 01 | 1 | Fixture | — | `make_classification_fixture` builds 2-community + 1-isolate graph with expected degree signature | unit | `pytest tests/test_mapping.py::test_fixture_degrees_match_contract -x` | ❌ W0 | ⬜ pending |
 | 3-01-01 | 01 | 1 | MAP-01 | — | Default folder from folder_mapping when rule omits `then.folder` | unit | `pytest tests/test_mapping.py::test_classify_default_statement_uses_folder_mapping_default -x` | ❌ W0 | ⬜ pending |
 | 3-01-02 | 01 | 1 | MAP-01 | T-3-02 path-traversal | Per-rule `then.folder` override applied and re-validated | unit | `pytest tests/test_mapping.py::test_classify_rule_folder_override -x` | ❌ W0 | ⬜ pending |
 | 3-01-03 | 01 | 1 | MAP-02 | — | God-node list classified as Thing in topology fallback | unit | `pytest tests/test_mapping.py::test_classify_topology_fallback_god_node_becomes_thing -x` | ❌ W0 | ⬜ pending |
@@ -60,6 +61,7 @@ created: 2026-04-11
 | 3-02-05 | 02 | 2 | D-60 | — | `sibling_labels` excludes current node label | unit | `pytest tests/test_mapping.py::test_sibling_labels_exclude_current_node -x` | ❌ W0 | ⬜ pending |
 | 3-02-06 | 02 | 2 | D-50 | — | Concept + file hubs appear in `skipped_node_ids`, not `per_node` | unit | `pytest tests/test_mapping.py::test_concept_and_file_hubs_are_skipped -x` | ❌ W0 | ⬜ pending |
 | 3-02-07 | 02 | 2 | D-49 | — | Zero god nodes is valid state (no crash, no fallback promotion) | unit | `pytest tests/test_mapping.py::test_classify_zero_god_nodes_no_crash -x` | ❌ W0 | ⬜ pending |
+| 3-02-08 | 02 | 2 | D-60 | — | Non-god nodes receive empty `sibling_labels` (D-60 fidelity — BLOCKER 1 fix) | unit | `pytest tests/test_mapping.py::test_sibling_labels_empty_for_non_god_node -x` | ❌ W0 | ⬜ pending |
 | 3-03-01 | 03 | 1 | D-44 | T-3-01 ReDoS | Regex pattern length >512 chars rejected at validation time | unit | `pytest tests/test_mapping.py::test_validate_rules_regex_too_long_rejected -x` | ❌ W0 | ⬜ pending |
 | 3-03-02 | 03 | 1 | D-44 | T-3-01 ReDoS | Candidate string length >2048 chars → matcher returns False | unit | `pytest tests/test_mapping.py::test_match_when_attr_regex_candidate_too_long_returns_false -x` | ❌ W0 | ⬜ pending |
 | 3-03-03 | 03 | 1 | D-44 | T-3-04 non-string attr | Non-string attribute fed to `contains`/`regex` → matcher returns False (no crash) | unit | `pytest tests/test_mapping.py::test_match_when_non_string_attr_contains_returns_false -x` | ❌ W0 | ⬜ pending |
@@ -67,10 +69,13 @@ created: 2026-04-11
 | 3-03-05 | 03 | 1 | D-45 | — | No cross-kind dead-rule false positives | unit | `pytest tests/test_mapping.py::test_validate_rules_no_dead_rule_warning_across_kinds -x` | ❌ W0 | ⬜ pending |
 | 3-03-06 | 03 | 1 | D-47 | T-3-02 path-traversal | `then.folder` with `..` / absolute / `~` rejected at validation | unit | `pytest tests/test_mapping.py::test_validate_rules_rejects_path_traversal_in_folder -x` | ❌ W0 | ⬜ pending |
 | 3-03-07 | 03 | 1 | D-47 | T-3-03 bool-as-int | `moc_threshold: true` rejected by validator | unit | `pytest tests/test_profile.py::test_default_profile_rejects_bool_as_int_threshold -x` | ❌ W0 | ⬜ pending |
+| 3-03-08 | 03 | 1 | D-46 | — | Unknown keys in `then:` rejected (WARNING 1 fix) | unit | `pytest tests/test_mapping.py::test_validate_rules_rejects_unknown_then_keys -x` | ❌ W0 | ⬜ pending |
 | 3-04-01 | 04 | 3 | Contract | — | `classify()` output round-trips through `render_note()` without raising | integration (no IO) | `pytest tests/test_mapping.py::test_classify_output_round_trips_through_render_note -x` | ❌ W0 | ⬜ pending |
 | 3-04-02 | 04 | 3 | Contract | — | `classify()` output round-trips through `render_moc()` without raising | integration (no IO) | `pytest tests/test_mapping.py::test_classify_output_round_trips_through_render_moc -x` | ❌ W0 | ⬜ pending |
 | 3-04-03 | 04 | 3 | Profile | — | `validate_profile` surfaces `mapping_rules` errors in aggregate list | unit | `pytest tests/test_profile.py::test_validate_profile_surfaces_mapping_rules_errors -x` | ❌ W0 | ⬜ pending |
 | 3-04-04 | 04 | 3 | Profile | — | `_deep_merge` respects new `topology` + `mapping` sections | unit | `pytest tests/test_profile.py::test_deep_merge_respects_topology_section -x` | ❌ W0 | ⬜ pending |
+| 3-04-05 | 04 | 4 | Package | — | `classify` exported via graphify package lazy map (WARNING 4 fix) | unit | `pytest tests/test_mapping.py::test_graphify_package_lazy_exports_classify -x` | ❌ W0 | ⬜ pending |
+| 3-04-06 | 04 | 4 | D-58 | — | `per_community[cid]['cohesion']` populated end-to-end (W-2 fix) | unit | `pytest tests/test_mapping.py::test_classify_output_round_trips_through_render_moc -x` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

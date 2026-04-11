@@ -1294,33 +1294,38 @@ Phase 3's nearest-host tie-break follows the same tuple-key pattern (see Pattern
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `rule_traces` include the compiled matcher args, or just the raw rule index?**
    - What we know: test assertions need `rule_index` at minimum; debugging benefits from seeing the `matcher_kind` tag.
    - What's unclear: whether users exposed to `GRAPH_REPORT.md` want to see the full normalized args.
    - Recommendation: ship `{node_id, rule_index, matched_kind, note_type, folder}` as the minimum viable TypedDict. Expand later if Phase 5 needs it.
+   - **RESOLVED:** `RuleTrace(TypedDict)` ships `node_id`, `rule_index`, `matched_kind`, `when_expr` — as implemented in Plan 01 Task 2.
 
 2. **Should `validate_rules` accept a partially compiled `profile` dict or just the raw `mapping_rules` list?**
    - What we know: `validate_profile` calls `validate_rules(profile["mapping_rules"])` — the list, not the profile.
    - What's unclear: if dead-rule detection later needs to know `profile["folder_mapping"]` to validate `then.folder` against known types, the signature may need the full profile.
    - Recommendation: start with `validate_rules(rules: list) -> list[str]`. Widen if a use case surfaces.
+   - **RESOLVED:** `validate_rules(rules: list) -> list[str]` — takes rules list only, called from `profile.py` via function-local import.
 
 3. **Should Phase 3 emit `cohesion` per-community inside `per_community[cid]["cohesion"]` for render_moc to display?**
    - What we know: `templates.py:705-706` reads `ctx.get("cohesion")` and renders it in MOC frontmatter.
    - What's unclear: CONTEXT.md doesn't list `cohesion` as a `ClassificationContext` key.
    - Resolution path: Phase 3's `_build_moc_context` SHOULD populate `cohesion` when `cohesion` is passed to `classify()`. The TypedDict at `templates.py:57-67` is `total=False`, so adding `cohesion` to `per_community` entries is forward-compatible.
    - Recommendation: populate `per_community[cid]["cohesion"]` whenever cohesion data is available. Document in `classify` docstring. (Minor gap in CONTEXT.md — either an oversight in the TypedDict listing or implied via "the engine reads cluster.score_all to feed cohesion_gte".)
+   - **RESOLVED:** `per_community[cid]["cohesion"]` IS populated (see W-2 fix); Plan 02 Task 2 writes `cohesion=float(cohesion.get(cid, 0.0))` for above-threshold MOC entries and the bucket MOC.
 
 4. **Should `MappingResult.per_community` also contain the `parent_moc_label` key for MOCs themselves?**
    - What we know: non-MOC notes have `parent_moc_label` pointing to their community's MOC. MOCs themselves have no parent (they link up to Atlas root).
    - What's unclear: should `per_community[cid]["parent_moc_label"]` be empty string, None, or absent?
    - Recommendation: absent (TypedDict total=False). `templates._build_wayfinder_callout` [CITED: templates.py:333-352] already handles `parent_moc_label=None` → atlas fallback.
+   - **RESOLVED:** MOC entries in `per_community` set `parent_moc_label=None` (TypedDict total=False — key absent); `render_moc()` at `templates.py:333-352` handles the fallback to `"Atlas"` via the wayfinder builder.
 
 5. **What happens if two different below-threshold communities have the same nearest host?**
    - What we know: host_ctx["sub_communities"] is a list. Multiple appenders is fine.
    - What's unclear: is sub_community ordering deterministic?
    - Recommendation: sort sub_communities by source `community_id` ascending before emitting, to guarantee reproducible output.
+   - **RESOLVED:** sorted by source community_id ascending; `_assemble_communities` MUST explicitly `sub_communities.sort(key=lambda s: s["_source_cid"])` at insertion time (add `_source_cid` as an internal key; Phase 2 consumers at `templates.py:458-477` ignore unknown keys since TypedDict is total=False).
 
 ---
 
