@@ -783,3 +783,195 @@ def test_validate_profile_accepts_all_three_merge_strategies():
 def test_validate_profile_omits_field_policies_is_ok():
     from graphify.profile import validate_profile
     assert validate_profile({"merge": {"strategy": "update"}}) == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 / D-77 / D-77a — validate_profile_preflight + PreflightResult tests
+# ---------------------------------------------------------------------------
+
+from graphify.profile import validate_profile_preflight, PreflightResult
+
+
+def _mk_vault(tmp_path, profile_yaml: str | None = None, templates: dict[str, str] | None = None):
+    """Construct a minimal vault layout under tmp_path."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    if profile_yaml is not None or templates is not None:
+        (vault / ".graphify").mkdir()
+    if profile_yaml is not None:
+        (vault / ".graphify" / "profile.yaml").write_text(profile_yaml, encoding="utf-8")
+    if templates:
+        (vault / ".graphify" / "templates").mkdir()
+    for name, text in (templates or {}).items():
+        (vault / ".graphify" / "templates" / name).write_text(text, encoding="utf-8")
+    return vault
+
+
+def test_validate_profile_preflight_nonexistent_vault(tmp_path):
+    result = validate_profile_preflight(tmp_path / "missing")
+    assert len(result.errors) == 1
+    assert "does not exist" in result.errors[0]
+    assert result.warnings == []
+    assert result.rule_count == 0
+    assert result.template_count == 0
+
+
+def test_validate_profile_preflight_no_graphify_dir(tmp_path):
+    vault = _mk_vault(tmp_path)
+    result = validate_profile_preflight(vault)
+    assert result.errors == []
+    assert result.warnings == []
+    assert result.rule_count == 0
+    assert result.template_count == 0
+
+
+def test_validate_profile_preflight_empty_profile_yaml(tmp_path):
+    vault = _mk_vault(tmp_path, profile_yaml="")
+    result = validate_profile_preflight(vault)
+    assert result.errors == []
+    assert result.template_count == 0
+
+
+def test_validate_profile_preflight_layer1_schema_error(tmp_path):
+    yaml_text = (
+        "folder_mapping:\n"
+        "  moc: '../escape'\n"
+    )
+    vault = _mk_vault(tmp_path, profile_yaml=yaml_text)
+    result = validate_profile_preflight(vault)
+    assert any(".." in e for e in result.errors), f"Expected path traversal error, got {result.errors}"
+
+
+def test_validate_profile_preflight_layer2_template_missing_required(tmp_path):
+    # MOC template missing ${frontmatter} placeholder
+    bad_template = "# ${label}\n${members_section}\n${dataview_block}\n"
+    vault = _mk_vault(tmp_path, profile_yaml="", templates={"moc.md": bad_template})
+    result = validate_profile_preflight(vault)
+    assert any("frontmatter" in e and "moc.md" in e for e in result.errors), (
+        f"Expected frontmatter placeholder error, got {result.errors}"
+    )
+    # Failed template must NOT increment template_count
+    assert result.template_count == 0
+
+
+def test_validate_profile_preflight_layer3_dead_rule_warning(tmp_path):
+    yaml_text = (
+        "mapping_rules:\n"
+        "  - when: {topology: god_node}\n"
+        "    then: {note_type: thing}\n"
+        "  - when: {topology: god_node}\n"
+        "    then: {note_type: thing}\n"
+    )
+    vault = _mk_vault(tmp_path, profile_yaml=yaml_text)
+    result = validate_profile_preflight(vault)
+    assert any("dead rule" in w for w in result.warnings), (
+        f"Expected dead-rule warning, got {result.warnings}"
+    )
+    assert result.rule_count == 2
+
+
+def test_validate_profile_preflight_layer4_deep_folder_warning(tmp_path):
+    yaml_text = (
+        "folder_mapping:\n"
+        "  moc: 'A/B/C/D/E'\n"  # 5 segments > 4
+    )
+    vault = _mk_vault(tmp_path, profile_yaml=yaml_text)
+    result = validate_profile_preflight(vault)
+    assert any("segments" in w or "nesting" in w for w in result.warnings), (
+        f"Expected nesting warning, got {result.warnings}"
+    )
+
+
+def test_validate_profile_preflight_layer4_long_path_warning(tmp_path):
+    deep_folder = "/".join(["longsegment" * 3] * 2)
+    yaml_text = f"folder_mapping:\n  moc: '{deep_folder}'\n"
+    vault = _mk_vault(tmp_path, profile_yaml=yaml_text)
+    result = validate_profile_preflight(vault)
+    assert any("path length" in w or "MAX_PATH" in w for w in result.warnings), (
+        f"Expected length warning, got {result.warnings}"
+    )
+
+
+def test_validate_profile_preflight_layer4_mapping_rule_folder(tmp_path):
+    yaml_text = (
+        "mapping_rules:\n"
+        "  - when: {topology: god_node}\n"
+        "    then: {note_type: thing, folder: 'A/B/C/D/E'}\n"
+    )
+    vault = _mk_vault(tmp_path, profile_yaml=yaml_text)
+    result = validate_profile_preflight(vault)
+    assert any("mapping_rules[0]" in w for w in result.warnings), (
+        f"Expected rule folder warning, got {result.warnings}"
+    )
+
+
+def test_validate_profile_preflight_no_side_effects(tmp_path):
+    vault = _mk_vault(tmp_path, profile_yaml="naming: {convention: kebab-case}\n")
+    r_a = validate_profile_preflight(vault)
+    r_b = validate_profile_preflight(vault)
+    assert r_a == r_b
+    files_after = sorted(p for p in vault.rglob("*"))
+    assert all(p.name in {".graphify", "profile.yaml"} for p in files_after)
+
+
+def test_validate_profile_preflight_clean_vault_passes(tmp_path):
+    vault = _mk_vault(
+        tmp_path,
+        profile_yaml="naming: {convention: title_case}\n",
+    )
+    result = validate_profile_preflight(vault)
+    assert result.errors == []
+
+
+# --- PreflightResult shape tests (D-77a N/M suffix prerequisites) ---
+
+def test_preflight_result_is_named_tuple_with_four_fields(tmp_path):
+    result = validate_profile_preflight(tmp_path / "missing")
+    assert isinstance(result, PreflightResult)
+    assert hasattr(result, "errors")
+    assert hasattr(result, "warnings")
+    assert hasattr(result, "rule_count")
+    assert hasattr(result, "template_count")
+    assert isinstance(result.errors, list)
+    assert isinstance(result.warnings, list)
+    assert isinstance(result.rule_count, int)
+    assert isinstance(result.template_count, int)
+
+
+def test_preflight_result_tuple_unpack_backward_compat(tmp_path):
+    vault = _mk_vault(tmp_path, profile_yaml="")
+    result = validate_profile_preflight(vault)
+    # Legacy 2-tuple unpack via star-rest
+    errors, warnings, *_ = result
+    assert errors == result.errors
+    assert warnings == result.warnings
+    # Full 4-tuple unpack
+    e2, w2, rc, tc = result
+    assert e2 == result.errors
+    assert w2 == result.warnings
+    assert rc == result.rule_count
+    assert tc == result.template_count
+
+
+def test_preflight_result_rule_and_template_counts_populated(tmp_path):
+    # Valid profile with 3 rules and 1 valid template override
+    yaml_text = (
+        "mapping_rules:\n"
+        "  - when: {topology: god_node}\n"
+        "    then: {note_type: thing}\n"
+        "  - when: {file_type: document}\n"
+        "    then: {note_type: source}\n"
+        "  - when: {community_size: {min: 5}}\n"
+        "    then: {note_type: statement}\n"
+    )
+    valid_thing_template = (
+        "---\n${frontmatter}---\n# ${label}\nbody\n"
+    )
+    vault = _mk_vault(
+        tmp_path,
+        profile_yaml=yaml_text,
+        templates={"thing.md": valid_thing_template},
+    )
+    result = validate_profile_preflight(vault)
+    assert result.rule_count == 3
+    assert result.template_count == 1
