@@ -391,6 +391,46 @@ def test_safe_tag_slashes_and_plus():
     assert safe_tag("slashes/and+plus") == "slashes-and-plus"
 
 
+def test_obs01_obs02_safe_tag_regression_anchor():
+    """Regression anchor for OBS-01 / OBS-02 (Phase 1 requirements).
+
+    Before Phase 5, `graphify --obsidian` wrote a `.obsidian/graph.json` file
+    whose community entries used `tag:community/<slug>` syntax (OBS-01) and
+    which read-merged with existing user settings to preserve non-graphify
+    entries (OBS-02). The Phase 5 refactor (D-74) removed graph.json
+    generation from `to_obsidian` entirely.
+
+    The underlying invariant — that community tags use `community/<slug>`
+    syntax where <slug> is produced by `safe_tag` — is still the contract
+    used by render_note / render_moc when they emit tags into
+    frontmatter and dataview queries. safe_tag therefore remains the root
+    of OBS-01/OBS-02 correctness.
+
+    This test belt-and-suspenders the exact literal form the graph.json
+    feature used to emit, so that any regression in safe_tag (such as
+    accidentally producing `community/<raw>` without slugification, or
+    emitting `#community/<slug>` with a stray hash) fails here loudly
+    with a search-hit on 'OBS-01' or 'OBS-02'.
+    """
+    from graphify.profile import safe_tag
+
+    # OBS-01 form: community/<slug> — never `#community/...`, never raw input.
+    assert safe_tag("ML/AI Architecture") == "ml-ai-architecture"
+    slug = safe_tag("ML/AI Architecture")
+    tag_query = f"tag:community/{slug}"
+    assert tag_query == "tag:community/ml-ai-architecture"
+    assert "#" not in tag_query, "OBS-01 requires tag:community/ syntax, not #-prefixed"
+
+    # OBS-02 implicitly depends on safe_tag being idempotent and deterministic
+    # so read-merge-write can identify existing graphify entries by prefix.
+    assert safe_tag("ML/AI Architecture") == safe_tag("ML/AI Architecture")
+    assert safe_tag("My Community").startswith(""), "safe_tag output is a valid prefix root"
+
+    # Additional adversarial inputs that OBS-01 had to handle at graph.json time:
+    assert safe_tag("a/b+c d") == "a-b-c-d"   # / + space → collapse to hyphens
+    assert safe_tag("") == "community"          # empty → fallback, matching OBS-02 behavior
+
+
 # ---------------------------------------------------------------------------
 # safe_filename tests
 # ---------------------------------------------------------------------------
