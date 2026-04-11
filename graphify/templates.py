@@ -616,7 +616,10 @@ def _render_moc_like(
     members_by_type = ctx.get("members_by_type", {})
     sub_communities = ctx.get("sub_communities", [])
     sibling_labels = ctx.get("sibling_labels", [])
-    cohesion = ctx.get("cohesion")  # float | None
+    # Cast to plain float so numpy.float64 (not a Python float subclass) renders
+    # correctly as "0.82" rather than "numpy.float64(0.82)" (WR-06).
+    _raw_cohesion = ctx.get("cohesion")
+    cohesion: float | None = float(_raw_cohesion) if _raw_cohesion is not None else None
 
     # Frontmatter
     up_list: list[str] = [_emit_wikilink(

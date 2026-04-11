@@ -1471,6 +1471,48 @@ def test_render_moc_cohesion_included_in_frontmatter():
     assert "cohesion: 0.82" in text
 
 
+# ---------------------------------------------------------------------------
+# WR-06 regression: cohesion cast to float() so numpy.float64 renders correctly
+# ---------------------------------------------------------------------------
+
+
+def test_render_moc_cohesion_numpy_float64_renders_as_decimal():
+    """numpy.float64 passed as cohesion must render as '0.82' not 'numpy.float64(0.82)'."""
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+
+    # Simulate numpy.float64 by creating a float subclass that has a different repr
+    class FakeNumpy(float):
+        def __repr__(self) -> str:
+            return f"numpy.float64({super().__repr__()})"
+
+        def __str__(self) -> str:
+            return f"numpy.float64({super().__str__()})"
+
+    ctx = make_moc_context(cohesion=FakeNumpy(0.82))
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    # Must render as plain decimal, not with numpy repr
+    assert "cohesion: 0.82" in text
+    assert "numpy.float64" not in text
+
+
+def test_render_moc_cohesion_none_does_not_appear_in_frontmatter():
+    """When cohesion is None it must be absent from the frontmatter."""
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(cohesion=None)
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "cohesion:" not in text
+
+
 def test_render_community_overview_uses_community_template(tmp_path):
     from tests.fixtures.template_context import make_min_graph, make_moc_context
     from graphify.templates import render_community_overview
