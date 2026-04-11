@@ -32,10 +32,14 @@ def __getattr__(name):
         "validate_rules": ("graphify.mapping", "validate_rules"),
         "apply_merge_plan": ("graphify.merge", "apply_merge_plan"),
         "compute_merge_plan": ("graphify.merge", "compute_merge_plan"),
+        "format_merge_plan": ("graphify.merge", "format_merge_plan"),
+        "split_rendered_note": ("graphify.merge", "split_rendered_note"),
         "MergeAction": ("graphify.merge", "MergeAction"),
         "MergePlan": ("graphify.merge", "MergePlan"),
         "MergeResult": ("graphify.merge", "MergeResult"),
         "RenderedNote": ("graphify.merge", "RenderedNote"),
+        "validate_profile_preflight": ("graphify.profile", "validate_profile_preflight"),
+        "PreflightResult": ("graphify.profile", "PreflightResult"),
     }
     if name in _map:
         import importlib
