@@ -184,10 +184,35 @@ def load_templates(vault_dir: Path) -> dict[str, string.Template]:
 # Wikilink emission (D-37, D-38) — single source of truth
 # ---------------------------------------------------------------------------
 
+# Characters that break wikilink syntax when present in the display alias.
+# `]]` closes the wikilink early; `|` creates a malformed alias; newlines
+# break the containing callout/list/frontmatter block.
+_WIKILINK_ALIAS_FORBIDDEN: dict[str, str] = {
+    "]]": "] ]",
+    "|": "-",
+    "\n": " ",
+    "\r": " ",
+}
+
+
+def _sanitize_wikilink_alias(label: str) -> str:
+    """Replace characters that would break wikilink alias syntax."""
+    out = label
+    for bad, repl in _WIKILINK_ALIAS_FORBIDDEN.items():
+        out = out.replace(bad, repl)
+    return out
+
+
 def _emit_wikilink(label: str, convention: str) -> str:
-    """Return `[[filename|label]]` auto-aliased to display label."""
+    """Return `[[filename|label]]` auto-aliased to display label.
+
+    The filename is sanitized by resolve_filename/safe_filename.
+    The display alias is sanitized by _sanitize_wikilink_alias to prevent
+    injection via `]]`, `|`, or newlines in node labels (CR-01).
+    """
     fname = resolve_filename(label, convention)
-    return f"[[{fname}|{label}]]"
+    alias = _sanitize_wikilink_alias(label)
+    return f"[[{fname}|{alias}]]"
 
 
 # ---------------------------------------------------------------------------

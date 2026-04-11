@@ -341,6 +341,61 @@ def test_emit_wikilink_unicode_preserved_in_alias():
 
 
 # ---------------------------------------------------------------------------
+# CR-01 regression: _sanitize_wikilink_alias / _emit_wikilink escaping
+# ---------------------------------------------------------------------------
+
+
+def test_sanitize_wikilink_alias_escapes_closing_brackets():
+    from graphify.templates import _sanitize_wikilink_alias
+
+    # ]] must not appear in alias — it would close the wikilink early
+    assert "]]" not in _sanitize_wikilink_alias("Array[int]]")
+
+
+def test_sanitize_wikilink_alias_escapes_pipe():
+    from graphify.templates import _sanitize_wikilink_alias
+
+    # | in alias creates a malformed second alias segment
+    result = _sanitize_wikilink_alias("Label|Injection")
+    assert "|" not in result
+
+
+def test_sanitize_wikilink_alias_escapes_newlines():
+    from graphify.templates import _sanitize_wikilink_alias
+
+    result = _sanitize_wikilink_alias("Line1\nLine2\rLine3")
+    assert "\n" not in result
+    assert "\r" not in result
+
+
+def test_emit_wikilink_label_with_closing_brackets():
+    from graphify.templates import _emit_wikilink, _sanitize_wikilink_alias
+
+    # "Array[int]]" raw alias would contain "]]" which closes the wikilink early.
+    # After sanitization "]]" is replaced with "] ]" so no premature close.
+    alias = _sanitize_wikilink_alias("Array[int]]")
+    assert "]]" not in alias
+
+
+def test_emit_wikilink_label_with_pipe():
+    from graphify.templates import _emit_wikilink
+
+    result = _emit_wikilink("A|B", "title_case")
+    # Only one | separator (between fname and alias) — no extra | in alias
+    assert result.count("|") == 1
+
+
+def test_emit_wikilink_label_with_newline():
+    from graphify.templates import _emit_wikilink, _sanitize_wikilink_alias
+
+    # resolve_filename may preserve \n in the filename stem (safe_filename handles it),
+    # but the alias must not contain newlines so the containing callout line stays intact.
+    alias = _sanitize_wikilink_alias("Label\nWith\rNewlines")
+    assert "\n" not in alias
+    assert "\r" not in alias
+
+
+# ---------------------------------------------------------------------------
 # Plan 03 Task 1: _build_frontmatter_fields tests
 # ---------------------------------------------------------------------------
 
