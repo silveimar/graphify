@@ -45,3 +45,17 @@ def test_all_extras_includes_pyyaml():
         "must include every optional dep — if obsidian is in extras, its "
         "package must be in 'all' too."
     )
+
+
+def test_package_data_includes_builtin_templates():
+    data = _load_pyproject()
+    package_data = data["tool"]["setuptools"]["package-data"]["graphify"]
+    assert "builtin_templates/*.md" in package_data, (
+        "pyproject.toml package-data for graphify is missing 'builtin_templates/*.md'. "
+        "Phase 2 requires built-in template files to be included in wheel installs. "
+        "Add 'builtin_templates/*.md' to [tool.setuptools.package-data] graphify list."
+    )
+    assert "skill.md" in package_data, (
+        "pyproject.toml package-data for graphify is missing 'skill.md'. "
+        "This entry must not be removed — it is required for graphify install to work."
+    )
