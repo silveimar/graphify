@@ -84,12 +84,12 @@ Plans:
 **Plans:** 6 plans
 
 Plans:
-- [ ] 04-01-PLAN-sentinel-backpatch.md — Wrap Phase 2 section builders in sentinel HTML comments so merge can detect graphify-owned body regions (unblocks D-62 fingerprint + D-67/D-68 round-trip)
-- [ ] 04-02-PLAN-profile-extensions.md — Extend _DEFAULT_PROFILE.merge with `created` preserve + `field_policies` default + validate_merge_config schema
-- [ ] 04-03-PLAN-merge-primitives.md — merge.py dataclasses, hand-rolled YAML reader (inverse of _dump_frontmatter), sentinel parser, _DEFAULT_FIELD_POLICIES table, policy dispatcher
-- [ ] 04-04-PLAN-compute-merge-plan.md — compute_merge_plan pure function + 7 vault test fixtures (empty, pristine, user_extended, fingerprint_stripped, malformed_sentinel, preserve_fields_edited, unmanaged_collision)
-- [ ] 04-05-PLAN-apply-merge-plan.md — apply_merge_plan atomic writes (.tmp + fsync + os.replace), content-hash skip, stale .tmp cleanup, MergeResult, graphify/__init__.py lazy exports
-- [ ] 04-06-PLAN-full-coverage-tests.md — TestPhase4MustHaves: M1..M10 end-to-end tests covering every success criterion + D-63/D-68/D-69/D-72 edge cases + T-04-01 security assertion
+- [ ] 04-01-PLAN.md — Wrap Phase 2 section builders in sentinel HTML comments so merge can detect graphify-owned body regions (unblocks D-62 fingerprint + D-67/D-68 round-trip)
+- [ ] 04-02-PLAN.md — Extend _DEFAULT_PROFILE.merge with `created` preserve + `field_policies` default + validate_merge_config schema
+- [ ] 04-03-PLAN.md — merge.py dataclasses, hand-rolled YAML reader (inverse of _dump_frontmatter), sentinel parser, _DEFAULT_FIELD_POLICIES table, policy dispatcher
+- [ ] 04-04-PLAN.md — compute_merge_plan pure function + 7 vault test fixtures (empty, pristine, user_extended, fingerprint_stripped, malformed_sentinel, preserve_fields_edited, unmanaged_collision)
+- [ ] 04-05-PLAN.md — apply_merge_plan atomic writes (.tmp + fsync + os.replace), content-hash skip, stale .tmp cleanup, MergeResult, graphify/__init__.py lazy exports
+- [ ] 04-06-PLAN.md — TestPhase4MustHaves: M1..M10 end-to-end tests covering every success criterion + D-63/D-68/D-69/D-72 edge cases + T-04-01 security assertion
 
 ### Phase 5: Integration & CLI
 **Goal**: All four modules are wired into a refactored `to_obsidian()` that passes existing tests; `--dry-run` and `--validate-profile` are available from the CLI
