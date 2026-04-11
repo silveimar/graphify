@@ -179,6 +179,20 @@ def validate_profile(profile: dict) -> list[str]:
                         f"folder_mapping.{name} contains '..' — "
                         "path traversal sequences are not allowed in folder mappings"
                     )
+                elif Path(path_val).is_absolute():
+                    # Absolute paths escape the vault entirely (WR-07).
+                    # validate_vault_path catches these at use-time, but
+                    # rejecting them early gives a clearer error message.
+                    errors.append(
+                        f"folder_mapping.{name} is an absolute path — "
+                        "only relative paths are allowed in folder mappings"
+                    )
+                elif path_val.startswith("~"):
+                    # Home-expansion would also escape the vault (WR-07).
+                    errors.append(
+                        f"folder_mapping.{name} starts with '~' — "
+                        "home-relative paths are not allowed in folder mappings"
+                    )
 
     # mapping_rules section
     mapping_rules = profile.get("mapping_rules")

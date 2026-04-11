@@ -158,6 +158,45 @@ def test_validate_profile_traversal_in_folder_mapping():
     assert ".." in errors[0]
 
 
+# ---------------------------------------------------------------------------
+# WR-07 regression: validate_profile rejects absolute paths and ~ prefixes
+# ---------------------------------------------------------------------------
+
+
+def test_validate_profile_absolute_path_rejected():
+    errors = validate_profile({"folder_mapping": {"moc": "/etc/passwd"}})
+    assert len(errors) == 1
+    assert "absolute" in errors[0].lower()
+
+
+def test_validate_profile_tilde_prefix_rejected():
+    errors = validate_profile({"folder_mapping": {"moc": "~/Documents/vault"}})
+    assert len(errors) == 1
+    assert "~" in errors[0]
+
+
+def test_validate_profile_relative_path_accepted():
+    errors = validate_profile({"folder_mapping": {"moc": "Atlas/Maps/"}})
+    assert errors == []
+
+
+def test_validate_profile_windows_drive_root_rejected():
+    # C:\path is absolute on Windows — Path.is_absolute() handles it on all platforms
+    import sys
+    errors = validate_profile({"folder_mapping": {"moc": "C:\\Users\\vault"}})
+    if sys.platform == "win32":
+        # On Windows C:\... is absolute
+        assert any("absolute" in e.lower() for e in errors)
+    else:
+        # On POSIX C:\Users\vault is relative (no leading /) — validate_vault_path
+        # catches it at use-time, but profile validation on POSIX won't flag it.
+        # The test just verifies it doesn't crash.
+        assert isinstance(errors, list)
+
+
+# ---------------------------------------------------------------------------
+
+
 def test_validate_profile_collects_multiple_errors():
     """D-03: collect all errors, not fail-on-first."""
     profile = {"key1": 1, "key2": 2, "key3": 3}
