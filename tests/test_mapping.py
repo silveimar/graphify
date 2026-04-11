@@ -584,3 +584,121 @@ def test_sibling_labels_empty_for_non_god_node():
     )
     # And a god node DOES get siblings populated (Hub is top god node).
     assert "Secondary" in result["per_node"]["n_hub"]["sibling_labels"]
+
+
+# ---------------------------------------------------------------------------
+# Plan 03: validate_rules + _detect_dead_rules tests
+# ---------------------------------------------------------------------------
+
+
+def test_validate_rules_regex_too_long_rejected():
+    # VALIDATION row 3-03-01
+    from graphify.mapping import validate_rules, _MAX_PATTERN_LEN
+    rules = [{
+        "when": {"attr": "label", "regex": "x" * (_MAX_PATTERN_LEN + 1)},
+        "then": {"note_type": "thing"},
+    }]
+    errors = validate_rules(rules)
+    assert any(
+        "pattern length" in e and "mapping_rules[0].when.regex" in e
+        for e in errors
+    )
+
+
+def test_validate_rules_rejects_malformed_regex_with_pointed_error():
+    from graphify.mapping import validate_rules
+    rules = [{"when": {"attr": "label", "regex": "("}, "then": {"note_type": "thing"}}]
+    errors = validate_rules(rules)
+    assert any("mapping_rules[0].when.regex" in e for e in errors)
+
+
+def test_validate_rules_rejects_unknown_note_type():
+    from graphify.mapping import validate_rules
+    rules = [{"when": {"attr": "label", "equals": "X"}, "then": {"note_type": "BOGUS"}}]
+    errors = validate_rules(rules)
+    assert any("mapping_rules[0].then.note_type" in e for e in errors)
+
+
+def test_validate_rules_rejects_path_traversal_in_folder():
+    # VALIDATION row 3-03-06
+    from graphify.mapping import validate_rules
+    rules = [
+        {"when": {"attr": "label", "equals": "X"}, "then": {"note_type": "thing", "folder": "../escape/"}},
+        {"when": {"attr": "label", "equals": "Y"}, "then": {"note_type": "thing", "folder": "/abs/path"}},
+        {"when": {"attr": "label", "equals": "Z"}, "then": {"note_type": "thing", "folder": "~/home"}},
+    ]
+    errors = validate_rules(rules)
+    assert any("mapping_rules[0].then.folder" in e and ".." in e for e in errors)
+    assert any("mapping_rules[1].then.folder" in e and "absolute" in e for e in errors)
+    assert any("mapping_rules[2].then.folder" in e and "~" in e for e in errors)
+
+
+def test_validate_rules_rejects_bool_topology_value():
+    from graphify.mapping import validate_rules
+    rules = [{
+        "when": {"topology": "community_size_gte", "value": True},
+        "then": {"note_type": "moc"},
+    }]
+    errors = validate_rules(rules)
+    assert any("mapping_rules[0].when.value" in e for e in errors)
+
+
+def test_validate_rules_rejects_multiple_matcher_kinds():
+    from graphify.mapping import validate_rules
+    rules = [{
+        "when": {"attr": "label", "equals": "X", "topology": "god_node"},
+        "then": {"note_type": "thing"},
+    }]
+    errors = validate_rules(rules)
+    assert any("multiple matcher kinds" in e for e in errors)
+
+
+def test_validate_rules_dead_rule_warning_identical():
+    # VALIDATION row 3-03-04
+    from graphify.mapping import validate_rules
+    rules = [
+        {"when": {"attr": "label", "equals": "Foo"}, "then": {"note_type": "thing"}},
+        {"when": {"attr": "label", "equals": "Foo"}, "then": {"note_type": "thing"}},
+    ]
+    errors = validate_rules(rules)
+    assert any("mapping_rules[1]: warning: dead rule" in e for e in errors)
+
+
+def test_validate_rules_no_dead_rule_warning_across_kinds():
+    # VALIDATION row 3-03-05
+    from graphify.mapping import validate_rules
+    rules = [
+        {"when": {"topology": "god_node"}, "then": {"note_type": "thing"}},
+        {"when": {"attr": "label", "equals": "Foo"}, "then": {"note_type": "thing"}},
+    ]
+    errors = validate_rules(rules)
+    assert not any("dead rule" in e for e in errors)
+
+
+def test_validate_rules_accepts_valid_example_from_context():
+    # Mirrors the D-43 profile.yaml example verbatim
+    from graphify.mapping import validate_rules
+    rules = [
+        {"when": {"attr": "file_type", "equals": "person"}, "then": {"note_type": "person"}},
+        {"when": {"topology": "god_node"}, "then": {"note_type": "thing", "folder": "Atlas/Dots/Things/"}},
+        {"when": {"source_file_ext": ".py"}, "then": {"note_type": "source", "folder": "Atlas/Sources/Code/"}},
+    ]
+    assert validate_rules(rules) == []
+
+
+def test_validate_rules_rejects_unknown_then_keys():
+    # WARNING 1 fix (D-46): unknown `then:` keys must be rejected with a
+    # pointed error, not silently dropped. VALIDATION row 3-03-08.
+    from graphify.mapping import validate_rules
+    rules = [
+        {
+            "when": {"attr": "file_type", "equals": "person"},
+            "then": {"note_type": "person", "tags": ["foo"]},
+        }
+    ]
+    errors = validate_rules(rules)
+    assert errors, "expected validation errors for unknown then key"
+    assert any(
+        "unknown keys ['tags']" in e and "mapping_rules[0].then" in e
+        for e in errors
+    ), f"expected pointed error about 'tags'; got: {errors}"
