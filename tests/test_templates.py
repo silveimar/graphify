@@ -315,3 +315,517 @@ def test_lazy_imports_load_templates():
     import graphify
 
     assert callable(graphify.load_templates)
+
+
+# ---------------------------------------------------------------------------
+# Plan 03 Task 1: _emit_wikilink tests
+# ---------------------------------------------------------------------------
+
+
+def test_emit_wikilink_auto_aliases():
+    from graphify.templates import _emit_wikilink
+
+    assert _emit_wikilink("Neural Network Theory", "title_case") == "[[Neural_Network_Theory|Neural Network Theory]]"
+
+
+def test_emit_wikilink_kebab():
+    from graphify.templates import _emit_wikilink
+
+    assert _emit_wikilink("Neural Network Theory", "kebab-case") == "[[neural-network-theory|Neural Network Theory]]"
+
+
+def test_emit_wikilink_unicode_preserved_in_alias():
+    from graphify.templates import _emit_wikilink
+
+    assert _emit_wikilink("Teoría de Redes", "title_case") == "[[Teoría_De_Redes|Teoría de Redes]]"
+
+
+# ---------------------------------------------------------------------------
+# Plan 03 Task 1: _build_frontmatter_fields tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_frontmatter_fields_non_moc_order():
+    import datetime
+    from graphify.templates import _build_frontmatter_fields
+
+    result = _build_frontmatter_fields(
+        up=["[[ML_Architecture|ML Architecture]]"],
+        related=[],
+        collections=[],
+        tags=["community/ml-architecture", "graphify/code"],
+        note_type="thing",
+        file_type="code",
+        source_file="src/model.py",
+        source_location="L42",
+        community="ML Architecture",
+        created=datetime.date(2026, 4, 11),
+    )
+    keys = list(result.keys())
+    # D-24 field order
+    expected_order = ["up", "created", "tags", "type", "file_type", "source_file", "source_location", "community"]
+    # Check order: each expected key appears in correct relative order
+    key_positions = {k: keys.index(k) for k in expected_order if k in keys}
+    ordered_keys = [k for k in expected_order if k in key_positions]
+    positions = [key_positions[k] for k in ordered_keys]
+    assert positions == sorted(positions), f"Keys not in expected order: {keys}"
+
+
+def test_build_frontmatter_fields_empty_lists_still_emit():
+    import datetime
+    from graphify.templates import _build_frontmatter_fields
+
+    result = _build_frontmatter_fields(
+        up=["[[Atlas|Atlas]]"],
+        related=[],
+        collections=[],
+        tags=["graphify/code"],
+        note_type="thing",
+        file_type="code",
+        source_file="src/model.py",
+        source_location=None,
+        community=None,
+        created=datetime.date(2026, 4, 11),
+    )
+    # LOCKED POLICY: empty lists are SKIPPED
+    assert "related" not in result
+    assert "collections" not in result
+
+
+def test_build_frontmatter_fields_up_is_always_list():
+    import datetime
+    from graphify.templates import _build_frontmatter_fields
+
+    result = _build_frontmatter_fields(
+        up=["[[ML_Architecture|ML Architecture]]"],
+        related=[],
+        collections=[],
+        tags=["community/ml-architecture"],
+        note_type="thing",
+        file_type="code",
+        source_file="src/model.py",
+        source_location=None,
+        community=None,
+        created=datetime.date(2026, 4, 11),
+    )
+    assert isinstance(result["up"], list)
+    assert len(result["up"]) == 1
+
+
+def test_build_frontmatter_fields_cohesion_only_for_moc():
+    import datetime
+    from graphify.templates import _build_frontmatter_fields
+
+    result = _build_frontmatter_fields(
+        up=[],
+        related=[],
+        collections=[],
+        tags=["graphify/code"],
+        note_type="thing",
+        file_type="code",
+        source_file="src/model.py",
+        source_location=None,
+        community=None,
+        created=datetime.date(2026, 4, 11),
+        cohesion=0.75,
+    )
+    assert "cohesion" not in result
+
+
+# ---------------------------------------------------------------------------
+# Plan 03 Task 1: _build_wayfinder_callout tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_wayfinder_callout_thing_links_to_parent_moc_and_atlas():
+    from graphify.templates import _build_wayfinder_callout
+
+    profile = {"obsidian": {"atlas_root": "Atlas"}}
+    result = _build_wayfinder_callout(
+        note_type="thing",
+        parent_moc_label="ML Architecture",
+        profile=profile,
+        convention="title_case",
+    )
+    expected = (
+        "> [!note] Wayfinder\n"
+        "> Up: [[ML_Architecture|ML Architecture]]\n"
+        "> Map: [[Atlas|Atlas]]"
+    )
+    assert result == expected
+
+
+def test_build_wayfinder_callout_custom_atlas_root():
+    from graphify.templates import _build_wayfinder_callout
+
+    profile = {"obsidian": {"atlas_root": "Vault"}}
+    result = _build_wayfinder_callout(
+        note_type="thing",
+        parent_moc_label="ML Architecture",
+        profile=profile,
+        convention="title_case",
+    )
+    assert "> Map: [[Vault|Vault]]" in result
+
+
+def test_build_wayfinder_callout_moc_up_is_atlas():
+    from graphify.templates import _build_wayfinder_callout
+
+    profile = {"obsidian": {"atlas_root": "Atlas"}}
+    result = _build_wayfinder_callout(
+        note_type="moc",
+        parent_moc_label="Some Parent",
+        profile=profile,
+        convention="title_case",
+    )
+    # For MOC type, both Up and Map point to Atlas (D-35)
+    assert "> Up: [[Atlas|Atlas]]" in result
+    assert "> Map: [[Atlas|Atlas]]" in result
+
+
+# ---------------------------------------------------------------------------
+# Plan 03 Task 1: _build_connections_callout tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_connections_callout_lists_outgoing_edges():
+    from tests.fixtures.template_context import make_min_graph
+    from graphify.templates import _build_connections_callout
+
+    G = make_min_graph()
+    result = _build_connections_callout(G, "n_transformer", "title_case")
+    assert result.startswith("> [!info] Connections")
+    assert "> - [[Attention_Mechanism|Attention Mechanism]] — contains [EXTRACTED]" in result
+    assert "> - [[Attention_Is_All_You_Need|Attention Is All You Need]] — references [INFERRED]" in result
+
+
+def test_build_connections_callout_empty_when_no_edges():
+    from tests.fixtures.template_context import make_min_graph
+    from graphify.templates import _build_connections_callout
+
+    G = make_min_graph()
+    G.add_node("n_isolated", label="Isolated Node", file_type="code", source_file="src/x.py")
+    result = _build_connections_callout(G, "n_isolated", "title_case")
+    assert result == ""
+
+
+def test_build_connections_callout_confidence_uppercase():
+    from tests.fixtures.template_context import make_min_graph
+    from graphify.templates import _build_connections_callout
+
+    G = make_min_graph()
+    result = _build_connections_callout(G, "n_transformer", "title_case")
+    assert "[EXTRACTED]" in result
+    assert "[INFERRED]" in result
+
+
+# ---------------------------------------------------------------------------
+# Plan 03 Task 1: _build_metadata_callout tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_metadata_callout_fields_present():
+    from graphify.templates import _build_metadata_callout
+
+    result = _build_metadata_callout(
+        source_file="src/model.py",
+        source_location="L42",
+        community="ML Architecture",
+    )
+    assert "> [!abstract] Metadata" in result
+    assert "> source_file: src/model.py" in result
+    assert "> source_location: L42" in result
+    assert "> community: ML Architecture" in result
+
+
+def test_build_metadata_callout_skips_missing_source_location():
+    from graphify.templates import _build_metadata_callout
+
+    result = _build_metadata_callout(
+        source_file="src/model.py",
+        source_location=None,
+        community="ML Architecture",
+    )
+    assert "source_location" not in result
+    assert "> source_file: src/model.py" in result
+
+
+# ---------------------------------------------------------------------------
+# Plan 03 Task 2: render_note tests
+# ---------------------------------------------------------------------------
+
+
+def test_render_note_returns_tuple_filename_and_text():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    fname, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert isinstance(fname, str)
+    assert fname.endswith(".md")
+    assert isinstance(text, str)
+    assert len(text) > 0
+
+
+def test_render_note_filename_uses_convention():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile_title = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    fname, _ = render_note("n_transformer", G, profile_title, "thing", ctx)
+    assert fname == "Transformer.md"
+
+    profile_kebab = {"naming": {"convention": "kebab-case"}, "obsidian": {"atlas_root": "Atlas"}}
+    fname2, _ = render_note("n_transformer", G, profile_kebab, "thing", ctx)
+    assert fname2 == "transformer.md"
+
+
+def test_render_note_thing_has_frontmatter_delimiters():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert text.startswith("---\n")
+    # Second --- exists (frontmatter end delimiter)
+    lines = text.split("\n")
+    dashes = [i for i, l in enumerate(lines) if l.strip() == "---"]
+    assert len(dashes) >= 2
+
+
+def test_render_note_frontmatter_field_order():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    # Extract frontmatter block
+    lines = text.split("\n")
+    fm_start = 0  # first ---
+    fm_end = next(i for i in range(1, len(lines)) if lines[i].strip() == "---")
+    fm_lines = lines[fm_start + 1:fm_end]
+    fm_keys = [l.split(":")[0].strip() for l in fm_lines if ":" in l and not l.startswith("  ")]
+    # D-24 order check: up before created before tags before type
+    for earlier, later in [("up", "created"), ("created", "tags"), ("tags", "type")]:
+        if earlier in fm_keys and later in fm_keys:
+            assert fm_keys.index(earlier) < fm_keys.index(later), (
+                f"Expected '{earlier}' before '{later}' but got order: {fm_keys}"
+            )
+
+
+def test_render_note_frontmatter_up_is_list_with_parent_moc():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context(parent_moc_label="ML Architecture")
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert "up:" in text
+    assert '- "[[ML_Architecture|ML Architecture]]"' in text or "- [[ML_Architecture|ML Architecture]]" in text
+
+
+def test_render_note_frontmatter_tags_include_community_tag():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context(community_tag="ml-architecture")
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert "community/ml-architecture" in text
+
+
+def test_render_note_frontmatter_created_is_today_iso():
+    import datetime
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    today = datetime.date.today().isoformat()
+    assert today in text
+
+
+def test_render_note_contains_heading():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert "# Transformer" in text
+
+
+def test_render_note_contains_wayfinder_callout():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context(parent_moc_label="ML Architecture")
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert "> [!note] Wayfinder" in text
+    assert "> Up: [[ML_Architecture|ML Architecture]]" in text
+    assert "> Map: [[Atlas|Atlas]]" in text
+
+
+def test_render_note_contains_connections_callout():
+    import re
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert "> [!info] Connections" in text
+    assert re.search(r"> - \[\[.*\]\] — .* \[EXTRACTED|INFERRED|AMBIGUOUS\]", text)
+
+
+def test_render_note_contains_metadata_callout():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert "> [!abstract] Metadata" in text
+    assert "> source_file: src/model.py" in text
+    assert "> source_location: L42" in text
+    assert "> community: ML Architecture" in text
+
+
+def test_render_note_section_order_d32():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    # D-32: frontmatter end → heading → wayfinder → connections → metadata
+    idx_fm_end = text.index("---\n", 3)  # second --- (after frontmatter content)
+    idx_heading = text.index("# Transformer")
+    idx_wayfinder = text.index("> [!note] Wayfinder")
+    idx_connections = text.index("> [!info] Connections")
+    idx_metadata = text.index("> [!abstract] Metadata")
+    assert idx_fm_end < idx_heading < idx_wayfinder < idx_connections < idx_metadata
+
+
+def test_render_note_all_four_non_moc_types_work():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    for note_type in ("thing", "statement", "person", "source"):
+        fname, text = render_note("n_transformer", G, profile, note_type, ctx)
+        assert fname.endswith(".md"), f"{note_type}: fname missing .md"
+        assert len(text) > 0, f"{note_type}: text is empty"
+        assert f"type: {note_type}" in text, f"{note_type}: type not in frontmatter"
+
+
+def test_render_note_wikilink_alias_human_label():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    # Display alias must use human label (with spaces), not slugified name
+    assert "[[Attention_Mechanism|Attention Mechanism]]" in text
+    assert "[[Attention_Mechanism|Attention_Mechanism]]" not in text
+
+
+def test_render_note_unknown_node_raises_valueerror():
+    import pytest
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    with pytest.raises(ValueError, match=r"node_id .* not in graph"):
+        render_note("nope", G, profile, "thing", ctx)
+
+
+def test_render_note_uses_user_template_override(tmp_path):
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    # Create custom user template override
+    tpl_dir = tmp_path / ".graphify" / "templates"
+    tpl_dir.mkdir(parents=True)
+    (tpl_dir / "thing.md").write_text(
+        "${frontmatter}\n# Custom: ${label}\n\n${connections_callout}\n${metadata_callout}",
+        encoding="utf-8",
+    )
+    _, text = render_note("n_transformer", G, profile, "thing", ctx, vault_dir=tmp_path)
+    assert "# Custom: Transformer" in text
+
+
+def test_render_note_lazy_import(tmp_path):
+    import graphify
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    fname, text = graphify.render_note("n_transformer", G, profile, "thing", ctx, vault_dir=tmp_path)
+    assert fname == "Transformer.md"
+    assert text.startswith("---")
+
+
+def test_render_note_without_vault_dir_uses_builtins_only():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    # vault_dir omitted — must use built-in templates, no exception
+    fname, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert "---" in text
+    assert "# Transformer" in text
+
+
+def test_render_note_raises_valueerror_for_unknown_node():
+    import pytest
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    with pytest.raises(ValueError, match=r"node_id .* not in graph"):
+        render_note("nope", G, profile, "thing", ctx)
+
+
+def test_render_note_raises_valueerror_for_invalid_note_type():
+    import pytest
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    with pytest.raises(ValueError, match=r"note_type .* not in"):
+        render_note("n_transformer", G, profile, "whatever", ctx)
