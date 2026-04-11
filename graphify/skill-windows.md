@@ -465,6 +465,34 @@ print('Report updated with community labels')
 Replace `LABELS_DICT` with the actual dict you constructed (e.g. `{0: "Attention Mechanism", 1: "Training Pipeline"}`).
 Replace INPUT_PATH with the actual path.
 
+### Step 6a - Validate profile (opt-in)
+
+**If `--validate-profile <vault-path>` was explicitly given, run this BEFORE anything else and exit afterwards.** The preflight validator reads `.graphify/profile.yaml` and `.graphify/templates/*.md` in the target vault, checks schema, template placeholders, dead mapping rules, and path-safety heuristics, and reports errors and warnings. It does not touch any file.
+
+On clean validation (no errors) the skill prints the D-77a literal:
+`profile ok — {N} rules, {M} templates validated`
+where N is `result.rule_count` and M is `result.template_count` from the returned `PreflightResult`.
+
+```powershell
+python -c "
+import sys
+from pathlib import Path
+from graphify.profile import validate_profile_preflight
+
+vault = Path('VAULT_PATH')  # replace with the --validate-profile argument
+result = validate_profile_preflight(vault)
+for err in result.errors:
+    print(f'error: {err}')
+for warn in result.warnings:
+    print(f'warning: {warn}')
+if not result.errors and not result.warnings:
+    print(f'profile ok — {result.rule_count} rules, {result.template_count} templates validated')
+sys.exit(1 if result.errors else 0)
+"
+```
+
+If the above exits non-zero, stop here and report errors to the user. If it exits 0 (even with warnings), proceed only if `--obsidian` was ALSO given, otherwise skip the rest of the Obsidian pipeline.
+
 ### Step 6 - Generate Obsidian vault (opt-in) + HTML
 
 **Generate HTML always** (unless `--no-viz`). **Obsidian vault only if `--obsidian` was explicitly given** — skip it otherwise, it generates one file per node.
@@ -472,12 +500,16 @@ Replace INPUT_PATH with the actual path.
 If `--obsidian` was given:
 
 - If `--obsidian-dir <path>` was also given, use that path as the vault directory. Otherwise default to `graphify-out/obsidian`.
+- If `--dry-run` was also given, print the merge plan without writing any files.
+- If `--validate-profile` was given, run the preflight validator against the vault's `.graphify/` directory, print results, and exit without running the pipeline.
 
 ```powershell
 python -c "
 import sys, json
 from graphify.build import build_from_json
 from graphify.export import to_obsidian, to_canvas
+from graphify.merge import MergePlan, MergeResult, format_merge_plan
+from graphify.profile import load_profile
 from pathlib import Path
 
 extraction = json.loads(Path('.graphify_extract.json').read_text())
@@ -491,8 +523,28 @@ labels = {int(k): v for k, v in labels_raw.items()}
 
 obsidian_dir = 'OBSIDIAN_DIR'  # replace with --obsidian-dir value, or 'graphify-out/obsidian' if not given
 
-n = to_obsidian(G, communities, obsidian_dir, community_labels=labels or None, cohesion=cohesion)
-print(f'Obsidian vault: {n} notes in {obsidian_dir}/')
+# Phase 5: profile-driven pipeline.
+profile = load_profile(obsidian_dir)
+
+dry_run = False  # replace with True if --dry-run was passed
+result = to_obsidian(
+    G, communities, obsidian_dir,
+    profile=profile,
+    community_labels=labels or None,
+    cohesion=cohesion,
+    dry_run=dry_run,
+)
+if isinstance(result, MergePlan):
+    # --dry-run path: nothing written, print the preview.
+    print(format_merge_plan(result))
+else:
+    s = result.plan.summary
+    total = s.get('CREATE', 0) + s.get('UPDATE', 0) + s.get('REPLACE', 0)
+    print(f'Obsidian vault: {total} writes in {obsidian_dir}/ '
+          f"(CREATE={s.get('CREATE',0)} UPDATE={s.get('UPDATE',0)} "
+          f"SKIP_PRESERVE={s.get('SKIP_PRESERVE',0)} SKIP_CONFLICT={s.get('SKIP_CONFLICT',0)})")
+    if result.failed:
+        print(f'  {len(result.failed)} failed writes — see stderr for details')
 
 to_canvas(G, communities, f'{obsidian_dir}/graph.canvas', community_labels=labels or None)
 print(f'Canvas: {obsidian_dir}/graph.canvas - open in Obsidian for structured community layout')
