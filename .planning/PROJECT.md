@@ -25,7 +25,7 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - [ ] Profile YAML schema: folder mapping, mapping rules, merge behavior, naming conventions, Obsidian config
 - [ ] Mapping rules support both graph topology (god node, community hub, leaf node) and node content/attributes (`file_type`, `type`, custom attributes)
 - [ ] Vault profile takes precedence over default; graceful fallback when no profile exists
-- [ ] Merge/update strategy for existing notes — update by default, preserve user-specified frontmatter fields, skip or replace as configured
+- [x] Merge/update strategy for existing notes — update by default, preserve user-specified frontmatter fields, skip or replace as configured _(Validated in Phase 4: Merge Engine)_
 - [ ] Community-to-MOC mapping: communities above configurable member threshold become MOCs in the configured Maps folder with Dataview queries
 - [ ] God-node-to-Dot mapping: high-degree abstraction nodes become Dots (Things) with connections as body content
 - [ ] Source-file-to-Source mapping: origin files become Source notes in configured Sources folder
@@ -65,7 +65,7 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 | YAML for profile, Markdown for templates | YAML is declarative and familiar; MD templates are native to Obsidian users | — Pending |
 | Dual mapping (topology + content attributes) | Some note types are determined by graph position (god node → Thing), others by content (file_type: person → Person) | — Pending |
 | Default = Ideaverse ACE structure | Most popular Obsidian framework; sensible fallback; validates the system works | — Pending |
-| Update-by-default merge strategy | Users expect injected content to refresh, not duplicate; preserving user-edited fields prevents data loss | — Pending |
+| Update-by-default merge strategy | Users expect injected content to refresh, not duplicate; preserving user-edited fields prevents data loss | Validated in Phase 4 — `merge.py` ships `compute_merge_plan`/`apply_merge_plan`; D-67 sentinel blocks + D-64 field policies + D-72 orphan-preservation locked in |
 | Simple placeholder templating (no Jinja2) | Avoids new dependency; templates stay readable as plain markdown; sufficient for frontmatter + body generation | Validated in Phase 2 — `string.Template.safe_substitute` works for KNOWN_VARS + two-phase Dataview wrap |
 
 ## Evolution
@@ -88,8 +88,10 @@ This document evolves at phase transitions and milestone boundaries.
 ## Current State
 
 - **Phase 1 (Foundation)** — ✅ Complete. `graphify/profile.py` delivers profile loading, validation, safe-filename/tag helpers, and security primitives.
-- **Phase 2 (Template Engine)** — ✅ Complete. `graphify/templates.py` renders MOC, Community, Thing, Statement, Person, and Source notes via `string.Template` + 6 built-in `.md` templates shipped in the wheel. `render_note()` and `render_moc()` are the public entry points. 587 tests passing.
-- **Phase 3 (Mapping Engine)** — Next. Will populate `ClassificationContext` to drive topology + attribute classification.
+- **Phase 2 (Template Engine)** — ✅ Complete. `graphify/templates.py` renders MOC, Community, Thing, Statement, Person, and Source notes via `string.Template` + 6 built-in `.md` templates shipped in the wheel. `render_note()` and `render_moc()` are the public entry points.
+- **Phase 3 (Mapping Engine)** — ✅ Complete. `ClassificationContext` drives topology + attribute classification.
+- **Phase 4 (Merge Engine)** — ✅ Complete. `graphify/merge.py` delivers `compute_merge_plan` (pure) and `apply_merge_plan` (atomic writes, content-hash skip, ORPHAN-preservation). 818 project tests passing, 28/28 must-haves verified.
+- **Phase 5 (Integration & CLI)** — Next. Wires the merge engine into the `--obsidian` CLI path with `--dry-run` support.
 
 ---
-*Last updated: 2026-04-11 after Phase 2 completion*
+*Last updated: 2026-04-11 after Phase 4 completion*
