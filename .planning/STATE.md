@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-04-11T17:03:40.483Z"
+stopped_at: Completed 04-05-PLAN.md
+last_updated: "2026-04-11T17:09:24.720Z"
 last_activity: 2026-04-11
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 16
-  completed_plans: 14
-  percent: 88
+  completed_plans: 15
+  percent: 94
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-09)
 ## Current Position
 
 Phase: 04 (merge-engine) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-04-11
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P02 | 3min | 3 tasks | 4 files |
 | Phase 04 P03 | 4min | 3 tasks | 2 files |
 | Phase 04 P04 | 4min | 3 tasks | 9 files |
+| Phase 04 P05 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - [Phase 04]: _resolve_field_policy: 4-tier precedence preserve_fields > user field_policies > _DEFAULT_FIELD_POLICIES > unknown-default preserve (D-65)
 - [Phase 04]: _CANONICAL_KEY_ORDER in merge.py not imported from templates.py — module isolation per CONTEXT.md (merge.py must not depend on templates.py)
 - [Phase 04]: RenderedNote TypedDict defined in merge.py — Phase 5 is real caller but merge.py owns input contract today
+- [Phase 04]: apply_merge_plan re-synthesizes text at write time (not baked into MergeAction) — keeps MergePlan O(action_count) and enables --dry-run to skip synthesis
+- [Phase 04]: Content-hash skip (SHA-256) covers CREATE as well as UPDATE/REPLACE — idempotent re-runs on unchanged vaults produce zero filesystem writes
 
 ### Pending Todos
 
@@ -88,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T17:03:40.480Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-04-11T17:09:24.717Z
+Stopped at: Completed 04-05-PLAN.md
 Resume file: None
