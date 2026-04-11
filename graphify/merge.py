@@ -386,3 +386,345 @@ def _apply_field_policy(
         return merged
     # Unknown mode — treat as preserve (conservative)
     return current
+
+
+# ---------------------------------------------------------------------------
+# Canonical frontmatter key order (D-24) — source of truth for
+# slot-near-neighbor insertion when adding new keys to existing files.
+# This list MUST match graphify.templates._build_frontmatter_fields order.
+# ---------------------------------------------------------------------------
+
+_CANONICAL_KEY_ORDER: list[str] = [
+    "up",
+    "related",
+    "collections",
+    "created",
+    "tags",
+    "type",
+    "file_type",
+    "source_file",
+    "source_location",
+    "community",
+    "cohesion",
+    "graphify_managed",
+]
+
+
+# ---------------------------------------------------------------------------
+# RenderedNote TypedDict — input shape for compute_merge_plan
+# ---------------------------------------------------------------------------
+
+from typing import TypedDict
+
+
+class RenderedNote(TypedDict):
+    """Input shape for compute_merge_plan's rendered_notes parameter.
+
+    Phase 5's to_obsidian() builds this dict by calling render_note / render_moc
+    from templates.py and adding the target_path from mapping.py's MappingResult.
+    """
+    node_id: str
+    target_path: Path
+    frontmatter_fields: dict
+    body: str
+
+
+# ---------------------------------------------------------------------------
+# Fingerprint check (D-62)
+# ---------------------------------------------------------------------------
+
+def _has_fingerprint(parsed_fm: dict | None, blocks: dict[str, str]) -> bool:
+    """True iff EITHER fingerprint signal (D-62) is present."""
+    if parsed_fm and parsed_fm.get("graphify_managed"):
+        return True
+    return bool(blocks)
+
+
+# ---------------------------------------------------------------------------
+# Body-start locator + path confinement gate
+# ---------------------------------------------------------------------------
+
+def _find_body_start(text: str) -> int:
+    """Byte index of the first char after the closing `---` delimiter of a
+    frontmatter block. Returns 0 when no frontmatter is present.
+    """
+    if not text.startswith("---"):
+        return 0
+    second = text.find("\n---", 3)
+    if second == -1:
+        return 0
+    end = text.find("\n", second + 1)
+    if end == -1:
+        return len(text)
+    return end + 1
+
+
+def _validate_target(candidate: Path, vault_dir: Path) -> Path:
+    """Gate every candidate path through profile.validate_vault_path.
+
+    Raises ValueError if the path escapes vault_dir.
+    """
+    from graphify.profile import validate_vault_path
+    rel = candidate if not candidate.is_absolute() else candidate.relative_to(vault_dir)
+    return validate_vault_path(rel, vault_dir)
+
+
+# ---------------------------------------------------------------------------
+# Frontmatter merge helpers (D-66)
+# ---------------------------------------------------------------------------
+
+def _insert_with_canonical_neighbor(target: dict, key: str, value) -> dict:
+    """Insert key:value into target after its nearest canonical neighbor."""
+    if key not in _CANONICAL_KEY_ORDER:
+        new_dict = dict(target)
+        new_dict[key] = value
+        return new_dict
+
+    canonical_idx = _CANONICAL_KEY_ORDER.index(key)
+    preceding = _CANONICAL_KEY_ORDER[:canonical_idx]
+    neighbor: str | None = None
+    for candidate in reversed(preceding):
+        if candidate in target:
+            neighbor = candidate
+            break
+
+    new_dict: dict = {}
+    if neighbor is None:
+        new_dict[key] = value
+        for k, v in target.items():
+            new_dict[k] = v
+        return new_dict
+
+    for k, v in target.items():
+        new_dict[k] = v
+        if k == neighbor:
+            new_dict[key] = value
+    return new_dict
+
+
+def _merge_frontmatter(
+    existing: dict,
+    new: dict,
+    profile: dict,
+) -> tuple[dict, list[str]]:
+    """Merge new frontmatter into existing, preserving order + per-key policy.
+
+    D-66 ordering rule: keys already in `existing` keep their position;
+    keys in `new` but not in `existing` are slotted after their nearest
+    preceding canonical neighbor from _CANONICAL_KEY_ORDER, falling back to
+    append at end.
+
+    Returns (merged_dict, changed_keys_list).
+    """
+    merged: dict = {}
+    changed: list[str] = []
+    new_consumed: set[str] = set()
+
+    for key, current_value in existing.items():
+        mode = _resolve_field_policy(key, profile)
+        if key in new:
+            updated = _apply_field_policy(key, current_value, new[key], mode)
+            new_consumed.add(key)
+        else:
+            # Not in new render
+            if mode == "preserve":
+                updated = current_value
+            else:
+                updated = None  # graphify removed — drop from output
+        if updated is None:
+            if current_value is not None:
+                changed.append(key)
+            continue
+        if updated != current_value:
+            changed.append(key)
+        merged[key] = updated
+
+    new_only = [k for k in new if k not in new_consumed]
+    for key in new_only:
+        mode = _resolve_field_policy(key, profile)
+        if mode == "preserve":
+            continue
+        value = _apply_field_policy(key, None, new[key], mode)
+        if value is None:
+            continue
+        merged = _insert_with_canonical_neighbor(merged, key, value)
+        changed.append(key)
+
+    return merged, changed
+
+
+# ---------------------------------------------------------------------------
+# Body block merge helper (D-68)
+# ---------------------------------------------------------------------------
+
+def _merge_body_blocks(
+    existing_body: str,
+    existing_blocks: dict[str, str],
+    new_blocks: dict[str, str],
+) -> tuple[str, list[str]]:
+    """Refresh existing body blocks in place; never re-insert deleted ones (D-68).
+
+    Walks existing_blocks (what's currently in the file) and replaces each
+    with its counterpart from new_blocks. Blocks in new_blocks not present
+    in existing_blocks are D-68 "deleted, respected" and NOT re-inserted.
+    Blocks in existing_blocks not in new_blocks are left unchanged.
+    """
+    changed: list[str] = []
+    result = existing_body
+    for name, existing_content in existing_blocks.items():
+        if name not in new_blocks:
+            continue
+        if new_blocks[name] == existing_content:
+            continue
+        start = f"<!-- graphify:{name}:start -->"
+        end = f"<!-- graphify:{name}:end -->"
+        old = f"{start}\n{existing_content}\n{end}"
+        replacement = f"{start}\n{new_blocks[name]}\n{end}"
+        result = result.replace(old, replacement, 1)
+        changed.append(name)
+    return result, changed
+
+
+# ---------------------------------------------------------------------------
+# compute_merge_plan — pure read-only orchestration (D-70, D-71, D-72)
+# ---------------------------------------------------------------------------
+
+def compute_merge_plan(
+    vault_dir: Path,
+    rendered_notes: dict[str, RenderedNote],
+    profile: dict,
+    *,
+    skipped_node_ids: set[str] | None = None,
+    previously_managed_paths: set[Path] | None = None,
+) -> MergePlan:
+    """Pure reconciliation of rendered notes against a vault on disk.
+
+    Produces a MergePlan listing per-file MergeAction decisions. Never writes.
+    Phase 5's --dry-run calls this directly.
+    """
+    vault_dir = Path(vault_dir).resolve()
+    skipped_node_ids = skipped_node_ids or set()
+    strategy = profile.get("merge", {}).get("strategy", "update")
+    if strategy not in _VALID_MERGE_STRATEGIES:
+        strategy = "update"
+
+    actions: list[MergeAction] = []
+    orphan_paths: list[Path] = []
+    rendered_path_set: set[Path] = set()
+
+    for node_id, rn in rendered_notes.items():
+        if node_id in skipped_node_ids:
+            continue
+        raw_target = Path(rn["target_path"])
+        try:
+            target_path = _validate_target(raw_target, vault_dir)
+        except ValueError as exc:
+            actions.append(MergeAction(
+                path=raw_target,
+                action="SKIP_CONFLICT",
+                reason=f"path escape: {exc}",
+                conflict_kind="unmanaged_file",
+            ))
+            continue
+        rendered_path_set.add(target_path)
+
+        if not target_path.exists():
+            actions.append(MergeAction(
+                path=target_path,
+                action="CREATE",
+                reason="new file",
+            ))
+            continue
+
+        # File exists — read and parse
+        existing_text = target_path.read_text(encoding="utf-8")
+        parsed_fm = _parse_frontmatter(existing_text)
+        body_start = _find_body_start(existing_text)
+        existing_body = existing_text[body_start:]
+
+        if parsed_fm is None:
+            actions.append(MergeAction(
+                path=target_path,
+                action="SKIP_CONFLICT",
+                reason="malformed frontmatter — file left untouched",
+                conflict_kind="malformed_frontmatter",
+            ))
+            continue
+
+        try:
+            existing_blocks = _parse_sentinel_blocks(existing_body)
+        except _MalformedSentinel as exc:
+            actions.append(MergeAction(
+                path=target_path,
+                action="SKIP_CONFLICT",
+                reason=f"malformed sentinel: {exc}",
+                conflict_kind="malformed_sentinel",
+            ))
+            continue
+
+        if not _has_fingerprint(parsed_fm, existing_blocks):
+            actions.append(MergeAction(
+                path=target_path,
+                action="SKIP_CONFLICT",
+                reason="no fingerprint — refusing to overwrite unmanaged file",
+                conflict_kind="unmanaged_file",
+            ))
+            continue
+
+        # Fingerprinted existing file — strategy dispatch
+        if strategy == "skip":
+            actions.append(MergeAction(
+                path=target_path,
+                action="SKIP_PRESERVE",
+                reason="strategy=skip leaves existing files untouched",
+            ))
+            continue
+        if strategy == "replace":
+            actions.append(MergeAction(
+                path=target_path,
+                action="REPLACE",
+                reason="strategy=replace overwrites fingerprinted file",
+            ))
+            continue
+
+        # strategy == "update" — per-field + per-block diff
+        _, changed_fields = _merge_frontmatter(parsed_fm, rn["frontmatter_fields"], profile)
+        try:
+            new_blocks = _parse_sentinel_blocks(rn["body"])
+        except _MalformedSentinel:
+            # Shouldn't happen — graphify-emitted bodies are always well-formed
+            new_blocks = {}
+        _, changed_blocks = _merge_body_blocks(existing_body, existing_blocks, new_blocks)
+
+        reason = "idempotent re-render" if not changed_fields and not changed_blocks else "update"
+        actions.append(MergeAction(
+            path=target_path,
+            action="UPDATE",
+            reason=reason,
+            changed_fields=changed_fields,
+            changed_blocks=changed_blocks,
+        ))
+
+    # Orphan detection (D-72)
+    if previously_managed_paths:
+        for prior in previously_managed_paths:
+            try:
+                prior_resolved = _validate_target(Path(prior), vault_dir)
+            except ValueError:
+                continue
+            if prior_resolved in rendered_path_set:
+                continue
+            if not prior_resolved.exists():
+                continue
+            orphan_paths.append(prior_resolved)
+            actions.append(MergeAction(
+                path=prior_resolved,
+                action="ORPHAN",
+                reason="node no longer in graph — reported, never deleted",
+            ))
+
+    summary: dict[str, int] = {}
+    for a in actions:
+        summary[a.action] = summary.get(a.action, 0) + 1
+
+    return MergePlan(actions=actions, orphans=orphan_paths, summary=summary)
