@@ -463,9 +463,27 @@ def _validate_target(candidate: Path, vault_dir: Path) -> Path:
     """Gate every candidate path through profile.validate_vault_path.
 
     Raises ValueError if the path escapes vault_dir.
+
+    WR-03: Absolute candidates are resolved via `.resolve()` before being
+    made relative to `vault_dir`. `vault_dir` is likewise resolved. This
+    ensures symlink parity on platforms like macOS, where `/tmp` is a
+    symlink to `/private/tmp`: without resolving, an absolute candidate
+    passed in as `/private/tmp/...` against a `vault_dir` of `/tmp/...`
+    (or vice versa) would raise ValueError from `Path.relative_to` even
+    though both paths point at the same vault.
     """
     from graphify.profile import validate_vault_path
-    rel = candidate if not candidate.is_absolute() else candidate.relative_to(vault_dir)
+    if candidate.is_absolute():
+        resolved_vault = vault_dir.resolve()
+        resolved_candidate = candidate.resolve()
+        try:
+            rel = resolved_candidate.relative_to(resolved_vault)
+        except ValueError as exc:
+            raise ValueError(
+                f"{candidate!r} escapes vault directory {vault_dir}"
+            ) from exc
+    else:
+        rel = candidate
     return validate_vault_path(rel, vault_dir)
 
 

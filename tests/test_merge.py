@@ -679,6 +679,57 @@ def test_compute_action_paths_are_absolute_and_inside_vault(tmp_path):
     assert str(vault.resolve()) in str(action_path)
 
 
+def test_validate_target_handles_symlinked_tmpdir(tmp_path):
+    """WR-03 regression: `_validate_target` must resolve both `vault_dir`
+    and the candidate path before calling `Path.relative_to`, so that
+    symlink parity (e.g. macOS `/tmp` → `/private/tmp`) does not cause a
+    false ValueError for paths that are in fact inside the vault.
+    """
+    import os
+    from graphify.merge import _validate_target
+
+    # Build a real vault under tmp_path, then create a sibling symlink that
+    # points at it. Passing the symlink dir as vault_dir and an absolute
+    # candidate under the real dir (or vice versa) used to raise ValueError.
+    real_vault = tmp_path / "real_vault"
+    real_vault.mkdir()
+    target_file = real_vault / "Atlas/Dots/Things/Transformer.md"
+    target_file.parent.mkdir(parents=True)
+    target_file.write_text("stub", encoding="utf-8")
+
+    symlink_vault = tmp_path / "symlink_vault"
+    os.symlink(real_vault, symlink_vault)
+
+    # vault_dir is the symlink; candidate is an absolute path under the
+    # *real* directory. Without resolving, `relative_to` raises ValueError.
+    candidate_via_real = real_vault / "Atlas/Dots/Things/Transformer.md"
+    result = _validate_target(candidate_via_real, symlink_vault)
+    assert result.is_absolute()
+    # Resolved form must live under the resolved vault.
+    assert str(result.resolve()).startswith(str(symlink_vault.resolve()))
+
+    # And the symmetric case: vault_dir is the real dir, candidate traverses
+    # through the symlink. Must also succeed.
+    candidate_via_symlink = symlink_vault / "Atlas/Dots/Things/Transformer.md"
+    result2 = _validate_target(candidate_via_symlink, real_vault)
+    assert result2.is_absolute()
+    assert str(result2.resolve()).startswith(str(real_vault.resolve()))
+
+
+def test_validate_target_rejects_absolute_path_outside_vault(tmp_path):
+    """Companion to the symlink test: an absolute path that genuinely
+    escapes the vault after resolution must still raise ValueError.
+    """
+    from graphify.merge import _validate_target
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    outside = tmp_path / "elsewhere" / "evil.md"
+    outside.parent.mkdir()
+    outside.write_text("x", encoding="utf-8")
+    with pytest.raises(ValueError):
+        _validate_target(outside, vault)
+
+
 # --- Phase 4 Task 5 Task 2: apply_merge_plan integration ---
 
 def test_apply_empty_plan_returns_empty_result(tmp_path):
