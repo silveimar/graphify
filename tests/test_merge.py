@@ -611,3 +611,235 @@ def test_compute_action_paths_are_absolute_and_inside_vault(tmp_path):
     action_path = plan.actions[0].path
     assert action_path.is_absolute()
     assert str(vault.resolve()) in str(action_path)
+
+
+# --- Phase 4 Task 5 Task 2: apply_merge_plan integration ---
+
+def test_apply_empty_plan_returns_empty_result(tmp_path):
+    from graphify.merge import apply_merge_plan, MergePlan, MergeResult
+    vault = _copy_vault_fixture("empty", tmp_path)
+    plan = MergePlan(actions=[], orphans=[], summary={})
+    result = apply_merge_plan(plan, vault, {}, {})
+    assert isinstance(result, MergeResult)
+    assert result.succeeded == []
+    assert result.failed == []
+    assert result.skipped_identical == []
+
+
+def test_apply_create_writes_new_file(tmp_path):
+    from graphify.merge import apply_merge_plan, compute_merge_plan
+    vault = _copy_vault_fixture("empty", tmp_path)
+    rn = {
+        "node_id": "transformer",
+        "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+        "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+        "body": "# Transformer\n",
+    }
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    assert plan.actions[0].action == "CREATE"
+    result = apply_merge_plan(plan, vault, {"transformer": rn}, {})
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    assert target.exists(), "CREATE must write the file"
+    content = target.read_text()
+    assert "graphify_managed" in content
+    assert "# Transformer" in content
+    # No .tmp file should remain
+    assert not (target.with_suffix(".md.tmp")).exists()
+    assert target in result.succeeded
+
+
+def test_apply_update_idempotent_skips_write(tmp_path):
+    from graphify.merge import compute_merge_plan, apply_merge_plan
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    rn = _rendered_note_matching_pristine(vault)
+    target = vault / rn["target_path"]
+    original_mtime = target.stat().st_mtime_ns
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    # Confirm the plan is UPDATE with empty changed lists
+    assert plan.actions[0].action == "UPDATE"
+    assert plan.actions[0].changed_fields == []
+    assert plan.actions[0].changed_blocks == []
+    result = apply_merge_plan(plan, vault, {"transformer": rn}, {})
+    assert target in result.skipped_identical
+    assert target not in result.succeeded
+    assert target.stat().st_mtime_ns == original_mtime, \
+        "idempotent re-apply must not touch the file"
+
+
+def test_apply_update_changed_source_file_writes(tmp_path):
+    from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    target_rel = Path("Atlas/Dots/Things/Transformer.md")
+    target = vault / target_rel
+    text = target.read_text()
+    fm = _parse_frontmatter(text)
+    new_fields = dict(fm)
+    new_fields["source_file"] = "src/transformer_v2.py"
+    body_start = text.index("---", 4) + 3
+    rn = {
+        "node_id": "transformer",
+        "target_path": target_rel,
+        "frontmatter_fields": new_fields,
+        "body": text[body_start:],
+    }
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    assert plan.actions[0].action == "UPDATE"
+    assert "source_file" in plan.actions[0].changed_fields
+    result = apply_merge_plan(plan, vault, {"transformer": rn}, {})
+    assert target in result.succeeded
+    assert target not in result.skipped_identical
+    written = _parse_frontmatter(target.read_text())
+    assert written["source_file"] == "src/transformer_v2.py"
+
+
+def test_apply_replace_overwrites_preserve_fields(tmp_path):
+    from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+    vault = _copy_vault_fixture("preserve_fields_edited", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    # Build a rendered note WITHOUT rank/mapState
+    existing = _parse_frontmatter(target.read_text())
+    new_fields = {k: v for k, v in existing.items() if k not in ("rank", "mapState")}
+    rn = {
+        "node_id": "transformer",
+        "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+        "frontmatter_fields": new_fields,
+        "body": target.read_text().split("---", 2)[2],
+    }
+    profile = {"merge": {"strategy": "replace"}}
+    plan = compute_merge_plan(vault, {"transformer": rn}, profile)
+    assert plan.actions[0].action == "REPLACE"
+    apply_merge_plan(plan, vault, {"transformer": rn}, profile)
+    after = _parse_frontmatter(target.read_text())
+    assert "rank" not in after, "replace must lose user's rank edit"
+    assert "mapState" not in after, "replace must lose user's mapState edit"
+
+
+def test_apply_skip_preserve_noop(tmp_path):
+    from graphify.merge import compute_merge_plan, apply_merge_plan
+    import os
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    rn = _rendered_note_matching_pristine(vault)
+    target = vault / rn["target_path"]
+    profile = {"merge": {"strategy": "skip"}}
+    plan = compute_merge_plan(vault, {"transformer": rn}, profile)
+    assert plan.actions[0].action == "SKIP_PRESERVE"
+    mtime_before = target.stat().st_mtime_ns
+    result = apply_merge_plan(plan, vault, {"transformer": rn}, profile)
+    assert target.stat().st_mtime_ns == mtime_before, "SKIP_PRESERVE must not touch file"
+    assert result.succeeded == []
+    assert result.skipped_identical == []
+
+
+def test_apply_orphan_never_deleted(tmp_path):
+    from graphify.merge import compute_merge_plan, apply_merge_plan
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    orphan_path = Path("Atlas/Dots/Things/Transformer.md")
+    # Empty rendered_notes: the file is "orphaned"
+    plan = compute_merge_plan(
+        vault, {}, {},
+        previously_managed_paths={(vault / orphan_path).resolve()},
+    )
+    assert any(a.action == "ORPHAN" for a in plan.actions)
+    result = apply_merge_plan(plan, vault, {}, {})
+    # The file must STILL exist — D-72 never deletes
+    assert (vault / orphan_path).exists()
+    # It must not be in succeeded or failed — apply skips ORPHAN
+    assert (vault / orphan_path).resolve() not in result.succeeded
+
+
+def test_apply_skip_conflict_no_write(tmp_path):
+    from graphify.merge import compute_merge_plan, apply_merge_plan
+    vault = _copy_vault_fixture("fingerprint_stripped", tmp_path)
+    rn = {
+        "node_id": "transformer",
+        "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+        "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+        "body": "# Transformer\n",
+    }
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    assert plan.actions[0].action == "SKIP_CONFLICT"
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    original_content = target.read_text()
+    original_mtime = target.stat().st_mtime_ns
+    result = apply_merge_plan(plan, vault, {"transformer": rn}, {})
+    assert target.read_text() == original_content, "SKIP_CONFLICT must not modify file"
+    assert target.stat().st_mtime_ns == original_mtime
+    assert result.succeeded == []
+    assert result.failed == []
+
+
+def test_apply_cleanup_stale_tmp(tmp_path):
+    from graphify.merge import apply_merge_plan, MergePlan
+    vault = _copy_vault_fixture("empty", tmp_path)
+    # Pre-seed a stale .tmp file
+    stale = vault / "Atlas/Dots/Things/Transformer.md.tmp"
+    stale.parent.mkdir(parents=True, exist_ok=True)
+    stale.write_text("stale content")
+    assert stale.exists()
+    plan = MergePlan(actions=[], orphans=[], summary={})
+    apply_merge_plan(plan, vault, {}, {})
+    assert not stale.exists(), "_cleanup_stale_tmp must remove stale .tmp files"
+
+
+def test_apply_atomic_no_partial_file_on_error(tmp_path, monkeypatch):
+    from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+    import os
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    original_content = target.read_text()
+    target_rel = Path("Atlas/Dots/Things/Transformer.md")
+    text = target.read_text()
+    fm = _parse_frontmatter(text)
+    new_fields = dict(fm)
+    new_fields["source_file"] = "new_source.py"
+    body_start = text.index("---", 4) + 3
+    rn = {
+        "node_id": "transformer",
+        "target_path": target_rel,
+        "frontmatter_fields": new_fields,
+        "body": text[body_start:],
+    }
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    assert plan.actions[0].action == "UPDATE"
+
+    # Monkeypatch os.replace to raise on the vault's file
+    original_replace = os.replace
+    def failing_replace(src, dst):
+        if str(vault) in str(dst):
+            raise OSError("simulated disk error")
+        return original_replace(src, dst)
+    monkeypatch.setattr(os, "replace", failing_replace)
+
+    result = apply_merge_plan(plan, vault, {"transformer": rn}, {})
+
+    # Original file must be unchanged
+    assert target.read_text() == original_content, \
+        "atomic write failure must leave original file intact"
+    # No .tmp file should remain
+    tmp_file = target.with_suffix(".md.tmp")
+    assert not tmp_file.exists(), "failed atomic write must clean up .tmp file"
+    # Failed path must be in MergeResult.failed
+    assert len(result.failed) == 1
+    assert result.failed[0][0] == target.resolve()
+
+
+def test_apply_path_escape_recorded_as_failed(tmp_path):
+    from graphify.merge import apply_merge_plan, MergePlan, MergeAction
+    vault = _copy_vault_fixture("empty", tmp_path)
+    # Craft a path that escapes vault_dir using '..' traversal
+    escape_path = vault / ".." / "escaped.md"
+    escaped_action = MergeAction(
+        path=escape_path.resolve(),
+        action="CREATE",
+        reason="crafted escape",
+    )
+    plan = MergePlan(actions=[escaped_action], orphans=[], summary={"CREATE": 1})
+    rn = {
+        "node_id": "escape",
+        "target_path": escape_path.resolve(),
+        "frontmatter_fields": {"type": "thing"},
+        "body": "# Escaped\n",
+    }
+    result = apply_merge_plan(plan, vault, {"escape": rn}, {})
+    assert len(result.failed) == 1, "escaped path must be recorded in failed"
+    assert not (tmp_path / "escaped.md").exists(), "escaped path must NOT be written"
