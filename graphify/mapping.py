@@ -238,11 +238,148 @@ def _resolve_folder(
 
 
 # ---------------------------------------------------------------------------
-# classify() — stubbed here; implementation lands in Task 3
+# classify() — D-47 precedence pipeline (per-node half; Plan 02 adds
+# community assembly)
 # ---------------------------------------------------------------------------
 
-def classify(G, communities, profile, *, cohesion=None):  # pragma: no cover
-    raise NotImplementedError("classify() lands in Task 3")
+def classify(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    profile: dict,
+    *,
+    cohesion: dict[int, float] | None = None,
+) -> MappingResult:
+    """Classify every real node into a ClassificationContext.
+
+    Precedence pipeline (D-47):
+        1. Explicit mapping_rules — first-match-wins
+        2. Built-in topology fallback — god node → thing
+        3. Default — statement
+
+    Global filters (D-50, D-51):
+        - concept nodes: always skipped
+        - file-hub nodes: skipped UNLESS explicit `{topology: is_source_file}`
+          rule matches (opt-in)
+
+    Community-level fields (community_tag, members_by_type, sibling_labels,
+    parent_moc_label, community_name) are left blank in this plan — Plan 02's
+    community assembly pass populates them.
+    """
+    from graphify.cluster import score_all
+
+    folder_mapping = profile.get("folder_mapping") or {}
+    top_n = (
+        profile.get("topology", {})
+        .get("god_node", {})
+        .get("top_n", 10)
+    )
+    raw_rules = profile.get("mapping_rules") or []
+    compiled_rules = compile_rules(raw_rules)
+
+    if cohesion is None:
+        cohesion = score_all(G, communities)
+
+    node_to_community = _node_community_map(communities)
+    community_sizes = {cid: len(members) for cid, members in communities.items()}
+    god_list = god_nodes(G, top_n=top_n)
+    god_ids = frozenset(g["id"] for g in god_list)
+
+    ctx = _MatchCtx(
+        node_to_community=node_to_community,
+        community_sizes=community_sizes,
+        cohesion=cohesion,
+        god_node_ids=god_ids,
+    )
+
+    per_node: dict[str, ClassificationContext] = {}
+    skipped: set[str] = set()
+    traces: list[RuleTrace] = []
+
+    # Deterministic ordering: by (community_id, node_id). Nodes in G but not
+    # in communities get classified too (sentinel community id -1).
+    ordered_nodes: list[tuple[int, str]] = sorted(
+        (cid, n)
+        for cid, members in communities.items()
+        for n in members
+    )
+    uncovered = sorted(n for n in G.nodes if n not in node_to_community)
+    ordered_nodes.extend((-1, n) for n in uncovered)
+
+    for _cid, node_id in ordered_nodes:
+        # (1) Unconditional concept skip (D-50/D-51).
+        if _is_concept_node(G, node_id):
+            skipped.add(node_id)
+            continue
+
+        is_file_hub = _is_file_node(G, node_id)
+        matched_rule: tuple[int, dict, dict] | None = None
+        for idx, rule in enumerate(compiled_rules):
+            when = rule.get("when") or {}
+            then = rule.get("then") or {}
+            if _match_when(when, node_id, G, ctx=ctx):
+                matched_rule = (idx, when, then)
+                break
+
+        # (2) File-hub opt-in: only surfaces when the matching rule was
+        #     {topology: is_source_file} (D-51). Otherwise skip the hub.
+        if is_file_hub:
+            if matched_rule is None or matched_rule[1].get("topology") != "is_source_file":
+                skipped.add(node_id)
+                continue
+
+        if matched_rule is not None:
+            idx, when, then = matched_rule
+            note_type = then.get("note_type", "statement")
+            if note_type not in _NOTE_TYPES:
+                note_type = "statement"
+            then_folder = then.get("folder")
+            folder = _resolve_folder(note_type, then_folder, folder_mapping)
+            traces.append(
+                RuleTrace(
+                    node_id=node_id,
+                    rule_index=idx,
+                    when_expr=dict(when),
+                    matched_kind=_kind_of(when),
+                )
+            )
+        else:
+            # (3) Built-in topology fallback — god node → thing, else statement.
+            if node_id in god_ids:
+                note_type = "thing"
+            else:
+                note_type = "statement"
+            folder = _resolve_folder(note_type, None, folder_mapping)
+
+        per_node[node_id] = ClassificationContext(
+            note_type=note_type,
+            folder=folder,
+            members_by_type={},
+            sub_communities=[],
+            sibling_labels=[],
+        )
+
+    return MappingResult(
+        per_node=per_node,
+        per_community={},  # Plan 02 populates
+        skipped_node_ids=skipped,
+        rule_traces=traces,
+    )
+
+
+def _kind_of(when: dict) -> str:
+    """Return a short string identifying which matcher kind a `when` clause uses."""
+    if "attr" in when:
+        for op in ("equals", "in", "contains", "regex"):
+            if op in when:
+                return f"attr:{op}"
+        return "attr:?"
+    if "topology" in when:
+        return f"topology:{when['topology']}"
+    if "source_file_ext" in when:
+        return "source_file_ext"
+    if "source_file_matches" in when:
+        return "source_file_matches"
+    return "unknown"
 
 
 def validate_rules(rules: list) -> list[str]:  # pragma: no cover
