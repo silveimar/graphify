@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 2: Template Engine** - Note rendering via `string.Template` with built-in templates for all note types
 - [x] **Phase 3: Mapping Engine** - Topology + attribute classification of nodes into note types and folder placements (completed 2026-04-11)
 - [x] **Phase 4: Merge Engine** - Safe frontmatter round-trip with `preserve_fields`, field-order preservation, and merge strategies (completed 2026-04-11)
-- [ ] **Phase 5: Integration & CLI** - Wire all four modules into refactored `to_obsidian()`; add `--dry-run` and `--validate-profile`
+- [x] **Phase 5: Integration & CLI** - Wire all four modules into refactored `to_obsidian()`; add `--dry-run` and `--validate-profile` (completed 2026-04-11)
 
 ## Phase Details
 
@@ -99,14 +99,14 @@ Plans:
   1. Running `graphify --validate-profile <vault-path>` prints pass/fail with actionable messages and exits without writing any files
   2. Running `graphify --obsidian --dry-run` prints the full plan of files to create or update without writing any files
   3. Running `graphify --obsidian` against a vault with no `.graphify/` directory produces output backward-compatible with the pre-existing `to_obsidian()` behavior and all existing tests pass
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 
 Plans:
 - [x] 05-01-PLAN.md — merge.py: add format_merge_plan helper (D-76) — pure dry-run formatter
 - [x] 05-02-PLAN.md — profile.py: add validate_profile_preflight four-layer composite (D-77, PROF-05)
 - [x] 05-03-PLAN.md — export.py: refactor to_obsidian to orchestrate the Phase 1-4 pipeline (D-74/D-75)
 - [x] 05-04-PLAN.md — tests: migrate FIX-01/02/03 invariants to test_integration.py, update test_pipeline.py (MRG-03, MRG-05)
-- [ ] 05-05-PLAN.md — __init__.py lazy imports + all 9 skill files: profile=/dry_run= wiring and --validate-profile path (D-77a, PROF-05/MRG-03/MRG-05)
+- [x] 05-05-PLAN.md — __init__.py lazy imports + all 9 skill files: profile=/dry_run= wiring and --validate-profile path (D-77a, PROF-05/MRG-03/MRG-05)
 
 ## Progress
 
@@ -121,4 +121,4 @@ Note: Phases 2 and 4 have no cross-module dependencies; they can be planned and 
 | 2. Template Engine | 0/4 | Planning complete | - |
 | 3. Mapping Engine | 4/4 | Complete    | 2026-04-11 |
 | 4. Merge Engine | 6/6 | Complete   | 2026-04-11 |
-| 5. Integration & CLI | 4/5 | In Progress|  |
+| 5. Integration & CLI | 5/5 | Complete   | 2026-04-11 |
