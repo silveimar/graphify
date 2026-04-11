@@ -2037,3 +2037,181 @@ def test_validate_template_builtin_templates_pass_validation():
         text = _BUILTIN_TEMPLATES_ROOT.joinpath(f"{note_type}.md").read_text(encoding="utf-8")
         errors = validate_template(text, _REQUIRED_PER_TYPE[note_type])
         assert errors == [], f"{note_type}.md failed validation: {errors}"
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 Plan 01 Task 2: D-67 sentinel round-trip assertions
+# ---------------------------------------------------------------------------
+# These tests verify that the six section builders (wrapped in Task 1) emit
+# paired <!-- graphify:<name>:start --> / :end --> markers around non-empty
+# body blocks, and emit NOTHING when a section is empty (D-18 empty-string
+# contract + D-68 deleted-block-respect rule). They form the round-trip
+# contract the Phase 4 merge parser (Plans 03-05) will read against.
+
+import re as _re_sentinel
+
+_SENTINEL_START_PATTERN = _re_sentinel.compile(r"<!-- graphify:(\w+):start -->")
+_SENTINEL_END_PATTERN = _re_sentinel.compile(r"<!-- graphify:(\w+):end -->")
+
+
+def _collect_sentinels(text: str) -> tuple[list[str], list[str]]:
+    """Extract the ordered list of start/end sentinel block names from *text*."""
+    starts = [m.group(1) for m in _SENTINEL_START_PATTERN.finditer(text)]
+    ends = [m.group(1) for m in _SENTINEL_END_PATTERN.finditer(text)]
+    return starts, ends
+
+
+def test_render_note_emits_matched_wayfinder_sentinels():
+    from tests.fixtures.template_context import make_classification_context, make_min_graph
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    starts, ends = _collect_sentinels(text)
+    assert starts.count("wayfinder") == 1
+    assert ends.count("wayfinder") == 1
+
+
+def test_render_note_emits_matched_connections_sentinels():
+    from tests.fixtures.template_context import make_classification_context, make_min_graph
+    from graphify.templates import render_note
+
+    G = make_min_graph()  # n_transformer has outgoing edges → connections present
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    starts, ends = _collect_sentinels(text)
+    assert starts.count("connections") == 1
+    assert ends.count("connections") == 1
+
+
+def test_render_note_omits_connections_sentinel_when_no_edges():
+    import networkx as nx
+    from tests.fixtures.template_context import make_classification_context
+    from graphify.templates import render_note
+
+    # Isolated node — no outgoing edges → connections section must be empty,
+    # and no stray start/end markers for "connections" may appear.
+    G = nx.Graph()
+    G.add_node(
+        "n_iso",
+        label="Isolated",
+        file_type="code",
+        source_file="src/iso.py",
+        source_location="L1",
+    )
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_iso", G, profile, "thing", ctx)
+    assert "<!-- graphify:connections:start -->" not in text
+    assert "<!-- graphify:connections:end -->" not in text
+
+
+def test_render_note_emits_matched_metadata_sentinels():
+    from tests.fixtures.template_context import make_classification_context, make_min_graph
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    starts, ends = _collect_sentinels(text)
+    assert starts.count("metadata") == 1
+    assert ends.count("metadata") == 1
+
+
+def test_render_moc_emits_all_moc_sentinels():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    # Fully populated MOC: members + sub_communities + dataview + metadata
+    ctx = make_moc_context(sub_communities=[
+        {"label": "Tiny", "members": [{"id": "n_x", "label": "X"}]},
+    ])
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    starts, ends = _collect_sentinels(text)
+    for name in ("wayfinder", "members", "sub_communities", "dataview", "metadata"):
+        assert starts.count(name) == 1, f"expected exactly one '{name}' start marker, got starts={starts}"
+        assert ends.count(name) == 1, f"expected exactly one '{name}' end marker, got ends={ends}"
+
+
+def test_render_moc_omits_members_sentinel_when_empty():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    # Empty members_by_type → no members section → no sentinels
+    ctx = make_moc_context(members_by_type={"thing": [], "statement": [], "person": [], "source": []})
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "<!-- graphify:members:start -->" not in text
+    assert "<!-- graphify:members:end -->" not in text
+
+
+def test_render_moc_omits_sub_communities_sentinel_when_empty():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(sub_communities=[])
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "<!-- graphify:sub_communities:start -->" not in text
+    assert "<!-- graphify:sub_communities:end -->" not in text
+
+
+def test_sentinel_start_end_are_paired_in_render_output():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(sub_communities=[
+        {"label": "Tiny", "members": [{"id": "n_x", "label": "X"}]},
+    ])
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    starts, ends = _collect_sentinels(text)
+    # Every start has a matching end, in the SAME ORDER and SAME COUNT
+    # (D-67: paired and nested cleanly, no crossovers).
+    assert starts == ends, f"unmatched sentinels: starts={starts} ends={ends}"
+
+
+def test_sentinel_pairing_survives_adversarial_connections_label():
+    """T-04-01: node label containing a sentinel-looking string must NOT
+    break sentinel pairing or allow a premature end marker to escape.
+
+    The label flows through _emit_wikilink (which sanitizes ]] and |) and
+    appears inside the callout bullet, NOT inside the sentinel-literal
+    brackets. The wrap itself is a fixed literal from _wrap_sentinel.
+    """
+    import networkx as nx
+    from tests.fixtures.template_context import make_classification_context
+    from graphify.templates import render_note
+
+    G = nx.Graph()
+    G.add_node("n_a", label="Alpha", file_type="code", source_file="a.py")
+    G.add_node(
+        "n_b",
+        # Adversarial label: tries to smuggle a fake end marker.
+        label="graphify:connections:end -->evil",
+        file_type="code",
+        source_file="b.py",
+    )
+    G.add_edge("n_a", "n_b", relation="contains", confidence="EXTRACTED")
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_a", G, profile, "thing", ctx)
+    starts, ends = _collect_sentinels(text)
+    # The only "connections" markers come from _wrap_sentinel, not the label.
+    # Count must be exactly 1 start and 1 end, and they must pair.
+    assert starts.count("connections") == 1
+    assert ends.count("connections") == 1
+    assert starts == ends
