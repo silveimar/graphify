@@ -13,7 +13,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **PROF-02**: When no vault profile exists, graphify uses a built-in default profile producing Ideaverse ACE-compatible output
 - [x] **PROF-03**: Vault profile merges over defaults (partial overrides work — user only specifies what differs)
 - [x] **PROF-04**: Profile schema validation produces actionable error messages on invalid configuration
-- [ ] **PROF-05**: User can run `graphify --validate-profile <vault-path>` to check profile validity without generating output
+- [x] **PROF-05**: User can run `graphify --validate-profile <vault-path>` to check profile validity without generating output
 - [x] **PROF-06**: Profile YAML schema supports: folder_mapping, mapping_rules, merge behavior, naming conventions, obsidian config sections
 
 ### Note Generation
@@ -39,7 +39,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **MRG-01**: Re-running graphify on a vault with existing notes updates graphify-owned fields while preserving user-edited fields
 - [x] **MRG-02**: `preserve_fields` list in profile specifies frontmatter fields that graphify never overwrites (default: `rank`, `mapState`, `tags`)
-- [ ] **MRG-03**: User can run `graphify --obsidian --dry-run` to preview all changes without writing any files
+- [x] **MRG-03**: User can run `graphify --obsidian --dry-run` to preview all changes without writing any files
 - [x] **MRG-04**: All profile-derived file paths are validated against path-traversal attacks (no writing outside vault directory)
 - [ ] **MRG-05**: When no vault profile exists, output is backward-compatible with current `to_obsidian()` behavior
 - [x] **MRG-06**: Frontmatter field ordering is preserved on update to minimize git diff noise
@@ -94,7 +94,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | PROF-02 | Phase 1 | Complete |
 | PROF-03 | Phase 1 | Complete |
 | PROF-04 | Phase 1 | Complete |
-| PROF-05 | Phase 5 | Pending |
+| PROF-05 | Phase 5 | Complete |
 | PROF-06 | Phase 1 | Complete |
 | GEN-01 | Phase 2 | Pending |
 | GEN-02 | Phase 2 | Pending |
@@ -111,7 +111,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | MAP-06 | Phase 3 | Pending |
 | MRG-01 | Phase 4 | Complete |
 | MRG-02 | Phase 4 | Complete |
-| MRG-03 | Phase 5 | Pending |
+| MRG-03 | Phase 5 | Complete |
 | MRG-04 | Phase 1 | Complete |
 | MRG-05 | Phase 5 | Pending |
 | MRG-06 | Phase 4 | Complete |

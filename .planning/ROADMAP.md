@@ -99,11 +99,11 @@ Plans:
   1. Running `graphify --validate-profile <vault-path>` prints pass/fail with actionable messages and exits without writing any files
   2. Running `graphify --obsidian --dry-run` prints the full plan of files to create or update without writing any files
   3. Running `graphify --obsidian` against a vault with no `.graphify/` directory produces output backward-compatible with the pre-existing `to_obsidian()` behavior and all existing tests pass
-**Plans:** 1/5 plans executed
+**Plans:** 2/5 plans executed
 
 Plans:
 - [x] 05-01-PLAN.md — merge.py: add format_merge_plan helper (D-76) — pure dry-run formatter
-- [ ] 05-02-PLAN.md — profile.py: add validate_profile_preflight four-layer composite (D-77, PROF-05)
+- [x] 05-02-PLAN.md — profile.py: add validate_profile_preflight four-layer composite (D-77, PROF-05)
 - [ ] 05-03-PLAN.md — export.py: refactor to_obsidian to orchestrate the Phase 1-4 pipeline (D-74/D-75)
 - [ ] 05-04-PLAN.md — tests: migrate FIX-01/02/03 invariants to test_integration.py, update test_pipeline.py (MRG-03, MRG-05)
 - [ ] 05-05-PLAN.md — __init__.py lazy imports + all 9 skill files: profile=/dry_run= wiring and --validate-profile path (D-77a, PROF-05/MRG-03/MRG-05)
@@ -121,4 +121,4 @@ Note: Phases 2 and 4 have no cross-module dependencies; they can be planned and 
 | 2. Template Engine | 0/4 | Planning complete | - |
 | 3. Mapping Engine | 4/4 | Complete    | 2026-04-11 |
 | 4. Merge Engine | 6/6 | Complete   | 2026-04-11 |
-| 5. Integration & CLI | 1/5 | In Progress|  |
+| 5. Integration & CLI | 2/5 | In Progress|  |
