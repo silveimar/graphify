@@ -123,6 +123,49 @@ class TestParseFrontmatter:
         assert result == {"cohesion": 0.82}
         assert isinstance(result["cohesion"], float)
 
+    def test_parse_frontmatter_user_edited_float_one_decimal(self):
+        """WR-04 regression: a user-edited `cohesion: 0.5` must parse as
+        float(0.5), not as the string "0.5". Otherwise the next
+        _merge_frontmatter compares "0.5" (str) != 0.5 (float) and reports
+        spurious churn on every re-run.
+        """
+        from graphify.merge import _parse_frontmatter
+        result = _parse_frontmatter("---\ncohesion: 0.5\n---\n")
+        assert result == {"cohesion": 0.5}
+        assert isinstance(result["cohesion"], float)
+
+    def test_parse_frontmatter_user_edited_float_three_decimals(self):
+        """WR-04 regression: user writes `cohesion: 0.123` (three decimals).
+        The old regex hardcoded exactly two decimals and would fall through
+        to the bare-string branch.
+        """
+        from graphify.merge import _parse_frontmatter
+        result = _parse_frontmatter("---\ncohesion: 0.123\n---\n")
+        assert result == {"cohesion": 0.123}
+        assert isinstance(result["cohesion"], float)
+
+    def test_parse_frontmatter_user_edited_float_merge_is_idempotent(self):
+        """WR-04 regression, end-to-end: a user-edited `cohesion: 0.5` must
+        not cause `_merge_frontmatter` to report `cohesion` as changed when
+        the new render emits the same float value.
+        """
+        from graphify.merge import _merge_frontmatter, _parse_frontmatter
+        existing = _parse_frontmatter("---\ncohesion: 0.5\n---\n")
+        assert existing is not None
+        merged, changed = _merge_frontmatter(existing, {"cohesion": 0.5}, profile={})
+        assert changed == [], (
+            "user-edited 0.5 (float) should be idempotent vs new render 0.5 — "
+            f"got changed={changed!r}"
+        )
+        assert merged == {"cohesion": 0.5}
+
+    def test_parse_frontmatter_negative_float_one_decimal(self):
+        """Negative floats with arbitrary precision must also round-trip."""
+        from graphify.merge import _parse_frontmatter
+        result = _parse_frontmatter("---\ncohesion: -0.5\n---\n")
+        assert result == {"cohesion": -0.5}
+        assert isinstance(result["cohesion"], float)
+
     def test_parse_frontmatter_round_trip_date(self):
         result = _round_trip({"created": datetime.date(2026, 4, 11)})
         assert result == {"created": datetime.date(2026, 4, 11)}

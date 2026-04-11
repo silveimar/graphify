@@ -133,7 +133,14 @@ _FM_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$")
 _FM_LIST_ITEM_RE = re.compile(r"^\s{2}-\s(.*)$")
 _FM_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _FM_INT_RE = re.compile(r"^-?\d+$")
-_FM_FLOAT_RE = re.compile(r"^-?\d+\.\d{2}$")  # _dump_frontmatter always uses {:.2f}
+# _dump_frontmatter emits floats via `f"{v:.2f}"`, but users may hand-edit a
+# fingerprinted file and write `cohesion: 0.5` or `cohesion: 0.123`. The
+# reader must round-trip any well-formed decimal to float so the next
+# compute_merge_plan doesn't report churn purely because "0.5" (string) !=
+# 0.5 (float). Intentionally stricter than YAML: no bare keywords, no
+# scientific notation (mirrors `_dump_frontmatter`'s isinstance ladder —
+# scientific notation is a degenerate case rejected at emission time).
+_FM_FLOAT_RE = re.compile(r"^-?\d+\.\d+$")  # WR-04: any decimal precision
 
 
 def _unquote_scalar(raw: str) -> str:
