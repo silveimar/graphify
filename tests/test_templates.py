@@ -438,18 +438,21 @@ def test_build_frontmatter_fields_cohesion_only_for_moc():
 
 
 def test_build_wayfinder_callout_thing_links_to_parent_moc_and_atlas():
-    from graphify.templates import _build_wayfinder_callout
+    from graphify.templates import _build_wayfinder_callout, resolve_filename
 
     profile = {"obsidian": {"atlas_root": "Atlas"}}
+    parent_label = "ML Architecture"
     result = _build_wayfinder_callout(
         note_type="thing",
-        parent_moc_label="ML Architecture",
+        parent_moc_label=parent_label,
         profile=profile,
         convention="title_case",
     )
+    # Use resolve_filename to derive expected filename (locked behavior: .capitalize())
+    parent_fname = resolve_filename(parent_label, "title_case")
     expected = (
         "> [!note] Wayfinder\n"
-        "> Up: [[ML_Architecture|ML Architecture]]\n"
+        f"> Up: [[{parent_fname}|{parent_label}]]\n"
         "> Map: [[Atlas|Atlas]]"
     )
     assert result == expected
@@ -623,14 +626,18 @@ def test_render_note_frontmatter_field_order():
 
 def test_render_note_frontmatter_up_is_list_with_parent_moc():
     from tests.fixtures.template_context import make_min_graph, make_classification_context
-    from graphify.templates import render_note
+    from graphify.templates import render_note, resolve_filename
 
     G = make_min_graph()
-    ctx = make_classification_context(parent_moc_label="ML Architecture")
+    parent_label = "ML Architecture"
+    ctx = make_classification_context(parent_moc_label=parent_label)
     profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
     _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    parent_fname = resolve_filename(parent_label, "title_case")
+    wikilink = f"[[{parent_fname}|{parent_label}]]"
     assert "up:" in text
-    assert '- "[[ML_Architecture|ML Architecture]]"' in text or "- [[ML_Architecture|ML Architecture]]" in text
+    # wikilink may be quoted by safe_frontmatter_value (contains [)
+    assert wikilink in text or f'"{wikilink}"' in text
 
 
 def test_render_note_frontmatter_tags_include_community_tag():
@@ -670,14 +677,16 @@ def test_render_note_contains_heading():
 
 def test_render_note_contains_wayfinder_callout():
     from tests.fixtures.template_context import make_min_graph, make_classification_context
-    from graphify.templates import render_note
+    from graphify.templates import render_note, resolve_filename
 
     G = make_min_graph()
-    ctx = make_classification_context(parent_moc_label="ML Architecture")
+    parent_label = "ML Architecture"
+    ctx = make_classification_context(parent_moc_label=parent_label)
     profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
     _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    parent_fname = resolve_filename(parent_label, "title_case")
     assert "> [!note] Wayfinder" in text
-    assert "> Up: [[ML_Architecture|ML Architecture]]" in text
+    assert f"> Up: [[{parent_fname}|{parent_label}]]" in text
     assert "> Map: [[Atlas|Atlas]]" in text
 
 

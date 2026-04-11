@@ -1,6 +1,7 @@
 """Template engine: pure rendering functions for Obsidian notes."""
 from __future__ import annotations
 
+import datetime
 import re
 import string
 import sys
@@ -177,3 +178,252 @@ def load_templates(vault_dir: Path) -> dict[str, string.Template]:
         else:
             templates[note_type] = _load_builtin_template(note_type)
     return templates
+
+
+# ---------------------------------------------------------------------------
+# Wikilink emission (D-37, D-38) — single source of truth
+# ---------------------------------------------------------------------------
+
+def _emit_wikilink(label: str, convention: str) -> str:
+    """Return `[[filename|label]]` auto-aliased to display label."""
+    fname = resolve_filename(label, convention)
+    return f"[[{fname}|{label}]]"
+
+
+# ---------------------------------------------------------------------------
+# Frontmatter field dict builder (D-23, D-24, D-25, D-26, D-27)
+# ---------------------------------------------------------------------------
+
+def _build_frontmatter_fields(
+    *,
+    up: list[str],
+    related: list[str],
+    collections: list[str],
+    tags: list[str],
+    note_type: str,
+    file_type: str | None,
+    source_file: str | None,
+    source_location: str | None,
+    community: str | None,
+    created: datetime.date,
+    cohesion: float | None = None,
+) -> dict:
+    """Build the ordered dict of frontmatter fields.
+
+    Order (D-24): up → related → collections → created → tags → type → file_type
+                 → source_file → source_location → community → cohesion
+
+    Empty lists are SKIPPED (locked policy).
+    None scalars are SKIPPED.
+    `up` is always a list even when single-item (D-26).
+    `cohesion` only included when note_type in {moc, community}.
+    """
+    fields: dict = {}
+    if up:
+        fields["up"] = up
+    if related:
+        fields["related"] = related
+    if collections:
+        fields["collections"] = collections
+    fields["created"] = created
+    if tags:
+        fields["tags"] = tags
+    fields["type"] = note_type
+    if file_type:
+        fields["file_type"] = file_type
+    if source_file:
+        fields["source_file"] = source_file
+    if source_location:
+        fields["source_location"] = source_location
+    if community:
+        fields["community"] = community
+    if cohesion is not None and note_type in ("moc", "community"):
+        fields["cohesion"] = cohesion
+    return fields
+
+
+# ---------------------------------------------------------------------------
+# Wayfinder callout (D-35, D-39)
+# ---------------------------------------------------------------------------
+
+def _build_wayfinder_callout(
+    note_type: str,
+    parent_moc_label: str | None,
+    profile: dict,
+    convention: str,
+) -> str:
+    """Build a `> [!note] Wayfinder` callout with Up: and Map: rows."""
+    atlas_root = profile.get("obsidian", {}).get("atlas_root", "Atlas")
+    atlas_link = _emit_wikilink(atlas_root, convention)
+    if note_type in ("moc", "community"):
+        up_link = atlas_link
+    elif parent_moc_label:
+        up_link = _emit_wikilink(parent_moc_label, convention)
+    else:
+        up_link = atlas_link  # fallback: orphan → link directly to Atlas
+    return (
+        "> [!note] Wayfinder\n"
+        f"> Up: {up_link}\n"
+        f"> Map: {atlas_link}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Connections callout (D-33) — iterates outgoing edges, auto-aliases
+# ---------------------------------------------------------------------------
+
+def _build_connections_callout(G, node_id: str, convention: str) -> str:
+    """Build a `> [!info] Connections` callout listing outgoing edges.
+
+    Format: `> - [[target_fname|target_label]] — relation [CONFIDENCE]`
+    Returns empty string when the node has no edges.
+    """
+    if node_id not in G:
+        return ""
+    lines: list[str] = []
+    # networkx Graph.edges(node, data=True) → iterable of (u, v, data)
+    for u, v, data in G.edges(node_id, data=True):
+        target = v if u == node_id else u
+        target_label = G.nodes[target].get("label", target)
+        relation = data.get("relation", "related")
+        confidence = data.get("confidence", "AMBIGUOUS")
+        link = _emit_wikilink(target_label, convention)
+        lines.append(f"> - {link} — {relation} [{confidence}]")
+    if not lines:
+        return ""
+    return "> [!info] Connections\n" + "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Metadata callout (D-34)
+# ---------------------------------------------------------------------------
+
+def _build_metadata_callout(
+    *,
+    source_file: str | None,
+    source_location: str | None,
+    community: str | None,
+) -> str:
+    """Build a `> [!abstract] Metadata` callout duplicating key fields."""
+    lines: list[str] = ["> [!abstract] Metadata"]
+    if source_file:
+        lines.append(f"> source_file: {source_file}")
+    if source_location:
+        lines.append(f"> source_location: {source_location}")
+    if community:
+        lines.append(f"> community: {community}")
+    if len(lines) == 1:
+        return ""
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Public: render_note (D-32, D-41)
+# ---------------------------------------------------------------------------
+
+def render_note(
+    node_id: str,
+    G,
+    profile: dict,
+    note_type: str,
+    classification_context: "ClassificationContext | dict",
+    *,
+    vault_dir: "Path | None" = None,
+) -> tuple[str, str]:
+    """Render a non-MOC note (thing/statement/person/source).
+
+    Returns (filename, rendered_text). Filename includes `.md` extension.
+
+    The `vault_dir` keyword arg is an extension of D-41: when supplied,
+    user template overrides from `<vault_dir>/.graphify/templates/` are
+    honored. When omitted, only built-in templates are loaded.
+    Phase 5 will pass this through from the refactored `to_obsidian()`.
+    """
+    # WARNING 1: both input-validation failures raise ValueError for consistency.
+    _KNOWN_NOTE_TYPES = ("thing", "statement", "person", "source")
+    if note_type not in _KNOWN_NOTE_TYPES:
+        raise ValueError(
+            f"render_note: note_type {note_type!r} not in {sorted(_KNOWN_NOTE_TYPES)}"
+        )
+    if node_id not in G:
+        raise ValueError(f"render_note: node_id {node_id!r} not in graph")
+
+    convention = profile.get("naming", {}).get("convention", "title_case")
+    node = G.nodes[node_id]
+    label = node.get("label", node_id)
+    file_type = node.get("file_type")
+    source_file = node.get("source_file")
+    source_location = node.get("source_location")
+
+    ctx = classification_context
+    parent_moc_label = ctx.get("parent_moc_label") if isinstance(ctx, dict) else None
+    community_tag = ctx.get("community_tag") if isinstance(ctx, dict) else None
+    community_name = ctx.get("parent_moc_label") if isinstance(ctx, dict) else None
+    sibling_labels = ctx.get("sibling_labels", []) if isinstance(ctx, dict) else []
+
+    # Build each section as a pre-rendered scalar (D-18)
+    up_list: list[str] = []
+    if parent_moc_label:
+        up_list.append(_emit_wikilink(parent_moc_label, convention))
+
+    related_list: list[str] = [
+        _emit_wikilink(lab, convention) for lab in sibling_labels if lab
+    ]
+
+    tag_list: list[str] = []
+    if community_tag:
+        tag_list.append(f"community/{community_tag}")
+    tag_list.append(f"graphify/{file_type or 'note'}")
+
+    frontmatter_fields = _build_frontmatter_fields(
+        up=up_list,
+        related=related_list,
+        collections=[],
+        tags=tag_list,
+        note_type=note_type,
+        file_type=file_type,
+        source_file=source_file,
+        source_location=source_location,
+        community=community_name,
+        created=datetime.date.today(),
+    )
+    frontmatter = _dump_frontmatter(frontmatter_fields)
+
+    wayfinder = _build_wayfinder_callout(
+        note_type=note_type,
+        parent_moc_label=parent_moc_label,
+        profile=profile,
+        convention=convention,
+    )
+    connections = _build_connections_callout(G, node_id, convention)
+    metadata = _build_metadata_callout(
+        source_file=source_file,
+        source_location=source_location,
+        community=community_name,
+    )
+
+    substitution_ctx = {
+        "label": label,
+        "frontmatter": frontmatter,
+        "wayfinder_callout": wayfinder,
+        "connections_callout": connections,
+        "metadata_callout": metadata,
+        "body": "",  # D-18: absent section → empty string
+        # MOC-only vars provided as empty for safe_substitute idempotence
+        "members_section": "",
+        "sub_communities_callout": "",
+        "dataview_block": "",
+    }
+
+    if vault_dir is not None:
+        templates = load_templates(vault_dir)
+    else:
+        templates = {
+            nt: _load_builtin_template(nt)
+            for nt in ("thing", "statement", "person", "source", "moc", "community")
+        }
+    template = templates[note_type]
+    text = template.safe_substitute(substitution_ctx)
+
+    filename = resolve_filename(label, convention) + ".md"
+    return filename, text
