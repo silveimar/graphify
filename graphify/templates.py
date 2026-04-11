@@ -480,6 +480,7 @@ def render_note(
     classification_context: "ClassificationContext | dict",
     *,
     vault_dir: "Path | None" = None,
+    created: "datetime.date | None" = None,
 ) -> tuple[str, str]:
     """Render a non-MOC note (thing/statement/person/source).
 
@@ -489,6 +490,10 @@ def render_note(
     user template overrides from `<vault_dir>/.graphify/templates/` are
     honored. When omitted, only built-in templates are loaded.
     Phase 5 will pass this through from the refactored `to_obsidian()`.
+
+    The `created` kwarg (IN-05) lets callers (and tests) pin the
+    `created:` frontmatter date for reproducible/deterministic output.
+    Defaults to `datetime.date.today()` for backward compatibility.
     """
     # WARNING 1: both input-validation failures raise ValueError for consistency.
     _KNOWN_NOTE_TYPES = ("thing", "statement", "person", "source")
@@ -542,7 +547,8 @@ def render_note(
         source_file=source_file,
         source_location=source_location,
         community=community_name,
-        created=datetime.date.today(),
+        # IN-05: caller-supplied date wins; default to today for back-compat.
+        created=created if created is not None else datetime.date.today(),
     )
     frontmatter = _dump_frontmatter(frontmatter_fields)
 
@@ -598,6 +604,7 @@ def _render_moc_like(
     classification_context,
     template_key: str,  # "moc" or "community"
     vault_dir,
+    created: "datetime.date | None" = None,
 ) -> tuple[str, str]:
     """Shared rendering body for MOC and Community Overview notes.
 
@@ -654,7 +661,8 @@ def _render_moc_like(
         source_file=None,
         source_location=None,
         community=community_name,
-        created=datetime.date.today(),
+        # IN-05: caller-supplied date wins; default to today for back-compat.
+        created=created if created is not None else datetime.date.today(),
         cohesion=cohesion,
     )
     frontmatter = _dump_frontmatter(fm_fields)
@@ -709,11 +717,16 @@ def render_moc(
     classification_context,
     *,
     vault_dir=None,
+    created: "datetime.date | None" = None,
 ) -> tuple[str, str]:
-    """Render a MOC note for a community. Returns (filename, rendered_text)."""
+    """Render a MOC note for a community. Returns (filename, rendered_text).
+
+    The `created` kwarg (IN-05) lets callers pin the `created:` frontmatter
+    date for reproducible/deterministic output. Defaults to today.
+    """
     return _render_moc_like(
         community_id, G, communities, profile, classification_context,
-        template_key="moc", vault_dir=vault_dir,
+        template_key="moc", vault_dir=vault_dir, created=created,
     )
 
 
@@ -725,10 +738,15 @@ def render_community_overview(
     classification_context,
     *,
     vault_dir=None,
+    created: "datetime.date | None" = None,
 ) -> tuple[str, str]:
     """Render a Community Overview note. Same signature as render_moc but
-    uses the `community.md` built-in template by default."""
+    uses the `community.md` built-in template by default.
+
+    The `created` kwarg (IN-05) lets callers pin the `created:` frontmatter
+    date for reproducible/deterministic output. Defaults to today.
+    """
     return _render_moc_like(
         community_id, G, communities, profile, classification_context,
-        template_key="community", vault_dir=vault_dir,
+        template_key="community", vault_dir=vault_dir, created=created,
     )

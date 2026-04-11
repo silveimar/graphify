@@ -1680,3 +1680,55 @@ def test_fallback_moc_query_matches_default_profile():
         _FALLBACK_MOC_QUERY
         == _DEFAULT_PROFILE["obsidian"]["dataview"]["moc_query"]
     )
+
+
+# ---------------------------------------------------------------------------
+# IN-05: render_note / render_moc accept `created` kwarg for determinism
+# ---------------------------------------------------------------------------
+
+
+def test_render_note_uses_supplied_created_date():
+    """IN-05: render_note honors a caller-supplied created date.
+
+    Without this, the frontmatter `created:` field is non-deterministic
+    (datetime.date.today()), which makes vault rebuilds re-touch every note
+    and breaks reproducible test snapshots.
+    """
+    import datetime as _dt
+    from tests.fixtures.template_context import make_classification_context, make_min_graph
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    pinned = _dt.date(2024, 1, 15)
+    _, text = render_note("n_transformer", G, profile, "thing", ctx, created=pinned)
+    assert "created: 2024-01-15" in text
+
+
+def test_render_note_default_created_is_today():
+    """IN-05 backward-compat: omitting `created` falls back to today()."""
+    import datetime as _dt
+    from tests.fixtures.template_context import make_classification_context, make_min_graph
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert f"created: {_dt.date.today().isoformat()}" in text
+
+
+def test_render_moc_uses_supplied_created_date():
+    """IN-05: render_moc honors a caller-supplied created date too."""
+    import datetime as _dt
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    pinned = _dt.date(2025, 6, 30)
+    _, text = render_moc(0, G, communities, profile, ctx, created=pinned)
+    assert "created: 2025-06-30" in text
