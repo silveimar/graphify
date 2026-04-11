@@ -427,6 +427,10 @@ def _build_dataview_block(profile: dict, community_tag: str, folder: str) -> str
       3. Pass the fence as the `${dataview_block}` value to the OUTER
          template — because `string.Template` is single-pass, any literal
          `${...}` remaining in the query text is preserved as-is.
+
+    Inputs are sanitized before substitution (WR-05): backticks and newlines
+    in `folder` or `community_tag` would break the outer dataview fence.
+    Post-substitution the query is also guarded against fence-breaking chars.
     """
     moc_query = (
         profile.get("obsidian", {})
@@ -435,10 +439,21 @@ def _build_dataview_block(profile: dict, community_tag: str, folder: str) -> str
     )
     if not moc_query:
         moc_query = _FALLBACK_MOC_QUERY
+
+    # Strip backticks and newlines from substitution values so they cannot
+    # break the ``` fence or inject new lines into the query block (WR-05).
+    safe_community_tag = community_tag.replace("`", "").replace("\n", "").replace("\r", "")
+    safe_folder = folder.replace("`", "").replace("\n", "").replace("\r", "")
+
     query = string.Template(moc_query).safe_substitute(
-        community_tag=community_tag,
-        folder=folder,
+        community_tag=safe_community_tag,
+        folder=safe_folder,
     )
+
+    # Guard post-substitution query: ``` anywhere in the query would prematurely
+    # close the dataview fence in the rendered markdown.
+    query = query.replace("```", "")
+
     return f"```dataview\n{query}\n```"
 
 

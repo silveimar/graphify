@@ -1221,6 +1221,58 @@ def test_build_dataview_block_missing_moc_query_uses_default():
 
 
 # ---------------------------------------------------------------------------
+# WR-05 regression: _build_dataview_block sanitizes folder and community_tag
+# ---------------------------------------------------------------------------
+
+
+def test_build_dataview_block_backtick_in_folder_stripped():
+    from graphify.templates import _build_dataview_block
+
+    profile = {}
+    result = _build_dataview_block(profile, "my-tag", "Atlas/Maps/`evil`/")
+    # Backtick must not appear anywhere in output (would break the fence)
+    assert "`" not in result.replace("```dataview", "").replace("\n```", "")
+
+
+def test_build_dataview_block_newline_in_folder_stripped():
+    from graphify.templates import _build_dataview_block
+
+    profile = {}
+    result = _build_dataview_block(profile, "my-tag", "Atlas/Maps/\nevil/")
+    # The injected newline must be stripped from the folder value
+    assert "evil" not in result or "\nevil" not in result
+
+
+def test_build_dataview_block_backtick_in_community_tag_stripped():
+    from graphify.templates import _build_dataview_block
+
+    profile = {}
+    result = _build_dataview_block(profile, "tag`injection", "Atlas/Maps/")
+    # Backtick in community_tag must be stripped
+    inner = result.replace("```dataview\n", "").replace("\n```", "")
+    assert "`" not in inner
+
+
+def test_build_dataview_block_fence_not_broken_by_triple_backtick_in_query():
+    from graphify.templates import _build_dataview_block
+
+    # If moc_query itself contains ```, the post-substitution guard removes it
+    profile = {
+        "obsidian": {
+            "dataview": {
+                "moc_query": "TABLE file.name\nFROM ```evil```\nSORT file.name ASC"
+            }
+        }
+    }
+    result = _build_dataview_block(profile, "my-tag", "Atlas/")
+    # Only the outer fence markers should contain ```, not the inner query
+    parts = result.split("\n")
+    inner_lines = parts[1:-1]  # skip first (```dataview) and last (```)
+    for line in inner_lines:
+        assert "```" not in line
+
+
+# ---------------------------------------------------------------------------
 # Plan 04 Task 2: render_moc + render_community_overview tests
 # ---------------------------------------------------------------------------
 
