@@ -699,5 +699,339 @@ def _kind_of(when: dict) -> str:
     return "unknown"
 
 
-def validate_rules(rules: list) -> list[str]:  # pragma: no cover
-    raise NotImplementedError("validate_rules() lands in Plan 03")
+# ---------------------------------------------------------------------------
+# Rule validation (D-44, D-45, D-47) — Plan 03
+# ---------------------------------------------------------------------------
+
+
+def validate_rules(rules: list) -> list[str]:
+    """Validate mapping_rules shape and contents. Returns a list of error
+    strings — empty means valid. Never raises.
+
+    Covers:
+      - Rule shape: dict with `when` + `then`, both dicts
+      - Matcher kinds: exactly one of attr/topology/source_file_ext/source_file_matches
+      - attr operators: exactly one of equals/in/contains/regex
+      - Regex safety: pattern length ≤ _MAX_PATTERN_LEN, compiles via re.compile
+      - then.note_type in _NOTE_TYPES (whitelisted)
+      - then.folder path safety: no `..`, no absolute, no leading `~`
+      - Topology value type: int (not bool) for size thresholds; int|float for cohesion
+      - Unknown `then:` keys rejected (D-46; WARNING 1 fix)
+      - Dead-rule detection: appended as warnings after per-rule errors
+    """
+    errors: list[str] = []
+    if rules is None:
+        return errors
+    if not isinstance(rules, list):
+        errors.append("'mapping_rules' must be a list")
+        return errors
+
+    for idx, rule in enumerate(rules):
+        prefix = f"mapping_rules[{idx}]"
+        if not isinstance(rule, dict):
+            errors.append(f"{prefix}: must be a mapping (dict)")
+            continue
+        when = rule.get("when")
+        then = rule.get("then")
+        if not isinstance(when, dict):
+            errors.append(f"{prefix}.when: must be a mapping (dict)")
+        if not isinstance(then, dict):
+            errors.append(f"{prefix}.then: must be a mapping (dict)")
+        if not isinstance(when, dict) or not isinstance(then, dict):
+            continue
+
+        # --- when: exactly one matcher kind ----------------------------
+        matcher_keys = [
+            k for k in ("attr", "topology", "source_file_ext", "source_file_matches")
+            if k in when
+        ]
+        if len(matcher_keys) == 0:
+            errors.append(
+                f"{prefix}.when: must contain exactly one of "
+                "'attr', 'topology', 'source_file_ext', 'source_file_matches'"
+            )
+            # Still validate then fields so users see all problems at once.
+        elif len(matcher_keys) > 1:
+            errors.append(
+                f"{prefix}.when: contains multiple matcher kinds {matcher_keys} — "
+                "each rule may use only one matcher kind"
+            )
+        else:
+            kind = matcher_keys[0]
+            errors.extend(_validate_when_kind(kind, when, prefix))
+
+        # --- then.note_type (required) ---------------------------------
+        note_type = then.get("note_type")
+        if note_type is None:
+            errors.append(f"{prefix}.then.note_type: required")
+        elif note_type not in _NOTE_TYPES:
+            errors.append(
+                f"{prefix}.then.note_type: {note_type!r} not in {sorted(_NOTE_TYPES)}"
+            )
+
+        # --- then.folder (optional, path-safety) -----------------------
+        folder = then.get("folder")
+        if folder is not None:
+            errors.extend(_validate_folder(folder, f"{prefix}.then.folder"))
+
+        # --- then: reject unknown keys (D-46 — WARNING 1 fix) ----------
+        # D-46: `then:` supports ONLY `note_type` and `folder`. Any other
+        # key is a user error we must surface — silently dropping them
+        # would let users believe tags/up/etc. were applied.
+        extra_keys = set(then) - {"note_type", "folder"}
+        if extra_keys:
+            errors.append(
+                f"{prefix}.then: unknown keys {sorted(extra_keys)} — "
+                "only 'note_type' and 'folder' are supported (D-46)"
+            )
+
+    # Append dead-rule warnings only when no per-rule errors blocked them.
+    # Shape errors above mean the pairwise heuristic could read nonsense.
+    if not errors:
+        errors.extend(_detect_dead_rules(rules))
+    return errors
+
+
+def _validate_when_kind(kind: str, when: dict, prefix: str) -> list[str]:
+    """Dispatch to kind-specific validator. Returns list of error strings."""
+    if kind == "attr":
+        return _validate_attr_when(when, prefix)
+    if kind == "topology":
+        return _validate_topology_when(when, prefix)
+    if kind == "source_file_ext":
+        return _validate_source_file_ext_when(when, prefix)
+    if kind == "source_file_matches":
+        return _validate_source_file_matches_when(when, prefix)
+    return [f"{prefix}.when: unknown matcher kind {kind!r}"]
+
+
+def _validate_attr_when(when: dict, prefix: str) -> list[str]:
+    errors: list[str] = []
+    key = when.get("attr")
+    if not isinstance(key, str) or not key:
+        errors.append(f"{prefix}.when.attr: must be a non-empty string")
+    ops = [op for op in ("equals", "in", "contains", "regex") if op in when]
+    if len(ops) == 0:
+        errors.append(
+            f"{prefix}.when: attr matcher requires one of "
+            "'equals', 'in', 'contains', 'regex'"
+        )
+        return errors
+    if len(ops) > 1:
+        errors.append(
+            f"{prefix}.when: attr matcher may use only one operator, got {ops}"
+        )
+        return errors
+    op = ops[0]
+    if op == "in" and not isinstance(when["in"], (list, tuple)):
+        errors.append(f"{prefix}.when.in: must be a list")
+    if op == "contains" and not isinstance(when["contains"], str):
+        errors.append(f"{prefix}.when.contains: must be a string")
+    if op == "regex":
+        pat = when["regex"]
+        if not isinstance(pat, str):
+            errors.append(f"{prefix}.when.regex: must be a string")
+        elif len(pat) > _MAX_PATTERN_LEN:
+            errors.append(
+                f"{prefix}.when.regex: pattern length {len(pat)} exceeds cap "
+                f"{_MAX_PATTERN_LEN} (ReDoS mitigation)"
+            )
+        else:
+            try:
+                re.compile(pat)
+            except re.error as exc:
+                errors.append(f"{prefix}.when.regex: {exc}")
+    return errors
+
+
+def _validate_topology_when(when: dict, prefix: str) -> list[str]:
+    errors: list[str] = []
+    kind = when.get("topology")
+    if kind not in _VALID_TOPOLOGY_KINDS:
+        errors.append(
+            f"{prefix}.when.topology: {kind!r} not in {sorted(_VALID_TOPOLOGY_KINDS)}"
+        )
+        return errors
+    if kind in ("community_size_gte", "community_size_lt"):
+        value = when.get("value")
+        # bool-before-int guard (T-3-03) — bool is a subclass of int in Python.
+        if isinstance(value, bool) or not isinstance(value, int):
+            errors.append(
+                f"{prefix}.when.value: must be an integer (got {type(value).__name__})"
+            )
+    elif kind == "cohesion_gte":
+        value = when.get("value")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            errors.append(
+                f"{prefix}.when.value: must be a number (got {type(value).__name__})"
+            )
+        elif not (0.0 <= float(value) <= 1.0):
+            errors.append(
+                f"{prefix}.when.value: must be in [0.0, 1.0] (got {value})"
+            )
+    return errors
+
+
+def _validate_source_file_ext_when(when: dict, prefix: str) -> list[str]:
+    errors: list[str] = []
+    val = when.get("source_file_ext")
+    if isinstance(val, str):
+        if not val.startswith("."):
+            errors.append(
+                f"{prefix}.when.source_file_ext: must start with '.' (got {val!r})"
+            )
+    elif isinstance(val, list):
+        for i, item in enumerate(val):
+            if not isinstance(item, str) or not item.startswith("."):
+                errors.append(
+                    f"{prefix}.when.source_file_ext[{i}]: must be a string starting with '.'"
+                )
+    else:
+        errors.append(
+            f"{prefix}.when.source_file_ext: must be a string or list of strings"
+        )
+    return errors
+
+
+def _validate_source_file_matches_when(when: dict, prefix: str) -> list[str]:
+    errors: list[str] = []
+    pat = when.get("source_file_matches")
+    if not isinstance(pat, str):
+        errors.append(f"{prefix}.when.source_file_matches: must be a string")
+        return errors
+    if len(pat) > _MAX_PATTERN_LEN:
+        errors.append(
+            f"{prefix}.when.source_file_matches: pattern length {len(pat)} exceeds cap "
+            f"{_MAX_PATTERN_LEN} (ReDoS mitigation)"
+        )
+        return errors
+    try:
+        re.compile(pat)
+    except re.error as exc:
+        errors.append(f"{prefix}.when.source_file_matches: {exc}")
+    return errors
+
+
+def _validate_folder(folder: object, prefix: str) -> list[str]:
+    """Path-safety mirror of profile.py:178-195 for then.folder overrides (T-3-02)."""
+    errors: list[str] = []
+    if not isinstance(folder, str):
+        errors.append(f"{prefix}: must be a string")
+        return errors
+    if ".." in folder:
+        errors.append(
+            f"{prefix}: contains '..' — path traversal sequences are not allowed"
+        )
+    elif folder.startswith("/"):
+        errors.append(
+            f"{prefix}: is an absolute path — only relative paths are allowed"
+        )
+    elif folder.startswith("~"):
+        errors.append(
+            f"{prefix}: starts with '~' — home-relative paths are not allowed"
+        )
+    return errors
+
+
+def _detect_dead_rules(rules: list) -> list[str]:
+    """D-45 dead-rule detection. Conservative structural heuristic.
+
+    A rule i is dead iff an earlier rule j:
+      - has the same matcher kind (attr:<op>, topology:<kind>, source_file_ext)
+      - has the same then.note_type
+      - has a strict structural superset of rule i's when-clause within that kind
+
+    Warnings are prefixed ``mapping_rules[{i}]: warning: dead rule ...``. Cross-kind
+    pairs never trigger (no false positives). attr:contains, attr:regex, and
+    source_file_matches are skipped (semantic equivalence undecidable).
+    """
+    warnings: list[str] = []
+    for i in range(1, len(rules)):
+        ri = rules[i]
+        if not isinstance(ri, dict):
+            continue
+        wi = ri.get("when") or {}
+        ti = ri.get("then") or {}
+        if not isinstance(wi, dict) or not isinstance(ti, dict):
+            continue
+        ki = _kind_of(wi)
+        nt_i = ti.get("note_type")
+        for j in range(i):
+            rj = rules[j]
+            if not isinstance(rj, dict):
+                continue
+            wj = rj.get("when") or {}
+            tj = rj.get("then") or {}
+            if not isinstance(wj, dict) or not isinstance(tj, dict):
+                continue
+            if _kind_of(wj) != ki:
+                continue
+            if tj.get("note_type") != nt_i:
+                continue
+            if _is_shadowed(ki, wj, wi):
+                warnings.append(
+                    f"mapping_rules[{i}]: warning: dead rule — "
+                    f"shadowed by mapping_rules[{j}]"
+                )
+                break
+    return warnings
+
+
+def _is_shadowed(kind: str, broad_when: dict, narrow_when: dict) -> bool:
+    """Return True if `broad_when` matches everything `narrow_when` matches.
+
+    Conservative: source_file_matches and attr:contains / attr:regex return
+    False (semantic equivalence of regex/substring is undecidable). No false
+    positives is the contract.
+    """
+    if kind == "attr:equals":
+        return (
+            broad_when.get("attr") == narrow_when.get("attr")
+            and broad_when.get("equals") == narrow_when.get("equals")
+        )
+    if kind == "attr:in":
+        if broad_when.get("attr") != narrow_when.get("attr"):
+            return False
+        broad_set = set(broad_when.get("in") or [])
+        narrow_set = set(narrow_when.get("in") or [])
+        return broad_set.issuperset(narrow_set)
+    if kind in ("topology:god_node", "topology:is_source_file"):
+        return True  # both are parameterless — earlier wins
+    if kind == "topology:community_size_gte":
+        bv = broad_when.get("value")
+        nv = narrow_when.get("value")
+        if not isinstance(bv, int) or not isinstance(nv, int):
+            return False
+        if isinstance(bv, bool) or isinstance(nv, bool):
+            return False
+        return bv <= nv
+    if kind == "topology:community_size_lt":
+        bv = broad_when.get("value")
+        nv = narrow_when.get("value")
+        if not isinstance(bv, int) or not isinstance(nv, int):
+            return False
+        if isinstance(bv, bool) or isinstance(nv, bool):
+            return False
+        return bv >= nv
+    if kind == "topology:cohesion_gte":
+        bv = broad_when.get("value")
+        nv = narrow_when.get("value")
+        if not isinstance(bv, (int, float)) or not isinstance(nv, (int, float)):
+            return False
+        if isinstance(bv, bool) or isinstance(nv, bool):
+            return False
+        return float(bv) <= float(nv)
+    if kind == "source_file_ext":
+        def _as_set(v: object) -> set[str]:
+            if isinstance(v, str):
+                return {v.lower()}
+            if isinstance(v, (list, tuple)):
+                return {x.lower() for x in v if isinstance(x, str)}
+            return set()
+        broad_set = _as_set(broad_when.get("source_file_ext"))
+        narrow_set = _as_set(narrow_when.get("source_file_ext"))
+        if not broad_set or not narrow_set:
+            return False
+        return broad_set.issuperset(narrow_set)
+    # attr:contains, attr:regex, source_file_matches → conservative skip
+    return False
