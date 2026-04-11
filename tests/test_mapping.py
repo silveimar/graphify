@@ -250,6 +250,124 @@ def test_concept_and_file_hubs_are_skipped():
     assert "n_file_model" not in result["per_node"]
 
 
+# ---------------------------------------------------------------------------
+# Plan 02 Task 1: community helpers (_derive_community_label,
+# _build_sibling_labels, _nearest_host, _inter_community_edges)
+# ---------------------------------------------------------------------------
+
+
+def test_community_label_top_god_node_in_community():
+    """VALIDATION row 3-02-01."""
+    from graphify.mapping import _derive_community_label
+
+    G, communities = make_classification_fixture()
+    assert _derive_community_label(G, communities[0], 0) == "Transformer"
+    assert _derive_community_label(G, communities[1], 1) == "AuthService"
+
+
+def test_community_label_fallback_to_community_n():
+    """VALIDATION row 3-02-02: all-synthetic community → fallback label."""
+    import networkx as nx
+
+    from graphify.mapping import _derive_community_label
+
+    G = nx.Graph()
+    # All-synthetic community: a file hub (label == basename) and a concept node
+    G.add_node("n_hub", label="x.py", source_file="x.py", file_type="code")
+    G.add_node("n_cpt", label="Concept", source_file="", file_type="code")
+    members = ["n_hub", "n_cpt"]
+    assert _derive_community_label(G, members, 7) == "Community 7"
+
+
+def test_sibling_labels_cap_at_5():
+    """VALIDATION row 3-02-04."""
+    import networkx as nx
+
+    from graphify.mapping import _build_sibling_labels
+
+    G = nx.Graph()
+    # 7 real peers + 1 current node, all linked to 'current'
+    for i in range(7):
+        G.add_node(
+            f"n_{i}",
+            label=f"Peer{i}",
+            source_file="src/x.py",
+            source_location=f"L{i}",
+            file_type="code",
+        )
+    G.add_node(
+        "current",
+        label="Current",
+        source_file="src/x.py",
+        source_location="L0",
+        file_type="code",
+    )
+    for i in range(7):
+        G.add_edge("current", f"n_{i}")
+        # Give every peer a distinct degree so ordering is deterministic
+        for j in range(i):
+            G.add_edge(f"n_{i}", f"n_{j}")
+    members = ["current"] + [f"n_{i}" for i in range(7)]
+    # All peers + current are god nodes in this test
+    god = frozenset(members)
+    result = _build_sibling_labels(G, members, "current", god, cap=5)
+    assert len(result) == 5
+    assert "Current" not in result
+
+
+def test_sibling_labels_exclude_current_node():
+    """VALIDATION row 3-02-05."""
+    from graphify.mapping import _build_sibling_labels
+
+    G, communities = make_classification_fixture()
+    # Every real node in cid 0 is a god node in this hand-built god set
+    god = frozenset({"n_transformer", "n_attention", "n_layernorm", "n_softmax"})
+    result = _build_sibling_labels(G, communities[0], "n_transformer", god)
+    assert "Transformer" not in result
+    # Should include other real god nodes in cid 0 (not the file hub or concept)
+    assert "Attention" in result
+    assert "model.py" not in result
+    assert "AttentionConcept" not in result
+
+
+def test_nearest_host_arg_max_by_edge_count():
+    """VALIDATION row 3-01-11."""
+    import networkx as nx
+
+    from graphify.mapping import _inter_community_edges, _nearest_host
+
+    G = nx.Graph()
+    # below community (cid 2) connected to two above communities
+    # cid 0 has 3 inter-community edges, cid 1 has 1
+    G.add_nodes_from(["a0", "a1", "a2", "b0", "b1", "c0"])
+    for n in ["a0", "a1", "a2"]:
+        G.add_edge(n, "c0")
+    G.add_edge("b0", "c0")
+    node_to_community = {"a0": 0, "a1": 0, "a2": 0, "b0": 1, "b1": 1, "c0": 2}
+    inter = _inter_community_edges(G, node_to_community)
+    result = _nearest_host(2, [0, 1], inter, {0: 3, 1: 2})
+    assert result == 0
+
+
+def test_nearest_host_tiebreak_largest_then_lowest_cid():
+    """VALIDATION row 3-01-12: tied edge counts → largest size, then lowest cid."""
+    from graphify.mapping import _nearest_host
+
+    # Both hosts tied at 2 edges
+    inter = {(0, 2): 2, (1, 2): 2}
+    # Size tie → lowest cid wins (0)
+    assert _nearest_host(2, [0, 1], inter, {0: 5, 1: 5}) == 0
+    # Size mismatch → larger wins (1)
+    assert _nearest_host(2, [0, 1], inter, {0: 3, 1: 7}) == 1
+
+
+def test_nearest_host_returns_none_when_no_edges():
+    """Host-less below-threshold community → None triggers bucket-MOC path."""
+    from graphify.mapping import _nearest_host
+
+    assert _nearest_host(5, [0, 1], {}, {0: 3, 1: 4}) is None
+
+
 def test_classify_zero_god_nodes_no_crash():
     """VALIDATION row 3-02-07: D-49 zero-god-nodes state — when every
     candidate is filtered as synthetic, classify() must not crash and must

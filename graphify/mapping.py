@@ -366,6 +366,120 @@ def classify(
     )
 
 
+# ---------------------------------------------------------------------------
+# Community-level derivations (Plan 02)
+# ---------------------------------------------------------------------------
+
+
+def _derive_community_label(G: nx.Graph, members: list[str], cid: int) -> str:
+    """D-58: community label = top-god-node-in-community label.
+
+    Ranks members by G.degree() descending, skipping file-hub and concept
+    nodes. Returns the label of the highest-degree real node. If every
+    member is synthetic, falls back to ``f"Community {cid}"``.
+    """
+    ranked = sorted(
+        (m for m in members if not _is_file_node(G, m) and not _is_concept_node(G, m)),
+        key=lambda m: (-G.degree(m), m),
+    )
+    if not ranked:
+        return f"Community {cid}"
+    top = ranked[0]
+    return str(G.nodes[top].get("label", top))
+
+
+def _build_sibling_labels(
+    G: nx.Graph,
+    community_members: list[str],
+    current_node_id: str,
+    god_node_ids: frozenset[str] | set[str],
+    *,
+    cap: int = 5,
+) -> list[str]:
+    """D-60: ``sibling_labels`` = up to ``cap`` **god-node** labels in the
+    community sorted by ``G.degree()`` descending, excluding the current node.
+
+    ``god_node_ids`` is the set computed once in ``classify()`` from
+    ``analyze.god_nodes(G, top_n)``. Only community members that are god
+    nodes are eligible — D-60 explicitly states non-god nodes get
+    ``sibling_labels: []`` and must never be returned here. File-hub and
+    concept (synthetic) nodes are also filtered.
+    """
+    ranked = sorted(
+        (
+            m
+            for m in community_members
+            if m != current_node_id
+            and m in god_node_ids
+            and not _is_file_node(G, m)
+            and not _is_concept_node(G, m)
+        ),
+        key=lambda m: (-G.degree(m), m),
+    )
+    return [str(G.nodes[m].get("label", m)) for m in ranked[:cap]]
+
+
+def _inter_community_edges(
+    G: nx.Graph,
+    node_to_community: dict[str, int],
+) -> dict[tuple[int, int], int]:
+    """Single-pass walk producing symmetric inter-community edge counts.
+
+    Keys are ``(min(cid_u, cid_v), max(cid_u, cid_v))``. Intra-community
+    edges (``cid_u == cid_v``) are ignored. Nodes not in
+    ``node_to_community`` are ignored.
+    """
+    counts: dict[tuple[int, int], int] = {}
+    for u, v in G.edges():
+        cu = node_to_community.get(u)
+        cv = node_to_community.get(v)
+        if cu is None or cv is None or cu == cv:
+            continue
+        key = (min(cu, cv), max(cu, cv))
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _nearest_host(
+    below_cid: int,
+    above_cids: list[int],
+    inter_edges: dict[tuple[int, int], int],
+    community_sizes: dict[int, int],
+) -> int | None:
+    """D-53: return the above-threshold cid with the most inter-community
+    edges to ``below_cid``.
+
+    Tie-break order: largest community first (``community_sizes`` desc),
+    then lowest cid ascending. Returns ``None`` when zero inter-community
+    edges exist to any above cid (caller falls back to bucket MOC).
+    """
+    best_cid: int | None = None
+    best_count = 0
+    best_size = -1
+    for host_cid in above_cids:
+        key = (min(below_cid, host_cid), max(below_cid, host_cid))
+        count = inter_edges.get(key, 0)
+        if count == 0:
+            continue
+        size = community_sizes.get(host_cid, 0)
+        take = False
+        if count > best_count:
+            take = True
+        elif count == best_count and size > best_size:
+            take = True
+        elif (
+            count == best_count
+            and size == best_size
+            and (best_cid is None or host_cid < best_cid)
+        ):
+            take = True
+        if take:
+            best_count = count
+            best_size = size
+            best_cid = host_cid
+    return best_cid
+
+
 def _kind_of(when: dict) -> str:
     """Return a short string identifying which matcher kind a `when` clause uses."""
     if "attr" in when:
