@@ -7,6 +7,26 @@ import re
 import sys
 import unicodedata
 from pathlib import Path
+from typing import NamedTuple
+
+
+class PreflightResult(NamedTuple):
+    """Return value for validate_profile_preflight (D-77, D-77a).
+
+    Supports attribute access (result.rule_count) AND tuple unpacking
+    (errors, warnings, *_ = result). NamedTuple is immutable and costs
+    nothing over a plain tuple at runtime.
+
+    Fields:
+      errors:          schema + template errors (layers 1 + 2) — non-empty → skill exits 1
+      warnings:        dead-rule + path-safety findings (layers 3 + 4) — non-fatal
+      rule_count:      len(merged_profile["mapping_rules"]) at preflight time
+      template_count:  number of .graphify/templates/<type>.md overrides that PASSED layer 2 validation
+    """
+    errors: list[str]
+    warnings: list[str]
+    rule_count: int
+    template_count: int
 
 
 # ---------------------------------------------------------------------------
@@ -428,3 +448,170 @@ def _dump_frontmatter(fields: dict) -> str:
             lines.append(f"{key}: {safe_frontmatter_value(str(value))}")
     lines.append("---")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Preflight composite validator (D-77, D-77a, PROF-05) — read-only four-layer check
+# ---------------------------------------------------------------------------
+
+# D-77 path-safety thresholds
+_PATH_SAFETY_MAX_LEN = 240           # Windows MAX_PATH 260 with 20-char headroom
+_PATH_SAFETY_MAX_SEGMENTS = 4        # UX: Obsidian file tree gets noisy past 4 levels
+_PATH_SAFETY_SIM_FILENAME = "X" * 200  # D-06 filename cap, worst-case
+
+
+def validate_profile_preflight(
+    vault_dir: str | Path,
+) -> PreflightResult:
+    """Four-layer preflight validation of a vault's .graphify/ directory.
+
+    Returns PreflightResult(errors, warnings, rule_count, template_count).
+    Never raises on validation problems. Never writes. Never mutates the vault.
+
+    Layers (D-77):
+      1. Schema  (errors)   — validate_profile on the merged profile
+      2. Templates (errors) — validate_template for each override present
+      3. Dead rules (warnings) — mapping._detect_dead_rules
+      4. Path safety (warnings) — folder length + nesting thresholds
+
+    Caller contract (D-77a): skill exits 1 if errors non-empty, 0 otherwise.
+    On clean validation the skill prints
+      `profile ok — {result.rule_count} rules, {result.template_count} templates validated`
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    rule_count = 0
+    template_count = 0
+
+    vault_path = Path(vault_dir)
+    if not vault_path.exists():
+        return PreflightResult(
+            errors=[f"vault_dir does not exist: {vault_path}"],
+            warnings=[],
+            rule_count=0,
+            template_count=0,
+        )
+    if not vault_path.is_dir():
+        return PreflightResult(
+            errors=[f"vault_dir is not a directory: {vault_path}"],
+            warnings=[],
+            rule_count=0,
+            template_count=0,
+        )
+
+    graphify_dir = vault_path / ".graphify"
+    profile_path = graphify_dir / "profile.yaml"
+
+    # No .graphify directory → no user profile at all; all counts are 0 by
+    # definition (D-77a: N/M suffix reflects user-authored overrides only).
+    if not graphify_dir.exists():
+        return PreflightResult(errors=[], warnings=[], rule_count=0, template_count=0)
+
+    # Step A: load user YAML (if any). Mirrors load_profile's PyYAML guard.
+    user_data: dict = {}
+    if profile_path.exists():
+        try:
+            import yaml  # type: ignore[import-untyped]
+        except ImportError:
+            errors.append(
+                "PyYAML not installed — cannot read profile.yaml. "
+                "Install with: pip install graphifyy[obsidian]"
+            )
+            return PreflightResult(errors, warnings, rule_count, template_count)
+        try:
+            user_data = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            errors.append(f".graphify/profile.yaml parse error: {exc}")
+            return PreflightResult(errors, warnings, rule_count, template_count)
+        if not isinstance(user_data, dict):
+            errors.append(".graphify/profile.yaml top-level must be a mapping (dict)")
+            return PreflightResult(errors, warnings, rule_count, template_count)
+
+    # LAYER 1: Schema — validate_profile on the raw user data (errors only)
+    errors.extend(validate_profile(user_data))
+
+    # Build the effective merged profile (for layers 3 + 4).
+    merged = _deep_merge(_DEFAULT_PROFILE, user_data)
+
+    # LAYER 2: Templates — check every override present in .graphify/templates/
+    templates_dir = graphify_dir / "templates"
+    if templates_dir.exists() and templates_dir.is_dir():
+        # Function-local import to avoid templates.py → profile.py cycle
+        from graphify.templates import (
+            validate_template as _validate_template,
+            _REQUIRED_PER_TYPE,
+        )
+        for note_type, required in _REQUIRED_PER_TYPE.items():
+            tpl_file = templates_dir / f"{note_type}.md"
+            if not tpl_file.exists():
+                continue
+            # Path-confinement: templates/<type>.md must stay inside vault
+            try:
+                validate_vault_path(Path(".graphify") / "templates" / f"{note_type}.md", vault_path)
+            except ValueError as exc:
+                errors.append(f"templates/{note_type}.md: {exc}")
+                continue
+            try:
+                text = tpl_file.read_text(encoding="utf-8")
+            except OSError as exc:
+                errors.append(f"templates/{note_type}.md: read failed: {exc}")
+                continue
+            tpl_errors = _validate_template(text, required)
+            if tpl_errors:
+                for err in tpl_errors:
+                    errors.append(f"templates/{note_type}.md: {err}")
+            else:
+                # Only templates that PASSED validation count toward template_count.
+                template_count += 1
+
+    # LAYER 3: Dead mapping rules (warnings only)
+    rules = merged.get("mapping_rules") or []
+    if isinstance(rules, list):
+        rule_count = len(rules)
+        if rules:
+            # Function-local import — matches validate_profile's existing pattern
+            from graphify.mapping import _detect_dead_rules
+            warnings.extend(_detect_dead_rules(rules))
+
+    # LAYER 4: Path safety (warnings only)
+    folder_candidates: list[tuple[str, str]] = []   # (origin, folder)
+    folder_mapping = merged.get("folder_mapping") or {}
+    if isinstance(folder_mapping, dict):
+        for key, val in folder_mapping.items():
+            if isinstance(val, str):
+                folder_candidates.append((f"folder_mapping.{key}", val))
+    if isinstance(rules, list):
+        for idx, rule in enumerate(rules):
+            if not isinstance(rule, dict):
+                continue
+            then = rule.get("then")
+            if not isinstance(then, dict):
+                continue
+            rule_folder = then.get("folder")
+            if isinstance(rule_folder, str):
+                folder_candidates.append(
+                    (f"mapping_rules[{idx}].then.folder", rule_folder)
+                )
+
+    for origin, folder in folder_candidates:
+        segments = [s for s in folder.strip("/").split("/") if s]
+        if len(segments) > _PATH_SAFETY_MAX_SEGMENTS:
+            warnings.append(
+                f"{origin}: {len(segments)} path segments exceeds "
+                f"{_PATH_SAFETY_MAX_SEGMENTS}-level nesting recommendation "
+                f"(Obsidian UX)"
+            )
+        simulated = str(vault_path / folder / _PATH_SAFETY_SIM_FILENAME)
+        if len(simulated) > _PATH_SAFETY_MAX_LEN:
+            warnings.append(
+                f"{origin}: worst-case path length "
+                f"{len(simulated)} exceeds {_PATH_SAFETY_MAX_LEN}-char budget "
+                f"(Windows MAX_PATH headroom)"
+            )
+
+    return PreflightResult(
+        errors=errors,
+        warnings=warnings,
+        rule_count=rule_count,
+        template_count=template_count,
+    )
