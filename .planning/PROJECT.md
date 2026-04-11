@@ -12,7 +12,11 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] Markdown templates with placeholders for note generation per note type (MOC, Dot/Thing, Dot/Statement, Dot/Person, Source, Community Overview) _(Validated in Phase 2: Template Engine)_
+- [x] Proper Ideaverse frontmatter generation: `up:`, `related:`, `collections:`, `created:`, `tags:` with wikilink format _(Validated in Phase 2: Template Engine)_
+- [x] Wikilink generation respecting vault naming conventions _(Validated in Phase 2: Template Engine)_
+- [x] Wayfinder generation in notes (configurable) _(Validated in Phase 2: Template Engine)_
+- [x] Dataview query embedding in MOC notes (configurable) _(Validated in Phase 2: Template Engine)_
 
 ### Active
 
@@ -21,15 +25,10 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - [ ] Profile YAML schema: folder mapping, mapping rules, merge behavior, naming conventions, Obsidian config
 - [ ] Mapping rules support both graph topology (god node, community hub, leaf node) and node content/attributes (`file_type`, `type`, custom attributes)
 - [ ] Vault profile takes precedence over default; graceful fallback when no profile exists
-- [ ] Markdown templates with placeholders for note generation per note type (MOC, Dot/Thing, Dot/Statement, Dot/Person, Source, Community Overview)
 - [ ] Merge/update strategy for existing notes — update by default, preserve user-specified frontmatter fields, skip or replace as configured
-- [ ] Proper Ideaverse frontmatter generation: `up:`, `related:`, `collections:`, `created:`, `tags:` with wikilink format
 - [ ] Community-to-MOC mapping: communities above configurable member threshold become MOCs in the configured Maps folder with Dataview queries
 - [ ] God-node-to-Dot mapping: high-degree abstraction nodes become Dots (Things) with connections as body content
 - [ ] Source-file-to-Source mapping: origin files become Source notes in configured Sources folder
-- [ ] Wikilink generation respecting vault naming conventions
-- [ ] Wayfinder generation in notes (configurable)
-- [ ] Dataview query embedding in MOC notes (configurable)
 - [ ] `.obsidian/graph.json` community color generation (configurable)
 - [ ] Replaces current `to_obsidian()` in `export.py` while maintaining backward compatibility (no profile = similar output to current)
 
@@ -67,7 +66,7 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 | Dual mapping (topology + content attributes) | Some note types are determined by graph position (god node → Thing), others by content (file_type: person → Person) | — Pending |
 | Default = Ideaverse ACE structure | Most popular Obsidian framework; sensible fallback; validates the system works | — Pending |
 | Update-by-default merge strategy | Users expect injected content to refresh, not duplicate; preserving user-edited fields prevents data loss | — Pending |
-| Simple placeholder templating (no Jinja2) | Avoids new dependency; templates stay readable as plain markdown; sufficient for frontmatter + body generation | — Pending |
+| Simple placeholder templating (no Jinja2) | Avoids new dependency; templates stay readable as plain markdown; sufficient for frontmatter + body generation | Validated in Phase 2 — `string.Template.safe_substitute` works for KNOWN_VARS + two-phase Dataview wrap |
 
 ## Evolution
 
@@ -86,5 +85,11 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
+## Current State
+
+- **Phase 1 (Foundation)** — ✅ Complete. `graphify/profile.py` delivers profile loading, validation, safe-filename/tag helpers, and security primitives.
+- **Phase 2 (Template Engine)** — ✅ Complete. `graphify/templates.py` renders MOC, Community, Thing, Statement, Person, and Source notes via `string.Template` + 6 built-in `.md` templates shipped in the wheel. `render_note()` and `render_moc()` are the public entry points. 587 tests passing.
+- **Phase 3 (Mapping Engine)** — Next. Will populate `ClassificationContext` to drive topology + attribute classification.
+
 ---
-*Last updated: 2026-04-09 after initialization*
+*Last updated: 2026-04-11 after Phase 2 completion*
