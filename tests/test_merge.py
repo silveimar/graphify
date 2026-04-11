@@ -1312,3 +1312,186 @@ def test_malicious_label_does_not_break_sentinel_pairing(tmp_path):
     except _MalformedSentinel:
         # Equally acceptable — fail-loud on ambiguous input per D-69
         pass
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 / D-76 — format_merge_plan tests
+# ---------------------------------------------------------------------------
+
+from graphify.merge import format_merge_plan, MergePlan, MergeAction
+
+
+def _mk_plan(actions=None, summary=None, orphans=None):
+    actions = actions or []
+    orphans = orphans or []
+    # Derive summary from actions if not provided
+    if summary is None:
+        summary = {
+            "CREATE": 0, "UPDATE": 0, "SKIP_PRESERVE": 0,
+            "SKIP_CONFLICT": 0, "REPLACE": 0, "ORPHAN": 0,
+        }
+        for a in actions:
+            summary[a.action] = summary.get(a.action, 0) + 1
+    return MergePlan(actions=actions, orphans=orphans, summary=summary)
+
+
+def test_format_merge_plan_empty_plan():
+    out = format_merge_plan(_mk_plan())
+    assert out.startswith("Merge Plan — 0 actions\n")
+    assert "CREATE:" in out
+    assert "UPDATE:" in out
+    assert "SKIP_PRESERVE:" in out
+    assert "SKIP_CONFLICT:" in out
+    assert "REPLACE:" in out
+    assert "ORPHAN:" in out
+    # No per-group headers when everything is empty
+    assert "CREATE (" not in out
+
+
+def test_format_merge_plan_header_total_counts_actions():
+    plan = _mk_plan([
+        MergeAction(path=Path("a.md"), action="CREATE", reason="new"),
+        MergeAction(path=Path("b.md"), action="CREATE", reason="new"),
+        MergeAction(path=Path("c.md"), action="CREATE", reason="new"),
+    ])
+    out = format_merge_plan(plan)
+    assert out.startswith("Merge Plan — 3 actions\n")
+
+
+def test_format_merge_plan_all_six_summary_rows_in_locked_order():
+    plan = _mk_plan([MergeAction(path=Path("a.md"), action="CREATE", reason="new")])
+    out = format_merge_plan(plan)
+    order = ["CREATE:", "UPDATE:", "SKIP_PRESERVE:", "SKIP_CONFLICT:", "REPLACE:", "ORPHAN:"]
+    positions = [out.index(label) for label in order]
+    assert positions == sorted(positions), f"Summary rows out of order: {positions}"
+
+
+def test_format_merge_plan_update_row_suffix():
+    plan = _mk_plan([
+        MergeAction(
+            path=Path("Atlas/Maps/Community_0.md"),
+            action="UPDATE",
+            reason="update",
+            changed_fields=["a", "b", "c"],
+            changed_blocks=["x", "y"],
+        )
+    ])
+    out = format_merge_plan(plan)
+    assert "(3 fields, 2 blocks)" in out
+    assert "UPDATE  Atlas/Maps/Community_0.md" in out
+
+
+def test_format_merge_plan_skip_conflict_suffix():
+    plan = _mk_plan([
+        MergeAction(
+            path=Path("x.md"), action="SKIP_CONFLICT",
+            reason="conflict", conflict_kind="unmanaged_file",
+        ),
+        MergeAction(
+            path=Path("y.md"), action="SKIP_CONFLICT",
+            reason="conflict", conflict_kind=None,
+        ),
+    ])
+    out = format_merge_plan(plan)
+    assert "[unmanaged_file]" in out
+    assert "[unknown]" in out
+
+
+def test_format_merge_plan_orphan_reason():
+    plan = _mk_plan([
+        MergeAction(
+            path=Path("Atlas/Dots/Things/Old.md"),
+            action="ORPHAN",
+            reason="node transformer_old no longer in graph",
+        )
+    ])
+    out = format_merge_plan(plan)
+    assert "(node transformer_old no longer in graph)" in out
+
+
+def test_format_merge_plan_deterministic():
+    plan = _mk_plan([
+        MergeAction(path=Path("a.md"), action="CREATE", reason="new"),
+        MergeAction(path=Path("b.md"), action="UPDATE", reason="update"),
+    ])
+    assert format_merge_plan(plan) == format_merge_plan(plan)
+
+
+def test_format_merge_plan_action_groups_sorted_by_path():
+    plan = _mk_plan([
+        MergeAction(path=Path("Atlas/Dots/Things/Z.md"), action="CREATE", reason="new"),
+        MergeAction(path=Path("Atlas/Dots/Things/A.md"), action="CREATE", reason="new"),
+    ])
+    out = format_merge_plan(plan)
+    a_pos = out.index("Atlas/Dots/Things/A.md")
+    z_pos = out.index("Atlas/Dots/Things/Z.md")
+    assert a_pos < z_pos, "CREATE group must be sorted by path"
+
+
+def test_format_merge_plan_group_section_only_when_nonzero():
+    plan = _mk_plan([MergeAction(path=Path("a.md"), action="CREATE", reason="new")])
+    out = format_merge_plan(plan)
+    # Summary line for UPDATE: 0 must be present
+    assert "UPDATE:" in out
+    # But per-group header for UPDATE must NOT be present (count is zero)
+    assert "UPDATE (" not in out
+
+
+# ---------------------------------------------------------------------------
+# Plan 05-01 — split_rendered_note tests (public wrapper over private helpers)
+# ---------------------------------------------------------------------------
+
+from graphify.merge import split_rendered_note
+
+
+def test_split_rendered_note_happy_path():
+    text = "---\nkey: value\ncount: 3\n---\n# Title\nbody line\n"
+    fm, body = split_rendered_note(text)
+    assert isinstance(fm, dict)
+    assert fm.get("key") == "value"
+    assert "# Title" in body
+    assert "body line" in body
+    assert "---" not in body  # fence is consumed
+
+
+def test_split_rendered_note_no_frontmatter():
+    text = "# Title\nno fence here\n"
+    fm, body = split_rendered_note(text)
+    assert fm == {}
+    assert body == text
+
+
+def test_split_rendered_note_unclosed_frontmatter():
+    text = "---\nkey: value\n# no closing fence\n"
+    fm, body = split_rendered_note(text)
+    assert fm == {}
+    assert body == text
+
+
+def test_split_rendered_note_empty_string():
+    fm, body = split_rendered_note("")
+    assert fm == {}
+    assert body == ""
+
+
+def test_split_rendered_note_returns_two_tuple_of_dict_str():
+    result = split_rendered_note("---\nk: v\n---\nhi\n")
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert isinstance(result[0], dict)
+    assert isinstance(result[1], str)
+
+
+def test_split_rendered_note_roundtrip_with_dump_frontmatter():
+    # _dump_frontmatter is Phase 4's existing serializer; split_rendered_note
+    # must be its inverse for simple key/value cases.
+    # _dump_frontmatter returns "---\n...\n---" (no trailing newline), so a
+    # newline separator is required before the body — matching how render_note
+    # assembles the full document in practice.
+    from graphify.merge import _dump_frontmatter
+    original = {"tags": ["community/transformer"], "type": "thing"}
+    rendered = _dump_frontmatter(original) + "\nbody\n"
+    fm, body = split_rendered_note(rendered)
+    assert fm.get("type") == "thing"
+    assert fm.get("tags") == ["community/transformer"]
+    assert body == "body\n"

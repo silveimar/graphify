@@ -6,7 +6,7 @@ import datetime
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from graphify.profile import (
     _DEFAULT_PROFILE,
@@ -30,6 +30,11 @@ _VALID_ACTIONS: frozenset[str] = frozenset({
     "REPLACE",
     "ORPHAN",
 })
+
+# D-76 — presentation order for format_merge_plan (matches CONTEXT.md spec)
+_ACTION_DISPLAY_ORDER: tuple[str, ...] = (
+    "CREATE", "UPDATE", "SKIP_PRESERVE", "SKIP_CONFLICT", "REPLACE", "ORPHAN",
+)
 
 _VALID_CONFLICT_KINDS: frozenset[str] = frozenset({
     "unmanaged_file",
@@ -1022,3 +1027,99 @@ def apply_merge_plan(
         failed=failed,
         skipped_identical=skipped_identical,
     )
+
+
+# ---------------------------------------------------------------------------
+# Dry-run formatter (D-76) — public helper consumed by Phase 5 skill
+# ---------------------------------------------------------------------------
+
+def format_merge_plan(plan: MergePlan) -> str:
+    """Render a MergePlan as the grouped human-readable summary shown
+    by Phase 5's --dry-run code path. Pure function; no I/O.
+
+    Output shape is locked in CONTEXT.md D-76:
+      - Header line `Merge Plan — N actions` + separator `=====...`
+      - Six-line summary block (CREATE/UPDATE/SKIP_PRESERVE/SKIP_CONFLICT/REPLACE/ORPHAN)
+      - One per-group section per non-empty action kind, actions sorted by
+        str(path) for determinism.
+    """
+    total = len(plan.actions)
+    lines: list[str] = []
+    lines.append(f"Merge Plan \u2014 {total} actions")
+    lines.append("=" * 24)
+
+    # Summary block: always emit all six keys in locked order, even at zero.
+    # Right-pad labels to 15 chars so counts align (matches CONTEXT.md example).
+    summary = plan.summary or {}
+    for key in _ACTION_DISPLAY_ORDER:
+        count = summary.get(key, 0)
+        lines.append(f"  {key + ':':<15}{count:>3}")
+    lines.append("")
+
+    # Per-group sections in the same locked order.
+    by_action: dict[str, list[MergeAction]] = {k: [] for k in _ACTION_DISPLAY_ORDER}
+    for a in plan.actions:
+        if a.action in by_action:
+            by_action[a.action].append(a)
+
+    for kind in _ACTION_DISPLAY_ORDER:
+        group = by_action[kind]
+        if not group:
+            continue
+        lines.append(f"{kind} ({len(group)})")
+        # Deterministic order: sort by POSIX path string
+        for act in sorted(group, key=lambda x: str(x.path)):
+            suffix = _format_action_suffix(act)
+            lines.append(f"  {kind}  {act.path}{suffix}")
+        lines.append("")
+
+    # Trailing newline elision: strip the final blank line if one was added.
+    if lines and lines[-1] == "":
+        lines.pop()
+    return "\n".join(lines) + "\n"
+
+
+def _format_action_suffix(action: MergeAction) -> str:
+    """Build the trailing parenthetical/bracket for a single action row."""
+    if action.action == "UPDATE":
+        return f"  ({len(action.changed_fields)} fields, {len(action.changed_blocks)} blocks)"
+    if action.action == "SKIP_CONFLICT":
+        kind = action.conflict_kind or "unknown"
+        return f"  [{kind}]"
+    if action.action == "ORPHAN":
+        return f"  ({action.reason})"
+    return ""
+
+
+# ---------------------------------------------------------------------------
+# Rendered-note splitter (Plan 05-01) — public helper consumed by export.py
+# ---------------------------------------------------------------------------
+
+def split_rendered_note(rendered_text: str) -> tuple[dict[str, Any], str]:
+    """Split a rendered note (produced by templates.render_note) into its
+    frontmatter dict and body string.
+
+    This is the public inverse of the private `_parse_frontmatter` +
+    `_find_body_start` pair. It exists so export.py (Plan 05-03) can
+    consume a single stable public contract instead of importing two
+    underscore-prefixed helpers across module boundaries.
+
+    Behavior:
+      - Happy path: returns (frontmatter_dict, body_text_without_frontmatter).
+      - No frontmatter fence: returns ({}, rendered_text).
+      - Malformed / unclosed frontmatter (_parse_frontmatter → None):
+        returns ({}, rendered_text).
+      - Empty input: returns ({}, "").
+
+    Never raises. Never mutates input. Pure function.
+    """
+    if not rendered_text:
+        return ({}, "")
+    fm = _parse_frontmatter(rendered_text)
+    if fm is None:
+        # _parse_frontmatter returns None when there is no fence or when
+        # the fence is unclosed. Treat both as "no frontmatter" per contract.
+        return ({}, rendered_text)
+    body_start = _find_body_start(rendered_text)
+    body = rendered_text[body_start:]
+    return (fm, body)
