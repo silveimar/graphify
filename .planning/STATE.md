@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 context gathered
-last_updated: "2026-04-11T19:48:50.537Z"
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-04-11T20:41:52.547Z"
 last_activity: 2026-04-11
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 16
-  completed_plans: 16
-  percent: 100
+  total_plans: 21
+  completed_plans: 17
+  percent: 81
 ---
 
 # Project State
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-09)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile
-**Current focus:** Phase 04 — merge-engine
+**Current focus:** Phase 05 — integration-cli
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
+Phase: 05 (integration-cli) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
 Last activity: 2026-04-11
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P04 | 4min | 3 tasks | 9 files |
 | Phase 04 P05 | 5min | 2 tasks | 3 files |
 | Phase 04-merge-engine P06 | 2min | 3 tasks | 1 files |
+| Phase 05 P01 | 2m 23s | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Content-hash skip (SHA-256) covers CREATE as well as UPDATE/REPLACE — idempotent re-runs on unchanged vaults produce zero filesystem writes
 - [Phase 04-06]: Traceability comment block (M1..M10 → requirement IDs) added to test_merge.py for greppability by future maintainers
 - [Phase 04-06]: M7 test asserts conflict_kind field only — compute_merge_plan does not emit stderr warnings; conflict surfaces via MergeAction.reason (future enhancement)
+- [Phase 05]: _dump_frontmatter returns no trailing newline — round-trip test uses newline separator before body (matches real render_note assembly)
+- [Phase 05]: format_merge_plan total = len(plan.actions); ORPHAN MergeActions live in plan.actions not plan.orphans per _VALID_ACTIONS
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T19:48:50.527Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-integration-cli/05-CONTEXT.md
+Last session: 2026-04-11T20:41:52.545Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: None
