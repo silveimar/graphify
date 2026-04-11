@@ -838,3 +838,170 @@ def test_render_note_raises_valueerror_for_invalid_note_type():
     profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
     with pytest.raises(ValueError, match=r"note_type .* not in"):
         render_note("n_transformer", G, profile, "whatever", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Plan 04 Task 1: _build_members_section tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_members_section_groups_by_type():
+    from graphify.templates import _build_members_section
+
+    members_by_type = {
+        "thing": [{"id": "n1", "label": "Transformer"}, {"id": "n2", "label": "Attention"}],
+        "statement": [],
+        "person": [],
+        "source": [{"id": "n3", "label": "Attention Is All You Need"}],
+    }
+    result = _build_members_section(members_by_type, "title_case")
+    # Things group present with correct wikilinks
+    assert "> [!info] Things" in result
+    assert "[[Transformer|Transformer]]" in result
+    assert "[[Attention|Attention]]" in result
+    # Sources group present
+    assert "> [!info] Sources" in result
+    assert "[[Attention_Is_All_You_Need|Attention Is All You Need]]" in result
+    # Empty groups omitted (D-30)
+    assert "> [!info] Statements" not in result
+    assert "> [!info] People" not in result
+
+
+def test_build_members_section_group_order():
+    from graphify.templates import _build_members_section
+
+    members_by_type = {
+        "thing": [{"id": "n1", "label": "Thing One"}],
+        "statement": [{"id": "n2", "label": "Statement One"}],
+        "person": [{"id": "n3", "label": "Person One"}],
+        "source": [{"id": "n4", "label": "Source One"}],
+    }
+    result = _build_members_section(members_by_type, "title_case")
+    idx_things = result.index("> [!info] Things")
+    idx_statements = result.index("> [!info] Statements")
+    idx_people = result.index("> [!info] People")
+    idx_sources = result.index("> [!info] Sources")
+    assert idx_things < idx_statements < idx_people < idx_sources
+
+
+def test_build_members_section_empty_returns_empty_string():
+    from graphify.templates import _build_members_section
+
+    members_by_type = {"thing": [], "statement": [], "person": [], "source": []}
+    result = _build_members_section(members_by_type, "title_case")
+    assert result == ""
+
+
+def test_build_members_section_wikilinks_auto_aliased():
+    from graphify.templates import _build_members_section
+
+    members_by_type = {
+        "thing": [{"id": "n1", "label": "Attention Mechanism"}],
+        "statement": [],
+        "person": [],
+        "source": [],
+    }
+    result = _build_members_section(members_by_type, "title_case")
+    assert "[[Attention_Mechanism|Attention Mechanism]]" in result
+
+
+# ---------------------------------------------------------------------------
+# Plan 04 Task 1: _build_sub_communities_callout tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_sub_communities_callout_renders_nested_bullets():
+    from graphify.templates import _build_sub_communities_callout
+
+    sub_communities = [
+        {"label": "Tiny Cluster", "members": [{"id": "n1", "label": "Node A"}, {"id": "n2", "label": "Node B"}]}
+    ]
+    result = _build_sub_communities_callout(sub_communities, "title_case")
+    assert result == "> [!abstract] Sub-communities\n> - **Tiny Cluster:** [[Node_A|Node A]], [[Node_B|Node B]]"
+
+
+def test_build_sub_communities_callout_multiple_sub_communities():
+    from graphify.templates import _build_sub_communities_callout
+
+    sub_communities = [
+        {"label": "Cluster One", "members": [{"id": "n1", "label": "Node A"}]},
+        {"label": "Cluster Two", "members": [{"id": "n2", "label": "Node B"}]},
+    ]
+    result = _build_sub_communities_callout(sub_communities, "title_case")
+    lines = result.split("\n")
+    bullet_lines = [l for l in lines if l.startswith("> - **")]
+    assert len(bullet_lines) == 2
+
+
+def test_build_sub_communities_callout_empty_returns_empty_string():
+    from graphify.templates import _build_sub_communities_callout
+
+    result = _build_sub_communities_callout([], "title_case")
+    assert result == ""
+
+
+def test_build_sub_communities_callout_single_member():
+    from graphify.templates import _build_sub_communities_callout
+
+    sub_communities = [{"label": "Solo Cluster", "members": [{"id": "n1", "label": "Solo Node"}]}]
+    result = _build_sub_communities_callout(sub_communities, "title_case")
+    assert "[[Solo_Node|Solo Node]]" in result
+    assert "> - **Solo Cluster:**" in result
+
+
+# ---------------------------------------------------------------------------
+# Plan 04 Task 1: _build_dataview_block tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_dataview_block_substitutes_community_tag():
+    from graphify.profile import _DEFAULT_PROFILE
+    from graphify.templates import _build_dataview_block
+
+    profile = {
+        "obsidian": {
+            "dataview": {
+                "moc_query": _DEFAULT_PROFILE["obsidian"]["dataview"]["moc_query"],
+            }
+        }
+    }
+    result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/")
+    assert result.startswith("```dataview\n")
+    assert result.endswith("\n```")
+    assert "FROM #community/ml-architecture" in result
+    assert "SORT file.name ASC" in result
+
+
+def test_build_dataview_block_honors_custom_moc_query():
+    from graphify.templates import _build_dataview_block
+
+    custom_query = 'TABLE file.name, type\nFROM #community/${community_tag}\nWHERE type = "thing"\nLIMIT 20'
+    profile = {"obsidian": {"dataview": {"moc_query": custom_query}}}
+    result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/")
+    assert "LIMIT 20" in result
+    assert '#community/ml-architecture' in result
+    assert 'WHERE type = "thing"' in result
+    assert "SORT file.name ASC" not in result
+
+
+def test_build_dataview_block_two_phase_isolation():
+    from graphify.templates import _build_dataview_block
+
+    # User's moc_query contains a literal ${label} token (made-up variable)
+    profile = {"obsidian": {"dataview": {"moc_query": "TABLE ${label} FROM #community/${community_tag}"}}}
+    result = _build_dataview_block(profile, "foo", "Atlas/Maps/")
+    # safe_substitute must leave ${label} unchanged (not in {community_tag, folder})
+    assert "${label}" in result
+    assert "#community/foo" in result
+    assert result.startswith("```dataview")
+
+
+def test_build_dataview_block_missing_moc_query_uses_default():
+    from graphify.templates import _build_dataview_block
+
+    # profile has obsidian: {} (no dataview key)
+    profile = {"obsidian": {}}
+    result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/")
+    # Fallback must produce a non-empty dataview block
+    assert result.startswith("```dataview")
+    assert len(result) > 20
