@@ -26,11 +26,10 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - [ ] Mapping rules support both graph topology (god node, community hub, leaf node) and node content/attributes (`file_type`, `type`, custom attributes)
 - [ ] Vault profile takes precedence over default; graceful fallback when no profile exists
 - [x] Merge/update strategy for existing notes — update by default, preserve user-specified frontmatter fields, skip or replace as configured _(Validated in Phase 4: Merge Engine)_
-- [ ] Community-to-MOC mapping: communities above configurable member threshold become MOCs in the configured Maps folder with Dataview queries
-- [ ] God-node-to-Dot mapping: high-degree abstraction nodes become Dots (Things) with connections as body content
-- [ ] Source-file-to-Source mapping: origin files become Source notes in configured Sources folder
-- [ ] `.obsidian/graph.json` community color generation (configurable)
-- [ ] Replaces current `to_obsidian()` in `export.py` while maintaining backward compatibility (no profile = similar output to current)
+- [x] Community-to-MOC mapping: communities above configurable member threshold become MOCs in the configured Maps folder with Dataview queries _(Validated in Phase 3: Mapping Engine)_
+- [x] God-node-to-Dot mapping: high-degree abstraction nodes become Dots (Things) with connections as body content _(Validated in Phase 3: Mapping Engine)_
+- [x] Source-file-to-Source mapping: origin files become Source notes in configured Sources folder _(Validated in Phase 3: Mapping Engine)_
+- [x] Replaces current `to_obsidian()` in `export.py` while maintaining backward compatibility (no profile = similar output to current) _(Validated in Phase 5: Integration & CLI — confirmed by live dry-run against fixture graph and 872 passing tests)_
 
 ### Out of Scope
 
@@ -40,6 +39,7 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - Obsidian plugin development — output is standard markdown + frontmatter
 - Real-time sync or watch mode integration — this is a batch injection operation
 - Neo4j or other export formats — this is Obsidian-specific
+- `.obsidian/graph.json` community color generation (OBS-01, OBS-02) — de-scoped in D-74; `to_obsidian()` no longer manages graph.json directly. The `safe_tag()` invariant that produced the `community/<slug>` form is preserved and anchored by a regression test, but single-file graph.json read-merge-write lives outside the library-level entry point in v1.0
 
 ## Context
 
@@ -67,6 +67,8 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 | Default = Ideaverse ACE structure | Most popular Obsidian framework; sensible fallback; validates the system works | — Pending |
 | Update-by-default merge strategy | Users expect injected content to refresh, not duplicate; preserving user-edited fields prevents data loss | Validated in Phase 4 — `merge.py` ships `compute_merge_plan`/`apply_merge_plan`; D-67 sentinel blocks + D-64 field policies + D-72 orphan-preservation locked in |
 | Simple placeholder templating (no Jinja2) | Avoids new dependency; templates stay readable as plain markdown; sufficient for frontmatter + body generation | Validated in Phase 2 — `string.Template.safe_substitute` works for KNOWN_VARS + two-phase Dataview wrap |
+| **D-73**: CLI is utilities-only; the skill is the pipeline driver | `graphify --obsidian` and `graphify --validate-profile` exist as direct utility entry points, but the full pipeline (detect → extract → build → cluster → analyze → report → export) runs via the skill, not via a single CLI verb. Avoids rebuilding agent orchestration in Python. | Validated in Phase 5 — `__main__.py` exposes two new flags for direct utility access; `skill.md` drives the full pipeline with embedded Python blocks. Known limitation: `dry_run = False` in skill.md:547 is a placeholder the agent flips when `--dry-run` is parsed. |
+| **D-74**: De-scope `.obsidian/graph.json` generation from `to_obsidian()` | Phase 5 integration refactor consolidated `to_obsidian()` around the merge engine and profile-driven mapping. Writing `.obsidian/graph.json` directly from the library entry point couples vault-config-file management with note generation, which conflicts with the "library is a pipeline, skill is the driver" shape from D-73. The `safe_tag()` helper that produced `community/<slug>` labels remains in `profile.py` and is used by note frontmatter tags + Dataview queries; a regression test in `test_profile.py::test_obs01_obs02_safe_tag_regression_anchor` locks the slugification invariant. | Accepted in Phase 5 refactor — moves OBS-01 and OBS-02 to Out of Scope for v1.0. Revisit if a future release needs plugin-side `.obsidian/graph.json` management, at which point the feature likely lives behind a flag or in a separate module, not in `to_obsidian()`. |
 
 ## Evolution
 

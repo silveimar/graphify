@@ -18,22 +18,22 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Note Generation
 
-- [ ] **GEN-01**: Generated notes have YAML frontmatter with configurable fields (default: `up:`, `related:`, `collections:`, `tags:`, `created:`)
-- [ ] **GEN-02**: All inter-note references use `[[wikilink]]` format with proper deduplication and label sanitization
-- [ ] **GEN-03**: User can provide custom markdown templates in `.graphify/templates/` that override built-in templates per note type
-- [ ] **GEN-04**: Built-in templates exist for: MOC, Dot/Thing, Dot/Statement, Dot/Person, Source, Community Overview
-- [ ] **GEN-05**: MOC notes include embedded Dataview queries that dynamically list community members
-- [ ] **GEN-06**: Notes include wayfinder navigation elements linking to parent MOC and related communities
-- [ ] **GEN-07**: File naming follows configurable convention (title_case, kebab-case, preserve original label)
+- [x] **GEN-01**: Generated notes have YAML frontmatter with configurable fields (default: `up:`, `related:`, `collections:`, `tags:`, `created:`)
+- [x] **GEN-02**: All inter-note references use `[[wikilink]]` format with proper deduplication and label sanitization
+- [x] **GEN-03**: User can provide custom markdown templates in `.graphify/templates/` that override built-in templates per note type
+- [x] **GEN-04**: Built-in templates exist for: MOC, Dot/Thing, Dot/Statement, Dot/Person, Source, Community Overview
+- [x] **GEN-05**: MOC notes include embedded Dataview queries that dynamically list community members
+- [x] **GEN-06**: Notes include wayfinder navigation elements linking to parent MOC and related communities
+- [x] **GEN-07**: File naming follows configurable convention (title_case, kebab-case, preserve original label)
 
 ### Mapping & Placement
 
-- [ ] **MAP-01**: Notes are placed in folders defined by `profile.yaml` `folder_mapping` (e.g., MOCs → `Atlas/Maps/`, Things → `Atlas/Dots/Things/`)
-- [ ] **MAP-02**: Topology-based classification: god nodes → Things, communities above threshold → MOCs, source files → Sources, default → Statements
-- [ ] **MAP-03**: Attribute-based classification: node content attributes (e.g., `file_type: person`) override topology classification per profile rules
-- [ ] **MAP-04**: Mapping rules support dual evaluation: attribute rules take precedence, then topology rules, then default
-- [ ] **MAP-05**: Community-to-MOC threshold is configurable (default: 3 members); below threshold, community collapses to list in parent MOC
-- [ ] **MAP-06**: Source files route to sub-folders by file type when profile specifies routing rules (e.g., Books/, Code/, Papers/)
+- [x] **MAP-01**: Notes are placed in folders defined by `profile.yaml` `folder_mapping` (e.g., MOCs → `Atlas/Maps/`, Things → `Atlas/Dots/Things/`)
+- [x] **MAP-02**: Topology-based classification: god nodes → Things, communities above threshold → MOCs, source files → Sources, default → Statements
+- [x] **MAP-03**: Attribute-based classification: node content attributes (e.g., `file_type: person`) override topology classification per profile rules
+- [x] **MAP-04**: Mapping rules support dual evaluation: attribute rules take precedence, then topology rules, then default
+- [x] **MAP-05**: Community-to-MOC threshold is configurable (default: 3 members); below threshold, community collapses to list in parent MOC
+- [x] **MAP-06**: Source files route to sub-folders by file type when profile specifies routing rules (e.g., Books/, Code/, Papers/)
 
 ### Merge & Safety
 
@@ -41,14 +41,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **MRG-02**: `preserve_fields` list in profile specifies frontmatter fields that graphify never overwrites (default: `rank`, `mapState`, `tags`)
 - [x] **MRG-03**: User can run `graphify --obsidian --dry-run` to preview all changes without writing any files
 - [x] **MRG-04**: All profile-derived file paths are validated against path-traversal attacks (no writing outside vault directory)
-- [ ] **MRG-05**: When no vault profile exists, output is backward-compatible with current `to_obsidian()` behavior
+- [x] **MRG-05**: When no vault profile exists, output is backward-compatible with current `to_obsidian()` behavior
 - [x] **MRG-06**: Frontmatter field ordering is preserved on update to minimize git diff noise
 - [x] **MRG-07**: User can configure merge strategy per profile: `update` (default), `skip` (don't touch existing), or `replace` (overwrite entirely)
-
-### Obsidian Config
-
-- [x] **OBS-01**: `.obsidian/graph.json` community color groups use correct `tag:community/Name` syntax (fix existing `tag:#` bug)
-- [x] **OBS-02**: `graph.json` generation uses read-merge-write strategy to preserve user's existing color groups and settings
 
 ### Pre-existing Bug Fixes
 
@@ -85,6 +80,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | Real-time sync or watch mode | This is a batch injection operation |
 | Two-way sync (vault changes → graph) | Unidirectional: graph → vault only |
 | Jinja2 template engine | Adds dependency, RCE risk via vault-supplied templates |
+| **OBS-01**: `.obsidian/graph.json` community color groups use `tag:community/Name` syntax | **De-scoped in D-74 (Phase 5 refactor).** `to_obsidian()` no longer writes `.obsidian/graph.json` — the CLI became utilities-only and the pipeline runs via the skill, so single-file graph.json management does not belong in the library-level entry point. The underlying `safe_tag()` slugification that produced the `community/<slug>` form remains in `profile.py` and is anchored by `test_obs01_obs02_safe_tag_regression_anchor` in `tests/test_profile.py`, so downstream consumers (including note frontmatter tags and Dataview queries) still observe the correct invariant. File-level graph.json read/write is a candidate for a future plugin-side integration, not v1.0. |
+| **OBS-02**: `graph.json` generation uses read-merge-write strategy | **De-scoped in D-74.** Removed together with OBS-01 for the same reason. The read-merge-write invariant had no production surface once the write path was removed. |
 
 ## Traceability
 
@@ -96,28 +93,28 @@ Deferred to future release. Tracked but not in current roadmap.
 | PROF-04 | Phase 1 | Complete |
 | PROF-05 | Phase 5 | Complete |
 | PROF-06 | Phase 1 | Complete |
-| GEN-01 | Phase 2 | Pending |
-| GEN-02 | Phase 2 | Pending |
-| GEN-03 | Phase 2 | Pending |
-| GEN-04 | Phase 2 | Pending |
-| GEN-05 | Phase 2 | Pending |
-| GEN-06 | Phase 2 | Pending |
-| GEN-07 | Phase 2 | Pending |
-| MAP-01 | Phase 3 | Pending |
-| MAP-02 | Phase 3 | Pending |
-| MAP-03 | Phase 3 | Pending |
-| MAP-04 | Phase 3 | Pending |
-| MAP-05 | Phase 3 | Pending |
-| MAP-06 | Phase 3 | Pending |
+| GEN-01 | Phase 2 | Complete |
+| GEN-02 | Phase 2 | Complete |
+| GEN-03 | Phase 2 | Complete |
+| GEN-04 | Phase 2 | Complete |
+| GEN-05 | Phase 2 | Complete |
+| GEN-06 | Phase 2 | Complete |
+| GEN-07 | Phase 2 | Complete |
+| MAP-01 | Phase 3 | Complete |
+| MAP-02 | Phase 3 | Complete |
+| MAP-03 | Phase 3 | Complete |
+| MAP-04 | Phase 3 | Complete |
+| MAP-05 | Phase 3 | Complete |
+| MAP-06 | Phase 3 | Complete |
 | MRG-01 | Phase 4 | Complete |
 | MRG-02 | Phase 4 | Complete |
 | MRG-03 | Phase 5 | Complete |
 | MRG-04 | Phase 1 | Complete |
-| MRG-05 | Phase 5 | Pending |
+| MRG-05 | Phase 5 | Complete |
 | MRG-06 | Phase 4 | Complete |
 | MRG-07 | Phase 4 | Complete |
-| OBS-01 | Phase 1 | Complete |
-| OBS-02 | Phase 1 | Complete |
+| OBS-01 | Phase 1 | Out of Scope (D-74) |
+| OBS-02 | Phase 1 | Out of Scope (D-74) |
 | FIX-01 | Phase 1 | Complete |
 | FIX-02 | Phase 1 | Complete |
 | FIX-03 | Phase 1 | Complete |
@@ -125,10 +122,12 @@ Deferred to future release. Tracked but not in current roadmap.
 | FIX-05 | Phase 1 | Complete |
 
 **Coverage:**
-- v1 requirements: 33 total
-- Mapped to phases: 33
+- v1 requirements: 33 total (2 de-scoped in D-74)
+- In-scope: 31
+- Complete: 31 / 31
+- Out of Scope: 2 (OBS-01, OBS-02)
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-09*
-*Last updated: 2026-04-09 after roadmap confirmation*
+*Last updated: 2026-04-11 after milestone v1.0 audit — D-74 de-scope of OBS-01/OBS-02; GEN-01..07 and MAP-01..06 flipped to Complete to reconcile traceability with Phase 2/3 VERIFICATION.md evidence*
