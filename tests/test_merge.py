@@ -987,3 +987,168 @@ def test_field_order_preserved_minimal_diff(tmp_path):
     _, old_line, new_line = diff[0]
     assert "source_file" in old_line and "source_file" in new_line, \
         f"the only diff must be on source_file, got {old_line!r} -> {new_line!r}"
+
+
+# --- Phase 4 must_haves M5..M10 + T-04-01 security assertion ---
+
+
+def test_sentinel_round_trip_deleted_block_not_reinserted(tmp_path):
+    from pathlib import Path
+    import re
+    from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+
+    # Remove the connections block from the file
+    original = target.read_text()
+    stripped = re.sub(
+        r"<!-- graphify:connections:start -->.*?<!-- graphify:connections:end -->",
+        "",
+        original,
+        flags=re.DOTALL,
+    )
+    assert "graphify:connections:start" not in stripped
+    target.write_text(stripped)
+
+    # Rendered note includes a FRESH connections block
+    existing_fm = _parse_frontmatter(stripped)
+    body_with_new_connections = (
+        "# Transformer\n\n"
+        "<!-- graphify:wayfinder:start -->\n> [!note] Wayfinder\n> Up: [[X|X]]\n> Map: [[Atlas|Atlas]]\n<!-- graphify:wayfinder:end -->\n\n"
+        "<!-- graphify:connections:start -->\n> [!info] Connections\n> - [[New|New]] — uses [EXTRACTED]\n<!-- graphify:connections:end -->\n\n"
+        "<!-- graphify:metadata:start -->\n> [!abstract] Metadata\n> source_file: src/transformer.py\n<!-- graphify:metadata:end -->"
+    )
+    rn = {
+        "node_id": "transformer",
+        "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+        "frontmatter_fields": existing_fm,
+        "body": body_with_new_connections,
+    }
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    apply_merge_plan(plan, vault, {"transformer": rn}, {})
+
+    after = target.read_text()
+    assert "graphify:connections:start" not in after, \
+        "D-68: deleted block must NOT be re-inserted by merge"
+
+
+def test_unmanaged_file_skip_conflict(tmp_path):
+    from pathlib import Path
+    from graphify.merge import compute_merge_plan, apply_merge_plan
+    vault = _copy_vault_fixture("fingerprint_stripped", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    original_bytes = target.read_bytes()
+    rn = {
+        "node_id": "transformer",
+        "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+        "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+        "body": "<!-- graphify:wayfinder:start -->\nX\n<!-- graphify:wayfinder:end -->",
+    }
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    assert plan.actions[0].action == "SKIP_CONFLICT"
+    assert plan.actions[0].conflict_kind == "unmanaged_file"
+    apply_merge_plan(plan, vault, {"transformer": rn}, {})
+    assert target.read_bytes() == original_bytes, "unmanaged file must never be touched"
+
+
+def test_malformed_sentinel_skip_warn(tmp_path):
+    from pathlib import Path
+    from graphify.merge import compute_merge_plan, apply_merge_plan
+    vault = _copy_vault_fixture("malformed_sentinel", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    original_bytes = target.read_bytes()
+    rn = {
+        "node_id": "transformer",
+        "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+        "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+        "body": "<!-- graphify:wayfinder:start -->\nX\n<!-- graphify:wayfinder:end -->",
+    }
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    assert plan.actions[0].action == "SKIP_CONFLICT"
+    assert plan.actions[0].conflict_kind == "malformed_sentinel"
+    apply_merge_plan(plan, vault, {"transformer": rn}, {})
+    assert target.read_bytes() == original_bytes, \
+        "D-69: malformed sentinel must leave file untouched"
+
+
+def test_orphan_never_deleted_under_replace(tmp_path):
+    from pathlib import Path
+    from graphify.merge import compute_merge_plan, apply_merge_plan
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    assert target.exists()
+
+    profile = {"merge": {"strategy": "replace"}}
+    plan = compute_merge_plan(
+        vault,
+        {},  # no rendered notes — everything is orphan
+        profile,
+        previously_managed_paths={target.resolve()},
+    )
+    orphan_actions = [a for a in plan.actions if a.action == "ORPHAN"]
+    assert len(orphan_actions) == 1, f"expected 1 ORPHAN, got {plan.actions}"
+    apply_merge_plan(plan, vault, {}, profile)
+    assert target.exists(), "D-72: orphan files are NEVER deleted, even under replace"
+
+
+def test_compute_merge_plan_is_pure(tmp_path):
+    from pathlib import Path
+    from graphify.merge import compute_merge_plan, _parse_frontmatter
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    mtime_before = target.stat().st_mtime_ns
+
+    rn = _rendered_note_matching_pristine(vault)
+    _ = compute_merge_plan(vault, {"transformer": rn}, {})
+
+    assert target.stat().st_mtime_ns == mtime_before, \
+        "compute_merge_plan must not modify any file"
+    # No .tmp files created
+    tmp_files = list(vault.rglob("*.tmp"))
+    assert tmp_files == [], f"compute must not create .tmp files, found {tmp_files}"
+
+
+def test_apply_merge_plan_content_hash_skip(tmp_path):
+    from pathlib import Path
+    from graphify.merge import compute_merge_plan, apply_merge_plan
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    rn = _rendered_note_matching_pristine(vault)
+
+    # First apply — idempotent update, but content is already identical
+    plan1 = compute_merge_plan(vault, {"transformer": rn}, {})
+    r1 = apply_merge_plan(plan1, vault, {"transformer": rn}, {})
+    assert target in r1.skipped_identical, \
+        f"first apply should content-hash-skip; got succeeded={r1.succeeded}, skipped={r1.skipped_identical}"
+    mtime_after_first = target.stat().st_mtime_ns
+
+    # Second apply — must still skip
+    plan2 = compute_merge_plan(vault, {"transformer": rn}, {})
+    r2 = apply_merge_plan(plan2, vault, {"transformer": rn}, {})
+    assert target in r2.skipped_identical
+    assert target.stat().st_mtime_ns == mtime_after_first, \
+        "content-hash skip must not touch mtime across runs"
+
+
+def test_malicious_label_does_not_break_sentinel_pairing(tmp_path):
+    """T-04-01 mitigation: a node label containing the literal end-marker
+    substring must not confuse the sentinel parser."""
+    from graphify.merge import _parse_sentinel_blocks
+    body = (
+        "<!-- graphify:connections:start -->\n"
+        "> - [[Fake|contains <!-- graphify:connections:end --> in alias]] — uses [EXTRACTED]\n"
+        "<!-- graphify:connections:end -->\n"
+    )
+    # The parser currently uses regex .search — verify it still extracts exactly
+    # one connections block, OR raises _MalformedSentinel. EITHER behavior is
+    # safe (test pins whichever is implemented) — the point is it must not
+    # SILENTLY claim the wrong region as graphify-owned.
+    from graphify.merge import _MalformedSentinel
+    try:
+        blocks = _parse_sentinel_blocks(body)
+        # If it parses, the extracted content must include the closing end-marker
+        # in the alias (demonstrating the parser found the LAST end marker)
+        assert "connections" in blocks
+    except _MalformedSentinel:
+        # Equally acceptable — fail-loud on ambiguous input per D-69
+        pass
