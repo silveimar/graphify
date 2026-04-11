@@ -27,6 +27,9 @@ def __getattr__(name):
         "render_note": ("graphify.templates", "render_note"),
         "render_moc": ("graphify.templates", "render_moc"),
         "render_community_overview": ("graphify.templates", "render_community_overview"),
+        "classify": ("graphify.mapping", "classify"),
+        "MappingResult": ("graphify.mapping", "MappingResult"),
+        "validate_rules": ("graphify.mapping", "validate_rules"),
     }
     if name in _map:
         import importlib

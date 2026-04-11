@@ -702,3 +702,29 @@ def test_validate_rules_rejects_unknown_then_keys():
         "unknown keys ['tags']" in e and "mapping_rules[0].then" in e
         for e in errors
     ), f"expected pointed error about 'tags'; got: {errors}"
+
+
+# ---------------------------------------------------------------------------
+# Plan 04 Task 1: Package-surface lazy exports (VALIDATION row 3-04-05)
+# ---------------------------------------------------------------------------
+
+
+def test_graphify_package_lazy_exports_classify():
+    """VALIDATION row 3-04-05 (WARNING 4 fix): Phase 3 public API is exported
+    via graphify/__init__.py's lazy import map so downstream callers can do
+    `from graphify import classify` without a submodule reference."""
+    import graphify
+
+    assert callable(graphify.classify)
+    assert callable(graphify.validate_rules)
+    # MappingResult is a TypedDict — it's a class at runtime
+    assert hasattr(graphify, "MappingResult")
+
+
+def test_graphify_classify_is_graphify_mapping_classify():
+    """A typo in the lazy-map tuple (T-3-13) would produce an ImportError at
+    first access; this identity assertion is a cheap regression guard."""
+    import graphify
+    from graphify.mapping import classify as direct
+
+    assert graphify.classify is direct
