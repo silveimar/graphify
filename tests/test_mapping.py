@@ -728,3 +728,136 @@ def test_graphify_classify_is_graphify_mapping_classify():
     from graphify.mapping import classify as direct
 
     assert graphify.classify is direct
+
+
+# ---------------------------------------------------------------------------
+# Plan 04 Task 2: Contract round-trip tests — Phase 3 ↔ Phase 2 boundary
+# (VALIDATION rows 3-04-01, 3-04-02, 3-04-06)
+# ---------------------------------------------------------------------------
+
+
+def test_classify_output_round_trips_through_render_note():
+    """VALIDATION row 3-04-01: classify()'s per_node ClassificationContext
+    feeds render_note() without raising. Guards against key-name drift
+    between Phase 2 and Phase 3 (T-3-12)."""
+    import datetime
+
+    from graphify.mapping import classify
+    from graphify.profile import safe_tag
+    from graphify.templates import render_note
+
+    G, communities = make_classification_fixture()
+    result = classify(G, communities, _profile())
+
+    # n_transformer is the sole top-degree real node in cid 0 and, with
+    # top_n=1, the only god node → classified as "thing" via topology fallback.
+    ctx = result["per_node"]["n_transformer"]
+    assert ctx["note_type"] == "thing"
+    # community enrichment from Plan 02 must have landed end-to-end.
+    assert ctx.get("community_name") == "Transformer"
+    assert ctx.get("parent_moc_label") == "Transformer"
+    assert ctx.get("community_tag") == safe_tag("Transformer")
+
+    filename, text = render_note(
+        "n_transformer",
+        G,
+        _profile(),
+        "thing",
+        ctx,
+        created=datetime.date(2024, 1, 1),
+    )
+    assert isinstance(filename, str) and filename.endswith(".md")
+    assert isinstance(text, str) and len(text) > 0
+    # The node label appears as the note heading.
+    assert "Transformer" in text
+    # community_tag is emitted in the tags frontmatter list as
+    # `community/<safe_tag>` (templates.py:598).
+    assert f"community/{safe_tag('Transformer')}" in text
+
+
+def test_classify_output_round_trips_through_render_moc():
+    """VALIDATION rows 3-04-02 + 3-04-06: classify()'s per_community
+    ClassificationContext feeds render_moc() without raising, and the
+    cohesion field is populated end-to-end (W-2 fix) as a plain Python
+    float (WR-06)."""
+    import datetime
+
+    from graphify.mapping import classify
+    from graphify.templates import render_moc
+
+    G, communities = make_classification_fixture()
+    result = classify(G, communities, _profile())
+
+    # cid 0 is the only above-threshold community (4 real members ≥ 3).
+    assert 0 in result["per_community"]
+    moc_ctx = result["per_community"][0]
+    assert moc_ctx["note_type"] == "moc"
+    assert moc_ctx["community_name"] == "Transformer"
+
+    filename, text = render_moc(
+        0,
+        G,
+        communities,
+        _profile(),
+        moc_ctx,
+        created=datetime.date(2024, 1, 1),
+    )
+    assert isinstance(filename, str) and filename.endswith(".md")
+    assert isinstance(text, str) and len(text) > 0
+    # Community name is the rendered title.
+    assert "Transformer" in text
+    # Dataview block present (from _build_dataview_block).
+    assert "```dataview" in text
+    # cid 1 (below-threshold) collapses into cid 0's sub_communities;
+    # its god node AuthService must appear in the rendered MOC.
+    assert "AuthService" in text
+
+    # W-2 fix (VALIDATION row 3-04-06): per_community[cid]["cohesion"] MUST
+    # be populated so that templates.py:705-706 `_render_moc_like` reads a
+    # real float. Pick the first real MOC (not the synthetic -1 bucket).
+    first_moc_cid = next(
+        cid
+        for cid, cctx in result["per_community"].items()
+        if cctx.get("note_type") == "moc" and cid >= 0
+    )
+    cohesion = result["per_community"][first_moc_cid].get("cohesion")
+    assert cohesion is not None, (
+        "per_community[cid]['cohesion'] must be populated (Plan 02 W-2 fix). "
+        "See templates.py:705-706 which reads ctx.get('cohesion')."
+    )
+    # WR-06: must be a plain Python float, not numpy.float64 — the latter
+    # renders as 'numpy.float64(0.82)' rather than '0.82'.
+    assert isinstance(cohesion, float), (
+        f"cohesion must be a plain float per WR-06 (got {type(cohesion).__name__})"
+    )
+
+
+def test_classify_output_round_trips_members_by_type_into_moc():
+    """Every non-skipped member of an above-threshold community must render
+    through to the MOC text via members_by_type — tightens the 3-04-02
+    contract by asserting member visibility, not just non-raising."""
+    import datetime
+
+    from graphify.mapping import classify
+    from graphify.templates import render_moc
+
+    G, communities = make_classification_fixture()
+    result = classify(G, communities, _profile())
+    moc_ctx = result["per_community"][0]
+    _, text = render_moc(
+        0,
+        G,
+        communities,
+        _profile(),
+        moc_ctx,
+        created=datetime.date(2024, 1, 1),
+    )
+
+    # Every non-skipped member of cid 0 must appear in the rendered text.
+    expected_labels = {
+        G.nodes[m]["label"]
+        for m in communities[0]
+        if m not in result["skipped_node_ids"]
+    }
+    for label in expected_labels:
+        assert label in text, f"expected {label!r} in MOC render"
