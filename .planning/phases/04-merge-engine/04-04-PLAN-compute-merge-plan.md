@@ -1,0 +1,900 @@
+---
+phase: 04-merge-engine
+plan: 04
+type: execute
+wave: 3
+depends_on:
+  - 01
+  - 03
+files_modified:
+  - graphify/merge.py
+  - tests/test_merge.py
+  - tests/fixtures/vaults/empty/.gitkeep
+  - tests/fixtures/vaults/pristine_graphify/Atlas/Dots/Things/Transformer.md
+  - tests/fixtures/vaults/user_extended/Atlas/Dots/Things/Transformer.md
+  - tests/fixtures/vaults/fingerprint_stripped/Atlas/Dots/Things/Transformer.md
+  - tests/fixtures/vaults/malformed_sentinel/Atlas/Dots/Things/Transformer.md
+  - tests/fixtures/vaults/preserve_fields_edited/Atlas/Dots/Things/Transformer.md
+  - tests/fixtures/vaults/unmanaged_collision/Atlas/Dots/Things/Transformer.md
+autonomous: true
+requirements:
+  - MRG-01
+  - MRG-06
+  - MRG-07
+tags:
+  - merge
+  - compute-plan
+  - pure-function
+  - fixtures
+
+must_haves:
+  truths:
+    - "compute_merge_plan is pure — calling it against a vault on disk produces a MergePlan without writing any file"
+    - "compute_merge_plan emits CREATE for rendered notes whose target path does not yet exist"
+    - "compute_merge_plan emits UPDATE for rendered notes whose target path exists AND carries the dual fingerprint (frontmatter graphify_managed: true OR any body sentinel)"
+    - "compute_merge_plan emits SKIP_CONFLICT with conflict_kind='unmanaged_file' when target path exists but has no fingerprint (D-63)"
+    - "compute_merge_plan emits SKIP_CONFLICT with conflict_kind='malformed_sentinel' when body sentinels are malformed (D-69)"
+    - "compute_merge_plan emits SKIP_CONFLICT with conflict_kind='malformed_frontmatter' when existing frontmatter cannot be parsed"
+    - "compute_merge_plan emits ORPHAN for files previously managed by graphify whose node_id no longer appears in rendered_notes"
+    - "compute_merge_plan honors merge_strategy='skip' by emitting SKIP_PRESERVE for every existing fingerprinted file"
+    - "compute_merge_plan honors merge_strategy='replace' by emitting REPLACE for fingerprinted existing files (still SKIP_CONFLICT for unmanaged)"
+    - "UPDATE actions preserve existing frontmatter field order and slot new keys near canonical neighbors per D-66"
+    - "A node_id present in the skipped_node_ids set produces NO action (not CREATE, not UPDATE, not ORPHAN)"
+    - "Every MergeAction.path is inside vault_dir (validated via profile.validate_vault_path)"
+    - "tests/fixtures/vaults/ contains 7 representative vault states (empty + 6 populated) copied into tmp_path by tests"
+  artifacts:
+    - path: "graphify/merge.py"
+      provides: "compute_merge_plan public function + RenderedNote TypedDict + supporting private helpers"
+      min_lines: 400
+    - path: "tests/fixtures/vaults/"
+      provides: "7 subdirectories of real vault states reused across Plans 04, 05, 06"
+    - path: "tests/test_merge.py"
+      provides: "compute_merge_plan unit tests covering CREATE/UPDATE/SKIP/REPLACE/ORPHAN paths + purity assertion"
+  key_links:
+    - from: "compute_merge_plan"
+      to: "_parse_frontmatter + _parse_sentinel_blocks + _resolve_field_policy + _apply_field_policy"
+      via: "Plan 03 primitives composed into per-file decision logic"
+      pattern: "_parse_frontmatter"
+    - from: "compute_merge_plan"
+      to: "profile.validate_vault_path"
+      via: "every MergeAction.path gated through path-confinement check"
+      pattern: "validate_vault_path"
+    - from: "_insert_with_canonical_neighbor"
+      to: "templates._build_frontmatter_fields canonical order (D-24)"
+      via: "_CANONICAL_KEY_ORDER list mirrors the emission order in templates.py"
+      pattern: "_CANONICAL_KEY_ORDER"
+---
+
+<objective>
+Implement `compute_merge_plan`, the pure-function core of Phase 4. It consumes a vault directory, a dict of rendered notes from Phase 2/3, and a validated profile, then emits a `MergePlan` describing every per-file decision. No filesystem writes — this function is read-only I/O over `vault_dir`. Phase 5's `--dry-run` calls this directly and prints the plan.
+
+This plan also creates the `tests/fixtures/vaults/` corpus (7 representative vault states) that Plans 04, 05, and 06 all reuse.
+
+Purpose: Satisfies D-61..D-69, D-70, D-71, D-72. Delivers the decision surface that Phase 5's `--dry-run` will reuse unchanged. Every success criterion of Phase 4 is decidable from compute_merge_plan's output alone.
+
+Output: `compute_merge_plan(vault_dir, rendered_notes, profile) -> MergePlan` function; 7 vault fixtures; 15+ unit tests covering every action type and edge case.
+</objective>
+
+<execution_context>
+@$HOME/.claude/get-shit-done/workflows/execute-plan.md
+@$HOME/.claude/get-shit-done/templates/summary.md
+</execution_context>
+
+<context>
+@.planning/phases/04-merge-engine/04-CONTEXT.md
+@.planning/phases/04-merge-engine/04-01-PLAN-sentinel-backpatch.md
+@.planning/phases/04-merge-engine/04-03-PLAN-merge-primitives.md
+@graphify/merge.py
+@graphify/profile.py
+@graphify/templates.py
+@tests/test_merge.py
+
+<interfaces>
+<!-- Public signature (D-70) -->
+
+```python
+def compute_merge_plan(
+    vault_dir: Path,
+    rendered_notes: dict[str, "RenderedNote"],
+    profile: dict,
+    *,
+    skipped_node_ids: set[str] | None = None,
+    previously_managed_paths: set[Path] | None = None,
+) -> MergePlan: ...
+```
+
+<!-- rendered_notes input shape — Plan 04 defines this TypedDict since
+    Phase 5 will be the first real caller and it needs the contract today. -->
+
+```python
+class RenderedNote(TypedDict):
+    node_id: str
+    target_path: Path    # vault-relative or absolute (compute_merge_plan resolves)
+    frontmatter_fields: dict
+    body: str            # post-frontmatter body including sentinel-wrapped blocks
+```
+
+<!-- Available primitives from Plan 03 -->
+From graphify/merge.py (already exists):
+- `_DEFAULT_FIELD_POLICIES: dict[str, str]`
+- `_parse_frontmatter(body: str) -> dict | None`
+- `_parse_sentinel_blocks(body: str) -> dict[str, str]` (raises `_MalformedSentinel`)
+- `_resolve_field_policy(key: str, profile: dict) -> str`
+- `_apply_field_policy(key, current, new, mode) -> Any`
+- `MergeAction, MergePlan, MergeResult` (frozen dataclasses)
+- `_VALID_ACTIONS, _VALID_CONFLICT_KINDS`
+- `class _MalformedSentinel(Exception)`
+
+From graphify/profile.py:
+- `validate_vault_path(candidate, vault_dir) -> Path`  # raises ValueError on escape
+- `_dump_frontmatter(fields: dict) -> str`
+
+<!-- Fingerprint contract (D-62) -->
+A file is fingerprinted iff EITHER:
+  - Parsed frontmatter contains `graphify_managed: true`, OR
+  - Parsed sentinel blocks dict is non-empty
+
+Both are normally present on a CREATE output. Either alone is sufficient.
+</interfaces>
+
+<prior_patterns>
+<!-- Phase 3 coupling -->
+- A node_id in skipped_node_ids produces NO action — not CREATE, not UPDATE, not ORPHAN.
+- Orphans come from files that previously existed in the vault under a graphify path but have no matching rendered_note this run. Phase 5 supplies previously_managed_paths; Plan 04 uses that set directly instead of walking the vault.
+
+<!-- D-66 field-order preservation -->
+- For each UPDATE: walk existing frontmatter keys in their original order. For each, apply policy. Keys new to the render (not in existing) slot after their canonical neighbor from _CANONICAL_KEY_ORDER.
+
+<!-- D-68 deleted-block respect -->
+- When refreshing body blocks: iterate blocks PRESENT in the existing body. Blocks graphify emits but absent from the file are NOT re-inserted. State-free.
+</prior_patterns>
+</context>
+
+<tasks>
+
+<task type="auto" tdd="true">
+  <name>Task 1: Create vault test fixture corpus</name>
+  <files>
+    tests/fixtures/vaults/empty/.gitkeep,
+    tests/fixtures/vaults/pristine_graphify/Atlas/Dots/Things/Transformer.md,
+    tests/fixtures/vaults/user_extended/Atlas/Dots/Things/Transformer.md,
+    tests/fixtures/vaults/fingerprint_stripped/Atlas/Dots/Things/Transformer.md,
+    tests/fixtures/vaults/malformed_sentinel/Atlas/Dots/Things/Transformer.md,
+    tests/fixtures/vaults/preserve_fields_edited/Atlas/Dots/Things/Transformer.md,
+    tests/fixtures/vaults/unmanaged_collision/Atlas/Dots/Things/Transformer.md
+  </files>
+  <read_first>
+    - .planning/phases/04-merge-engine/04-CONTEXT.md "Specific Ideas" section (vault fixture corpus)
+    - graphify/profile.py L359-394 (_dump_frontmatter — pristine fixture frontmatter MUST match this grammar byte-for-byte so round-trip tests pass)
+    - graphify/templates.py (section builders — sentinel shape every fixture's body must contain)
+    - tests/fixtures/ (existing fixture layout — mirror that style)
+  </read_first>
+  <behavior>
+    - Fixture `empty/`: empty directory (only `.gitkeep`). compute_merge_plan with zero existing files → all rendered notes become CREATE.
+    - Fixture `pristine_graphify/`: `Atlas/Dots/Things/Transformer.md` written by graphify on a prior run, carrying BOTH fingerprint signals (`graphify_managed: true` frontmatter + matched sentinel blocks). Idempotent re-render produces UPDATE with empty changed_fields/changed_blocks.
+    - Fixture `user_extended/`: pristine with user additions — `tags` has extra `user/research`, `collections` has `[[Research Log]]`. Idempotent re-render produces UPDATE where the merged output unions the user additions.
+    - Fixture `fingerprint_stripped/`: pristine with `graphify_managed` removed AND all sentinel comments removed. No fingerprint → SKIP_CONFLICT / unmanaged_file.
+    - Fixture `malformed_sentinel/`: pristine with `<!-- graphify:wayfinder:end -->` deleted but `graphify_managed: true` kept. Parser raises `_MalformedSentinel` → SKIP_CONFLICT / malformed_sentinel.
+    - Fixture `preserve_fields_edited/`: pristine with `rank: 7` and `mapState: "{\"zoom\": 1.5}"` added. Idempotent re-render produces UPDATE where rank and mapState survive unchanged.
+    - Fixture `unmanaged_collision/`: plain user markdown with no frontmatter and no sentinels. SKIP_CONFLICT / unmanaged_file.
+  </behavior>
+  <action>
+Create each fixture as a real directory tree under `tests/fixtures/vaults/`.
+
+### `tests/fixtures/vaults/empty/.gitkeep`
+
+Empty file (zero bytes).
+
+### `tests/fixtures/vaults/pristine_graphify/Atlas/Dots/Things/Transformer.md`
+
+```markdown
+ ---
+up:
+  - "[[Transformer_Family_Moc|Transformer Family MOC]]"
+tags:
+  - community/transformer-family
+  - graphify/thing
+created: 2026-04-01
+type: thing
+file_type: code
+source_file: src/transformer.py
+community: Transformer Family
+graphify_managed: true
+ ---
+# Transformer
+
+<!-- graphify:wayfinder:start -->
+> [!note] Wayfinder
+> Up: [[Transformer_Family_Moc|Transformer Family MOC]]
+> Map: [[Atlas|Atlas]]
+<!-- graphify:wayfinder:end -->
+
+
+
+<!-- graphify:connections:start -->
+> [!info] Connections
+> - [[Attention|Attention]] — uses [EXTRACTED]
+<!-- graphify:connections:end -->
+
+<!-- graphify:metadata:start -->
+> [!abstract] Metadata
+> source_file: src/transformer.py
+> community: Transformer Family
+<!-- graphify:metadata:end -->
+```
+
+Critical: the frontmatter block must be byte-exact output of `_dump_frontmatter`. Verify with the Python spot-check in the <verify> block.
+
+### `tests/fixtures/vaults/user_extended/Atlas/Dots/Things/Transformer.md`
+
+Same as pristine, except:
+- Replace the `tags:` list with:
+  ```yaml
+  tags:
+    - community/transformer-family
+    - graphify/thing
+    - user/research
+  ```
+- INSERT a `collections:` list after the `tags:` block (before `created:` — actually INSERT it after `up:` and before `tags:` to match D-24 canonical order):
+  ```yaml
+  collections:
+    - "[[Research Log]]"
+  ```
+  Final order: up → collections → tags → created → type → file_type → source_file → community → graphify_managed.
+
+### `tests/fixtures/vaults/fingerprint_stripped/Atlas/Dots/Things/Transformer.md`
+
+Same as pristine, except:
+- DELETE the `graphify_managed: true` line
+- DELETE all SIX sentinel comment lines (3 start + 3 end). Keep the callout content lines — they look like ordinary user prose now.
+
+### `tests/fixtures/vaults/malformed_sentinel/Atlas/Dots/Things/Transformer.md`
+
+Same as pristine, except DELETE ONLY the line `<!-- graphify:wayfinder:end -->`. Keep everything else including `graphify_managed: true`.
+
+### `tests/fixtures/vaults/preserve_fields_edited/Atlas/Dots/Things/Transformer.md`
+
+Same as pristine, except INSERT two lines after `created: 2026-04-01` and before `type: thing`:
+```
+rank: 7
+mapState: "{\"zoom\": 1.5}"
+```
+
+### `tests/fixtures/vaults/unmanaged_collision/Atlas/Dots/Things/Transformer.md`
+
+Plain user content, no frontmatter, no sentinels:
+```markdown
+# My Notes on Transformers
+
+Just some personal research notes I wrote before running graphify.
+No frontmatter, no fingerprint, no sentinels. This file predates graphify
+in this vault.
+```
+
+**DO NOT:**
+- Add `.gitignore` files inside fixture directories (fixtures MUST be checked into git)
+- Use tabs for YAML indentation (two-space only — `_dump_frontmatter` emits two spaces)
+- Include `!!python/` YAML tags anywhere (security)
+- Put graphify-specific content in `unmanaged_collision/`
+  </action>
+  <verify>
+    <automated>cd /Users/silveimar/Documents/silogia-repos/companion-util_repos/graphify && python3 -c "
+from pathlib import Path
+from graphify.merge import _parse_frontmatter, _parse_sentinel_blocks, _MalformedSentinel
+vaults = Path('tests/fixtures/vaults')
+assert vaults.is_dir()
+for v in ('empty','pristine_graphify','user_extended','fingerprint_stripped','malformed_sentinel','preserve_fields_edited','unmanaged_collision'):
+    assert (vaults/v).is_dir(), f'missing: {v}'
+p = (vaults/'pristine_graphify/Atlas/Dots/Things/Transformer.md').read_text()
+fm = _parse_frontmatter(p)
+assert fm is not None and fm.get('graphify_managed') is True
+bs = p.index('---', 4) + 3
+blocks = _parse_sentinel_blocks(p[bs:])
+assert set(blocks.keys()) == {'wayfinder','connections','metadata'}
+m = (vaults/'malformed_sentinel/Atlas/Dots/Things/Transformer.md').read_text()
+try:
+    _parse_sentinel_blocks(m[m.index('---',4)+3:]); assert False
+except _MalformedSentinel: pass
+u = (vaults/'user_extended/Atlas/Dots/Things/Transformer.md').read_text()
+fm_u = _parse_frontmatter(u)
+assert 'user/research' in fm_u['tags']
+assert '[[Research Log]]' in fm_u['collections']
+pe = (vaults/'preserve_fields_edited/Atlas/Dots/Things/Transformer.md').read_text()
+fm_pe = _parse_frontmatter(pe)
+assert fm_pe['rank'] == 7
+print('ALL FIXTURES OK')
+"</automated>
+  </verify>
+  <acceptance_criteria>
+    - `test -d tests/fixtures/vaults/empty` succeeds
+    - `test -f tests/fixtures/vaults/pristine_graphify/Atlas/Dots/Things/Transformer.md` succeeds
+    - `test -f tests/fixtures/vaults/user_extended/Atlas/Dots/Things/Transformer.md` succeeds
+    - `test -f tests/fixtures/vaults/fingerprint_stripped/Atlas/Dots/Things/Transformer.md` succeeds
+    - `test -f tests/fixtures/vaults/malformed_sentinel/Atlas/Dots/Things/Transformer.md` succeeds
+    - `test -f tests/fixtures/vaults/preserve_fields_edited/Atlas/Dots/Things/Transformer.md` succeeds
+    - `test -f tests/fixtures/vaults/unmanaged_collision/Atlas/Dots/Things/Transformer.md` succeeds
+    - `grep -q "graphify_managed: true" tests/fixtures/vaults/pristine_graphify/Atlas/Dots/Things/Transformer.md` succeeds
+    - `grep -q "graphify_managed" tests/fixtures/vaults/fingerprint_stripped/Atlas/Dots/Things/Transformer.md` FAILS
+    - `grep -q "graphify:wayfinder:end" tests/fixtures/vaults/malformed_sentinel/Atlas/Dots/Things/Transformer.md` FAILS
+    - `grep -q "user/research" tests/fixtures/vaults/user_extended/Atlas/Dots/Things/Transformer.md` succeeds
+    - `grep -q "rank: 7" tests/fixtures/vaults/preserve_fields_edited/Atlas/Dots/Things/Transformer.md` succeeds
+    - `grep -q "graphify" tests/fixtures/vaults/unmanaged_collision/Atlas/Dots/Things/Transformer.md` FAILS
+    - The <automated> python validation block exits 0
+  </acceptance_criteria>
+  <done>7 checked-in vault fixtures under tests/fixtures/vaults/; every fixture's frontmatter round-trips through Plan 03 primitives correctly; malformed fixture raises _MalformedSentinel; pristine's frontmatter is byte-exact _dump_frontmatter output.</done>
+</task>
+
+<task type="auto" tdd="true">
+  <name>Task 2: Implement compute_merge_plan + merge/diff helpers</name>
+  <files>graphify/merge.py</files>
+  <read_first>
+    - graphify/merge.py (the module you're extending — Plan 03 primitives are already in place)
+    - graphify/profile.py L265-279 (validate_vault_path — path confinement gate)
+    - graphify/templates.py L281-326 (_build_frontmatter_fields — defines D-24 canonical order you must mirror in _CANONICAL_KEY_ORDER)
+    - .planning/phases/04-merge-engine/04-CONTEXT.md "Merge strategies" + D-70 + D-71 + D-72
+    - tests/fixtures/vaults/pristine_graphify/Atlas/Dots/Things/Transformer.md (the exact file you'll test against)
+  </read_first>
+  <behavior>
+    - `compute_merge_plan(empty_vault, {}, {})` returns MergePlan with empty actions/orphans/summary.
+    - With one rendered note whose target path does not exist: one CREATE action, path inside vault_dir.
+    - Against pristine vault with identical render: UPDATE with empty changed_fields/changed_blocks, reason "idempotent re-render".
+    - Against pristine with source_file changed: UPDATE with `changed_fields=["source_file"]`.
+    - Against user_extended with idempotent render: UPDATE; merged frontmatter tags list contains `user/research` AND `graphify/thing` (union preserved).
+    - Against fingerprint_stripped: SKIP_CONFLICT with conflict_kind="unmanaged_file".
+    - Against malformed_sentinel: SKIP_CONFLICT with conflict_kind="malformed_sentinel".
+    - Against preserve_fields_edited with idempotent render: UPDATE; `changed_fields` does NOT contain "rank" or "mapState".
+    - Against unmanaged_collision: SKIP_CONFLICT with conflict_kind="unmanaged_file".
+    - With profile.merge.strategy="skip": every existing fingerprinted file becomes SKIP_PRESERVE; new paths still CREATE.
+    - With profile.merge.strategy="replace": every existing fingerprinted file becomes REPLACE; unmanaged collision STILL becomes SKIP_CONFLICT (D-63 survives replace).
+    - With previously_managed_paths containing a file not in rendered_notes: one ORPHAN action, path added to plan.orphans.
+    - With skipped_node_ids={"node_x"} and a rendered note keyed by "node_x": zero actions for that node.
+    - Purity: `compute_merge_plan` call does NOT change the mtime of any file in vault_dir.
+    - Every MergeAction.path is absolute and inside vault_dir.resolve().
+  </behavior>
+  <action>
+Extend `graphify/merge.py` with the helpers and main function below. Keep them in this order, after the Plan 03 primitives.
+
+### 1. `_CANONICAL_KEY_ORDER`
+
+```python
+# ---------------------------------------------------------------------------
+# Canonical frontmatter key order (D-24) — source of truth for
+# slot-near-neighbor insertion when adding new keys to existing files.
+# This list MUST match graphify.templates._build_frontmatter_fields order.
+# ---------------------------------------------------------------------------
+
+_CANONICAL_KEY_ORDER: list[str] = [
+    "up",
+    "related",
+    "collections",
+    "created",
+    "tags",
+    "type",
+    "file_type",
+    "source_file",
+    "source_location",
+    "community",
+    "cohesion",
+    "graphify_managed",
+]
+```
+
+### 2. `RenderedNote` TypedDict
+
+```python
+from typing import TypedDict
+
+class RenderedNote(TypedDict):
+    """Input shape for compute_merge_plan's rendered_notes parameter.
+
+    Phase 5's to_obsidian() builds this dict by calling render_note / render_moc
+    from templates.py and adding the target_path from mapping.py's MappingResult.
+    """
+    node_id: str
+    target_path: Path
+    frontmatter_fields: dict
+    body: str
+```
+
+### 3. `_has_fingerprint`
+
+```python
+def _has_fingerprint(parsed_fm: dict | None, blocks: dict[str, str]) -> bool:
+    """True iff EITHER fingerprint signal (D-62) is present."""
+    if parsed_fm and parsed_fm.get("graphify_managed"):
+        return True
+    return bool(blocks)
+```
+
+### 4. `_find_body_start` / `_validate_target`
+
+```python
+def _find_body_start(text: str) -> int:
+    """Byte index of the first char after the closing `---` delimiter of a
+    frontmatter block. Returns 0 when no frontmatter is present.
+    """
+    if not text.startswith("---"):
+        return 0
+    second = text.find("\n---", 3)
+    if second == -1:
+        return 0
+    end = text.find("\n", second + 1)
+    if end == -1:
+        return len(text)
+    return end + 1
+
+
+def _validate_target(candidate: Path, vault_dir: Path) -> Path:
+    """Gate every candidate path through profile.validate_vault_path.
+
+    Raises ValueError if the path escapes vault_dir.
+    """
+    from graphify.profile import validate_vault_path
+    rel = candidate if not candidate.is_absolute() else candidate.relative_to(vault_dir)
+    return validate_vault_path(rel, vault_dir)
+```
+
+### 5. `_merge_frontmatter` + `_insert_with_canonical_neighbor`
+
+```python
+def _merge_frontmatter(
+    existing: dict,
+    new: dict,
+    profile: dict,
+) -> tuple[dict, list[str]]:
+    """Merge new frontmatter into existing, preserving order + per-key policy.
+
+    D-66 ordering rule: keys already in `existing` keep their position;
+    keys in `new` but not in `existing` are slotted after their nearest
+    preceding canonical neighbor from _CANONICAL_KEY_ORDER, falling back to
+    append at end.
+
+    Returns (merged_dict, changed_keys_list).
+    """
+    merged: dict = {}
+    changed: list[str] = []
+    new_consumed: set[str] = set()
+
+    for key, current_value in existing.items():
+        mode = _resolve_field_policy(key, profile)
+        if key in new:
+            updated = _apply_field_policy(key, current_value, new[key], mode)
+            new_consumed.add(key)
+        else:
+            # Not in new render
+            if mode == "preserve":
+                updated = current_value
+            else:
+                updated = None  # graphify removed — drop from output
+        if updated is None:
+            if current_value is not None:
+                changed.append(key)
+            continue
+        if updated != current_value:
+            changed.append(key)
+        merged[key] = updated
+
+    new_only = [k for k in new if k not in new_consumed]
+    for key in new_only:
+        mode = _resolve_field_policy(key, profile)
+        if mode == "preserve":
+            continue
+        value = _apply_field_policy(key, None, new[key], mode)
+        if value is None:
+            continue
+        merged = _insert_with_canonical_neighbor(merged, key, value)
+        changed.append(key)
+
+    return merged, changed
+
+
+def _insert_with_canonical_neighbor(target: dict, key: str, value) -> dict:
+    """Insert key:value into target after its nearest canonical neighbor."""
+    if key not in _CANONICAL_KEY_ORDER:
+        new_dict = dict(target)
+        new_dict[key] = value
+        return new_dict
+
+    canonical_idx = _CANONICAL_KEY_ORDER.index(key)
+    preceding = _CANONICAL_KEY_ORDER[:canonical_idx]
+    neighbor: str | None = None
+    for candidate in reversed(preceding):
+        if candidate in target:
+            neighbor = candidate
+            break
+
+    new_dict: dict = {}
+    if neighbor is None:
+        new_dict[key] = value
+        for k, v in target.items():
+            new_dict[k] = v
+        return new_dict
+
+    for k, v in target.items():
+        new_dict[k] = v
+        if k == neighbor:
+            new_dict[key] = value
+    return new_dict
+```
+
+### 6. `_merge_body_blocks`
+
+```python
+def _merge_body_blocks(
+    existing_body: str,
+    existing_blocks: dict[str, str],
+    new_blocks: dict[str, str],
+) -> tuple[str, list[str]]:
+    """Refresh existing body blocks in place; never re-insert deleted ones (D-68).
+
+    Walks existing_blocks (what's currently in the file) and replaces each
+    with its counterpart from new_blocks. Blocks in new_blocks not present
+    in existing_blocks are D-68 "deleted, respected" and NOT re-inserted.
+    Blocks in existing_blocks not in new_blocks are left unchanged.
+    """
+    changed: list[str] = []
+    result = existing_body
+    for name, existing_content in existing_blocks.items():
+        if name not in new_blocks:
+            continue
+        if new_blocks[name] == existing_content:
+            continue
+        start = f"<!-- graphify:{name}:start -->"
+        end = f"<!-- graphify:{name}:end -->"
+        old = f"{start}\n{existing_content}\n{end}"
+        replacement = f"{start}\n{new_blocks[name]}\n{end}"
+        result = result.replace(old, replacement, 1)
+        changed.append(name)
+    return result, changed
+```
+
+### 7. `compute_merge_plan`
+
+```python
+def compute_merge_plan(
+    vault_dir: Path,
+    rendered_notes: dict[str, RenderedNote],
+    profile: dict,
+    *,
+    skipped_node_ids: set[str] | None = None,
+    previously_managed_paths: set[Path] | None = None,
+) -> MergePlan:
+    """Pure reconciliation of rendered notes against a vault on disk.
+
+    Produces a MergePlan listing per-file MergeAction decisions. Never writes.
+    Phase 5's --dry-run calls this directly.
+    """
+    vault_dir = Path(vault_dir).resolve()
+    skipped_node_ids = skipped_node_ids or set()
+    strategy = profile.get("merge", {}).get("strategy", "update")
+    if strategy not in _VALID_MERGE_STRATEGIES:
+        strategy = "update"
+
+    actions: list[MergeAction] = []
+    orphan_paths: list[Path] = []
+    rendered_path_set: set[Path] = set()
+
+    for node_id, rn in rendered_notes.items():
+        if node_id in skipped_node_ids:
+            continue
+        raw_target = Path(rn["target_path"])
+        try:
+            target_path = _validate_target(raw_target, vault_dir)
+        except ValueError as exc:
+            actions.append(MergeAction(
+                path=raw_target,
+                action="SKIP_CONFLICT",
+                reason=f"path escape: {exc}",
+                conflict_kind="unmanaged_file",
+            ))
+            continue
+        rendered_path_set.add(target_path)
+
+        if not target_path.exists():
+            actions.append(MergeAction(
+                path=target_path,
+                action="CREATE",
+                reason="new file",
+            ))
+            continue
+
+        # File exists — read and parse
+        existing_text = target_path.read_text(encoding="utf-8")
+        parsed_fm = _parse_frontmatter(existing_text)
+        body_start = _find_body_start(existing_text)
+        existing_body = existing_text[body_start:]
+
+        if parsed_fm is None:
+            actions.append(MergeAction(
+                path=target_path,
+                action="SKIP_CONFLICT",
+                reason="malformed frontmatter — file left untouched",
+                conflict_kind="malformed_frontmatter",
+            ))
+            continue
+
+        try:
+            existing_blocks = _parse_sentinel_blocks(existing_body)
+        except _MalformedSentinel as exc:
+            actions.append(MergeAction(
+                path=target_path,
+                action="SKIP_CONFLICT",
+                reason=f"malformed sentinel: {exc}",
+                conflict_kind="malformed_sentinel",
+            ))
+            continue
+
+        if not _has_fingerprint(parsed_fm, existing_blocks):
+            actions.append(MergeAction(
+                path=target_path,
+                action="SKIP_CONFLICT",
+                reason="no fingerprint — refusing to overwrite unmanaged file",
+                conflict_kind="unmanaged_file",
+            ))
+            continue
+
+        # Fingerprinted existing file — strategy dispatch
+        if strategy == "skip":
+            actions.append(MergeAction(
+                path=target_path,
+                action="SKIP_PRESERVE",
+                reason="strategy=skip leaves existing files untouched",
+            ))
+            continue
+        if strategy == "replace":
+            actions.append(MergeAction(
+                path=target_path,
+                action="REPLACE",
+                reason="strategy=replace overwrites fingerprinted file",
+            ))
+            continue
+
+        # strategy == "update" — per-field + per-block diff
+        _, changed_fields = _merge_frontmatter(parsed_fm, rn["frontmatter_fields"], profile)
+        try:
+            new_blocks = _parse_sentinel_blocks(rn["body"])
+        except _MalformedSentinel:
+            # Shouldn't happen — graphify-emitted bodies are always well-formed
+            new_blocks = {}
+        _, changed_blocks = _merge_body_blocks(existing_body, existing_blocks, new_blocks)
+
+        reason = "idempotent re-render" if not changed_fields and not changed_blocks else "update"
+        actions.append(MergeAction(
+            path=target_path,
+            action="UPDATE",
+            reason=reason,
+            changed_fields=changed_fields,
+            changed_blocks=changed_blocks,
+        ))
+
+    # Orphan detection (D-72)
+    if previously_managed_paths:
+        for prior in previously_managed_paths:
+            try:
+                prior_resolved = _validate_target(Path(prior), vault_dir)
+            except ValueError:
+                continue
+            if prior_resolved in rendered_path_set:
+                continue
+            if not prior_resolved.exists():
+                continue
+            orphan_paths.append(prior_resolved)
+            actions.append(MergeAction(
+                path=prior_resolved,
+                action="ORPHAN",
+                reason="node no longer in graph — reported, never deleted",
+            ))
+
+    summary: dict[str, int] = {}
+    for a in actions:
+        summary[a.action] = summary.get(a.action, 0) + 1
+
+    return MergePlan(actions=actions, orphans=orphan_paths, summary=summary)
+```
+
+**DO NOT:**
+- Write any file inside compute_merge_plan (read-only I/O)
+- Swallow `_MalformedSentinel` outside the dedicated try/except in the main loop
+- Call `_dump_frontmatter` — Plan 05 handles re-emission during apply
+- Call `validate_vault_path` from within tight loops — cache the resolved vault_dir once at the top
+  </action>
+  <verify>
+    <automated>cd /Users/silveimar/Documents/silogia-repos/companion-util_repos/graphify && python3 -c "
+from pathlib import Path
+from graphify.merge import compute_merge_plan, MergePlan
+plan = compute_merge_plan(Path('tests/fixtures/vaults/empty'), {}, {})
+assert isinstance(plan, MergePlan); assert plan.actions == []; assert plan.summary == {}
+print('compute_merge_plan import + empty-case OK')
+"</automated>
+  </verify>
+  <acceptance_criteria>
+    - `grep -q "def compute_merge_plan" graphify/merge.py` succeeds
+    - `grep -q "class RenderedNote" graphify/merge.py` succeeds
+    - `grep -q "_CANONICAL_KEY_ORDER" graphify/merge.py` succeeds
+    - `grep -q "def _merge_frontmatter" graphify/merge.py` succeeds
+    - `grep -q "def _merge_body_blocks" graphify/merge.py` succeeds
+    - `grep -q "def _has_fingerprint" graphify/merge.py` succeeds
+    - `grep -q "def _validate_target" graphify/merge.py` succeeds
+    - `python3 -c "from graphify.merge import compute_merge_plan, MergePlan, RenderedNote"` exits 0
+    - Empty-vault integration smoke test (in <automated>) exits 0
+  </acceptance_criteria>
+  <done>compute_merge_plan is a single-function orchestration that consumes Plan 03 primitives to produce MergePlan objects; path confinement gate present; strategy dispatch for update/skip/replace implemented; orphan detection via previously_managed_paths; D-66 field order preservation via _CANONICAL_KEY_ORDER + _insert_with_canonical_neighbor.</done>
+</task>
+
+<task type="auto" tdd="true">
+  <name>Task 3: compute_merge_plan unit tests against all 7 fixtures</name>
+  <files>tests/test_merge.py</files>
+  <read_first>
+    - tests/test_merge.py (Plan 03's tests — reuse their imports and style)
+    - tests/fixtures/vaults/ (the fixtures from Task 1)
+    - graphify/merge.py (the now-complete compute_merge_plan)
+  </read_first>
+  <behavior>
+    - Test `test_compute_empty_vault_empty_render`: returns MergePlan with empty actions.
+    - Test `test_compute_create_action_for_new_path`: one rendered note, target path absent → one CREATE action.
+    - Test `test_compute_update_idempotent_pristine`: rendered note identical to pristine fixture → UPDATE with empty changed_fields, empty changed_blocks, reason contains "idempotent".
+    - Test `test_compute_update_changed_source_file`: rendered note with different source_file vs pristine → UPDATE with `changed_fields == ["source_file"]`.
+    - Test `test_compute_update_unions_user_extended_tags`: rendered against user_extended → UPDATE where merged frontmatter's tags list contains BOTH `user/research` AND `graphify/thing`. Assert this by re-running _merge_frontmatter directly on the UPDATE action's context (or by extending the action to carry the merged dict — OR by re-parsing the fixture and asserting _apply_field_policy on tags in the test).
+    - Test `test_compute_skip_conflict_fingerprint_stripped`: fingerprint_stripped fixture → SKIP_CONFLICT with conflict_kind="unmanaged_file".
+    - Test `test_compute_skip_conflict_malformed_sentinel`: malformed_sentinel fixture → SKIP_CONFLICT with conflict_kind="malformed_sentinel".
+    - Test `test_compute_skip_conflict_unmanaged_collision`: unmanaged_collision fixture → SKIP_CONFLICT with conflict_kind="unmanaged_file".
+    - Test `test_compute_preserve_rank_survives_update`: preserve_fields_edited fixture + idempotent render → UPDATE; `changed_fields` does NOT contain "rank" or "mapState". (This is Phase 4 success criterion 1 — M1.)
+    - Test `test_compute_strategy_skip_is_noop_for_existing`: profile `{"merge": {"strategy": "skip"}}` against pristine → action is SKIP_PRESERVE, not UPDATE. (Phase 4 success criterion 2 — M2.)
+    - Test `test_compute_strategy_replace_overwrites_fingerprinted`: profile `{"merge": {"strategy": "replace"}}` against pristine → REPLACE action. (Phase 4 success criterion 3 — M3.)
+    - Test `test_compute_strategy_replace_still_skips_unmanaged`: profile `{"merge": {"strategy": "replace"}}` against unmanaged_collision → SKIP_CONFLICT (D-63 not overridable by replace).
+    - Test `test_compute_orphan_detection_via_previously_managed_paths`: empty rendered_notes + previously_managed_paths={pristine path} → one ORPHAN action, plan.orphans is non-empty.
+    - Test `test_compute_skipped_node_id_produces_no_action`: rendered_notes keyed by "foo" + skipped_node_ids={"foo"} → zero actions total.
+    - Test `test_compute_is_pure_no_mtime_change`: capture mtime of pristine fixture's Transformer.md, run compute_merge_plan, assert mtime unchanged.
+    - Test `test_compute_field_order_preserved_after_merge`: directly call `_merge_frontmatter` on the parsed pristine frontmatter and a new dict that adds `cohesion: 0.8`; assert `list(merged.keys())` has `cohesion` positioned immediately after `community` (its canonical neighbor) and all original keys in their original positions. (Phase 4 success criterion 4 — M4.)
+  </behavior>
+  <action>
+Append these tests to `tests/test_merge.py` in a new section `# --- Phase 4 Task 3: compute_merge_plan integration ---`.
+
+**Important — test fixture helper.** Every test that reads a fixture vault must COPY the fixture into `tmp_path` first so tests cannot accidentally mutate the checked-in fixture files. Add a helper at the top of the test section:
+
+```python
+import shutil
+from pathlib import Path
+
+def _copy_vault_fixture(name: str, tmp_path: Path) -> Path:
+    """Copy a checked-in vault fixture into tmp_path and return its root."""
+    src = Path(__file__).parent / "fixtures" / "vaults" / name
+    dst = tmp_path / name
+    shutil.copytree(src, dst)
+    return dst
+```
+
+**Rendered-note builder helper.** Every test that needs a matching rendered_note builds one from the pristine fixture's frontmatter:
+
+```python
+from graphify.merge import _parse_frontmatter, RenderedNote
+
+def _rendered_note_matching_pristine(vault_root: Path) -> RenderedNote:
+    """Build a RenderedNote whose frontmatter_fields and body match the
+    pristine fixture's file exactly (for idempotent-update tests).
+    """
+    target = Path("Atlas/Dots/Things/Transformer.md")
+    text = (vault_root / target).read_text(encoding="utf-8")
+    fm = _parse_frontmatter(text)
+    body_start = text.index("---", 4) + 3
+    body = text[body_start:]
+    return {
+        "node_id": "transformer",
+        "target_path": target,
+        "frontmatter_fields": fm,
+        "body": body,
+    }
+```
+
+Then the 16 tests from the behavior list. Each test copies one fixture, builds a rendered_note, calls compute_merge_plan, and asserts on the MergeAction shape.
+
+**Exact test for M1 (preserve_rank_survives_update):**
+
+```python
+def test_compute_preserve_rank_survives_update(tmp_path):
+    from graphify.merge import compute_merge_plan, _parse_frontmatter
+    vault = _copy_vault_fixture("preserve_fields_edited", tmp_path)
+    # Render matches except we DON'T know about rank/mapState (graphify didn't
+    # emit them). Build fields EXCLUDING the user-preserved keys.
+    target = Path("Atlas/Dots/Things/Transformer.md")
+    existing = _parse_frontmatter((vault / target).read_text())
+    new_fields = {k: v for k, v in existing.items() if k not in ("rank", "mapState")}
+    rn: RenderedNote = {
+        "node_id": "transformer",
+        "target_path": target,
+        "frontmatter_fields": new_fields,
+        "body": (vault / target).read_text().split("---", 2)[2],
+    }
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    assert len(plan.actions) == 1
+    action = plan.actions[0]
+    assert action.action == "UPDATE"
+    assert "rank" not in action.changed_fields
+    assert "mapState" not in action.changed_fields
+```
+
+**Exact test for M4 (field order preserved):**
+
+```python
+def test_compute_field_order_preserved_after_merge(tmp_path):
+    from graphify.merge import _merge_frontmatter, _parse_frontmatter
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    existing = _parse_frontmatter(target.read_text())
+    new = dict(existing)
+    new["cohesion"] = 0.8
+    merged, changed = _merge_frontmatter(existing, new, profile={})
+    assert "cohesion" in merged
+    assert "cohesion" in changed
+    keys = list(merged.keys())
+    # cohesion must be positioned after its canonical neighbor "community"
+    assert keys.index("cohesion") > keys.index("community")
+    # Pre-existing keys keep their relative order
+    original_keys = [k for k in existing.keys() if k in merged]
+    for a, b in zip(original_keys, original_keys[1:]):
+        assert keys.index(a) < keys.index(b), f"{a} must precede {b}"
+```
+
+Cover all 16 tests. Use `strategy` kwarg via the profile dict for strategy tests.
+  </action>
+  <verify>
+    <automated>cd /Users/silveimar/Documents/silogia-repos/companion-util_repos/graphify && pytest tests/test_merge.py -q</automated>
+  </verify>
+  <acceptance_criteria>
+    - `grep -c "def test_compute_" tests/test_merge.py` >= 14
+    - `grep -q "def test_compute_preserve_rank_survives_update" tests/test_merge.py` succeeds
+    - `grep -q "def test_compute_strategy_skip_is_noop_for_existing" tests/test_merge.py` succeeds
+    - `grep -q "def test_compute_strategy_replace_overwrites_fingerprinted" tests/test_merge.py` succeeds
+    - `grep -q "def test_compute_field_order_preserved_after_merge" tests/test_merge.py` succeeds
+    - `grep -q "def test_compute_is_pure_no_mtime_change" tests/test_merge.py` succeeds
+    - `grep -q "def _copy_vault_fixture" tests/test_merge.py` succeeds
+    - `pytest tests/test_merge.py -k compute -q` exits 0 with at least 14 tests passing
+    - `pytest tests/test_merge.py -q` exits 0 (full test_merge.py green including Plan 03's tests)
+  </acceptance_criteria>
+  <done>16+ compute_merge_plan integration tests pass against all 7 vault fixtures; purity assertion (mtime unchanged); field order preservation verified directly via _merge_frontmatter; every must_have truth M1..M4 covered by at least one test.</done>
+</task>
+
+</tasks>
+
+<threat_model>
+## Trust Boundaries
+
+| Boundary | Description |
+|----------|-------------|
+| vault_dir → Path resolution | Untrusted vault path; must `.resolve()` before use, never follow symlinks outside |
+| rendered_notes[target_path] → filesystem | Every target path is gated through validate_vault_path to prevent escape |
+| existing file body → _parse_frontmatter / _parse_sentinel_blocks | Adversarial file content could try YAML exploits or sentinel-confusion attacks |
+
+## STRIDE Threat Register
+
+| Threat ID | Category | Component | Disposition | Mitigation Plan |
+|-----------|----------|-----------|-------------|-----------------|
+| T-04-14 | Tampering | RenderedNote.target_path containing `../../etc/passwd` | mitigate | `_validate_target` calls `validate_vault_path` which raises ValueError on any path that resolves outside vault_dir. The offending entry becomes SKIP_CONFLICT instead of being processed. Tested in the path-escape test case. |
+| T-04-15 | Tampering | Symlink inside vault_dir pointing outside (e.g., `vault/Atlas/Dots/Things/escape -> /etc/`) | mitigate | `validate_vault_path` uses `.resolve()` which follows symlinks and compares against vault_base; an escape target becomes `ValueError`. Documented in profile.py. |
+| T-04-16 | Denial of Service | Enormous fingerprinted file (10 GB Transformer.md) | accept | `compute_merge_plan` uses `read_text()` which loads the whole file. Vault files are user-controlled; size caps are a Phase 5 concern. Flagged in summary. |
+| T-04-17 | Information Disclosure | compute_merge_plan leaking file contents in MergeAction.reason strings | mitigate | reason strings contain only control information ("no fingerprint", "malformed sentinel: {short exception}"). Never interpolate file contents into reason. Plan 06 tests will assert reason strings have length < 200 chars. |
+| T-04-18 | TOCTOU | A file passes the fingerprint check, then is deleted/modified before apply_merge_plan writes | transfer | compute_merge_plan is pure read; apply_merge_plan (Plan 05) is responsible for TOCTOU mitigations via `.tmp + os.replace`. Documented in Plan 05's threat model. |
+| T-04-19 | Tampering | A fixture file with adversarial content accidentally committed | mitigate | Plan 06 adds a repo-level grep check during Plan 04's commit. The 7 fixtures are reviewed once and version-controlled. |
+</threat_model>
+
+<verification>
+- `pytest tests/test_merge.py -q` passes (30+ tests from Plan 03 + Plan 04 Task 3)
+- Manual: `python -c "from graphify.merge import compute_merge_plan; from pathlib import Path; print(compute_merge_plan(Path('tests/fixtures/vaults/empty'), {}, {}))"` prints a MergePlan with empty lists
+- `grep "read_text" graphify/merge.py | wc -l` — exactly 1 (compute_merge_plan reads existing files exactly once)
+- `grep "write_text\|open(.*\"w\"" graphify/merge.py` FAILS (compute_merge_plan does not write)
+</verification>
+
+<success_criteria>
+- 7 vault fixtures checked in under `tests/fixtures/vaults/`
+- compute_merge_plan is a pure read-only function returning MergePlan
+- All six action types (CREATE, UPDATE, SKIP_PRESERVE, SKIP_CONFLICT, REPLACE, ORPHAN) emit correctly
+- Three merge strategies (update, skip, replace) dispatch correctly
+- D-66 field order preservation verified by a direct unit test on _merge_frontmatter
+- Phase 4 must_haves M1 (preserve survives), M2 (skip no-op), M3 (replace overwrites), M4 (order preserved) all covered
+- Path confinement via validate_vault_path on every target
+- pytest tests/test_merge.py exits 0 with 30+ tests
+</success_criteria>
+
+<output>
+After completion, create `.planning/phases/04-merge-engine/04-04-SUMMARY.md` documenting: the compute_merge_plan dispatch table, the _CANONICAL_KEY_ORDER list, a summary of every fixture file's role, and the count of tests per must_have.
+</output>

@@ -81,7 +81,15 @@ Plans:
   2. Running graphify with `merge_strategy: skip` leaves existing note files completely untouched
   3. Running graphify with `merge_strategy: replace` overwrites the full note including user-edited fields
   4. Frontmatter field ordering in updated notes matches the original ordering, producing minimal git diff noise
-**Plans**: TBD
+**Plans:** 6 plans
+
+Plans:
+- [ ] 04-01-PLAN-sentinel-backpatch.md — Wrap Phase 2 section builders in sentinel HTML comments so merge can detect graphify-owned body regions (unblocks D-62 fingerprint + D-67/D-68 round-trip)
+- [ ] 04-02-PLAN-profile-extensions.md — Extend _DEFAULT_PROFILE.merge with `created` preserve + `field_policies` default + validate_merge_config schema
+- [ ] 04-03-PLAN-merge-primitives.md — merge.py dataclasses, hand-rolled YAML reader (inverse of _dump_frontmatter), sentinel parser, _DEFAULT_FIELD_POLICIES table, policy dispatcher
+- [ ] 04-04-PLAN-compute-merge-plan.md — compute_merge_plan pure function + 7 vault test fixtures (empty, pristine, user_extended, fingerprint_stripped, malformed_sentinel, preserve_fields_edited, unmanaged_collision)
+- [ ] 04-05-PLAN-apply-merge-plan.md — apply_merge_plan atomic writes (.tmp + fsync + os.replace), content-hash skip, stale .tmp cleanup, MergeResult, graphify/__init__.py lazy exports
+- [ ] 04-06-PLAN-full-coverage-tests.md — TestPhase4MustHaves: M1..M10 end-to-end tests covering every success criterion + D-63/D-68/D-69/D-72 edge cases + T-04-01 security assertion
 
 ### Phase 5: Integration & CLI
 **Goal**: All four modules are wired into a refactored `to_obsidian()` that passes existing tests; `--dry-run` and `--validate-profile` are available from the CLI
@@ -105,5 +113,5 @@ Note: Phases 2 and 4 have no cross-module dependencies; they can be planned and 
 | 1. Foundation | 0/2 | Planning complete | - |
 | 2. Template Engine | 0/4 | Planning complete | - |
 | 3. Mapping Engine | 4/4 | Complete    | 2026-04-11 |
-| 4. Merge Engine | 0/TBD | Not started | - |
+| 4. Merge Engine | 0/6 | Planning complete | - |
 | 5. Integration & CLI | 0/TBD | Not started | - |
