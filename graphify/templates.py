@@ -318,6 +318,102 @@ def _build_metadata_callout(
 
 
 # ---------------------------------------------------------------------------
+# MOC member section (D-30, D-39) — grouped by note type, empty groups omitted
+# ---------------------------------------------------------------------------
+
+_MEMBER_GROUP_ORDER: list[tuple[str, str]] = [
+    # (note_type key in members_by_type, display name in callout header)
+    ("thing", "Things"),
+    ("statement", "Statements"),
+    ("person", "People"),
+    ("source", "Sources"),
+]
+
+
+def _build_members_section(members_by_type: dict, convention: str) -> str:
+    """Build grouped `> [!info] <Group>` callouts listing community members.
+
+    Empty groups are omitted. Each member is a bullet with an auto-aliased
+    wikilink. Group order is locked: Things → Statements → People → Sources.
+    """
+    blocks: list[str] = []
+    for type_key, display_name in _MEMBER_GROUP_ORDER:
+        members = members_by_type.get(type_key) or []
+        if not members:
+            continue
+        lines = [f"> [!info] {display_name}"]
+        for m in members:
+            label = m.get("label") if isinstance(m, dict) else str(m)
+            if not label:
+                continue
+            lines.append(f"> - {_emit_wikilink(label, convention)}")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+# ---------------------------------------------------------------------------
+# Sub-communities callout (D-29) — below-threshold communities inline
+# ---------------------------------------------------------------------------
+
+def _build_sub_communities_callout(sub_communities: list, convention: str) -> str:
+    """Render a `> [!abstract] Sub-communities` callout with nested bullets.
+
+    Each sub-community becomes a bullet of the form:
+    `> - **<group name>:** [[wikilink1]], [[wikilink2]], ...`
+    Returns empty string when the input list is empty.
+    """
+    if not sub_communities:
+        return ""
+    lines: list[str] = ["> [!abstract] Sub-communities"]
+    for sub in sub_communities:
+        sub_label = sub.get("label", "Subcommunity") if isinstance(sub, dict) else str(sub)
+        members = sub.get("members", []) if isinstance(sub, dict) else []
+        member_links = ", ".join(
+            _emit_wikilink(m.get("label", ""), convention)
+            for m in members
+            if isinstance(m, dict) and m.get("label")
+        )
+        lines.append(f"> - **{sub_label}:** {member_links}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Dataview block (D-28, Pattern 5) — two-phase substitution
+# ---------------------------------------------------------------------------
+
+_FALLBACK_MOC_QUERY = (
+    "TABLE file.folder as Folder, type, source_file\n"
+    "FROM #community/${community_tag}\n"
+    "SORT file.name ASC"
+)
+
+
+def _build_dataview_block(profile: dict, community_tag: str, folder: str) -> str:
+    """Render a ```dataview fence using the profile's moc_query template.
+
+    Uses two-phase `string.Template` substitution (Pattern 5 in 02-RESEARCH.md):
+      1. Substitute `${community_tag}` and `${folder}` INTO the user's
+         query template FIRST using safe_substitute.
+      2. Wrap the resulting query in a dataview fence.
+      3. Pass the fence as the `${dataview_block}` value to the OUTER
+         template — because `string.Template` is single-pass, any literal
+         `${...}` remaining in the query text is preserved as-is.
+    """
+    moc_query = (
+        profile.get("obsidian", {})
+        .get("dataview", {})
+        .get("moc_query")
+    )
+    if not moc_query:
+        moc_query = _FALLBACK_MOC_QUERY
+    query = string.Template(moc_query).safe_substitute(
+        community_tag=community_tag,
+        folder=folder,
+    )
+    return f"```dataview\n{query}\n```"
+
+
+# ---------------------------------------------------------------------------
 # Public: render_note (D-32, D-41)
 # ---------------------------------------------------------------------------
 
