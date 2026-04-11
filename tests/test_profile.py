@@ -9,9 +9,12 @@ from unittest import mock
 
 import pytest
 
+import datetime
+
 from graphify.profile import (
     _DEFAULT_PROFILE,
     _deep_merge,
+    _dump_frontmatter,
     load_profile,
     safe_filename,
     safe_frontmatter_value,
@@ -289,3 +292,115 @@ def test_safe_filename_empty_label():
 
 def test_safe_filename_preserves_case():
     assert safe_filename("MyClass") == "MyClass"
+
+
+# ---------------------------------------------------------------------------
+# _dump_frontmatter tests
+# ---------------------------------------------------------------------------
+
+
+def test_dump_frontmatter_basic_scalars():
+    out = _dump_frontmatter({"type": "moc", "community": "ML Architecture"})
+    assert "---\ntype: moc\ncommunity: ML Architecture\n---" in out
+
+
+def test_dump_frontmatter_block_list_tags():
+    out = _dump_frontmatter({"tags": ["community/ml", "graphify/code"]})
+    assert "tags:\n  - community/ml\n  - graphify/code" in out
+    # Must not use inline YAML list format
+    assert "[" not in out.split("---")[1]
+
+
+def test_dump_frontmatter_wikilink_quoted():
+    out = _dump_frontmatter({"up": ["[[Atlas|Atlas]]"]})
+    assert 'up:\n  - "[[Atlas|Atlas]]"' in out
+
+
+def test_dump_frontmatter_created_date_unquoted():
+    out = _dump_frontmatter({"created": datetime.date(2026, 4, 11)})
+    assert "created: 2026-04-11\n" in out
+    assert '"2026-04-11"' not in out
+
+
+def test_dump_frontmatter_cohesion_float_two_decimals():
+    out = _dump_frontmatter({"cohesion": 0.82345})
+    assert "cohesion: 0.82" in out
+
+
+def test_dump_frontmatter_int_unquoted():
+    out = _dump_frontmatter({"count": 3})
+    assert "count: 3" in out
+    assert '"3"' not in out
+
+
+def test_dump_frontmatter_bool_lowercase():
+    out = _dump_frontmatter({"active": True, "stale": False})
+    assert "active: true" in out
+    assert "stale: false" in out
+    # Must not render as 1 / 0
+    assert "active: 1" not in out
+    assert "stale: 0" not in out
+
+
+def test_dump_frontmatter_none_skipped():
+    out = _dump_frontmatter({"parent": None, "type": "thing"})
+    assert "type: thing" in out
+    lines = out.split("\n")
+    assert not any(line.startswith("parent:") for line in lines)
+
+
+def test_dump_frontmatter_field_order_preserved():
+    keys = ["up", "related", "collections", "created", "tags", "type"]
+    fields = {k: f"val_{k}" for k in keys}
+    out = _dump_frontmatter(fields)
+    body = out.split("---")[1]
+    positions = {k: body.index(k + ":") for k in keys}
+    for i in range(len(keys) - 1):
+        assert positions[keys[i]] < positions[keys[i + 1]], (
+            f"Expected {keys[i]!r} before {keys[i+1]!r} in output"
+        )
+
+
+def test_dump_frontmatter_delimiters():
+    import yaml
+    fields = {"type": "moc", "rank": 3, "tags": ["a", "b"]}
+    out = _dump_frontmatter(fields)
+    assert out.startswith("---\n")
+    assert out.rstrip("\n").endswith("---")
+    # Strip delimiters and round-trip through yaml
+    inner = out.split("---")[1]
+    parsed = yaml.safe_load(inner)
+    assert parsed["type"] == "moc"
+    assert parsed["rank"] == 3
+    assert parsed["tags"] == ["a", "b"]
+
+
+def test_default_profile_has_obsidian_dataview_moc_query():
+    expected = (
+        "TABLE file.folder as Folder, type, source_file\n"
+        "FROM #community/${community_tag}\n"
+        "SORT file.name ASC"
+    )
+    assert _DEFAULT_PROFILE["obsidian"]["dataview"]["moc_query"] == expected
+
+
+def test_default_profile_has_obsidian_atlas_root():
+    assert _DEFAULT_PROFILE["obsidian"]["atlas_root"] == "Atlas"
+
+
+def test_validate_profile_accepts_new_obsidian_keys():
+    result = validate_profile({
+        "obsidian": {
+            "atlas_root": "Custom",
+            "dataview": {"moc_query": "TABLE file.name FROM #foo"},
+        }
+    })
+    assert result == [], f"Expected no errors, got: {result}"
+
+
+def test_deep_merge_preserves_new_defaults():
+    merged = _deep_merge(_DEFAULT_PROFILE, {"obsidian": {"atlas_root": "MyRoot"}})
+    assert merged["obsidian"]["atlas_root"] == "MyRoot"
+    # Sibling key must survive partial override
+    assert "moc_query" in merged["obsidian"]["dataview"]
+    assert "${community_tag}" in merged["obsidian"]["dataview"]["moc_query"]
