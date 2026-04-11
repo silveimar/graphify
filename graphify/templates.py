@@ -680,8 +680,11 @@ def _render_moc_like(
     frontmatter = _dump_frontmatter(fm_fields)
 
     # Sections
+    # IN-07: pass `template_key` rather than hardcoding "moc" so that the
+    # wayfinder callout reflects the actual note type being rendered
+    # (community overviews used to be tagged as MOCs in this code path).
     wayfinder = _build_wayfinder_callout(
-        note_type="moc",
+        note_type=template_key,
         parent_moc_label=None,
         profile=profile,
         convention=convention,

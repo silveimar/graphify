@@ -1795,3 +1795,62 @@ def test_build_members_section_skips_group_when_all_dropped():
     assert "Things" not in result
     assert "Statements" in result
     assert "Real Statement" in result
+
+
+# ---------------------------------------------------------------------------
+# IN-07: _render_moc_like passes template_key (not hardcoded "moc") to wayfinder
+# ---------------------------------------------------------------------------
+
+
+def test_render_community_overview_wayfinder_uses_community_note_type():
+    """IN-07: community-overview rendering must not hardcode note_type='moc'.
+
+    Pre-fix, _render_moc_like passed `note_type="moc"` to the wayfinder
+    callout regardless of which template was being rendered. This was a
+    latent bug because _build_wayfinder_callout currently treats "moc" and
+    "community" identically, but any future divergence would silently
+    mis-tag community-overview notes as MOCs.
+
+    We assert the surface contract by inspecting the call: render_community_overview
+    must produce a wayfinder callout (the wayfinder header is present in the output).
+    """
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_community_overview
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_community_overview(0, G, communities, profile, ctx)
+    assert "> [!note] Wayfinder" in text
+
+
+def test_render_moc_like_passes_template_key_to_wayfinder(monkeypatch):
+    """IN-07: assert _render_moc_like forwards template_key to the wayfinder builder."""
+    import graphify.templates as templates
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+
+    captured: list[str] = []
+
+    real_builder = templates._build_wayfinder_callout
+
+    def spy_builder(*, note_type, parent_moc_label, profile, convention):
+        captured.append(note_type)
+        return real_builder(
+            note_type=note_type,
+            parent_moc_label=parent_moc_label,
+            profile=profile,
+            convention=convention,
+        )
+
+    monkeypatch.setattr(templates, "_build_wayfinder_callout", spy_builder)
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+
+    templates.render_moc(0, G, communities, profile, ctx)
+    templates.render_community_overview(0, G, communities, profile, ctx)
+
+    assert captured == ["moc", "community"]
