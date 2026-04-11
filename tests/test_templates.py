@@ -1002,6 +1002,58 @@ def test_render_note_falls_back_to_parent_moc_label_when_no_community_name():
 
 
 # ---------------------------------------------------------------------------
+# WR-04 regression: render_note applies safe_tag to community_tag and file_type
+# ---------------------------------------------------------------------------
+
+
+def test_render_note_file_type_with_spaces_produces_valid_tag():
+    """file_type='source code' must produce 'graphify/source-code' not 'graphify/source code'."""
+    import networkx as nx
+    from graphify.templates import render_note
+
+    G = nx.Graph()
+    G.add_node(
+        "n1",
+        label="MyNode",
+        file_type="source code",
+        source_file="src/x.py",
+        source_location="L1",
+    )
+    ctx = {
+        "note_type": "thing",
+        "folder": "Atlas/Dots/Things/",
+        "parent_moc_label": "Some MOC",
+        "community_tag": "my-community",
+        "sibling_labels": [],
+    }
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n1", G, profile, "thing", ctx)
+    # Tag must be slugified — no space in tag component
+    assert "graphify/source-code" in text
+    assert "graphify/source code" not in text
+
+
+def test_render_note_community_tag_with_uppercase_slugified():
+    """community_tag with uppercase letters must be lowercased by safe_tag."""
+    import networkx as nx
+    from graphify.templates import render_note
+
+    G = nx.Graph()
+    G.add_node("n1", label="N1", file_type="code", source_file="x.py", source_location="L1")
+    ctx = {
+        "note_type": "thing",
+        "folder": "Atlas/Dots/Things/",
+        "community_tag": "ML Architecture",  # not pre-slugified
+        "sibling_labels": [],
+    }
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n1", G, profile, "thing", ctx)
+    # Must be slugified to lowercase hyphenated form
+    assert "community/ml-architecture" in text
+    assert "community/ML Architecture" not in text
+
+
+# ---------------------------------------------------------------------------
 # Plan 04 Task 1: _build_members_section tests
 # ---------------------------------------------------------------------------
 

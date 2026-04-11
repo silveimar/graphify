@@ -501,8 +501,10 @@ def render_note(
 
     tag_list: list[str] = []
     if community_tag:
-        tag_list.append(f"community/{community_tag}")
-    tag_list.append(f"graphify/{file_type or 'note'}")
+        # safe_tag ensures no spaces, uppercase, or special chars in the tag
+        # component (WR-04). community_tag from ctx may not be pre-slugified.
+        tag_list.append(f"community/{safe_tag(community_tag)}")
+    tag_list.append(f"graphify/{safe_tag(file_type or 'note')}")
 
     frontmatter_fields = _build_frontmatter_fields(
         up=up_list,
