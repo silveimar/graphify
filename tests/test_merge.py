@@ -843,3 +843,147 @@ def test_apply_path_escape_recorded_as_failed(tmp_path):
     result = apply_merge_plan(plan, vault, {"escape": rn}, {})
     assert len(result.failed) == 1, "escaped path must be recorded in failed"
     assert not (tmp_path / "escaped.md").exists(), "escaped path must NOT be written"
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 must_have traceability (from .planning/phases/04-merge-engine/04-CONTEXT.md)
+# ---------------------------------------------------------------------------
+# M1  test_preserve_rank_survives_update                         → MRG-01, success-1
+# M2  test_strategy_skip_is_noop                                 → MRG-07, success-2
+# M3  test_strategy_replace_overwrites_preserve_fields           → MRG-07, success-3
+# M4  test_field_order_preserved_minimal_diff                    → MRG-06, success-4
+# M5  test_sentinel_round_trip_deleted_block_not_reinserted      → D-68
+# M6  test_unmanaged_file_skip_conflict                          → D-63
+# M7  test_malformed_sentinel_skip_warn                          → D-69
+# M8  test_orphan_never_deleted_under_replace                    → D-72
+# M9  test_compute_merge_plan_is_pure                            → Plan 04 purity
+# M10 test_apply_merge_plan_content_hash_skip                    → re-run cheapness
+# ---------------------------------------------------------------------------
+
+# --- Phase 4 must_haves M1..M4 (success criteria end-to-end) ---
+
+
+def test_preserve_rank_survives_update(tmp_path):
+    from pathlib import Path
+    from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+    vault = _copy_vault_fixture("preserve_fields_edited", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+
+    # Build a rendered note whose frontmatter EXCLUDES rank and mapState —
+    # graphify never emits them, so they can only come from the existing file.
+    existing_fm = _parse_frontmatter(target.read_text())
+    new_fields = {k: v for k, v in existing_fm.items() if k not in ("rank", "mapState")}
+    body_start = target.read_text().index("---", 4) + 3
+    rn = {
+        "node_id": "transformer",
+        "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+        "frontmatter_fields": new_fields,
+        "body": target.read_text()[body_start:],
+    }
+
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    assert plan.actions[0].action == "UPDATE"
+    apply_merge_plan(plan, vault, {"transformer": rn}, {})
+
+    after = _parse_frontmatter(target.read_text())
+    assert after["rank"] == 7, f"rank survived as {after.get('rank')!r}"
+    assert "mapState" in after and "zoom" in str(after["mapState"]), \
+        f"mapState lost: {after.get('mapState')!r}"
+
+
+def test_strategy_skip_is_noop(tmp_path):
+    from pathlib import Path
+    from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    original_bytes = target.read_bytes()
+    original_mtime = target.stat().st_mtime_ns
+
+    # Build a rendered note with a CHANGED source_file
+    existing_fm = _parse_frontmatter(target.read_text())
+    new_fields = dict(existing_fm)
+    new_fields["source_file"] = "src/models/CHANGED.py"
+    body_start = target.read_text().index("---", 4) + 3
+    rn = {
+        "node_id": "transformer",
+        "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+        "frontmatter_fields": new_fields,
+        "body": target.read_text()[body_start:],
+    }
+    profile = {"merge": {"strategy": "skip"}}
+    plan = compute_merge_plan(vault, {"transformer": rn}, profile)
+    assert plan.actions[0].action == "SKIP_PRESERVE"
+    apply_merge_plan(plan, vault, {"transformer": rn}, profile)
+
+    assert target.read_bytes() == original_bytes, "skip must leave file byte-identical"
+    assert target.stat().st_mtime_ns == original_mtime, "skip must not touch mtime"
+
+
+def test_strategy_replace_overwrites_preserve_fields(tmp_path):
+    from pathlib import Path
+    from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+    vault = _copy_vault_fixture("preserve_fields_edited", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+
+    existing_fm = _parse_frontmatter(target.read_text())
+    new_fields = {k: v for k, v in existing_fm.items() if k not in ("rank", "mapState")}
+    body_start = target.read_text().index("---", 4) + 3
+    rn = {
+        "node_id": "transformer",
+        "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+        "frontmatter_fields": new_fields,
+        "body": target.read_text()[body_start:],
+    }
+    profile = {"merge": {"strategy": "replace"}}
+    plan = compute_merge_plan(vault, {"transformer": rn}, profile)
+    assert plan.actions[0].action == "REPLACE"
+    apply_merge_plan(plan, vault, {"transformer": rn}, profile)
+
+    after = _parse_frontmatter(target.read_text())
+    assert "rank" not in after, f"replace must drop rank, got {after.get('rank')!r}"
+    assert "mapState" not in after, f"replace must drop mapState, got {after.get('mapState')!r}"
+
+
+def test_field_order_preserved_minimal_diff(tmp_path):
+    from pathlib import Path
+    from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    target = vault / "Atlas/Dots/Things/Transformer.md"
+    original_text = target.read_text()
+    original_fm = _parse_frontmatter(original_text)
+    original_keys = list(original_fm.keys())
+
+    new_fields = dict(original_fm)
+    new_fields["source_file"] = "src/models/transformer.py"  # CHANGED
+    body_start = original_text.index("---", 4) + 3
+    rn = {
+        "node_id": "transformer",
+        "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+        "frontmatter_fields": new_fields,
+        "body": original_text[body_start:],
+    }
+    plan = compute_merge_plan(vault, {"transformer": rn}, {})
+    assert plan.actions[0].action == "UPDATE"
+    assert plan.actions[0].changed_fields == ["source_file"], \
+        f"only source_file should change, got {plan.actions[0].changed_fields}"
+    apply_merge_plan(plan, vault, {"transformer": rn}, {})
+
+    after_text = target.read_text()
+    after_fm = _parse_frontmatter(after_text)
+    after_keys = list(after_fm.keys())
+    assert after_keys == original_keys, \
+        f"field order changed: before={original_keys} after={after_keys}"
+    assert after_fm["source_file"] == "src/models/transformer.py"
+
+    # Git-diff shape assertion: exactly ONE line differs between old and new text
+    # (the source_file line), ignoring trailing newline differences
+    old_lines = original_text.splitlines()
+    new_lines = after_text.splitlines()
+    diff = [
+        (i, o, n) for i, (o, n) in enumerate(zip(old_lines, new_lines)) if o != n
+    ]
+    diff_count = len(diff) + abs(len(old_lines) - len(new_lines))
+    assert diff_count == 1, f"expected exactly 1 line diff, got {diff_count}: {diff}"
+    _, old_line, new_line = diff[0]
+    assert "source_file" in old_line and "source_file" in new_line, \
+        f"the only diff must be on source_file, got {old_line!r} -> {new_line!r}"
