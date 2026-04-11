@@ -1659,3 +1659,24 @@ def test_render_moc_includes_sub_communities_when_present():
     _, text = render_moc(0, G, communities, profile, ctx)
     # Below-threshold sub-community must appear as inline callout inside MOC (no separate file)
     assert "> [!abstract] Sub-communities" in text
+
+
+# ---------------------------------------------------------------------------
+# IN-01: _FALLBACK_MOC_QUERY single source of truth
+# ---------------------------------------------------------------------------
+
+
+def test_fallback_moc_query_matches_default_profile():
+    """IN-01: templates._FALLBACK_MOC_QUERY must equal _DEFAULT_PROFILE's moc_query.
+
+    The fallback string lived in two places (templates.py and profile.py) before
+    this fix; updating one without the other caused silent drift. The fallback
+    is now imported from profile._DEFAULT_PROFILE so the two cannot diverge.
+    """
+    from graphify.templates import _FALLBACK_MOC_QUERY
+    from graphify.profile import _DEFAULT_PROFILE
+
+    assert (
+        _FALLBACK_MOC_QUERY
+        == _DEFAULT_PROFILE["obsidian"]["dataview"]["moc_query"]
+    )

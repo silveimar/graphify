@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from graphify.profile import (
+    _DEFAULT_PROFILE,
     _dump_frontmatter,
     safe_filename,
     safe_frontmatter_value,
@@ -410,10 +411,11 @@ def _build_sub_communities_callout(sub_communities: list, convention: str) -> st
 # Dataview block (D-28, Pattern 5) — two-phase substitution
 # ---------------------------------------------------------------------------
 
-_FALLBACK_MOC_QUERY = (
-    "TABLE file.folder as Folder, type, source_file\n"
-    "FROM #community/${community_tag}\n"
-    "SORT file.name ASC"
+# IN-01: Single source of truth — pull the default moc_query from
+# _DEFAULT_PROFILE in profile.py instead of duplicating the string here.
+# Updating the default in one place must not require touching the other.
+_FALLBACK_MOC_QUERY: str = (
+    _DEFAULT_PROFILE["obsidian"]["dataview"]["moc_query"]
 )
 
 
