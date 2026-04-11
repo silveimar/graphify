@@ -22,6 +22,32 @@ def make_classification_context(**overrides) -> dict:
     return defaults
 
 
+def make_moc_context(**overrides) -> dict:
+    """Return a ClassificationContext-shaped dict for MOC rendering tests.
+
+    Defaults represent an ML Architecture community with two members,
+    a cohesion score, and empty sub_communities.
+    Any kwarg overrides the default value.
+    """
+    defaults: dict = {
+        "note_type": "moc",
+        "folder": "Atlas/Maps/",
+        "community_name": "ML Architecture",
+        "community_tag": "ml-architecture",
+        "members_by_type": {
+            "thing": [{"id": "n_transformer", "label": "Transformer"}],
+            "statement": [],
+            "person": [],
+            "source": [{"id": "n_paper", "label": "Attention Is All You Need"}],
+        },
+        "sub_communities": [],
+        "sibling_labels": [],
+        "cohesion": 0.82,
+    }
+    defaults.update(overrides)
+    return defaults
+
+
 def make_min_graph() -> nx.Graph:
     """Return a minimal NetworkX graph with 3 nodes and 2 edges for testing.
 

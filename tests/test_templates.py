@@ -1005,3 +1005,350 @@ def test_build_dataview_block_missing_moc_query_uses_default():
     # Fallback must produce a non-empty dataview block
     assert result.startswith("```dataview")
     assert len(result) > 20
+
+
+# ---------------------------------------------------------------------------
+# Plan 04 Task 2: render_moc + render_community_overview tests
+# ---------------------------------------------------------------------------
+
+
+def test_render_moc_returns_tuple():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    fname, text = render_moc(0, G, communities, profile, ctx)
+    assert isinstance(fname, str)
+    assert fname.endswith(".md")
+    assert isinstance(text, str)
+    assert len(text) > 0
+
+
+def test_render_moc_filename_from_community_name():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(community_name="ML Architecture")
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    fname, _ = render_moc(0, G, communities, profile, ctx)
+    assert fname == "Ml_Architecture.md"
+
+
+def test_render_moc_frontmatter_type_moc():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "type: moc" in text
+
+
+def test_render_moc_frontmatter_fields():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    # Extract frontmatter block
+    lines = text.split("\n")
+    fm_end = next(i for i in range(1, len(lines)) if lines[i].strip() == "---")
+    fm_lines = lines[1:fm_end]
+    fm_keys = [l.split(":")[0].strip() for l in fm_lines if ":" in l and not l.startswith("  ")]
+    # D-24 order: up < created < tags < type, community before cohesion
+    for earlier, later in [("up", "created"), ("created", "tags"), ("tags", "type")]:
+        if earlier in fm_keys and later in fm_keys:
+            assert fm_keys.index(earlier) < fm_keys.index(later), (
+                f"Expected '{earlier}' before '{later}' but got order: {fm_keys}"
+            )
+    if "community" in fm_keys and "cohesion" in fm_keys:
+        assert fm_keys.index("community") < fm_keys.index("cohesion")
+
+
+def test_render_moc_frontmatter_tags_include_community_slug():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(community_tag="ml-architecture")
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "tags:" in text
+    assert "community/ml-architecture" in text
+
+
+def test_render_moc_contains_members_section():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "> [!info] Things" in text
+    assert "[[Transformer|Transformer]]" in text
+
+
+def test_render_moc_contains_dataview_fence():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "```dataview" in text
+    assert "FROM #community/ml-architecture" in text
+    assert "SORT file.name ASC" in text
+
+
+def test_render_moc_custom_moc_query_respected():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {
+        "naming": {"convention": "title_case"},
+        "obsidian": {
+            "atlas_root": "Atlas",
+            "dataview": {"moc_query": "TABLE file.name FROM #community/${community_tag} LIMIT 5"},
+        },
+    }
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "LIMIT 5" in text
+    assert "#community/ml-architecture" in text
+    assert "SORT file.name ASC" not in text
+
+
+def test_render_moc_wayfinder_links_to_atlas():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "> [!note] Wayfinder" in text
+    assert "> Up: [[Atlas|Atlas]]" in text
+    assert "> Map: [[Atlas|Atlas]]" in text
+
+
+def test_render_moc_section_order_d31():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(sub_communities=[{"label": "Tiny", "members": [{"id": "n_x", "label": "X"}]}])
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    # D-31: frontmatter closing --- < heading < wayfinder < members < sub_communities < dataview < metadata
+    idx_fm_end = text.index("---\n", 3)
+    idx_heading = text.index("# ML Architecture")
+    idx_wayfinder = text.index("> [!note] Wayfinder")
+    idx_members = text.index("> [!info]")
+    idx_sub = text.index("> [!abstract] Sub-communities")
+    idx_dataview = text.index("```dataview")
+    idx_metadata = text.index("> [!abstract] Metadata")
+    assert idx_fm_end < idx_heading < idx_wayfinder < idx_members < idx_sub < idx_dataview < idx_metadata
+
+
+def test_render_moc_sub_communities_rendered_when_present():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(sub_communities=[{"label": "Tiny", "members": [{"id": "n_x", "label": "X"}]}])
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "> [!abstract] Sub-communities" in text
+    assert "[[X|X]]" in text
+
+
+def test_render_moc_sub_communities_absent_when_empty():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(sub_communities=[])
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "> [!abstract] Sub-communities" not in text
+
+
+def test_render_moc_cohesion_included_in_frontmatter():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(cohesion=0.82)
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "cohesion: 0.82" in text
+
+
+def test_render_community_overview_uses_community_template(tmp_path):
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_community_overview
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    # With custom community.md override
+    tpl_dir = tmp_path / ".graphify" / "templates"
+    tpl_dir.mkdir(parents=True)
+    (tpl_dir / "community.md").write_text(
+        "${frontmatter}\n# Custom Community: ${label}\n${members_section}\n${dataview_block}",
+        encoding="utf-8",
+    )
+    fname, text = render_community_overview(0, G, communities, profile, ctx, vault_dir=tmp_path)
+    assert fname.endswith(".md")
+    assert "# Custom Community: ML Architecture" in text
+
+
+def test_render_moc_lazy_import():
+    import graphify
+
+    assert callable(graphify.render_moc)
+    assert callable(graphify.render_community_overview)
+
+
+def test_render_moc_without_vault_dir_uses_builtins_only():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    # vault_dir omitted — must not raise and must use built-in moc.md
+    fname, text = render_moc(0, G, communities, profile, ctx)
+    assert "# ML Architecture" in text
+    assert not fname == ""
+
+
+# ---------------------------------------------------------------------------
+# Plan 04 Task 2: regression tests
+# ---------------------------------------------------------------------------
+
+
+def test_moc_section_order_end_to_end_matches_d31():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(sub_communities=[{"label": "Mini", "members": [{"id": "n_x", "label": "X"}]}])
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    idx_fm_end = text.index("---\n", 3)
+    idx_heading = text.index("# ML Architecture")
+    idx_wayfinder = text.index("> [!note] Wayfinder")
+    idx_members = text.index("> [!info]")
+    idx_sub = text.index("> [!abstract] Sub-communities")
+    idx_dataview = text.index("```dataview")
+    idx_metadata = text.index("> [!abstract] Metadata")
+    assert idx_fm_end < idx_heading < idx_wayfinder < idx_members < idx_sub < idx_dataview < idx_metadata
+
+
+def test_frontmatter_field_order_d24_moc():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    lines = text.split("\n")
+    fm_end = next(i for i in range(1, len(lines)) if lines[i].strip() == "---")
+    fm_keys = [l.split(":")[0].strip() for l in lines[1:fm_end] if ":" in l and not l.startswith("  ")]
+    for earlier, later in [("up", "created"), ("created", "tags"), ("tags", "type")]:
+        if earlier in fm_keys and later in fm_keys:
+            assert fm_keys.index(earlier) < fm_keys.index(later)
+
+
+def test_templater_token_passthrough_in_user_moc_template(tmp_path):
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_community_overview
+
+    G = make_min_graph()
+    ctx = make_moc_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    tpl_dir = tmp_path / ".graphify" / "templates"
+    tpl_dir.mkdir(parents=True)
+    (tpl_dir / "community.md").write_text(
+        "${frontmatter}\n# ${label}\n<% tp.file.title %>\n${members_section}\n${dataview_block}",
+        encoding="utf-8",
+    )
+    _, text = render_community_overview(0, G, communities, profile, ctx, vault_dir=tmp_path)
+    assert "<% tp.file.title %>" in text
+
+
+def test_render_moc_does_not_consult_graph():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    # Add extra nodes NOT in classification_context members_by_type
+    G.add_node("n_ghost_1", label="GhostNodeOne", file_type="code", source_file="src/ghost.py")
+    G.add_node("n_ghost_2", label="GhostNodeTwo", file_type="code", source_file="src/ghost.py")
+    G.add_edge("n_ghost_1", "n_ghost_2", relation="calls", confidence="EXTRACTED")
+    G.add_edge("n_transformer", "n_ghost_1", relation="imports", confidence="EXTRACTED")
+
+    # ctx members_by_type contains ONLY n_transformer
+    ctx = make_moc_context(members_by_type={
+        "thing": [{"id": "n_transformer", "label": "Transformer"}],
+        "statement": [], "person": [], "source": [],
+    })
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    assert "GhostNodeOne" not in text
+    assert "GhostNodeTwo" not in text
+
+
+def test_build_sub_communities_callout_renders_abstract_callout():
+    from graphify.templates import _build_sub_communities_callout
+
+    sub_communities = [
+        {"label": "Tiny Cluster", "members": [{"id": "n1", "label": "Node A"}, {"id": "n2", "label": "Node B"}]}
+    ]
+    result = _build_sub_communities_callout(sub_communities, "title_case")
+    assert result.startswith("> [!abstract] Sub-communities")
+
+
+def test_render_moc_includes_sub_communities_when_present():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(sub_communities=[
+        {"label": "Below Threshold Cluster", "members": [{"id": "n_x", "label": "X"}, {"id": "n_y", "label": "Y"}]}
+    ])
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+    _, text = render_moc(0, G, communities, profile, ctx)
+    # Below-threshold sub-community must appear as inline callout inside MOC (no separate file)
+    assert "> [!abstract] Sub-communities" in text
