@@ -101,6 +101,8 @@ def validate_template(text: str, required: set[str]) -> list[str]:
       - `$$` (escaped dollar) → correctly ignored (Template.pattern.escaped group)
       - `<% ... %>` Templater tokens → never matched (no `$` prefix), ignored
       - Missing placeholders from `required` → reported as errors
+      - Malformed placeholders like `${bad name}` or a bare `$` → surfaced
+        as errors (IN-08), not silently swallowed.
     """
     errors: list[str] = []
     found: set[str] = set()
@@ -108,8 +110,19 @@ def validate_template(text: str, required: set[str]) -> list[str]:
         name = m.group("named") or m.group("braced")
         if name:
             found.add(name)
+            continue
         # m.group("escaped") == "$$" → not a substitution site
-        # m.group("invalid") → malformed, surfaced as unknown via `named`/`braced` None
+        if m.group("escaped"):
+            continue
+        # m.group("invalid") → malformed `$` not followed by an identifier
+        # (e.g. `${bad name}`, `$ `, trailing `$`). Surface a clear error
+        # rather than silently ignoring it (IN-08).
+        if m.group("invalid") is not None:
+            snippet = m.group(0)
+            errors.append(
+                f"malformed placeholder near {snippet!r} — "
+                "expected ${name} where name is a Python identifier"
+            )
     unknown = found - KNOWN_VARS
     for var in sorted(unknown):
         errors.append(f"unknown placeholder ${{{var}}} — not a graphify section var")

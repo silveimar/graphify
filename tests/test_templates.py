@@ -1854,3 +1854,65 @@ def test_render_moc_like_passes_template_key_to_wayfinder(monkeypatch):
     templates.render_community_overview(0, G, communities, profile, ctx)
 
     assert captured == ["moc", "community"]
+
+
+# ---------------------------------------------------------------------------
+# IN-08: validate_template surfaces malformed placeholders
+# ---------------------------------------------------------------------------
+
+
+def test_validate_template_reports_malformed_braced_placeholder():
+    """IN-08: `${bad name}` (space inside braces) is a malformed placeholder.
+
+    Pre-fix, validate_template silently ignored the `invalid` group from
+    string.Template.pattern, so a typo in a user template would never be
+    surfaced — the renderer would just leave the literal `${bad name}` in
+    the output.
+    """
+    from graphify.templates import validate_template
+
+    errors = validate_template("hello ${bad name} world", set())
+    assert any("malformed placeholder" in e for e in errors)
+
+
+def test_validate_template_reports_trailing_dollar():
+    """IN-08: a bare trailing `$` is also flagged as malformed."""
+    from graphify.templates import validate_template
+
+    errors = validate_template("ends with $", set())
+    assert any("malformed placeholder" in e for e in errors)
+
+
+def test_validate_template_does_not_flag_escaped_dollar():
+    """IN-08: `$$` is the escape for a literal `$` and must not be flagged."""
+    from graphify.templates import validate_template
+
+    errors = validate_template("price: $$5", set())
+    assert errors == []
+
+
+def test_validate_template_does_not_flag_known_placeholder():
+    """IN-08 sanity check: well-formed `${label}` still validates cleanly."""
+    from graphify.templates import validate_template
+
+    errors = validate_template("hello ${label}", {"label"})
+    assert errors == []
+
+
+def test_validate_template_builtin_templates_pass_validation():
+    """IN-08 regression: every shipped built-in template must pass validate_template.
+
+    If we ever introduce a malformed placeholder (e.g. via a typo in a
+    .md file), this catches it before users do.
+    """
+    from graphify.templates import (
+        _BUILTIN_TEMPLATES_ROOT,
+        _NOTE_TYPES,
+        _REQUIRED_PER_TYPE,
+        validate_template,
+    )
+
+    for note_type in _NOTE_TYPES:
+        text = _BUILTIN_TEMPLATES_ROOT.joinpath(f"{note_type}.md").read_text(encoding="utf-8")
+        errors = validate_template(text, _REQUIRED_PER_TYPE[note_type])
+        assert errors == [], f"{note_type}.md failed validation: {errors}"
