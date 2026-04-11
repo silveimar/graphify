@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-04-11T20:50:48.355Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-04-11T20:56:12.866Z"
 last_activity: 2026-04-11
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 21
-  completed_plans: 19
-  percent: 90
+  completed_plans: 20
+  percent: 95
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-09)
 ## Current Position
 
 Phase: 05 (integration-cli) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-04-11
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P01 | 2m 23s | 3 tasks | 2 files |
 | Phase 05 P02 | 3m 29s | 2 tasks | 2 files |
 | Phase 05 P03 | 4m | 1 tasks | 1 files |
+| Phase 05 P04 | 6m | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,7 @@ Recent decisions affecting current work:
 - [Phase 05]: No-.graphify-dir early return: validate_profile_preflight returns zero-everything before running any layers — N/M suffix reflects user-authored overrides only (D-77a)
 - [Phase 05]: D-74: always run new pipeline — no if-profile-is-None branching inside to_obsidian body; None resolved as first line via load_profile(out)
 - [Phase 05]: split_rendered_note (Plan 01 public helper) is the ONLY merge.py internal consumed by export.py — no private cross-module helper imports
+- [Phase 05]: MergeResult.plan.summary is sparse (zero-count keys omitted) — assertions use sum(values) not key membership
 
 ### Pending Todos
 
@@ -103,6 +105,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T20:50:48.353Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-04-11T20:56:12.863Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None
