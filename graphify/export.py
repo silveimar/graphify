@@ -4,6 +4,7 @@ import html as _html
 import json
 import math
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 import networkx as nx
@@ -512,9 +513,16 @@ def to_obsidian(
             filename, rendered_text = render_note(
                 node_id, G, profile, note_type, ctx, vault_dir=out,
             )
-        except ValueError:
+        except ValueError as exc:
             # render_note raises on unknown note_type or missing node —
             # skip (matches Phase 1/3 "validate, report, don't crash" ethos).
+            # Log to stderr so callers can distinguish "empty graph" from
+            # "100% of nodes silently dropped due to misconfigured rules".
+            print(
+                f"[graphify] to_obsidian: skipping node {node_id!r} "
+                f"({note_type}): {exc}",
+                file=sys.stderr,
+            )
             continue
         folder = ctx.get("folder") or profile.get("folder_mapping", {}).get("default", "Atlas/Dots/")
         target_path = out / folder / filename
@@ -540,7 +548,14 @@ def to_obsidian(
             filename, rendered_text = render_fn(
                 cid, G, communities, profile, ctx, vault_dir=out,
             )
-        except ValueError:
+        except ValueError as exc:
+            # Same diagnostic discipline as the per-node loop above: surface
+            # silently-skipped MOC/overview renders so CI logs catch regressions.
+            print(
+                f"[graphify] to_obsidian: skipping community {cid} "
+                f"({note_type}): {exc}",
+                file=sys.stderr,
+            )
             continue
         folder = ctx.get("folder") or profile.get("folder_mapping", {}).get("moc", "Atlas/Maps/")
         target_path = out / folder / filename
