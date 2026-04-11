@@ -578,6 +578,56 @@ def test_build_connections_callout_confidence_uppercase():
 
 
 # ---------------------------------------------------------------------------
+# WR-02 regression: _build_connections_callout sanitizes relation/confidence
+# ---------------------------------------------------------------------------
+
+
+def test_build_connections_callout_newline_in_relation_stripped():
+    import networkx as nx
+    from graphify.templates import _build_connections_callout
+
+    G = nx.Graph()
+    G.add_node("a", label="NodeA", file_type="code", source_file="a.py")
+    G.add_node("b", label="NodeB", file_type="code", source_file="b.py")
+    G.add_edge("a", "b", relation="bad\nrelation", confidence="EXTRACTED")
+    result = _build_connections_callout(G, "a", "title_case")
+    # Newline in relation must not produce multiple lines inside one bullet
+    assert "\n> - " not in result.replace("> [!info] Connections\n", "").split("\n")[0]
+    assert "\n" not in result.split("\n> [!info] Connections\n", 1)[-1].split("\n")[0]
+
+
+def test_build_connections_callout_bracket_in_confidence_stripped():
+    import networkx as nx
+    from graphify.templates import _build_connections_callout
+
+    G = nx.Graph()
+    G.add_node("a", label="NodeA", file_type="code", source_file="a.py")
+    G.add_node("b", label="NodeB", file_type="code", source_file="b.py")
+    G.add_edge("a", "b", relation="contains", confidence="EX]TRACTED")
+    result = _build_connections_callout(G, "a", "title_case")
+    # ] in confidence value must be stripped before interpolation
+    # The only ] chars in the output should be the closing bracket of the format
+    # Each bullet ends with exactly one ] — check no double ] before newline
+    bullets = [l for l in result.splitlines() if l.startswith("> -")]
+    for bullet in bullets:
+        # Strip the expected trailing ] of the format template
+        inner = bullet.rsplit("[", 1)[-1]  # part inside [...]
+        assert "]" not in inner.rstrip("]")
+
+
+def test_build_connections_callout_newline_in_confidence_stripped():
+    import networkx as nx
+    from graphify.templates import _build_connections_callout
+
+    G = nx.Graph()
+    G.add_node("a", label="NodeA", file_type="code", source_file="a.py")
+    G.add_node("b", label="NodeB", file_type="code", source_file="b.py")
+    G.add_edge("a", "b", relation="contains", confidence="EX\nTRACTED")
+    result = _build_connections_callout(G, "a", "title_case")
+    assert "\n" not in result.split("> [!info] Connections\n", 1)[-1].split("\n")[0]
+
+
+# ---------------------------------------------------------------------------
 # Plan 03 Task 1: _build_metadata_callout tests
 # ---------------------------------------------------------------------------
 

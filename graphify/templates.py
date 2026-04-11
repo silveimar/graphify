@@ -312,6 +312,10 @@ def _build_connections_callout(G, node_id: str, convention: str) -> str:
         target_label = G.nodes[target].get("label", target)
         relation = data.get("relation", "related")
         confidence = data.get("confidence", "AMBIGUOUS")
+        # Strip chars that break callout bullet syntax (WR-02):
+        # \n/\r split the callout line; ] closes the confidence bracket early.
+        relation = str(relation).replace("\n", " ").replace("\r", " ").replace("]", "")
+        confidence = str(confidence).replace("\n", " ").replace("\r", " ").replace("]", "")
         link = _emit_wikilink(target_label, convention)
         lines.append(f"> - {link} — {relation} [{confidence}]")
     if not lines:
