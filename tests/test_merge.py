@@ -635,6 +635,34 @@ def test_compute_field_order_preserved_after_merge(tmp_path):
         assert keys.index(a) < keys.index(b), f"{a} must precede {b}"
 
 
+def test_insert_canonical_key_prepended_when_no_preceding_neighbor():
+    """WR-02 regression: when `existing` has no canonical key preceding the
+    new canonical key, `_insert_with_canonical_neighbor` prepends the new key
+    so graphify-owned canonical fields lead user-authored fields.
+    """
+    from graphify.merge import _insert_with_canonical_neighbor
+    existing = {"rank": 5}
+    result = _insert_with_canonical_neighbor(existing, "source_file", "src/x.py")
+    keys = list(result.keys())
+    assert keys == ["source_file", "rank"], (
+        "source_file has no preceding canonical neighbor in existing, "
+        "so it must be prepended ahead of user-authored rank"
+    )
+    assert result["source_file"] == "src/x.py"
+    assert result["rank"] == 5
+
+
+def test_insert_non_canonical_key_appended_at_end():
+    """Non-canonical keys (not in _CANONICAL_KEY_ORDER) are appended at end
+    regardless of the presence of canonical keys.
+    """
+    from graphify.merge import _insert_with_canonical_neighbor
+    existing = {"type": "thing", "tags": ["a"]}
+    result = _insert_with_canonical_neighbor(existing, "priority", "high")
+    keys = list(result.keys())
+    assert keys == ["type", "tags", "priority"]
+
+
 def test_compute_action_paths_are_absolute_and_inside_vault(tmp_path):
     from graphify.merge import compute_merge_plan
     vault = _copy_vault_fixture("empty", tmp_path)

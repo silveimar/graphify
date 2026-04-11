@@ -474,7 +474,19 @@ def _validate_target(candidate: Path, vault_dir: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 def _insert_with_canonical_neighbor(target: dict, key: str, value) -> dict:
-    """Insert key:value into target after its nearest canonical neighbor."""
+    """Insert `key: value` into `target` using canonical-neighbor ordering.
+
+    Behavior (WR-02 — kept as-is, matches callers' expectations):
+      - If `key` is NOT in `_CANONICAL_KEY_ORDER`, append at end.
+      - If `key` IS canonical and `target` contains a preceding canonical
+        key (anything listed before `key` in `_CANONICAL_KEY_ORDER`), insert
+        immediately after the nearest such neighbor.
+      - If `key` IS canonical but NO preceding canonical neighbor exists in
+        `target`, *prepend* `key` at the start of the dict. This ensures
+        graphify-owned canonical keys lead user-authored content — e.g.
+        `{"rank": 5}` + new `source_file` becomes
+        `{"source_file": ..., "rank": 5}`, not the reverse.
+    """
     if key not in _CANONICAL_KEY_ORDER:
         new_dict = dict(target)
         new_dict[key] = value
@@ -511,8 +523,11 @@ def _merge_frontmatter(
 
     D-66 ordering rule: keys already in `existing` keep their position;
     keys in `new` but not in `existing` are slotted after their nearest
-    preceding canonical neighbor from _CANONICAL_KEY_ORDER, falling back to
-    append at end.
+    preceding canonical neighbor from _CANONICAL_KEY_ORDER. If no preceding
+    canonical neighbor is present in `existing`, the new key is *prepended*
+    so graphify-owned canonical keys always lead user-authored content
+    (see `_insert_with_canonical_neighbor`). Non-canonical `new`-only keys
+    are appended at end.
 
     Returns (merged_dict, changed_keys_list).
     """
