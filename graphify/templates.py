@@ -483,7 +483,11 @@ def render_note(
     ctx = classification_context
     parent_moc_label = ctx.get("parent_moc_label") if isinstance(ctx, dict) else None
     community_tag = ctx.get("community_tag") if isinstance(ctx, dict) else None
-    community_name = ctx.get("parent_moc_label") if isinstance(ctx, dict) else None
+    # Prefer ctx["community_name"] (Phase 3-populated) over parent_moc_label
+    # fallback — mirrors the preference order in _render_moc_like (WR-03).
+    community_name = (
+        ctx.get("community_name") or ctx.get("parent_moc_label")
+    ) if isinstance(ctx, dict) else None
     sibling_labels = ctx.get("sibling_labels", []) if isinstance(ctx, dict) else []
 
     # Build each section as a pre-rendered scalar (D-18)

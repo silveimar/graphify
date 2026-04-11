@@ -946,6 +946,62 @@ def test_render_note_raises_valueerror_for_invalid_note_type():
 
 
 # ---------------------------------------------------------------------------
+# WR-03 regression: render_note prefers ctx["community_name"] over parent_moc_label
+# ---------------------------------------------------------------------------
+
+
+def test_render_note_community_name_preferred_over_parent_moc_label():
+    """community_name in ctx must win over parent_moc_label when both are present."""
+    from tests.fixtures.template_context import make_min_graph
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = {
+        "note_type": "thing",
+        "folder": "Atlas/Dots/Things/",
+        "parent_moc_label": "Old MOC Label",
+        "community_name": "Correct Community Name",
+        "community_tag": "correct-community",
+        "members_by_type": {},
+        "sub_communities": [],
+        "sibling_labels": [],
+    }
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    # The community: field in frontmatter must use community_name, not parent_moc_label.
+    # Extract frontmatter body (between first --- and second ---).
+    fm_body = text.split("---")[1]
+    # community: line must contain Correct Community Name
+    community_line = next(
+        (l for l in fm_body.splitlines() if l.startswith("community:")), ""
+    )
+    assert "Correct Community Name" in community_line
+    # community: line must NOT contain parent_moc_label value
+    assert "Old MOC Label" not in community_line
+
+
+def test_render_note_falls_back_to_parent_moc_label_when_no_community_name():
+    """When community_name absent, fall back to parent_moc_label (WR-03)."""
+    from tests.fixtures.template_context import make_min_graph
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = {
+        "note_type": "thing",
+        "folder": "Atlas/Dots/Things/",
+        "parent_moc_label": "ML Architecture",
+        "community_tag": "ml-architecture",
+        "members_by_type": {},
+        "sub_communities": [],
+        "sibling_labels": [],
+        # no community_name key
+    }
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("n_transformer", G, profile, "thing", ctx)
+    assert "ML Architecture" in text
+
+
+# ---------------------------------------------------------------------------
 # Plan 04 Task 1: _build_members_section tests
 # ---------------------------------------------------------------------------
 
