@@ -244,12 +244,21 @@ _WIKILINK_ALIAS_FORBIDDEN: dict[str, str] = {
     "\r": " ",
 }
 
+# Control characters beyond \n/\r that must be replaced with a space in
+# aliases — tab, vertical tab, form feed, NEL, line/paragraph separators,
+# plus the rest of the C0/DEL range — all embed invisibly inside `[[...]]`
+# and break callout rendering.
+_WIKILINK_ALIAS_CONTROL_RE = re.compile(
+    r"[\x00-\x09\x0b\x0c\x0e-\x1f\x7f\u0085\u2028\u2029]"
+)
+
 
 def _sanitize_wikilink_alias(label: str) -> str:
     """Replace characters that would break wikilink alias syntax."""
     out = label
     for bad, repl in _WIKILINK_ALIAS_FORBIDDEN.items():
         out = out.replace(bad, repl)
+    out = _WIKILINK_ALIAS_CONTROL_RE.sub(" ", out)
     return out
 
 

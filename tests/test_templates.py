@@ -388,11 +388,58 @@ def test_emit_wikilink_label_with_pipe():
 def test_emit_wikilink_label_with_newline():
     from graphify.templates import _emit_wikilink, _sanitize_wikilink_alias
 
-    # resolve_filename may preserve \n in the filename stem (safe_filename handles it),
-    # but the alias must not contain newlines so the containing callout line stays intact.
+    # The alias must not contain newlines so the containing callout line stays intact.
     alias = _sanitize_wikilink_alias("Label\nWith\rNewlines")
     assert "\n" not in alias
     assert "\r" not in alias
+
+
+def test_sanitize_wikilink_alias_strips_tab():
+    """UAT Test 5 regression: \\t in alias embeds invisibly inside [[...]]."""
+    from graphify.templates import _sanitize_wikilink_alias
+
+    result = _sanitize_wikilink_alias("foo\tbar")
+    assert "\t" not in result
+    assert result == "foo bar"
+
+
+def test_sanitize_wikilink_alias_strips_c0_controls():
+    """C0 controls (\\x00-\\x1f minus \\n/\\r handled earlier) and DEL."""
+    from graphify.templates import _sanitize_wikilink_alias
+
+    label = "foo" + "".join(chr(c) for c in range(0x00, 0x20) if chr(c) not in "\n\r") + "\x7fbar"
+    result = _sanitize_wikilink_alias(label)
+    assert all(ord(c) >= 0x20 and ord(c) != 0x7f for c in result)
+    assert "foo" in result and "bar" in result
+
+
+def test_sanitize_wikilink_alias_strips_unicode_line_seps():
+    """NEL, LS, PS all embed invisibly in aliases and break Obsidian rendering."""
+    from graphify.templates import _sanitize_wikilink_alias
+
+    result = _sanitize_wikilink_alias("foo\u0085bar\u2028baz\u2029qux")
+    assert "\u0085" not in result
+    assert "\u2028" not in result
+    assert "\u2029" not in result
+
+
+def test_emit_wikilink_filename_side_strips_newline():
+    """UAT Test 5 regression: safe_filename must strip \\n so the filename
+    portion of the wikilink does not embed a literal newline that breaks
+    Obsidian's target parsing."""
+    from graphify.templates import _emit_wikilink
+
+    link = _emit_wikilink("line1\nline2", "title_case")
+    assert "\n" not in link
+    # Filename side stripped, alias side replaced with space
+    assert link == "[[Line1line2|line1 line2]]"
+
+
+def test_emit_wikilink_filename_side_strips_tab():
+    from graphify.templates import _emit_wikilink
+
+    link = _emit_wikilink("foo\tbar", "title_case")
+    assert "\t" not in link
 
 
 # ---------------------------------------------------------------------------

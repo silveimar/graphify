@@ -430,6 +430,52 @@ def test_safe_filename_preserves_case():
     assert safe_filename("MyClass") == "MyClass"
 
 
+def test_safe_filename_strips_newline():
+    """Newlines in labels would otherwise leak into wikilink targets."""
+    result = safe_filename("line1\nline2")
+    assert "\n" not in result
+    assert result == "line1line2"
+
+
+def test_safe_filename_strips_carriage_return():
+    result = safe_filename("line1\r\nline2")
+    assert "\r" not in result
+    assert "\n" not in result
+    assert result == "line1line2"
+
+
+def test_safe_filename_strips_tab():
+    result = safe_filename("foo\tbar")
+    assert "\t" not in result
+    assert result == "foobar"
+
+
+def test_safe_filename_strips_all_c0_controls():
+    """C0 control characters (\\x00-\\x1f) and DEL break filenames/wikilinks."""
+    label = "foo" + "".join(chr(c) for c in range(0x00, 0x20)) + "\x7fbar"
+    result = safe_filename(label)
+    assert all(ord(c) >= 0x20 and ord(c) != 0x7f for c in result)
+    assert result == "foobar"
+
+
+def test_safe_filename_strips_unicode_line_separators():
+    """NEL (\\x85), LS (\\u2028), and PS (\\u2029) are also newline-class."""
+    result = safe_filename("foo\u0085bar\u2028baz\u2029qux")
+    assert "\u0085" not in result
+    assert "\u2028" not in result
+    assert "\u2029" not in result
+    assert result == "foobarbazqux"
+
+
+def test_safe_filename_wikilink_target_no_newline():
+    """Regression for UAT Test 5: labels with newlines must not produce
+    broken wikilink targets like [[line1\\nline2|...]]."""
+    fname = safe_filename("line1\nline2")
+    wikilink = f"[[{fname}|alias]]"
+    assert "\n" not in wikilink
+    assert wikilink == "[[line1line2|alias]]"
+
+
 # ---------------------------------------------------------------------------
 # _dump_frontmatter tests
 # ---------------------------------------------------------------------------

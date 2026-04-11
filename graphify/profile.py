@@ -287,8 +287,13 @@ def safe_filename(label: str, max_len: int = 200) -> str:
     and caps length with a hash suffix to avoid collisions (FIX-05, D-06).
     """
     name = unicodedata.normalize("NFC", label)
-    # Strip OS-illegal and Obsidian-problematic characters
-    name = re.sub(r'[\\/*?:"<>|#^[\]]', "", name).strip() or "unnamed"
+    # Strip OS-illegal, Obsidian-problematic, and control characters.
+    # Control chars (including \n, \r, \t) break wikilink targets — a label
+    # like "line1\nline2" would otherwise produce [[line1\nline2|...]] which
+    # Obsidian cannot parse (UAT-05 gap adjacent to CR-01 alias fix).
+    name = re.sub(
+        r'[\\/*?:"<>|#^[\]\x00-\x1f\x7f\u0085\u2028\u2029]', "", name
+    ).strip() or "unnamed"
     if len(name) > max_len:
         suffix = hashlib.sha256(name.encode()).hexdigest()[:8]
         name = name[:max_len - 9] + "_" + suffix
