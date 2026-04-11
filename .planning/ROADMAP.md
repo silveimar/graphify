@@ -64,7 +64,13 @@ Plans:
   3. A node with attribute `file_type: person` is classified as a Person note even when topology alone would classify it differently
   4. Source files route to sub-folders by file type when the profile specifies routing rules (e.g., `.py` files → `Code/`)
   5. Attribute rules take precedence over topology rules, which take precedence over the default classification
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Rule matching core: classify() precedence pipeline, matcher dispatch, per-node classification (MAP-01..MAP-04, MAP-06)
+- [ ] 03-02-PLAN.md — Community assembly: MOC labels, sibling_labels, nearest-host resolution, bucket MOC, members_by_type (MAP-02, MAP-05)
+- [ ] 03-03-PLAN.md — Profile validator: _DEFAULT_PROFILE topology+mapping sections, validate_rules, dead-rule detection, path-traversal guards
+- [ ] 03-04-PLAN.md — Contract tests + __init__ lazy exports: round-trip classify() through render_note/render_moc
 
 ### Phase 4: Merge Engine
 **Goal**: Re-running graphify on a vault with existing notes updates graphify-owned fields without overwriting user-edited fields, in a deterministic, git-friendly way
@@ -98,6 +104,6 @@ Note: Phases 2 and 4 have no cross-module dependencies; they can be planned and 
 |-------|----------------|--------|-----------|
 | 1. Foundation | 0/2 | Planning complete | - |
 | 2. Template Engine | 0/4 | Planning complete | - |
-| 3. Mapping Engine | 0/TBD | Not started | - |
+| 3. Mapping Engine | 0/4 | Planning complete | - |
 | 4. Merge Engine | 0/TBD | Not started | - |
 | 5. Integration & CLI | 0/TBD | Not started | - |
