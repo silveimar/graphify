@@ -46,7 +46,13 @@ Plans:
   3. MOC notes contain an embedded Dataview query that lists community members dynamically
   4. Notes contain wayfinder navigation linking to the parent MOC and related communities
   5. Output filenames follow the convention configured in the profile (title_case, kebab-case, or preserve original label)
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Package-data + 6 built-in templates + _dump_frontmatter + obsidian profile defaults (BLOCKING foundation)
+- [ ] 02-02-PLAN.md — templates.py skeleton: resolve_filename + validate_template + load_templates + ClassificationContext + lazy imports
+- [ ] 02-03-PLAN.md — Section builders + render_note for Thing/Statement/Person/Source
+- [ ] 02-04-PLAN.md — render_moc + render_community_overview + members/sub-communities/dataview builders + VALIDATION binding
 
 ### Phase 3: Mapping Engine
 **Goal**: Every graph node is classified into exactly one note type and assigned a folder location, driven by topology and attribute rules from the profile
@@ -91,7 +97,7 @@ Note: Phases 2 and 4 have no cross-module dependencies; they can be planned and 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 0/2 | Planning complete | - |
-| 2. Template Engine | 0/TBD | Not started | - |
+| 2. Template Engine | 0/4 | Planning complete | - |
 | 3. Mapping Engine | 0/TBD | Not started | - |
 | 4. Merge Engine | 0/TBD | Not started | - |
 | 5. Integration & CLI | 0/TBD | Not started | - |
