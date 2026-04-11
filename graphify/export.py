@@ -477,6 +477,15 @@ def to_obsidian(
     )
 
     out = Path(output_dir)
+    # Upfront guard: fail loudly with an actionable message when output_dir
+    # collides with a non-directory (regular file, symlink, device, etc.).
+    # Without this, `out.mkdir(exist_ok=True)` below raises FileExistsError
+    # with a confusing "File exists" message, and downstream render_note calls
+    # can raise FileNotFoundError from load_templates(vault_dir=out).
+    if out.exists() and not out.is_dir():
+        raise ValueError(
+            f"to_obsidian: output_dir {out} exists but is not a directory"
+        )
     out.mkdir(parents=True, exist_ok=True)
 
     # D-74: always run the new pipeline. No `if profile is None` branching.
@@ -513,11 +522,12 @@ def to_obsidian(
             filename, rendered_text = render_note(
                 node_id, G, profile, note_type, ctx, vault_dir=out,
             )
-        except ValueError as exc:
-            # render_note raises on unknown note_type or missing node —
-            # skip (matches Phase 1/3 "validate, report, don't crash" ethos).
-            # Log to stderr so callers can distinguish "empty graph" from
-            # "100% of nodes silently dropped due to misconfigured rules".
+        except (ValueError, FileNotFoundError) as exc:
+            # render_note raises ValueError on unknown note_type or missing
+            # node, and FileNotFoundError from load_templates() if a user
+            # template file vanished mid-run. Broader OSError (permission
+            # denied, disk full, etc.) still propagates — "validate, report,
+            # don't crash" stops at truly unrecoverable errors.
             print(
                 f"[graphify] to_obsidian: skipping node {node_id!r} "
                 f"({note_type}): {exc}",
@@ -548,9 +558,13 @@ def to_obsidian(
             filename, rendered_text = render_fn(
                 cid, G, communities, profile, ctx, vault_dir=out,
             )
-        except ValueError as exc:
+        except (ValueError, FileNotFoundError) as exc:
             # Same diagnostic discipline as the per-node loop above: surface
             # silently-skipped MOC/overview renders so CI logs catch regressions.
+            # Mirrors the per-node except clause — ValueError from render_moc /
+            # render_community_overview (unknown shape, missing community) plus
+            # FileNotFoundError from load_templates() if a template file
+            # vanished mid-run.
             print(
                 f"[graphify] to_obsidian: skipping community {cid} "
                 f"({note_type}): {exc}",
