@@ -42,7 +42,31 @@ _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
 
 _VALID_MERGE_STRATEGIES = {"update", "skip", "replace"}
 
-_YAML_SPECIAL = set(':#[]{}')
+# Characters that require quoting when present anywhere in a YAML scalar.
+# Covers flow-context indicators and structural chars (WR-01).
+_YAML_SPECIAL = set(':#[]{},')
+
+# Characters that require quoting when they appear as the FIRST character
+# of a YAML scalar — they are interpreted as block/directive/anchor markers.
+_YAML_LEADING_INDICATORS = set('-?!&*|>%@`')
+
+# Strings that YAML 1.1 (used by many parsers) interprets as bool/null
+# rather than plain strings, regardless of case.
+_YAML_RESERVED_WORDS: frozenset[str] = frozenset({
+    "yes", "no", "true", "false", "null", "on", "off", "~",
+})
+
+# Numeric-looking scalars that YAML parses as int, float, or octal.
+_YAML_NUMERIC_RE = re.compile(
+    r"^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$"   # int / float / scientific
+    r"|^0x[0-9a-fA-F]+$"                            # hex
+    r"|^0o[0-7]+$"                                  # octal (YAML 1.2)
+    r"|^0[0-7]+$"                                   # octal (YAML 1.1)
+    r"|^\.\w+$"                                     # .inf / .nan
+)
+
+# Control characters other than ordinary space that corrupt YAML scalars.
+_YAML_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x85\u2028\u2029]")
 
 
 # ---------------------------------------------------------------------------
@@ -192,15 +216,36 @@ def validate_vault_path(candidate: str | Path, vault_dir: str | Path) -> Path:
 def safe_frontmatter_value(value: str) -> str:
     """Sanitize a value for use in YAML frontmatter.
 
-    Wraps in double quotes if value contains YAML-special characters.
-    Replaces newlines with spaces to prevent multi-line injection (Pitfall 3).
-    """
-    # Strip newlines/carriage returns
-    value = value.replace("\n", " ").replace("\r", " ")
+    Wraps in double quotes when the value would be misinterpreted by YAML
+    parsers. Covers (WR-01):
+      - Structural characters: `:#[]{},`
+      - Leading indicator characters: -?!&*|>%@` (backtick)
+      - YAML 1.1 reserved words: yes/no/true/false/null/on/off/~
+      - Numeric-looking strings parsed as int/float/octal/hex
+      - Newlines and other control characters (stripped before quoting check)
 
-    # If any YAML-special char present, quote-wrap
-    if any(ch in _YAML_SPECIAL for ch in value):
-        # Escape internal double quotes
+    Replaces newlines/CR with spaces and strips other control chars to
+    prevent multi-line injection (Pitfall 3).
+    """
+    # Replace newlines with spaces (Pitfall 3)
+    value = value.replace("\n", " ").replace("\r", " ")
+    # Strip remaining control characters (tab and others left as-is would
+    # corrupt the YAML stream)
+    value = _YAML_CONTROL_RE.sub("", value)
+
+    needs_quoting = (
+        # Any structural/flow-context character anywhere in the value
+        any(ch in _YAML_SPECIAL for ch in value)
+        # Leading indicator character at position 0
+        or (value and value[0] in _YAML_LEADING_INDICATORS)
+        # Reserved word (case-insensitive)
+        or value.lower() in _YAML_RESERVED_WORDS
+        # Looks like a number, hex, octal, .inf, or .nan
+        or bool(_YAML_NUMERIC_RE.match(value))
+    )
+
+    if needs_quoting:
+        # Escape internal double quotes before wrapping
         value = value.replace('"', '\\"')
         return f'"{value}"'
 

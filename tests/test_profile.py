@@ -231,6 +231,103 @@ def test_safe_frontmatter_value_carriage_return():
 
 
 # ---------------------------------------------------------------------------
+# WR-01 regression: safe_frontmatter_value YAML scalar-poison cases
+# ---------------------------------------------------------------------------
+
+
+def test_safe_frontmatter_value_leading_dash_quoted():
+    # Leading '-' is a YAML sequence indicator — must quote
+    result = safe_frontmatter_value("- item")
+    assert result.startswith('"') and result.endswith('"')
+
+
+def test_safe_frontmatter_value_leading_exclamation_quoted():
+    # Leading '!' is a YAML tag indicator — must quote
+    result = safe_frontmatter_value("!important")
+    assert result.startswith('"') and result.endswith('"')
+
+
+def test_safe_frontmatter_value_leading_pipe_quoted():
+    # Leading '|' is a YAML block scalar indicator — must quote
+    result = safe_frontmatter_value("|block")
+    assert result.startswith('"') and result.endswith('"')
+
+
+def test_safe_frontmatter_value_leading_backtick_quoted():
+    # Leading '`' is reserved in YAML — must quote
+    result = safe_frontmatter_value("`code`")
+    assert result.startswith('"') and result.endswith('"')
+
+
+def test_safe_frontmatter_value_reserved_word_true_quoted():
+    assert safe_frontmatter_value("true").startswith('"')
+
+
+def test_safe_frontmatter_value_reserved_word_false_quoted():
+    assert safe_frontmatter_value("false").startswith('"')
+
+
+def test_safe_frontmatter_value_reserved_word_null_quoted():
+    assert safe_frontmatter_value("null").startswith('"')
+
+
+def test_safe_frontmatter_value_reserved_word_yes_quoted():
+    assert safe_frontmatter_value("yes").startswith('"')
+
+
+def test_safe_frontmatter_value_reserved_word_no_quoted():
+    assert safe_frontmatter_value("no").startswith('"')
+
+
+def test_safe_frontmatter_value_reserved_word_on_quoted():
+    assert safe_frontmatter_value("on").startswith('"')
+
+
+def test_safe_frontmatter_value_reserved_word_case_insensitive():
+    # YAML 1.1 treats Yes, YES, NO, True, FALSE, NULL etc. as bool/null
+    assert safe_frontmatter_value("Yes").startswith('"')
+    assert safe_frontmatter_value("NO").startswith('"')
+    assert safe_frontmatter_value("True").startswith('"')
+    assert safe_frontmatter_value("NULL").startswith('"')
+
+
+def test_safe_frontmatter_value_numeric_integer_quoted():
+    assert safe_frontmatter_value("42").startswith('"')
+
+
+def test_safe_frontmatter_value_numeric_float_quoted():
+    assert safe_frontmatter_value("0.1").startswith('"')
+
+
+def test_safe_frontmatter_value_numeric_scientific_quoted():
+    assert safe_frontmatter_value("1e10").startswith('"')
+
+
+def test_safe_frontmatter_value_comma_quoted():
+    # Comma is a flow-context separator — must quote
+    result = safe_frontmatter_value("a, b")
+    assert result.startswith('"') and result.endswith('"')
+
+
+def test_safe_frontmatter_value_control_chars_stripped():
+    # Control characters other than \n/\r must be stripped
+    result = safe_frontmatter_value("before\x00after")
+    assert "\x00" not in result
+    assert "beforeafter" in result
+
+
+def test_safe_frontmatter_value_nel_stripped():
+    # NEL (U+0085) is a YAML line break — must be stripped
+    result = safe_frontmatter_value("line\x85break")
+    assert "\x85" not in result
+
+
+def test_safe_frontmatter_value_plain_text_unchanged():
+    # Normal text with no poison chars must pass through unchanged
+    assert safe_frontmatter_value("ML Architecture") == "ML Architecture"
+
+
+# ---------------------------------------------------------------------------
 # safe_tag tests
 # ---------------------------------------------------------------------------
 
