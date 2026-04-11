@@ -1,9 +1,9 @@
 ---
 phase: 2
 slug: template-engine
-status: planned
+status: validated
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-04-11
 updated: 2026-04-11
 ---
@@ -124,3 +124,23 @@ updated: 2026-04-11
 - [x] `nyquist_compliant: true` set in frontmatter (bound to concrete task IDs 2026-04-11)
 
 **Approval:** bound by planner 2026-04-11
+
+---
+
+## Validation Audit 2026-04-11
+
+Re-verified all VALIDATION.md rows against live test suite via `/gsd-validate-phase 02`.
+
+| Metric | Count |
+|--------|-------|
+| Rows audited | 30 |
+| Test functions found in codebase | 30 |
+| Test functions missing | 0 |
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated to manual-only | 0 |
+| `pytest tests/test_templates.py tests/test_profile.py -q` | ✅ 224 passed |
+
+**Verdict:** Phase 02 is Nyquist-compliant. Every GEN-01…GEN-07 and MAP-05 requirement has an automated test that exists and runs green. `nyquist_compliant: true` confirmed in frontmatter. No gap-filling was required — auditor spawn skipped per workflow Step 3 ("No gaps → skip to Step 6").
+
+Manual-only verifications remain in the dedicated section above (Obsidian runtime rendering, List Callouts plugin styling) — these are inherently non-automatable and unchanged by this audit.
