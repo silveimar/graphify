@@ -181,6 +181,31 @@ def validate_profile(profile: dict) -> list[str]:
             preserve = merge.get("preserve_fields")
             if preserve is not None and not isinstance(preserve, list):
                 errors.append("'merge.preserve_fields' must be a list")
+            # Phase 4 D-65: optional per-key merge policy overrides.
+            # Users map frontmatter field name -> one of
+            # _VALID_FIELD_POLICY_MODES. Validation keeps the accumulator
+            # pattern (error list, never raise).
+            field_policies = merge.get("field_policies")
+            if field_policies is not None:
+                if not isinstance(field_policies, dict):
+                    errors.append(
+                        "'merge.field_policies' must be a mapping (dict) of "
+                        "field-name -> policy-mode"
+                    )
+                else:
+                    for fp_key, fp_value in field_policies.items():
+                        if not isinstance(fp_key, str):
+                            errors.append(
+                                f"merge.field_policies key {fp_key!r} must be a "
+                                f"string (got {type(fp_key).__name__})"
+                            )
+                            continue
+                        if fp_value not in _VALID_FIELD_POLICY_MODES:
+                            errors.append(
+                                f"merge.field_policies.{fp_key} has invalid mode "
+                                f"{fp_value!r} — valid modes are: "
+                                f"{sorted(_VALID_FIELD_POLICY_MODES)}"
+                            )
 
     # folder_mapping section
     folder_mapping = profile.get("folder_mapping")
