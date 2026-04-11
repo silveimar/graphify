@@ -553,9 +553,11 @@ def test_build_wayfinder_callout_thing_links_to_parent_moc_and_atlas():
     # Use resolve_filename to derive expected filename (locked behavior: .capitalize())
     parent_fname = resolve_filename(parent_label, "title_case")
     expected = (
+        "<!-- graphify:wayfinder:start -->\n"
         "> [!note] Wayfinder\n"
         f"> Up: [[{parent_fname}|{parent_label}]]\n"
-        "> Map: [[Atlas|Atlas]]"
+        "> Map: [[Atlas|Atlas]]\n"
+        "<!-- graphify:wayfinder:end -->"
     )
     assert result == expected
 
@@ -599,7 +601,9 @@ def test_build_connections_callout_lists_outgoing_edges():
 
     G = make_min_graph()
     result = _build_connections_callout(G, "n_transformer", "title_case")
-    assert result.startswith("> [!info] Connections")
+    assert result.startswith("<!-- graphify:connections:start -->\n")
+    assert result.endswith("\n<!-- graphify:connections:end -->")
+    assert "> [!info] Connections" in result
     assert "> - [[Attention_Mechanism|Attention Mechanism]] — contains [EXTRACTED]" in result
     assert "> - [[Attention_Is_All_You_Need|Attention Is All You Need]] — references [INFERRED]" in result
 
@@ -1177,7 +1181,12 @@ def test_build_sub_communities_callout_renders_nested_bullets():
         {"label": "Tiny Cluster", "members": [{"id": "n1", "label": "Node A"}, {"id": "n2", "label": "Node B"}]}
     ]
     result = _build_sub_communities_callout(sub_communities, "title_case")
-    assert result == "> [!abstract] Sub-communities\n> - **Tiny Cluster:** [[Node_A|Node A]], [[Node_B|Node B]]"
+    assert result == (
+        "<!-- graphify:sub_communities:start -->\n"
+        "> [!abstract] Sub-communities\n"
+        "> - **Tiny Cluster:** [[Node_A|Node A]], [[Node_B|Node B]]\n"
+        "<!-- graphify:sub_communities:end -->"
+    )
 
 
 def test_build_sub_communities_callout_multiple_sub_communities():
@@ -1226,8 +1235,10 @@ def test_build_dataview_block_substitutes_community_tag():
         }
     }
     result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/")
-    assert result.startswith("```dataview\n")
-    assert result.endswith("\n```")
+    assert result.startswith("<!-- graphify:dataview:start -->\n")
+    assert result.endswith("\n<!-- graphify:dataview:end -->")
+    assert "```dataview\n" in result
+    assert "\n```" in result
     assert "FROM #community/ml-architecture" in result
     assert "SORT file.name ASC" in result
 
@@ -1253,7 +1264,7 @@ def test_build_dataview_block_two_phase_isolation():
     # safe_substitute must leave ${label} unchanged (not in {community_tag, folder})
     assert "${label}" in result
     assert "#community/foo" in result
-    assert result.startswith("```dataview")
+    assert result.startswith("<!-- graphify:dataview:start -->\n```dataview")
 
 
 def test_build_dataview_block_missing_moc_query_uses_default():
@@ -1262,8 +1273,9 @@ def test_build_dataview_block_missing_moc_query_uses_default():
     # profile has obsidian: {} (no dataview key)
     profile = {"obsidian": {}}
     result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/")
-    # Fallback must produce a non-empty dataview block
-    assert result.startswith("```dataview")
+    # Fallback must produce a non-empty dataview block wrapped in sentinels
+    assert result.startswith("<!-- graphify:dataview:start -->\n```dataview")
+    assert result.endswith("\n<!-- graphify:dataview:end -->")
     assert len(result) > 20
 
 
@@ -1312,8 +1324,13 @@ def test_build_dataview_block_fence_not_broken_by_triple_backtick_in_query():
         }
     }
     result = _build_dataview_block(profile, "my-tag", "Atlas/")
+    # Strip sentinel wrap, then check inner fence lines
+    inner = result
+    assert inner.startswith("<!-- graphify:dataview:start -->\n")
+    assert inner.endswith("\n<!-- graphify:dataview:end -->")
+    inner = inner[len("<!-- graphify:dataview:start -->\n"):-len("\n<!-- graphify:dataview:end -->")]
     # Only the outer fence markers should contain ```, not the inner query
-    parts = result.split("\n")
+    parts = inner.split("\n")
     inner_lines = parts[1:-1]  # skip first (```dataview) and last (```)
     for line in inner_lines:
         assert "```" not in line
@@ -1690,7 +1707,9 @@ def test_build_sub_communities_callout_renders_abstract_callout():
         {"label": "Tiny Cluster", "members": [{"id": "n1", "label": "Node A"}, {"id": "n2", "label": "Node B"}]}
     ]
     result = _build_sub_communities_callout(sub_communities, "title_case")
-    assert result.startswith("> [!abstract] Sub-communities")
+    assert result.startswith("<!-- graphify:sub_communities:start -->\n")
+    assert "> [!abstract] Sub-communities" in result
+    assert result.endswith("\n<!-- graphify:sub_communities:end -->")
 
 
 def test_render_moc_includes_sub_communities_when_present():

@@ -50,6 +50,33 @@ _NOTE_TYPES: frozenset[str] = frozenset({
 })
 
 # ---------------------------------------------------------------------------
+# Sentinel grammar (D-67) — body-signal half of the dual fingerprint (D-62)
+# ---------------------------------------------------------------------------
+# Any change to these literals MUST be mirrored in merge.py's sentinel parser:
+# these strings are the source of truth for the body-signal half of the dual
+# fingerprint (D-62). Plan 03/04 of Phase 4 parse them to detect graphify-owned
+# body regions, refresh them on update (D-67), and respect their deletion
+# (D-68). Empty sections never emit stray markers — the empty-string contract
+# (D-18) is preserved by _wrap_sentinel's short-circuit on empty content.
+
+_SENTINEL_START_FMT: str = "<!-- graphify:{name}:start -->"
+_SENTINEL_END_FMT: str = "<!-- graphify:{name}:end -->"
+
+
+def _wrap_sentinel(name: str, content: str) -> str:
+    """Wrap a non-empty section in paired HTML-comment sentinel markers.
+
+    Returns the original (empty) string when *content* is empty — empty
+    sections never emit stray markers per the empty-string contract (D-18)
+    and the D-68 deleted-block-respect rule.
+    """
+    if not content:
+        return ""
+    start = _SENTINEL_START_FMT.format(name=name)
+    end = _SENTINEL_END_FMT.format(name=name)
+    return f"{start}\n{content}\n{end}"
+
+# ---------------------------------------------------------------------------
 # Classification context shape (D-42) — Phase 3 populates, Phase 2 consumes
 # ---------------------------------------------------------------------------
 
@@ -345,11 +372,12 @@ def _build_wayfinder_callout(
         up_link = _emit_wikilink(parent_moc_label, convention)
     else:
         up_link = atlas_link  # fallback: orphan → link directly to Atlas
-    return (
+    body = (
         "> [!note] Wayfinder\n"
         f"> Up: {up_link}\n"
         f"> Map: {atlas_link}"
     )
+    return _wrap_sentinel("wayfinder", body)
 
 
 # ---------------------------------------------------------------------------
@@ -379,7 +407,8 @@ def _build_connections_callout(G, node_id: str, convention: str) -> str:
         lines.append(f"> - {link} — {relation} [{confidence}]")
     if not lines:
         return ""
-    return "> [!info] Connections\n" + "\n".join(lines)
+    body = "> [!info] Connections\n" + "\n".join(lines)
+    return _wrap_sentinel("connections", body)
 
 
 # ---------------------------------------------------------------------------
@@ -402,7 +431,8 @@ def _build_metadata_callout(
         lines.append(f"> community: {community}")
     if len(lines) == 1:
         return ""
-    return "\n".join(lines)
+    body = "\n".join(lines)
+    return _wrap_sentinel("metadata", body)
 
 
 # ---------------------------------------------------------------------------
@@ -448,7 +478,8 @@ def _build_members_section(members_by_type: dict, convention: str) -> str:
         if len(lines) == 1:
             continue
         blocks.append("\n".join(lines))
-    return "\n\n".join(blocks)
+    body = "\n\n".join(blocks)
+    return _wrap_sentinel("members", body)
 
 
 # ---------------------------------------------------------------------------
@@ -474,7 +505,8 @@ def _build_sub_communities_callout(sub_communities: list, convention: str) -> st
             if isinstance(m, dict) and m.get("label")
         )
         lines.append(f"> - **{sub_label}:** {member_links}")
-    return "\n".join(lines)
+    body = "\n".join(lines)
+    return _wrap_sentinel("sub_communities", body)
 
 
 # ---------------------------------------------------------------------------
@@ -526,7 +558,8 @@ def _build_dataview_block(profile: dict, community_tag: str, folder: str) -> str
     # close the dataview fence in the rendered markdown.
     query = query.replace("```", "")
 
-    return f"```dataview\n{query}\n```"
+    body = f"```dataview\n{query}\n```"
+    return _wrap_sentinel("dataview", body)
 
 
 # ---------------------------------------------------------------------------
