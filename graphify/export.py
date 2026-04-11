@@ -445,257 +445,121 @@ def to_obsidian(
     G: nx.Graph,
     communities: dict[int, list[str]],
     output_dir: str,
+    *,
+    profile: dict | None = None,
     community_labels: dict[int, str] | None = None,
     cohesion: dict[int, float] | None = None,
-) -> int:
-    """Export graph as an Obsidian vault - one .md file per node with [[wikilinks]],
-    plus one _COMMUNITY_name.md overview note per community (sorted to top by underscore prefix).
+    dry_run: bool = False,
+) -> "MergeResult | MergePlan":
+    """Export graph as an Obsidian vault using the profile-driven pipeline.
 
-    Open the output directory as a vault in Obsidian to get an interactive
-    graph view with community colors and full-text search over node metadata.
+    Runs: load_profile → classify → render_all → compute_merge_plan → apply_merge_plan.
+    When `profile` is None, discovers `.graphify/profile.yaml` inside `output_dir`
+    or falls back to `_DEFAULT_PROFILE` (Ideaverse ACE-shaped Atlas layout).
+    When `dry_run=True`, returns a MergePlan without writing any files.
+    Otherwise returns a MergeResult recording per-path write outcomes.
 
-    Returns the number of node notes + community notes written.
+    `community_labels` feeds per-community display names into the classification
+    pipeline via profile-independent merge into classify()'s per_community ctx.
+    `cohesion` is passed through to classify() for per-community cohesion scores.
     """
+    # Function-local imports so `graphify install` (which touches export.py through
+    # __init__.py's lazy map) doesn't force heavy deps at CLI entry time.
+    from graphify.profile import load_profile
+    from graphify.mapping import classify
+    from graphify.templates import render_note, render_moc
+    from graphify.merge import (
+        compute_merge_plan,
+        apply_merge_plan,
+        RenderedNote,
+        split_rendered_note,
+    )
+
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    node_community = _node_community_map(communities)
+    # D-74: always run the new pipeline. No `if profile is None` branching.
+    if profile is None:
+        profile = load_profile(out)
 
-    # Map node_id → safe filename so wikilinks stay consistent.
-    # Deduplicate: if two nodes produce the same filename, append a numeric suffix.
-    def safe_name(label: str) -> str:
-        return re.sub(r'[\\/*?:"<>|#^[\]]', "", label.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")).strip() or "unnamed"
+    mapping_result = classify(G, communities, profile, cohesion=cohesion)
+    per_node = mapping_result.get("per_node", {}) or {}
+    per_community = mapping_result.get("per_community", {}) or {}
+    skipped = mapping_result.get("skipped_node_ids", set()) or set()
 
-    node_filename: dict[str, str] = {}
-    seen_names: dict[str, int] = {}
-    for node_id, data in sorted(
-        G.nodes(data=True),
-        key=lambda nd: (nd[1].get("source_file", ""), nd[1].get("label", nd[0]))
-    ):
-        base = safe_filename(data.get("label", node_id))
-        if base in seen_names:
-            seen_names[base] += 1
-            node_filename[node_id] = f"{base}_{seen_names[base]}"
-        else:
-            seen_names[base] = 0
-            node_filename[node_id] = base
+    # community_labels flows through per_community context — when caller
+    # passes display labels, inject them as community_name override into
+    # the matching ClassificationContext so render_moc picks them up.
+    if community_labels:
+        for cid, label in community_labels.items():
+            if cid in per_community:
+                ctx = dict(per_community[cid])
+                ctx.setdefault("community_name", label)
+                per_community[cid] = ctx
 
-    # Helper: compute dominant confidence for a node across all its edges
-    def _dominant_confidence(node_id: str) -> str:
-        confs = []
-        for u, v, edata in G.edges(node_id, data=True):
-            confs.append(edata.get("confidence", "EXTRACTED"))
-        if not confs:
-            return "EXTRACTED"
-        return Counter(confs).most_common(1)[0][0]
+    rendered_notes: dict[str, RenderedNote] = {}
 
-    # Map file_type → graphify tag
-    _FTYPE_TAG = {
-        "code": "graphify/code",
-        "document": "graphify/document",
-        "paper": "graphify/paper",
-        "image": "graphify/image",
-    }
-
-    # Write one .md file per node
-    for node_id, data in G.nodes(data=True):
-        label = data.get("label", node_id)
-        cid = node_community.get(node_id)
-        community_name = (
-            community_labels.get(cid, f"Community {cid}")
-            if community_labels and cid is not None
-            else f"Community {cid}"
-        )
-
-        # Build tags for this node
-        ftype = data.get("file_type", "")
-        ftype_tag = _FTYPE_TAG.get(ftype, f"graphify/{ftype}" if ftype else "graphify/document")
-        dom_conf = _dominant_confidence(node_id)
-        conf_tag = f"graphify/{dom_conf}"
-        comm_tag = f"community/{safe_tag(community_name)}"
-        node_tags = [ftype_tag, conf_tag, comm_tag]
-
-        lines: list[str] = []
-
-        # YAML frontmatter - readable in Obsidian's properties panel
-        lines += [
-            "---",
-            f'source_file: {safe_frontmatter_value(data.get("source_file", ""))}',
-            f'type: {safe_frontmatter_value(ftype)}',
-            f'community: {safe_frontmatter_value(community_name)}',
-        ]
-        if data.get("source_location"):
-            lines.append(f'location: {safe_frontmatter_value(data["source_location"])}')
-        # Add tags list to frontmatter
-        lines.append("tags:")
-        for tag in node_tags:
-            lines.append(f"  - {tag}")
-        lines += ["---", "", f"# {label}", ""]
-
-        # Outgoing edges as wikilinks
-        neighbors = list(G.neighbors(node_id))
-        if neighbors:
-            lines.append("## Connections")
-            for neighbor in sorted(neighbors, key=lambda n: G.nodes[n].get("label", n)):
-                edge_data = G.edges[node_id, neighbor]
-                neighbor_label = node_filename[neighbor]
-                relation = edge_data.get("relation", "")
-                confidence = edge_data.get("confidence", "EXTRACTED")
-                lines.append(f"- [[{neighbor_label}]] - `{relation}` [{confidence}]")
-            lines.append("")
-
-        # Inline tags at bottom of note body (for Obsidian tag panel)
-        inline_tags = " ".join(f"#{t}" for t in node_tags)
-        lines.append(inline_tags)
-
-        fname = node_filename[node_id] + ".md"
-        (out / fname).write_text("\n".join(lines), encoding="utf-8")
-
-    # Write one _COMMUNITY_name.md overview note per community
-    # Build inter-community edge counts for "Connections to other communities"
-    inter_community_edges: dict[int, dict[int, int]] = {}
-    for cid in communities:
-        inter_community_edges[cid] = {}
-    for u, v in G.edges():
-        cu = node_community.get(u)
-        cv = node_community.get(v)
-        if cu is not None and cv is not None and cu != cv:
-            inter_community_edges.setdefault(cu, {})
-            inter_community_edges.setdefault(cv, {})
-            inter_community_edges[cu][cv] = inter_community_edges[cu].get(cv, 0) + 1
-            inter_community_edges[cv][cu] = inter_community_edges[cv].get(cu, 0) + 1
-
-    # Precompute per-node community reach (number of distinct communities a node connects to)
-    def _community_reach(node_id: str) -> int:
-        neighbor_cids = {
-            node_community[nb]
-            for nb in G.neighbors(node_id)
-            if nb in node_community and node_community[nb] != node_community.get(node_id)
-        }
-        return len(neighbor_cids)
-
-    community_notes_written = 0
-    for cid, members in communities.items():
-        community_name = (
-            community_labels.get(cid, f"Community {cid}")
-            if community_labels and cid is not None
-            else f"Community {cid}"
-        )
-        n_members = len(members)
-        coh_value = cohesion.get(cid) if cohesion else None
-
-        lines: list[str] = []
-
-        # YAML frontmatter
-        lines.append("---")
-        lines.append("type: community")
-        if coh_value is not None:
-            lines.append(f"cohesion: {coh_value:.2f}")
-        lines.append(f"members: {n_members}")
-        lines.append("---")
-        lines.append("")
-        lines.append(f"# {community_name}")
-        lines.append("")
-
-        # Cohesion + member count summary
-        if coh_value is not None:
-            cohesion_desc = (
-                "tightly connected" if coh_value >= 0.7
-                else "moderately connected" if coh_value >= 0.4
-                else "loosely connected"
-            )
-            lines.append(f"**Cohesion:** {coh_value:.2f} - {cohesion_desc}")
-        lines.append(f"**Members:** {n_members} nodes")
-        lines.append("")
-
-        # Members section
-        lines.append("## Members")
-        for node_id in sorted(members, key=lambda n: G.nodes[n].get("label", n)):
-            data = G.nodes[node_id]
-            node_label = node_filename[node_id]
-            ftype = data.get("file_type", "")
-            source = data.get("source_file", "")
-            entry = f"- [[{node_label}]]"
-            if ftype:
-                entry += f" - {ftype}"
-            if source:
-                entry += f" - {source}"
-            lines.append(entry)
-        lines.append("")
-
-        # Dataview live query (improvement 2)
-        comm_tag_name = safe_tag(community_name)
-        lines.append("## Live Query (requires Dataview plugin)")
-        lines.append("")
-        lines.append("```dataview")
-        lines.append(f"TABLE source_file, type FROM #community/{comm_tag_name}")
-        lines.append("SORT file.name ASC")
-        lines.append("```")
-        lines.append("")
-
-        # Connections to other communities
-        cross = inter_community_edges.get(cid, {})
-        if cross:
-            lines.append("## Connections to other communities")
-            for other_cid, edge_count in sorted(cross.items(), key=lambda x: -x[1]):
-                other_name = (
-                    community_labels.get(other_cid, f"Community {other_cid}")
-                    if community_labels and other_cid is not None
-                    else f"Community {other_cid}"
-                )
-                other_safe = safe_filename(other_name)
-                lines.append(f"- {edge_count} edge{'s' if edge_count != 1 else ''} to [[_COMMUNITY_{other_safe}]]")
-            lines.append("")
-
-        # Top bridge nodes - highest degree nodes that connect to other communities
-        bridge_nodes = [
-            (node_id, G.degree(node_id), _community_reach(node_id))
-            for node_id in members
-            if _community_reach(node_id) > 0
-        ]
-        bridge_nodes.sort(key=lambda x: (-x[2], -x[1]))
-        top_bridges = bridge_nodes[:5]
-        if top_bridges:
-            lines.append("## Top bridge nodes")
-            for node_id, degree, reach in top_bridges:
-                node_label = node_filename[node_id]
-                lines.append(
-                    f"- [[{node_label}]] - degree {degree}, connects to {reach} "
-                    f"{'community' if reach == 1 else 'communities'}"
-                )
-
-        community_safe = safe_filename(community_name)
-        fname = f"_COMMUNITY_{community_safe}.md"
-        (out / fname).write_text("\n".join(lines), encoding="utf-8")
-        community_notes_written += 1
-
-    # Write .obsidian/graph.json — read-merge-write to preserve user settings (OBS-02)
-    obsidian_dir = out / ".obsidian"
-    obsidian_dir.mkdir(exist_ok=True)
-    graph_json_path = obsidian_dir / "graph.json"
-    existing_config: dict = {}
-    if graph_json_path.exists():
+    # ---- Per-node notes (thing / statement / person / source) ----
+    for node_id, ctx in per_node.items():
+        if node_id in skipped:
+            continue
+        note_type = ctx.get("note_type", "statement")
+        if note_type in ("moc", "community"):
+            # MOC-shaped classification belongs in per_community, not per_node —
+            # defensive skip to avoid double-rendering.
+            continue
         try:
-            existing_config = json.loads(graph_json_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            pass  # corrupt or unreadable — overwrite cleanly
+            filename, rendered_text = render_note(
+                node_id, G, profile, note_type, ctx, vault_dir=out,
+            )
+        except ValueError:
+            # render_note raises on unknown note_type or missing node —
+            # skip (matches Phase 1/3 "validate, report, don't crash" ethos).
+            continue
+        folder = ctx.get("folder") or profile.get("folder_mapping", {}).get("default", "Atlas/Dots/")
+        target_path = out / folder / filename
+        # Plan 01 public helper — stable contract for frontmatter splitting.
+        # No private merge.py internal helpers imported across the module boundary.
+        fm_fields, body = split_rendered_note(rendered_text)
+        rendered_notes[node_id] = RenderedNote(
+            node_id=node_id,
+            target_path=target_path,
+            frontmatter_fields=fm_fields,
+            body=body,
+        )
 
-    # Filter out graphify-owned community entries, keep user entries
-    user_color_groups = [
-        g for g in existing_config.get("colorGroups", [])
-        if not g.get("query", "").startswith("tag:community/")
-    ]
-    new_color_groups = [
-        {
-            "query": f"tag:community/{safe_tag(label)}",  # OBS-01: correct syntax
-            "color": {"a": 1, "rgb": int(COMMUNITY_COLORS[cid % len(COMMUNITY_COLORS)].lstrip('#'), 16)},
-        }
-        for cid, label in sorted((community_labels or {}).items())
-    ]
-    existing_config["colorGroups"] = user_color_groups + new_color_groups
-    graph_json_path.write_text(json.dumps(existing_config, indent=2), encoding="utf-8")
+    # ---- Per-community MOC notes ----
+    for cid, ctx in per_community.items():
+        note_type = ctx.get("note_type", "moc")
+        render_fn = render_moc if note_type == "moc" else None
+        if render_fn is None:
+            # community-overview shape: Phase 2's render_community_overview
+            from graphify.templates import render_community_overview
+            render_fn = render_community_overview
+        try:
+            filename, rendered_text = render_fn(
+                cid, G, communities, profile, ctx, vault_dir=out,
+            )
+        except ValueError:
+            continue
+        folder = ctx.get("folder") or profile.get("folder_mapping", {}).get("moc", "Atlas/Maps/")
+        target_path = out / folder / filename
+        fm_fields, body = split_rendered_note(rendered_text)
+        synthetic_id = f"_moc_{cid}"
+        rendered_notes[synthetic_id] = RenderedNote(
+            node_id=synthetic_id,
+            target_path=target_path,
+            frontmatter_fields=fm_fields,
+            body=body,
+        )
 
-    return G.number_of_nodes() + community_notes_written
+    plan = compute_merge_plan(
+        out, rendered_notes, profile,
+        skipped_node_ids=skipped,
+    )
+    if dry_run:
+        return plan
+    return apply_merge_plan(plan, out, rendered_notes, profile)
 
 
 def to_canvas(
