@@ -1,4 +1,14 @@
-"""Template engine: pure rendering functions for Obsidian notes."""
+"""Template engine: pure rendering functions for Obsidian notes.
+
+Optional-dependency note (IN-10): this module is **pure stdlib** — it does
+not import PyYAML, networkx, or any other third-party package. Profile
+loading (`graphify.profile`) is the only consumer of PyYAML, and it does so
+via a guarded `try: import yaml` so installs without the `[obsidian]` extras
+group still work against the built-in default profile. The `obsidian`
+extras group in `pyproject.toml` declares PyYAML for `profile.yaml` parsing
+only — installing graphify without that group still gives you a fully
+functional template engine running against `_DEFAULT_PROFILE`.
+"""
 from __future__ import annotations
 
 import datetime

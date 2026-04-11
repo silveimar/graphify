@@ -59,3 +59,61 @@ def test_package_data_includes_builtin_templates():
         "pyproject.toml package-data for graphify is missing 'skill.md'. "
         "This entry must not be removed — it is required for graphify install to work."
     )
+
+
+def test_templates_module_is_pure_stdlib():
+    """IN-10: graphify/templates.py must not import any third-party package.
+
+    The template engine is pure stdlib so that it works without the optional
+    `[obsidian]` extras group (which only carries PyYAML for profile.yaml
+    parsing). If you find yourself wanting to add a new top-level import to
+    templates.py, it must come from the stdlib. New optional deps must live
+    behind a guarded `try: import` in profile.py or another adapter module.
+    """
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    source = (root / "graphify" / "templates.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    # stdlib whitelist for templates.py — extend deliberately, not casually.
+    allowed_stdlib_roots = {
+        "__future__",
+        "datetime",
+        "importlib",
+        "re",
+        "string",
+        "sys",
+        "pathlib",
+        "typing",
+    }
+    # graphify.profile is fine — it's the only intra-package dep we accept here.
+    allowed_internal_prefixes = ("graphify",)
+
+    offending: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                root_pkg = alias.name.split(".")[0]
+                if (
+                    root_pkg not in allowed_stdlib_roots
+                    and not alias.name.startswith(allowed_internal_prefixes)
+                ):
+                    offending.append(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module is None:
+                continue
+            root_pkg = node.module.split(".")[0]
+            if (
+                root_pkg not in allowed_stdlib_roots
+                and not node.module.startswith(allowed_internal_prefixes)
+            ):
+                offending.append(node.module)
+
+    assert offending == [], (
+        f"graphify/templates.py imports non-stdlib packages: {offending}. "
+        "The template engine must remain pure stdlib so it works without "
+        "the [obsidian] extras group. See the IN-10 docstring at the top "
+        "of templates.py for the policy."
+    )
