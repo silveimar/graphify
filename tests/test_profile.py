@@ -586,3 +586,72 @@ def test_deep_merge_preserves_new_defaults():
     # Sibling key must survive partial override
     assert "moc_query" in merged["obsidian"]["dataview"]
     assert "${community_tag}" in merged["obsidian"]["dataview"]["moc_query"]
+
+
+# ---------------------------------------------------------------------------
+# Plan 03: _DEFAULT_PROFILE extensions (topology + mapping) and
+# validate_profile delegation to graphify.mapping.validate_rules
+# ---------------------------------------------------------------------------
+
+
+def test_default_profile_includes_topology_and_mapping_keys():
+    from graphify.profile import _DEFAULT_PROFILE
+    assert _DEFAULT_PROFILE["topology"]["god_node"]["top_n"] == 10
+    assert _DEFAULT_PROFILE["mapping"]["moc_threshold"] == 3
+
+
+def test_default_profile_top_n_and_threshold_are_not_bool():
+    from graphify.profile import _DEFAULT_PROFILE
+    top_n = _DEFAULT_PROFILE["topology"]["god_node"]["top_n"]
+    threshold = _DEFAULT_PROFILE["mapping"]["moc_threshold"]
+    assert isinstance(top_n, int) and not isinstance(top_n, bool)
+    assert isinstance(threshold, int) and not isinstance(threshold, bool)
+
+
+def test_deep_merge_respects_topology_section():
+    # VALIDATION row 3-04-04
+    from graphify.profile import _DEFAULT_PROFILE, _deep_merge
+    override = {"topology": {"god_node": {"top_n": 25}}}
+    merged = _deep_merge(_DEFAULT_PROFILE, override)
+    assert merged["topology"]["god_node"]["top_n"] == 25
+    # Unrelated defaults preserved
+    assert merged["mapping"]["moc_threshold"] == 3
+    assert merged["folder_mapping"]["moc"] == "Atlas/Maps/"
+
+
+def test_default_profile_rejects_bool_as_int_threshold():
+    # VALIDATION row 3-03-07
+    from graphify.profile import validate_profile
+    errors = validate_profile({"mapping": {"moc_threshold": True}})
+    assert any("mapping.moc_threshold" in e for e in errors)
+
+
+def test_validate_profile_rejects_bool_top_n():
+    from graphify.profile import validate_profile
+    errors = validate_profile({"topology": {"god_node": {"top_n": False}}})
+    assert any("topology.god_node.top_n" in e for e in errors)
+
+
+def test_validate_profile_rejects_negative_top_n():
+    from graphify.profile import validate_profile
+    errors = validate_profile({"topology": {"god_node": {"top_n": -1}}})
+    assert any("top_n must be ≥ 0" in e for e in errors)
+
+
+def test_validate_profile_surfaces_mapping_rules_errors():
+    # VALIDATION row 3-04-03
+    from graphify.profile import validate_profile
+    profile = {
+        "mapping_rules": [
+            {"when": {"attr": "label", "equals": "X"}, "then": {"note_type": "BOGUS"}},
+            {"when": {"topology": "god_node"}, "then": {"note_type": "thing", "folder": "../escape"}},
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("mapping_rules[0].then.note_type" in e for e in errors)
+    assert any("mapping_rules[1].then.folder" in e and ".." in e for e in errors)
+
+
+def test_validate_profile_accepts_default_profile_unchanged():
+    from graphify.profile import validate_profile, _DEFAULT_PROFILE
+    assert validate_profile(_DEFAULT_PROFILE) == []
