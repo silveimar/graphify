@@ -358,9 +358,19 @@ def classify(
             sibling_labels=[],
         )
 
+    per_community = _assemble_communities(
+        G,
+        communities,
+        per_node,
+        skipped,
+        profile,
+        cohesion,
+        ctx.god_node_ids,
+    )
+
     return MappingResult(
         per_node=per_node,
-        per_community={},  # Plan 02 populates
+        per_community=per_community,
         skipped_node_ids=skipped,
         rule_traces=traces,
     )
@@ -478,6 +488,199 @@ def _nearest_host(
             best_size = size
             best_cid = host_cid
     return best_cid
+
+
+def _assemble_communities(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    per_node: dict[str, ClassificationContext],
+    skipped_node_ids: set[str],
+    profile: dict,
+    cohesion: dict[int, float],
+    god_node_ids: frozenset[str],
+) -> dict[int, ClassificationContext]:
+    """D-52..D-60: derive per-community ClassificationContext entries.
+
+    Builds a per_community dict keyed by community id, and mutates every
+    per_node entry to fill community_tag / parent_moc_label /
+    community_name / sibling_labels.
+
+    Logic:
+      1. Communities with ``len(members) >= moc_threshold`` become MOC
+         entries (note_type="moc").
+      2. Below-threshold communities are routed to the nearest host via
+         ``_nearest_host`` (D-53 arg-max by inter-community edge count).
+      3. Below-threshold communities with no host edges collapse into a
+         synthetic ``per_community[-1]`` Uncategorized bucket MOC (D-56).
+      4. Non-MOC per_node entries receive their host MOC's
+         community_name / tag / parent_moc_label. ``sibling_labels`` is
+         populated only for god nodes (D-60 BLOCKER fidelity fix) and is
+         ``[]`` for every other node.
+    """
+    from graphify.profile import safe_tag
+
+    folder_mapping = profile.get("folder_mapping") or {}
+    moc_folder = folder_mapping.get("moc") or folder_mapping.get(
+        "default", "Atlas/Maps/"
+    )
+
+    # Defensive threshold parse — belt-and-suspenders with Plan 03's
+    # validate_rules. Explicitly reject bool (bool is a subclass of int).
+    raw_threshold = profile.get("mapping", {}).get("moc_threshold", 3)
+    if isinstance(raw_threshold, bool) or not isinstance(raw_threshold, int):
+        threshold = 3
+    else:
+        threshold = raw_threshold
+
+    node_to_community = _node_community_map(communities)
+    community_sizes = {cid: len(members) for cid, members in communities.items()}
+
+    above_cids = sorted(
+        cid for cid, members in communities.items() if len(members) >= threshold
+    )
+    below_cids = sorted(
+        cid for cid, members in communities.items() if len(members) < threshold
+    )
+
+    labels: dict[int, str] = {
+        cid: _derive_community_label(G, communities[cid], cid)
+        for cid in communities
+    }
+
+    inter_edges = _inter_community_edges(G, node_to_community)
+
+    per_community: dict[int, ClassificationContext] = {}
+
+    # --- Above-threshold: one MOC per community -----------------------------
+    for cid in above_cids:
+        name = labels[cid]
+        tag = safe_tag(name)
+        per_community[cid] = ClassificationContext(
+            note_type="moc",
+            folder=moc_folder,
+            community_name=name,
+            parent_moc_label=name,  # MOC is its own anchor for Phase 2 fallback
+            community_tag=tag,
+            members_by_type={"thing": [], "statement": [], "person": [], "source": []},
+            sub_communities=[],
+            sibling_labels=[],
+            # W-2 fix: populate cohesion so templates.py:705-706 renders a
+            # real value. Wrap with float() per WR-06 to coerce numpy scalars.
+            cohesion=float(cohesion.get(cid, 0.0)) if cohesion else 0.0,
+        )
+
+    # Sibling labels across MOCs: top 5 other MOC names by community size desc.
+    size_sorted_above = sorted(above_cids, key=lambda c: (-community_sizes[c], c))
+    for cid in above_cids:
+        siblings = [labels[other] for other in size_sorted_above if other != cid][:5]
+        per_community[cid]["sibling_labels"] = siblings
+
+    # --- Below-threshold: resolve hosts or route to bucket ------------------
+    hostless_below: list[int] = []
+    below_to_host: dict[int, int] = {}
+    for below_cid in below_cids:
+        host = _nearest_host(below_cid, above_cids, inter_edges, community_sizes)
+        if host is None:
+            hostless_below.append(below_cid)
+        else:
+            below_to_host[below_cid] = host
+
+    # --- Synthesize bucket MOC only when needed (D-56) ----------------------
+    bucket_needed = bool(hostless_below) or (not above_cids and bool(below_cids))
+    if bucket_needed:
+        per_community[-1] = ClassificationContext(
+            note_type="moc",
+            folder=moc_folder,
+            community_name="Uncategorized",
+            parent_moc_label="Uncategorized",
+            community_tag="uncategorized",
+            members_by_type={"thing": [], "statement": [], "person": [], "source": []},
+            sub_communities=[],
+            sibling_labels=[],
+            # Bucket MOC has no real community to score — 0.0 sentinel.
+            cohesion=0.0,
+        )
+        if not above_cids:
+            # Tiny-corpus edge case: ALL communities are below threshold.
+            for cid in below_cids:
+                below_to_host[cid] = -1
+        else:
+            for cid in hostless_below:
+                below_to_host[cid] = -1
+
+    # --- Fill sub_communities for host MOCs ---------------------------------
+    # Iterate below_to_host in ascending below_cid order so sub_communities
+    # is emitted deterministically (RESEARCH Q5 RESOLVED).
+    for below_cid in sorted(below_to_host):
+        host_cid = below_to_host[below_cid]
+        sub_label = labels[below_cid]
+        member_dicts: list[dict] = []
+        for m in communities[below_cid]:
+            if m in skipped_node_ids:
+                continue
+            ctx_m = per_node.get(m)
+            if ctx_m is None:
+                continue
+            member_dicts.append(
+                {
+                    "label": G.nodes[m].get("label", m),
+                    "note_type": ctx_m.get("note_type", "statement"),
+                }
+            )
+        if member_dicts:
+            per_community[host_cid]["sub_communities"].append(
+                {
+                    "label": sub_label,
+                    "members": member_dicts,
+                    # Internal key used only for deterministic ordering.
+                    # ClassificationContext TypedDict is total=False so Phase 2
+                    # consumers reading via .get() ignore unknown keys.
+                    "_source_cid": below_cid,
+                }
+            )
+
+    # --- members_by_type for MOCs (above-threshold only; below members
+    #     live in sub_communities) ------------------------------------------
+    for cid in above_cids:
+        for m in communities[cid]:
+            if m in skipped_node_ids:
+                continue
+            ctx_m = per_node.get(m)
+            if ctx_m is None:
+                continue
+            nt = ctx_m.get("note_type", "statement")
+            if nt == "moc":
+                continue
+            group = per_community[cid]["members_by_type"].setdefault(nt, [])
+            group.append({"label": G.nodes[m].get("label", m)})
+
+    # --- Enrich per_node entries with community fields ---------------------
+    for node_id, ctx_entry in per_node.items():
+        cid = node_to_community.get(node_id)
+        if cid is None:
+            continue
+        if cid in above_cids:
+            host_cid: int | None = cid
+        else:
+            host_cid = below_to_host.get(cid)
+        if host_cid is None or host_cid not in per_community:
+            continue
+        host_entry = per_community[host_cid]
+        host_name = host_entry["community_name"]
+        host_tag = host_entry["community_tag"]
+        ctx_entry["community_name"] = host_name
+        ctx_entry["parent_moc_label"] = host_name
+        ctx_entry["community_tag"] = host_tag
+        # BLOCKER 1 (D-60 fidelity): sibling_labels only for god nodes.
+        # Non-god nodes MUST receive [] — D-60 is explicit.
+        if node_id in god_node_ids:
+            ctx_entry["sibling_labels"] = _build_sibling_labels(
+                G, communities[cid], node_id, god_node_ids, cap=5,
+            )
+        else:
+            ctx_entry["sibling_labels"] = []
+
+    return per_community
 
 
 def _kind_of(when: dict) -> str:

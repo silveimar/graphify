@@ -414,3 +414,173 @@ def test_classify_zero_god_nodes_no_crash():
         assert ctx["note_type"] in {"moc", "community", "thing", "statement", "person", "source"}
     # Synthetic filter still fires.
     assert "n_hub" in result["skipped_node_ids"]
+
+
+# ---------------------------------------------------------------------------
+# Plan 02 Task 2: classify() community-assembly routing
+# ---------------------------------------------------------------------------
+
+
+def test_community_above_threshold_becomes_moc():
+    """VALIDATION row 3-01-04."""
+    from graphify.mapping import classify
+
+    G, communities = make_classification_fixture()
+    result = classify(G, communities, _profile())
+    assert 0 in result["per_community"]
+    assert result["per_community"][0]["note_type"] == "moc"
+    assert result["per_community"][0]["folder"] == "Atlas/Maps/"
+    assert result["per_community"][0]["community_name"] == "Transformer"
+
+
+def test_default_profile_moc_threshold_is_3():
+    """VALIDATION row 3-01-09.
+
+    Plan 02 tests exercise the behavior with an explicit ``moc_threshold: 3``
+    in ``_profile()``; Plan 03 lands the literal ``_DEFAULT_PROFILE`` default.
+    """
+    from graphify.mapping import classify
+
+    G, communities = make_classification_fixture()
+    result = classify(G, communities, _profile())
+    # cid 0 has 6 members (≥3) → MOC
+    # cid 1 has 2 members (<3) → collapsed into host
+    # cid 2 has 1 member  (<3) → hostless → bucket MOC (-1)
+    assert 0 in result["per_community"]
+    assert 1 not in result["per_community"]
+    assert 2 not in result["per_community"]
+
+
+def test_community_below_threshold_collapses_to_host():
+    """VALIDATION row 3-01-10."""
+    from graphify.mapping import classify
+
+    G, communities = make_classification_fixture()
+    result = classify(G, communities, _profile())
+    # cid 1 should collapse into cid 0 via the n_transformer—n_auth edge.
+    subs = result["per_community"][0]["sub_communities"]
+    labels_in_subs = {s["label"] for s in subs}
+    assert "AuthService" in labels_in_subs
+    # n_auth's per_node ctx points parent_moc_label at "Transformer"
+    assert result["per_node"]["n_auth"]["parent_moc_label"] == "Transformer"
+
+
+def test_bucket_moc_absorbs_hostless_below_threshold():
+    """VALIDATION row 3-01-13: all-below-threshold corpus → bucket MOC."""
+    import networkx as nx
+
+    from graphify.mapping import classify
+
+    G = nx.Graph()
+    # Two below-threshold isolated communities, no inter-community edges
+    G.add_node(
+        "a",
+        label="A",
+        file_type="code",
+        source_file="a.py",
+        source_location="L1",
+    )
+    G.add_node(
+        "b",
+        label="B",
+        file_type="code",
+        source_file="b.py",
+        source_location="L1",
+    )
+    communities = {0: ["a"], 1: ["b"]}
+    result = classify(G, communities, _profile())
+    # No above-threshold communities → bucket MOC emitted
+    assert -1 in result["per_community"]
+    assert result["per_community"][-1]["community_name"] == "Uncategorized"
+    assert result["per_community"][-1]["community_tag"] == "uncategorized"
+    # Both below communities merged into bucket
+    assert len(result["per_community"][-1]["sub_communities"]) == 2
+
+
+def test_community_tag_is_safe_tag_of_name():
+    """VALIDATION row 3-02-03."""
+    from graphify.mapping import classify
+    from graphify.profile import safe_tag
+
+    G, communities = make_classification_fixture()
+    result = classify(G, communities, _profile())
+    assert result["per_community"][0]["community_tag"] == safe_tag("Transformer")
+
+
+def test_bucket_moc_not_emitted_when_all_below_resolved():
+    """Verifies the fixture's hostless isolate (cid 2) still produces a bucket.
+
+    Despite the test name (which describes the ideal alternate case), the
+    make_classification_fixture includes cid 2 = ``n_isolate`` with zero
+    neighbors, so a bucket MOC IS expected here. The assertion confirms the
+    isolate lands in the bucket, not in cid 0.
+    """
+    from graphify.mapping import classify
+
+    G, communities = make_classification_fixture()
+    result = classify(G, communities, _profile())
+    assert -1 in result["per_community"]
+    bucket_labels = {
+        member["label"]
+        for sub in result["per_community"][-1]["sub_communities"]
+        for member in sub["members"]
+    }
+    assert "Orphan" in bucket_labels
+
+
+def test_sibling_labels_empty_for_non_god_node():
+    """VALIDATION row 3-02-08 — BLOCKER 1 (D-60 fidelity).
+
+    Non-god nodes MUST receive ``sibling_labels: []``. Pins ``top_n=2`` so
+    ``n_low_degree`` is provably outside the god-node set.
+    """
+    import networkx as nx
+
+    from graphify.mapping import classify
+
+    G = nx.Graph()
+    # Three real nodes: hub, secondary, low_degree.
+    G.add_node(
+        "n_hub",
+        label="Hub",
+        file_type="code",
+        source_file="src/hub.py",
+        source_location="L1",
+    )
+    G.add_node(
+        "n_secondary",
+        label="Secondary",
+        file_type="code",
+        source_file="src/hub.py",
+        source_location="L2",
+    )
+    G.add_node(
+        "n_low_degree",
+        label="LowDegree",
+        file_type="code",
+        source_file="src/hub.py",
+        source_location="L3",
+    )
+    # Hub degree 2, Secondary degree 2, LowDegree degree 2 — the tie means
+    # god_nodes(top_n=2) deterministically picks the first two by insertion
+    # order (Hub, Secondary). LowDegree is therefore NOT a god node.
+    G.add_edge("n_hub", "n_secondary")
+    G.add_edge("n_hub", "n_low_degree")
+    G.add_edge("n_secondary", "n_low_degree")
+    communities = {0: ["n_hub", "n_secondary", "n_low_degree"]}
+
+    profile = _profile()
+    # Pin top_n=2 so n_low_degree is provably outside the god-node set.
+    profile.setdefault("topology", {}).setdefault("god_node", {})["top_n"] = 2
+
+    result = classify(G, communities, profile)
+
+    # Sanity: n_low_degree exists in per_node.
+    assert "n_low_degree" in result["per_node"]
+    # The critical assertion — non-god node receives empty sibling_labels.
+    assert result["per_node"]["n_low_degree"]["sibling_labels"] == [], (
+        "D-60: non-god nodes MUST receive empty sibling_labels, "
+        f"got {result['per_node']['n_low_degree']['sibling_labels']!r}"
+    )
+    # And a god node DOES get siblings populated (Hub is top god node).
+    assert "Secondary" in result["per_node"]["n_hub"]["sibling_labels"]
