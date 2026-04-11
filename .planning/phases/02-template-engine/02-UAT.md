@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete
 phase: 02-template-engine
 source:
   - 02-01-SUMMARY.md
@@ -32,11 +32,10 @@ result: pass
 expected: render_moc output contains ` ```dataview ` fence with `${community_tag}` and `${folder}` substituted, no residual tokens, user `${label}` preserved.
 result: pass
 
-### 5. Wikilink label injection is defused (CR-01)
-expected: Alias portion sanitizes `]]` → `] ]`, `|` → `-`, `\n` → space. Filename target portion should not break Obsidian parsing.
-result: issue
-reported: "Alias sanitization works correctly (CR-01 fix confirmed). However, the filename portion of wikilinks does NOT strip newlines/tabs/CRLF — `safe_filename('line1\\nline2')` returns `'line1\\nline2'` verbatim, producing broken wikilink targets like `[[line1\\nline2|line1 line2]]` that Obsidian cannot parse. This is a gap adjacent to CR-01 but in `graphify/profile.py:safe_filename` rather than `_sanitize_wikilink_alias`. Tab and CRLF exhibit the same issue. Discovered while programmatically verifying Test 5."
-severity: major
+### 5. Wikilink label injection is defused (CR-01 + UAT-05 follow-up)
+expected: Alias portion sanitizes `]]` → `] ]`, `|` → `-`, `\n`/`\r`/`\t`/C0 controls → space. Filename target portion strips `\n`/`\r`/`\t`/C0 controls so Obsidian's wikilink target parser never sees a literal control character.
+result: pass
+resolution: "Initial run found the alias side already safe (CR-01 iteration-1 fix) but the filename side leaked \\n/\\r/\\t via safe_filename(). Fixed inline in commit 7b5c228 by (1) extending safe_filename()'s illegal-char regex to strip \\x00-\\x1f, \\x7f, \\u0085, \\u2028, \\u2029, and (2) adding _WIKILINK_ALIAS_CONTROL_RE as a second pass in _sanitize_wikilink_alias for tab and other controls missed by the replace-dict. 11 new regression tests confirm both sides clean across all control-char classes."
 
 ### 6. YAML frontmatter quotes reserved words, numerics, leading indicators (WR-01)
 expected: Reserved words (yes/null/true), numeric strings (42, 0.1), leading-indicator chars (-, ?, !, &, *, |, >, `, @), comma-containing strings all get quoted. Control chars stripped.
@@ -69,22 +68,16 @@ result: pass
 ### 13. Full test suite passes
 expected: `pytest tests/ -q` → 647+ passed, 0 failed.
 result: pass
+note: "Post-fix baseline is 658 passed (647 before UAT + 11 new regression tests for control-char sanitization added by commit 7b5c228)."
 
 ## Summary
 
 total: 13
-passed: 12
-issues: 1
+passed: 13
+issues: 0
 pending: 0
 skipped: 0
 
 ## Gaps
 
-- truth: "Wikilink label injection is fully defused for labels containing `]]`, `|`, `\n`, `\r`, `\t` — the wikilink should parse correctly in Obsidian regardless of which part of the syntax (filename or alias) the bad character lands in."
-  status: failed
-  reason: "User reported: alias sanitization works (CR-01 fix confirmed), but the filename portion still leaks newlines/tabs/CRLF. safe_filename() in graphify/profile.py does not strip these control chars, producing broken wikilink targets like `[[line1\\nline2|line1 line2]]` that Obsidian cannot parse. This is the filename-side complement to CR-01's alias-side fix."
-  severity: major
-  test: 5
-  artifacts: []
-  missing:
-    - "Control-char stripping in graphify/profile.py::safe_filename (or a new _sanitize_wikilink_target helper in templates.py called after resolve_filename)"
+[all gaps closed — see Test 5 resolution]
