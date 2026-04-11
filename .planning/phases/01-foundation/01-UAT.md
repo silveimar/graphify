@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: complete
 phase: 01-foundation
 source: [01-01-SUMMARY.md, 01-02-SUMMARY.md]
 started: 2026-04-10T00:00:00Z
-updated: 2026-04-10T00:30:00Z
+updated: 2026-04-10T01:00:00Z
 tested_by: claude-autonomous
 ---
 
@@ -60,15 +60,16 @@ note: First run produced `graph.json` with `tag:community/core` and `tag:communi
 
 ### 10. Optional Obsidian Extras Install
 expected: `pip install -e ".[obsidian]"` installs PyYAML; extras group declared in pyproject.toml.
-result: issue
-reported: "Merge commit 15b97be dropped the obsidian extras group and the PyYAML entry from the all extras. Phase 1 Plan 02's commit 70240fc correctly added both; the merge from v3 into ideaverse-integration silently clobbered them when reconciling with v3's video/audio extras additions."
+result: pass
+originally_reported: "Merge commit 15b97be dropped the obsidian extras group and the PyYAML entry from the all extras. Phase 1 Plan 02's commit 70240fc correctly added both; the merge from v3 into ideaverse-integration silently clobbered them when reconciling with v3's video/audio extras additions."
 severity: major
+resolution: "Fixed in commit 0ddf592. Restored `obsidian = [\"PyYAML\"]` and added `PyYAML` to `all` extras. Added `tests/test_pyproject.py` with 2 regression tests (test_obsidian_extras_group_exists, test_all_extras_includes_pyyaml) that parse pyproject.toml via tomllib (tomli fallback on Python 3.10 via pytest's transitive dep) and assert both invariants. Full suite: 471 passed (469 baseline + 2 new)."
 
 ## Summary
 
 total: 10
-passed: 9
-issues: 1
+passed: 10
+issues: 0
 pending: 0
 skipped: 0
 blocked: 0
@@ -76,21 +77,20 @@ blocked: 0
 ## Gaps
 
 - truth: "pyproject.toml declares `obsidian = [\"PyYAML\"]` optional-dependencies group and includes PyYAML in the `all` extras group, so `pip install graphifyy[obsidian]` and `pip install graphifyy[all]` both install PyYAML for profile loading support."
-  status: failed
+  status: resolved
   reason: "User reported: merge commit 15b97be dropped the obsidian extras group and the PyYAML entry from all extras when reconciling v3 branch's video/audio additions"
   severity: major
   test: 10
   root_cause: "Three-way merge of `pyproject.toml` in commit 15b97be resolved the `all` line in favor of v3's version (`[..., faster-whisper, yt-dlp]`) and dropped the `obsidian = [\"PyYAML\"]` line entirely. The ideaverse-integration side (commit 70240fc) had both `obsidian = [\"PyYAML\"]` and PyYAML appended to `all`; the v3 side had neither but added `video = [\"faster-whisper\", \"yt-dlp\"]`. The merge driver picked v3's `all` wholesale and did not carry over the new `obsidian` group."
   artifacts:
     - path: "pyproject.toml"
-      lines: "43-51"
+      lines: "43-52"
       issue: "Missing `obsidian = [\"PyYAML\"]` line; `all` extras missing `PyYAML` entry"
-    - path: "graphify/profile.py"
-      lines: "76-82 (approx)"
-      issue: "Fallback error message tells users to run `pip install graphifyy[obsidian]`, but that extras group no longer exists — broken install instructions"
-  missing:
-    - "Restore `obsidian = [\"PyYAML\"]` line after `office = [\"python-docx\", \"openpyxl\"]` in [project.optional-dependencies]"
-    - "Add `\"PyYAML\"` to the `all` extras list alongside `faster-whisper`/`yt-dlp`"
-    - "Add a regression test: `tests/test_pyproject.py` parses `pyproject.toml` with `tomllib` and asserts `obsidian` extras group exists and contains PyYAML, AND `all` extras contains PyYAML"
-  debug_session: ""
-  note: "Root cause diagnosed inline from git history — no separate debug session needed. Fix is mechanical: two-line restoration + one regression test."
+      fixed_in: "0ddf592"
+    - path: "tests/test_pyproject.py"
+      lines: "1-50"
+      issue: "Regression guard added — tomllib-based assertions on both invariants"
+      fixed_in: "0ddf592"
+  resolved_in: "0ddf592"
+  resolved_by: "Direct fix (UAT option 1) — mechanical merge-revert restoration"
+  verification: "pytest tests/test_pyproject.py → 2 passed; pytest tests/ → 471 passed (469 baseline + 2 new); pip install -e \".[obsidian]\" extras group now resolves cleanly"
