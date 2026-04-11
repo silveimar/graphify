@@ -655,3 +655,131 @@ def test_validate_profile_surfaces_mapping_rules_errors():
 def test_validate_profile_accepts_default_profile_unchanged():
     from graphify.profile import validate_profile, _DEFAULT_PROFILE
     assert validate_profile(_DEFAULT_PROFILE) == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 Plan 02: _DEFAULT_PROFILE.merge extension + _VALID_FIELD_POLICY_MODES
+# ---------------------------------------------------------------------------
+
+
+def test_default_profile_merge_preserve_fields_contains_created():
+    # D-27 + D-65: `created` preserved across merge UPDATE runs.
+    from graphify.profile import _DEFAULT_PROFILE
+    assert "created" in _DEFAULT_PROFILE["merge"]["preserve_fields"]
+
+
+def test_default_profile_merge_preserve_fields_exact_order():
+    # Locked order: rank, mapState, tags (original) + created (new, appended).
+    from graphify.profile import _DEFAULT_PROFILE
+    assert _DEFAULT_PROFILE["merge"]["preserve_fields"] == [
+        "rank",
+        "mapState",
+        "tags",
+        "created",
+    ]
+
+
+def test_default_profile_merge_field_policies_default_empty():
+    # D-65: empty default means Plan 03's built-in table wins unchanged.
+    from graphify.profile import _DEFAULT_PROFILE
+    assert _DEFAULT_PROFILE["merge"]["field_policies"] == {}
+
+
+def test_valid_field_policy_modes_constant_exact_set():
+    # D-64: replace / union / preserve only.
+    from graphify.profile import _VALID_FIELD_POLICY_MODES
+    assert _VALID_FIELD_POLICY_MODES == frozenset({"replace", "union", "preserve"})
+
+
+def test_load_profile_empty_vault_yields_empty_field_policies(tmp_path):
+    # Regression guard: vault with no profile still emits the default shape.
+    from graphify.profile import load_profile
+    result = load_profile(tmp_path)
+    assert result["merge"]["field_policies"] == {}
+    assert result["merge"]["preserve_fields"] == [
+        "rank",
+        "mapState",
+        "tags",
+        "created",
+    ]
+
+
+def test_load_profile_user_field_policies_deep_merges_over_default(tmp_path):
+    # D-65: user override replaces only the matched keys, other merge keys kept.
+    profile_dir = tmp_path / ".graphify"
+    profile_dir.mkdir()
+    (profile_dir / "profile.yaml").write_text(
+        "merge:\n  field_policies:\n    tags: replace\n",
+        encoding="utf-8",
+    )
+    from graphify.profile import load_profile
+    result = load_profile(tmp_path)
+    assert result["merge"]["field_policies"] == {"tags": "replace"}
+    # Other merge defaults preserved (deep-merge, not replace)
+    assert result["merge"]["strategy"] == "update"
+    assert result["merge"]["preserve_fields"] == [
+        "rank",
+        "mapState",
+        "tags",
+        "created",
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 Plan 02: merge.field_policies validation
+# ---------------------------------------------------------------------------
+
+
+def test_validate_profile_accepts_empty_field_policies():
+    from graphify.profile import validate_profile
+    assert validate_profile({"merge": {"field_policies": {}}}) == []
+
+
+def test_validate_profile_accepts_valid_field_policies():
+    from graphify.profile import validate_profile
+    p = {
+        "merge": {
+            "field_policies": {
+                "tags": "replace",
+                "collections": "union",
+                "rank": "preserve",
+            }
+        }
+    }
+    assert validate_profile(p) == []
+
+
+def test_validate_profile_rejects_non_dict_field_policies():
+    from graphify.profile import validate_profile
+    errors = validate_profile({"merge": {"field_policies": ["tags"]}})
+    assert any("merge.field_policies' must be a mapping" in e for e in errors)
+
+
+def test_validate_profile_rejects_non_string_field_policy_key():
+    from graphify.profile import validate_profile
+    errors = validate_profile({"merge": {"field_policies": {42: "replace"}}})
+    assert any(
+        "merge.field_policies key" in e and "must be a string" in e for e in errors
+    )
+
+
+def test_validate_profile_rejects_invalid_field_policy_mode():
+    from graphify.profile import validate_profile
+    errors = validate_profile({"merge": {"field_policies": {"tags": "nuke"}}})
+    matched = [e for e in errors if "merge.field_policies.tags" in e]
+    assert matched, f"expected tags policy error, got: {errors}"
+    assert "'nuke'" in matched[0]
+    assert "valid modes" in matched[0]
+
+
+def test_validate_profile_accepts_all_three_merge_strategies():
+    from graphify.profile import validate_profile
+    for strategy in ("update", "skip", "replace"):
+        assert validate_profile({"merge": {"strategy": strategy}}) == [], (
+            f"strategy {strategy} should be accepted"
+        )
+
+
+def test_validate_profile_omits_field_policies_is_ok():
+    from graphify.profile import validate_profile
+    assert validate_profile({"merge": {"strategy": "update"}}) == []
