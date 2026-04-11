@@ -30,6 +30,12 @@ def __getattr__(name):
         "classify": ("graphify.mapping", "classify"),
         "MappingResult": ("graphify.mapping", "MappingResult"),
         "validate_rules": ("graphify.mapping", "validate_rules"),
+        "apply_merge_plan": ("graphify.merge", "apply_merge_plan"),
+        "compute_merge_plan": ("graphify.merge", "compute_merge_plan"),
+        "MergeAction": ("graphify.merge", "MergeAction"),
+        "MergePlan": ("graphify.merge", "MergePlan"),
+        "MergeResult": ("graphify.merge", "MergeResult"),
+        "RenderedNote": ("graphify.merge", "RenderedNote"),
     }
     if name in _map:
         import importlib
