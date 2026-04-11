@@ -1,0 +1,388 @@
+"""Merge engine: pure reconciliation of rendered notes against an existing vault."""
+from __future__ import annotations
+
+import dataclasses
+import datetime
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Literal
+
+from graphify.profile import (
+    _DEFAULT_PROFILE,
+    _VALID_FIELD_POLICY_MODES,
+    _VALID_MERGE_STRATEGIES,
+    _deep_merge,
+    _dump_frontmatter,
+    safe_frontmatter_value,
+)
+
+
+# ---------------------------------------------------------------------------
+# Action vocabulary (D-71) — valid values for MergeAction.action
+# ---------------------------------------------------------------------------
+
+_VALID_ACTIONS: frozenset[str] = frozenset({
+    "CREATE",
+    "UPDATE",
+    "SKIP_PRESERVE",
+    "SKIP_CONFLICT",
+    "REPLACE",
+    "ORPHAN",
+})
+
+_VALID_CONFLICT_KINDS: frozenset[str] = frozenset({
+    "unmanaged_file",
+    "malformed_sentinel",
+    "malformed_frontmatter",
+})
+
+
+# ---------------------------------------------------------------------------
+# Built-in per-key field policy table (D-64)
+# ---------------------------------------------------------------------------
+
+# Policy rationale:
+# - `replace`  — identity-bearing graphify scalars that MUST track the new graph state
+# - `union`    — graphify-owned lists that users legitimately extend
+# - `preserve` — user-authored or once-only fields that must survive UPDATE
+#
+# Unknown frontmatter keys (user-added, not emitted by graphify) default to
+# `preserve` at dispatch time — see _resolve_field_policy's fallback.
+_DEFAULT_FIELD_POLICIES: dict[str, str] = {
+    # Graphify-owned scalars (D-64 replace list)
+    "type": "replace",
+    "file_type": "replace",
+    "source_file": "replace",
+    "source_location": "replace",
+    "community": "replace",
+    "cohesion": "replace",
+    "graphify_managed": "replace",  # Fingerprint scalar (D-62) — always refreshed on UPDATE
+    # Graphify-owned lists (D-64 union list)
+    "up": "union",
+    "related": "union",
+    "collections": "union",
+    "tags": "union",
+    # User-stewarded fields (D-64 preserve list) — defaults also in profile.merge.preserve_fields
+    "rank": "preserve",
+    "mapState": "preserve",
+    "created": "preserve",
+}
+
+
+# ---------------------------------------------------------------------------
+# Public dataclasses (D-71)
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class MergeAction:
+    """One row in a MergePlan — decision for a single file path.
+
+    See D-71 for field semantics. `action` is a Literal for type-checker
+    benefit only — runtime validation uses the _VALID_ACTIONS set.
+    """
+    path: Path
+    action: Literal["CREATE", "UPDATE", "SKIP_PRESERVE", "SKIP_CONFLICT", "REPLACE", "ORPHAN"]
+    reason: str
+    changed_fields: list[str] = field(default_factory=list)
+    changed_blocks: list[str] = field(default_factory=list)
+    conflict_kind: str | None = None
+
+
+@dataclass(frozen=True)
+class MergePlan:
+    """Pure data structure produced by compute_merge_plan (Plan 04).
+
+    Consumed by apply_merge_plan (Plan 05) or printed by Phase 5 --dry-run.
+    JSON-serializable via dataclasses.asdict.
+    """
+    actions: list[MergeAction]
+    orphans: list[Path]
+    summary: dict[str, int]
+
+
+@dataclass(frozen=True)
+class MergeResult:
+    """Mirror of MergePlan recording write outcomes after apply_merge_plan.
+
+    success/failed are per-path partitions; skipped_identical captures files
+    where content-hash comparison avoided a write (Claude's Discretion in
+    CONTEXT.md — content-hash skip).
+    """
+    plan: MergePlan
+    succeeded: list[Path]
+    failed: list[tuple[Path, str]]   # (path, error_message)
+    skipped_identical: list[Path]
+
+
+# ---------------------------------------------------------------------------
+# Hand-rolled frontmatter reader (D-23 Claude's Discretion: symmetric inverse
+# of profile.py::_dump_frontmatter — DO NOT introduce PyYAML on the read path)
+# ---------------------------------------------------------------------------
+
+# Grammar notes (inverse of _dump_frontmatter):
+# - A frontmatter block starts with a line exactly "---" and ends with "---".
+# - Each in-block line is either a scalar "key: value" or a list header "key:"
+#   followed by block-form items "  - value".
+# - Scalars may be bare, double-quoted (with escaped \"), or typed:
+#   true/false, integers, {:.2f} floats, ISO dates YYYY-MM-DD.
+# - Unknown shapes fall through to string (mirrors the `else` branch in dumper).
+
+_FM_DELIM_RE = re.compile(r"^---\s*$")
+_FM_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$")
+_FM_LIST_ITEM_RE = re.compile(r"^\s{2}-\s(.*)$")
+_FM_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_FM_INT_RE = re.compile(r"^-?\d+$")
+_FM_FLOAT_RE = re.compile(r"^-?\d+\.\d{2}$")  # _dump_frontmatter always uses {:.2f}
+
+
+def _unquote_scalar(raw: str) -> str:
+    """Inverse of safe_frontmatter_value quoting.
+
+    Removes surrounding double-quotes if present and unescapes internal
+    \\" → ". Bare values are returned as-is.
+    """
+    raw = raw.strip()
+    if len(raw) >= 2 and raw.startswith('"') and raw.endswith('"'):
+        return raw[1:-1].replace('\\"', '"')
+    return raw
+
+
+def _coerce_scalar(raw: str):
+    """Apply type coercion inverse to _dump_frontmatter's type-dispatch ladder.
+
+    Order matters: check typed forms BEFORE falling back to string, mirroring
+    the isinstance ladder in _dump_frontmatter (bool → int → float → date → str).
+    """
+    # quoted string short-circuits — quoting forces string type
+    stripped = raw.strip()
+    if len(stripped) >= 2 and stripped.startswith('"') and stripped.endswith('"'):
+        return _unquote_scalar(stripped)
+    if stripped == "true":
+        return True
+    if stripped == "false":
+        return False
+    if _FM_INT_RE.match(stripped):
+        return int(stripped)
+    if _FM_FLOAT_RE.match(stripped):
+        return float(stripped)
+    if _FM_ISO_DATE_RE.match(stripped):
+        try:
+            return datetime.date.fromisoformat(stripped)
+        except ValueError:
+            return stripped
+    return stripped  # bare string
+
+
+def _parse_frontmatter(body: str) -> dict | None:
+    """Parse a graphify-authored frontmatter block into an ordered dict.
+
+    Returns:
+      - {}   when there is no `---` block at the top of body
+      - dict when the block parses cleanly
+      - None when the block is malformed (unclosed delimiter, unknown line shape)
+
+    Malformed → None is how compute_merge_plan detects the
+    conflict_kind="malformed_frontmatter" case in Plan 04.
+    """
+    lines = body.split("\n")
+    if not lines or not _FM_DELIM_RE.match(lines[0]):
+        return {}
+    result: dict = {}
+    current_list_key: str | None = None
+    i = 1
+    while i < len(lines):
+        line = lines[i]
+        if _FM_DELIM_RE.match(line):
+            return result
+        # list item line?
+        list_match = _FM_LIST_ITEM_RE.match(line)
+        if list_match:
+            if current_list_key is None:
+                return None  # orphan list item
+            result[current_list_key].append(_unquote_scalar(list_match.group(1)))
+            i += 1
+            continue
+        # scalar or list-header line?
+        scalar_match = _FM_SCALAR_RE.match(line)
+        if not scalar_match:
+            # unknown line shape — bail (CONTEXT: never self-heal, fail loud)
+            return None
+        key, rhs = scalar_match.group(1), scalar_match.group(2)
+        if rhs == "":
+            # list header — next lines must be list items
+            result[key] = []
+            current_list_key = key
+        else:
+            # A bare rhs starting with ':' means _dump_frontmatter would have
+            # quoted it (safe_frontmatter_value quotes ':' anywhere). A line
+            # like `key: : : :` is unambiguously malformed on the read path.
+            rhs_stripped = rhs.strip()
+            if rhs_stripped and rhs_stripped[0] == ":" and not (
+                rhs_stripped.startswith('"') or rhs_stripped.startswith("'")
+            ):
+                return None
+            result[key] = _coerce_scalar(rhs)
+            current_list_key = None
+        i += 1
+    # fell off the end without a closing "---"
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Sentinel block parser (D-67, D-68, D-69)
+# ---------------------------------------------------------------------------
+
+# Mirror graphify.templates._SENTINEL_START_FMT / _SENTINEL_END_FMT exactly.
+# Duplicated here (not imported) because CONTEXT.md Claude's Discretion says
+# merge.py has NO dependency on templates.py — module isolation.
+_SENTINEL_START_RE = re.compile(r"<!--\s*graphify:([A-Za-z_][A-Za-z0-9_]*):start\s*-->")
+_SENTINEL_END_RE = re.compile(r"<!--\s*graphify:([A-Za-z_][A-Za-z0-9_]*):end\s*-->")
+
+
+class _MalformedSentinel(Exception):
+    """Private signal — compute_merge_plan catches this and emits
+    MergeAction(action='SKIP_CONFLICT', conflict_kind='malformed_sentinel').
+
+    T-04-09 note: a user writing sentinel-lookalike prose accidentally claims
+    that block as graphify-owned. This is an accepted tradeoff per D-62
+    (dual-signal ownership): if a user strips the frontmatter signal, their
+    fake sentinel still needs the frontmatter `graphify_managed: true` to
+    trigger merge. Plan 04's compute_merge_plan checks both signals.
+    """
+
+
+def _parse_sentinel_blocks(body: str) -> dict[str, str]:
+    """Extract {block_name: content_between_markers} from a note body.
+
+    Returns a mapping only for blocks whose start AND end markers are both
+    present, in order, and not nested for the same name. Blocks that don't
+    appear in the body are simply absent from the returned dict — this is
+    D-68 "deleted blocks are respected" behavior.
+
+    Raises `_MalformedSentinel` when:
+      - a start marker has no matching end marker
+      - an end marker appears with no prior start marker
+      - the same block name is opened twice before being closed
+
+    D-69 rule: NEVER self-heal. The caller (compute_merge_plan) catches the
+    exception and records SKIP_CONFLICT with conflict_kind="malformed_sentinel".
+    """
+    # Walk the body linearly. Maintain a stack of currently-open block names.
+    # Any deviation from the paired-in-order contract raises _MalformedSentinel.
+    lines = body.split("\n")
+    blocks: dict[str, str] = {}
+    open_block: tuple[str, int] | None = None  # (name, start_line_idx)
+    for idx, line in enumerate(lines):
+        start_match = _SENTINEL_START_RE.search(line)
+        end_match = _SENTINEL_END_RE.search(line)
+        if start_match and end_match:
+            # Both on one line — only legal if same block with empty content
+            if start_match.group(1) != end_match.group(1):
+                raise _MalformedSentinel(f"mixed start/end on line {idx}")
+            if open_block is not None:
+                raise _MalformedSentinel(
+                    f"nested same-line block while {open_block[0]!r} still open"
+                )
+            blocks[start_match.group(1)] = ""
+            continue
+        if start_match:
+            if open_block is not None:
+                raise _MalformedSentinel(
+                    f"nested start {start_match.group(1)!r} while "
+                    f"{open_block[0]!r} still open at line {idx}"
+                )
+            open_block = (start_match.group(1), idx)
+            continue
+        if end_match:
+            if open_block is None:
+                raise _MalformedSentinel(
+                    f"end marker {end_match.group(1)!r} with no open block at line {idx}"
+                )
+            if open_block[0] != end_match.group(1):
+                raise _MalformedSentinel(
+                    f"end marker {end_match.group(1)!r} does not match "
+                    f"open block {open_block[0]!r} at line {idx}"
+                )
+            content = "\n".join(lines[open_block[1] + 1 : idx])
+            if open_block[0] in blocks:
+                raise _MalformedSentinel(
+                    f"duplicate block {open_block[0]!r} at line {idx}"
+                )
+            blocks[open_block[0]] = content
+            open_block = None
+    if open_block is not None:
+        raise _MalformedSentinel(f"unclosed block {open_block[0]!r}")
+    return blocks
+
+
+# ---------------------------------------------------------------------------
+# Policy dispatcher (D-64, D-65)
+# ---------------------------------------------------------------------------
+
+def _resolve_field_policy(key: str, profile: dict) -> str:
+    """Resolve the merge mode for a single frontmatter key.
+
+    Precedence (highest first):
+      1. `profile.merge.preserve_fields` list — hard preserve, no override possible.
+         (This is the user-facing "don't touch" list from Phase 1 MRG-02.)
+      2. `profile.merge.field_policies.<key>` — user's per-key override.
+      3. `_DEFAULT_FIELD_POLICIES.<key>` — graphify's built-in policy table.
+      4. Unknown keys → `"preserve"` (conservative — never clobber user fields
+         graphify has never seen).
+
+    T-04-12 note: a malicious profile could set `{"graphify_managed": "preserve"}`
+    to freeze the fingerprint. This is accepted — user-local config is equivalent
+    trust to CLI flags. A user who edits their own profile to stop fingerprint
+    refresh is exercising local authority.
+    """
+    merge_cfg = profile.get("merge", {}) if isinstance(profile, dict) else {}
+    preserve_list = merge_cfg.get("preserve_fields") or []
+    if key in preserve_list:
+        return "preserve"
+    user_policies = merge_cfg.get("field_policies") or {}
+    if key in user_policies:
+        return user_policies[key]
+    if key in _DEFAULT_FIELD_POLICIES:
+        return _DEFAULT_FIELD_POLICIES[key]
+    return "preserve"
+
+
+def _apply_field_policy(
+    key: str,
+    current,
+    new,
+    mode: str,
+):
+    """Apply a single-key merge decision.
+
+    Modes:
+      - `replace`  — return `new` (including None, which means "graphify is
+                     no longer emitting this key, remove it").
+      - `preserve` — return `current` (including None, which means "user
+                     hasn't set it either, stay missing").
+      - `union`    — list-wise union: current items first (preserving user's
+                     stable order), then new items not already present.
+                     Non-list current → fall through to replace semantics.
+
+    T-04-13 note: union on a user's list containing wikilinks treats them as
+    opaque strings. The defense is at emission time via safe_frontmatter_value.
+    """
+    if mode == "replace":
+        return new
+    if mode == "preserve":
+        return current
+    if mode == "union":
+        if not isinstance(current, list):
+            return new if new is not None else current
+        if new is None:
+            return list(current)
+        if not isinstance(new, list):
+            return new  # degraded new shape — replace
+        merged = list(current)
+        for item in new:
+            if item not in merged:
+                merged.append(item)
+        return merged
+    # Unknown mode — treat as preserve (conservative)
+    return current
