@@ -34,9 +34,15 @@ _DEFAULT_PROFILE: dict = {
             "moc_query": "TABLE file.folder as Folder, type, source_file\nFROM #community/${community_tag}\nSORT file.name ASC",
         },
     },
+    # Phase 3 extensions (D-48, D-52)
+    "topology": {"god_node": {"top_n": 10}},
+    "mapping": {"moc_threshold": 3},
 }
 
-_VALID_TOP_LEVEL_KEYS = {"folder_mapping", "naming", "merge", "mapping_rules", "obsidian"}
+_VALID_TOP_LEVEL_KEYS = {
+    "folder_mapping", "naming", "merge", "mapping_rules", "obsidian",
+    "topology", "mapping",
+}
 
 _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
 
@@ -194,10 +200,60 @@ def validate_profile(profile: dict) -> list[str]:
                         "home-relative paths are not allowed in folder mappings"
                     )
 
-    # mapping_rules section
+    # topology section (Phase 3, D-48)
+    topology = profile.get("topology")
+    if topology is not None:
+        if not isinstance(topology, dict):
+            errors.append("'topology' must be a mapping (dict)")
+        else:
+            god_node = topology.get("god_node")
+            if god_node is not None:
+                if not isinstance(god_node, dict):
+                    errors.append("'topology.god_node' must be a mapping (dict)")
+                else:
+                    top_n = god_node.get("top_n")
+                    if top_n is not None:
+                        # bool-before-int guard (T-3-03) — bool is a subclass
+                        # of int in Python; pattern mirrors profile.py:326-329.
+                        if isinstance(top_n, bool) or not isinstance(top_n, int):
+                            errors.append(
+                                f"topology.god_node.top_n must be an integer "
+                                f"(got {type(top_n).__name__})"
+                            )
+                        elif top_n < 0:
+                            errors.append(
+                                f"topology.god_node.top_n must be ≥ 0 (got {top_n})"
+                            )
+
+    # mapping section (Phase 3, D-52)
+    mapping = profile.get("mapping")
+    if mapping is not None:
+        if not isinstance(mapping, dict):
+            errors.append("'mapping' must be a mapping (dict)")
+        else:
+            threshold = mapping.get("moc_threshold")
+            if threshold is not None:
+                if isinstance(threshold, bool) or not isinstance(threshold, int):
+                    errors.append(
+                        f"mapping.moc_threshold must be an integer "
+                        f"(got {type(threshold).__name__})"
+                    )
+                elif threshold < 1:
+                    errors.append(
+                        f"mapping.moc_threshold must be ≥ 1 (got {threshold})"
+                    )
+
+    # mapping_rules section — delegate to validate_rules (Phase 3, D-44/D-45)
     mapping_rules = profile.get("mapping_rules")
-    if mapping_rules is not None and not isinstance(mapping_rules, list):
-        errors.append("'mapping_rules' must be a list")
+    if mapping_rules is not None:
+        if not isinstance(mapping_rules, list):
+            errors.append("'mapping_rules' must be a list")
+        else:
+            # Function-local import breaks the circular dependency
+            # (graphify.mapping imports from graphify.templates which imports
+            # from graphify.profile). See plan 03-03 T-3-11.
+            from graphify.mapping import validate_rules
+            errors.extend(validate_rules(mapping_rules))
 
     return errors
 
