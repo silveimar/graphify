@@ -37,13 +37,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Merge & Safety
 
-- [ ] **MRG-01**: Re-running graphify on a vault with existing notes updates graphify-owned fields while preserving user-edited fields
-- [ ] **MRG-02**: `preserve_fields` list in profile specifies frontmatter fields that graphify never overwrites (default: `rank`, `mapState`, `tags`)
+- [x] **MRG-01**: Re-running graphify on a vault with existing notes updates graphify-owned fields while preserving user-edited fields
+- [x] **MRG-02**: `preserve_fields` list in profile specifies frontmatter fields that graphify never overwrites (default: `rank`, `mapState`, `tags`)
 - [ ] **MRG-03**: User can run `graphify --obsidian --dry-run` to preview all changes without writing any files
 - [x] **MRG-04**: All profile-derived file paths are validated against path-traversal attacks (no writing outside vault directory)
 - [ ] **MRG-05**: When no vault profile exists, output is backward-compatible with current `to_obsidian()` behavior
-- [ ] **MRG-06**: Frontmatter field ordering is preserved on update to minimize git diff noise
-- [ ] **MRG-07**: User can configure merge strategy per profile: `update` (default), `skip` (don't touch existing), or `replace` (overwrite entirely)
+- [x] **MRG-06**: Frontmatter field ordering is preserved on update to minimize git diff noise
+- [x] **MRG-07**: User can configure merge strategy per profile: `update` (default), `skip` (don't touch existing), or `replace` (overwrite entirely)
 
 ### Obsidian Config
 
@@ -109,13 +109,13 @@ Deferred to future release. Tracked but not in current roadmap.
 | MAP-04 | Phase 3 | Pending |
 | MAP-05 | Phase 3 | Pending |
 | MAP-06 | Phase 3 | Pending |
-| MRG-01 | Phase 4 | Pending |
-| MRG-02 | Phase 4 | Pending |
+| MRG-01 | Phase 4 | Complete |
+| MRG-02 | Phase 4 | Complete |
 | MRG-03 | Phase 5 | Pending |
 | MRG-04 | Phase 1 | Complete |
 | MRG-05 | Phase 5 | Pending |
-| MRG-06 | Phase 4 | Pending |
-| MRG-07 | Phase 4 | Pending |
+| MRG-06 | Phase 4 | Complete |
+| MRG-07 | Phase 4 | Complete |
 | OBS-01 | Phase 1 | Complete |
 | OBS-02 | Phase 1 | Complete |
 | FIX-01 | Phase 1 | Complete |
