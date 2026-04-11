@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import importlib.resources as ilr
 import re
 import string
 import sys
@@ -132,14 +133,22 @@ _REQUIRED_PER_TYPE: dict[str, set[str]] = {
 }
 
 
+# IN-03: Cache the Traversable handle for the built-in templates root so we
+# don't re-resolve `ilr.files("graphify")` on every template load. The handle
+# itself is cheap, but ilr.files() does a package walk on each call which adds
+# noticeable overhead when rendering many notes. The import lives at the top
+# of the module (instead of inside _load_builtin_template) for the same reason.
+_BUILTIN_TEMPLATES_ROOT = ilr.files("graphify").joinpath("builtin_templates")
+
+
 def _load_builtin_template(note_type: str) -> string.Template:
     """Load a built-in template from graphify/builtin_templates/ via importlib.resources.
 
-    Uses the Traversable API (Python 3.9+) — works under editable, wheel, and
-    zip-archive installs. Never cast to Path() directly (Pattern 1 pitfall).
+    Uses the cached Traversable root (Python 3.9+) — works under editable,
+    wheel, and zip-archive installs. Never cast to Path() directly
+    (Pattern 1 pitfall).
     """
-    import importlib.resources as ilr
-    ref = ilr.files("graphify").joinpath("builtin_templates").joinpath(f"{note_type}.md")
+    ref = _BUILTIN_TEMPLATES_ROOT.joinpath(f"{note_type}.md")
     text = ref.read_text(encoding="utf-8")
     return string.Template(text)
 
