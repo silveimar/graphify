@@ -728,3 +728,184 @@ def compute_merge_plan(
         summary[a.action] = summary.get(a.action, 0) + 1
 
     return MergePlan(actions=actions, orphans=orphan_paths, summary=summary)
+
+
+# ---------------------------------------------------------------------------
+# Apply layer (D-70 side-effectful half) — atomic writes, content-hash skip
+# ---------------------------------------------------------------------------
+
+import hashlib
+import os
+
+
+def _hash_bytes(data: bytes) -> str:
+    """SHA-256 hash of bytes — used for content-identical skip comparison."""
+    return hashlib.sha256(data).hexdigest()
+
+
+def _write_atomic(target: Path, content: str) -> None:
+    """Write *content* to *target* atomically via .tmp + os.replace.
+
+    Raises OSError on write / replace failure. Best-effort unlinks the .tmp
+    file if the sequence aborts mid-flight.
+    """
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(content)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, target)
+    except OSError:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        raise
+
+
+def _cleanup_stale_tmp(vault_dir: Path) -> None:
+    """Unlink any .md.tmp files left over from a previous aborted apply run.
+
+    Called once at the top of apply_merge_plan as a defensive pass (CONTEXT
+    Claude's Discretion: "Clean up stale .tmp files at the top of
+    apply_merge_plan as a defensive pass.")
+    """
+    for tmp in vault_dir.rglob("*.md.tmp"):
+        try:
+            tmp.unlink()
+        except OSError:
+            continue
+
+
+def _synthesize_file_text(
+    action: MergeAction,
+    rendered_note: RenderedNote,
+    existing_text: str | None,
+    profile: dict,
+) -> str:
+    """Produce the final file text for a given MergeAction.
+
+    CREATE / REPLACE: emit _dump_frontmatter(rendered.frontmatter_fields) + rendered.body
+    UPDATE: re-merge frontmatter against existing, refresh body blocks in place
+
+    Raises ValueError for actions this function cannot handle (SKIP_*, ORPHAN).
+    """
+    if action.action in ("CREATE", "REPLACE"):
+        fm_text = _dump_frontmatter(rendered_note["frontmatter_fields"])
+        body = rendered_note["body"]
+        # Ensure exactly one newline between frontmatter block and body
+        if body.startswith("\n"):
+            return fm_text + body
+        return fm_text + "\n" + body
+
+    if action.action == "UPDATE":
+        assert existing_text is not None
+        parsed_fm = _parse_frontmatter(existing_text)
+        if parsed_fm is None:
+            raise ValueError("UPDATE action on file with unparseable frontmatter")
+        body_start = _find_body_start(existing_text)
+        existing_body = existing_text[body_start:]
+        merged_fm, _ = _merge_frontmatter(parsed_fm, rendered_note["frontmatter_fields"], profile)
+        existing_blocks = _parse_sentinel_blocks(existing_body)
+        new_blocks = _parse_sentinel_blocks(rendered_note["body"])
+        merged_body, _ = _merge_body_blocks(existing_body, existing_blocks, new_blocks)
+        fm_text = _dump_frontmatter(merged_fm)
+        if merged_body.startswith("\n"):
+            return fm_text + merged_body
+        return fm_text + "\n" + merged_body
+
+    raise ValueError(f"_synthesize_file_text cannot handle action {action.action!r}")
+
+
+def apply_merge_plan(
+    plan: MergePlan,
+    vault_dir: Path,
+    rendered_notes: dict[str, RenderedNote],
+    profile: dict,
+) -> MergeResult:
+    """Consume a MergePlan and apply writes to disk.
+
+    Writes ONLY CREATE, UPDATE, REPLACE actions. Skips SKIP_PRESERVE,
+    SKIP_CONFLICT, and ORPHAN (D-72: orphans reported, never deleted).
+
+    Content-hash compare: before writing UPDATE or REPLACE, compute SHA-256
+    of new vs existing content and skip the write entirely if identical.
+    Skipped paths go into MergeResult.skipped_identical.
+
+    Atomic writes: `.tmp + fsync + os.replace` (Claude's Discretion).
+
+    Re-validates every target path via _validate_target before writing
+    (defense in depth; compute already did this).
+    """
+    vault_dir = Path(vault_dir).resolve()
+    _cleanup_stale_tmp(vault_dir)
+
+    succeeded: list[Path] = []
+    failed: list[tuple[Path, str]] = []
+    skipped_identical: list[Path] = []
+
+    # Index rendered_notes by target_path for O(1) lookup per action.
+    # compute_merge_plan already resolved target_paths to absolute; but the
+    # plan's action.path is the validated absolute path, so match on that.
+    notes_by_path: dict[Path, RenderedNote] = {}
+    for rn in rendered_notes.values():
+        try:
+            resolved = _validate_target(Path(rn["target_path"]), vault_dir)
+        except ValueError:
+            continue
+        notes_by_path[resolved] = rn
+
+    for action in plan.actions:
+        if action.action in ("SKIP_PRESERVE", "SKIP_CONFLICT", "ORPHAN"):
+            continue
+        try:
+            target = _validate_target(action.path, vault_dir)
+        except ValueError as exc:
+            failed.append((action.path, f"path escape on apply: {exc}"))
+            continue
+
+        rendered = notes_by_path.get(target)
+        if rendered is None:
+            failed.append((target, "no rendered note matches action path"))
+            continue
+
+        existing_text: str | None = None
+        if action.action == "UPDATE":
+            try:
+                existing_text = target.read_text(encoding="utf-8")
+            except OSError as exc:
+                failed.append((target, f"read existing failed: {exc}"))
+                continue
+
+        try:
+            new_text = _synthesize_file_text(action, rendered, existing_text, profile)
+        except (ValueError, _MalformedSentinel) as exc:
+            failed.append((target, f"synthesis failed: {exc}"))
+            continue
+
+        # Content-hash skip: compare bytes
+        new_bytes = new_text.encode("utf-8")
+        if target.exists():
+            try:
+                existing_bytes = target.read_bytes()
+            except OSError:
+                existing_bytes = b""
+            if _hash_bytes(new_bytes) == _hash_bytes(existing_bytes):
+                skipped_identical.append(target)
+                continue
+
+        try:
+            _write_atomic(target, new_text)
+            succeeded.append(target)
+        except OSError as exc:
+            failed.append((target, f"write failed: {exc}"))
+
+    return MergeResult(
+        plan=plan,
+        succeeded=succeeded,
+        failed=failed,
+        skipped_identical=skipped_identical,
+    )
