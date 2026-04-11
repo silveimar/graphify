@@ -2,25 +2,25 @@
 phase: 02-template-engine
 fixed_at: 2026-04-11T00:00:00Z
 review_path: .planning/phases/02-template-engine/02-REVIEW.md
-iteration: 1
-findings_in_scope: 8
-fixed: 8
-skipped: 0
-status: all_fixed
+iteration: 2
+findings_in_scope: 19
+fixed: 17
+skipped: 2
+status: partial
 ---
 
 # Phase 02: Code Review Fix Report — Template Engine
 
 **Fixed at:** 2026-04-11
 **Source review:** .planning/phases/02-template-engine/02-REVIEW.md
-**Iteration:** 1
+**Iteration:** 2
 
 **Summary:**
-- Findings in scope: 8
-- Fixed: 8
-- Skipped: 0
+- Findings in scope: 19 (1 Critical + 7 Warning + 11 Info)
+- Fixed: 17 (8 in iteration 1, 9 in iteration 2)
+- Skipped: 2 (both flagged as out-of-scope by the reviewer)
 
-## Fixed Issues
+## Fixed Issues — Iteration 1 (Critical + Warning)
 
 ### CR-01: Wikilink emission performs no escaping of `]]`, `|`, or `\n` in labels
 
@@ -86,25 +86,119 @@ status: all_fixed
 
 ---
 
+## Fixed Issues — Iteration 2 (Info)
+
+### IN-01: `_FALLBACK_MOC_QUERY` duplicates `_DEFAULT_PROFILE` moc_query
+
+**Files modified:** `graphify/templates.py`, `tests/test_templates.py`
+**Commit:** e1e2a60
+**Applied fix:** Imported `_DEFAULT_PROFILE` from `graphify.profile` and rewrote `_FALLBACK_MOC_QUERY` as `_DEFAULT_PROFILE["obsidian"]["dataview"]["moc_query"]` so the two cannot drift. Added a regression test asserting equality between `_FALLBACK_MOC_QUERY` and the dict-resident default.
+
+---
+
+### IN-02: `_render_moc_like` unused `communities` and `G` parameters
+
+**Files modified:** `graphify/templates.py`
+**Commit:** caa4fc3
+**Applied fix:** Updated the `_render_moc_like` docstring to document that both `G` and `communities` are part of the locked D-41 surface and reserved for future use; added an explicit `_ = communities` line next to the existing `_ = G` to silence linter unused-argument warnings. No behavioural change.
+
+---
+
+### IN-03: `_load_builtin_template` imports `importlib.resources` on every call
+
+**Files modified:** `graphify/templates.py`
+**Commit:** c290ac7
+**Applied fix:** Hoisted `import importlib.resources as ilr` to the top of the module and introduced a module-level `_BUILTIN_TEMPLATES_ROOT = ilr.files("graphify").joinpath("builtin_templates")` cache. `_load_builtin_template` now reuses the cached Traversable instead of re-walking the package on every call.
+
+---
+
+### IN-05: `render_note` uses `datetime.date.today()` non-deterministically
+
+**Files modified:** `graphify/templates.py`, `tests/test_templates.py`
+**Commit:** ba0119a
+**Applied fix:** Added a `created: datetime.date | None = None` keyword argument to `render_note`, `render_moc`, `render_community_overview`, and the shared `_render_moc_like` helper. When supplied, the value is passed to `_build_frontmatter_fields`; when omitted, the existing `datetime.date.today()` default is preserved for backward compatibility. Added 3 regression tests: caller-supplied date for `render_note`, default-today fallback, and caller-supplied date for `render_moc`.
+
+---
+
+### IN-06: Inconsistent member-dict handling between `_build_members_section` and `_build_sub_communities_callout`
+
+**Files modified:** `graphify/templates.py`, `tests/test_templates.py`
+**Commit:** 198fc75
+**Applied fix:** Tightened `_build_members_section` to match the strict policy already used by `_build_sub_communities_callout`: only dicts with a non-empty `label` key are rendered; non-dict entries (raw strings, `None`, ints) are silently dropped. Added a guard so a group whose entries are all dropped no longer emits a lone callout header with zero bullets. Added 3 regression tests covering non-dict drop, missing-label drop, and the empty-group skip.
+
+---
+
+### IN-07: `_build_wayfinder_callout` called with hardcoded `note_type="moc"` from `_render_moc_like`
+
+**Files modified:** `graphify/templates.py`, `tests/test_templates.py`
+**Commit:** 326817a
+**Applied fix:** Replaced the hardcoded `note_type="moc"` argument with `note_type=template_key` so community-overview rendering no longer mis-tags the wayfinder context. The change is currently behaviour-preserving (the wayfinder builder treats `"moc"` and `"community"` identically) but removes a latent bug for any future divergence. Added 2 regression tests: one asserting `render_community_overview` still produces a wayfinder callout, one using `monkeypatch` to spy on the builder and confirm `render_moc`/`render_community_overview` pass `"moc"`/`"community"` respectively.
+
+---
+
+### IN-08: `validate_template` silently ignores malformed placeholders
+
+**Files modified:** `graphify/templates.py`, `tests/test_templates.py`
+**Commit:** 399355d
+**Applied fix:** `validate_template` now inspects the `invalid` group from `string.Template.pattern.finditer` and surfaces a clear `"malformed placeholder near 'X'"` error for each match (e.g. `${bad name}` with whitespace, trailing `$`). Escaped `$$` is still correctly skipped. Added 5 regression tests: malformed braced placeholder, trailing dollar, escaped dollar, well-formed placeholder, and a sweep over every shipped built-in template asserting they all pass validation.
+
+---
+
+### IN-09: `render_note` does not validate `vault_dir` existence
+
+**Files modified:** `graphify/templates.py`, `tests/test_templates.py`
+**Commit:** 268d0f6
+**Applied fix:** `load_templates` now raises `FileNotFoundError` when `vault_dir` does not exist or is not a directory, with actionable error messages. The check fires before any template lookup so callers learn about typo'd vault paths immediately instead of silently falling back to built-ins. Added 4 regression tests: missing directory, vault path that points to a file, valid empty directory (built-ins still loaded), and propagation through `render_note`.
+
+---
+
+### IN-10: `pyproject.toml` obsidian extras semantic clarity
+
+**Files modified:** `graphify/templates.py`, `tests/test_pyproject.py`
+**Commit:** 2ebd303
+**Applied fix:** Added a module-level docstring to `graphify/templates.py` documenting the pure-stdlib policy and clarifying that PyYAML belongs to `graphify.profile` only. Added a regression test in `test_pyproject.py` that AST-parses `templates.py` and asserts every top-level import comes from a stdlib whitelist (`__future__`, `datetime`, `importlib`, `re`, `string`, `sys`, `pathlib`, `typing`) or from the `graphify` package. Future PRs that try to add a third-party top-level import to `templates.py` will fail this guard with a pointer to the IN-10 docstring.
+
+---
+
 ## Skipped Issues
 
-None — all 8 in-scope findings were fixed.
+### IN-04: `render_note` / `render_moc` re-read and re-parse built-in templates on every call
+
+**File:** `graphify/templates.py:146-180, 514-520, 621-628`
+**Reason:** Out of scope per REVIEW.md — the reviewer explicitly flagged this for the Phase 5 adapter rather than v1, since the optimization (caching parsed templates and detecting mid-run edits) is interlocked with how `to_obsidian()` will own the per-vault template lifecycle.
+**Original issue:** Performance + correctness — re-reading templates on every call wastes I/O and lets mid-run template edits cause cross-note drift within a single render pass.
+
+---
+
+### IN-11: `.gitignore` modification not in review scope
+
+**File:** `.gitignore`
+**Reason:** Out of scope per REVIEW.md — the reviewer noted the `.gitignore` change in `git status` but explicitly excluded it from the review file list and marked the finding "Out of scope."
+**Original issue:** A `.gitignore` modification was visible in `git status` but not in the files reviewed for Phase 02; the reviewer chose not to audit it.
 
 ---
 
 ## Test Suite Results
 
-Final full suite run after all 8 fixes:
+Final full suite run after iteration 2:
 
 ```
-628 passed in 1.50s
+647 passed in 1.47s
 ```
 
-Starting count (before fixes): 154 passed
-Ending count (after fixes): 628 passed (includes all pre-existing tests plus 41 new regression tests across `tests/test_templates.py` and `tests/test_profile.py`).
+- Iteration 1 ending count: 628 passed (154 baseline + 474 added across phases prior to this fix run + 41 new regression tests for CR-01/WR-01..07).
+- Iteration 2 ending count: 647 passed (628 + 19 new regression tests for IN-01, IN-05, IN-06, IN-07, IN-08, IN-09, IN-10).
+- No pre-existing tests were modified or skipped.
+
+Per-finding focused-suite verification:
+
+```
+pytest tests/test_templates.py tests/test_profile.py tests/test_pyproject.py -q
+217 passed in 0.22s
+```
 
 ---
 
 _Fixed: 2026-04-11_
 _Fixer: Claude (gsd-code-fixer)_
-_Iteration: 1_
+_Iteration: 2_
