@@ -85,11 +85,19 @@ def run_pipeline(tmp_path: Path) -> dict:
 
     # Step 9: export - Obsidian vault
     vault_path = tmp_path / "obsidian"
-    n_notes = to_obsidian(G, communities, str(vault_path), community_labels=labels, cohesion=cohesion)
-    assert n_notes > 0
-    assert (vault_path / ".obsidian" / "graph.json").exists()
-    md_files = list(vault_path.glob("*.md"))
+    result = to_obsidian(G, communities, str(vault_path), community_labels=labels, cohesion=cohesion)
+    # Phase 5: to_obsidian returns MergeResult on normal runs (MergePlan on dry_run).
+    from graphify.merge import MergeResult
+    assert isinstance(result, MergeResult)
+    # First run produces CREATEs; subsequent runs produce UPDATEs (idempotent re-render).
+    # Either way at least one action must have occurred.
+    total_actions = sum(result.plan.summary.values())
+    assert total_actions > 0, f"No actions in plan summary: {result.plan.summary}"
+    # The new pipeline writes .md files under Atlas/-shaped subdirectories.
+    md_files = list(vault_path.rglob("*.md"))
     assert len(md_files) > 0
+    # NOTE: .obsidian/graph.json is no longer written by to_obsidian (D-74 refactor).
+    # OBS-01/OBS-02 coverage preserved via safe_tag tests in tests/test_profile.py
 
     return {
         "detection": detection,

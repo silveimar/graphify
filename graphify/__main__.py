@@ -155,7 +155,8 @@ This project has a graphify knowledge graph at graphify-out/.
 
 Rules:
 - Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
-- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- If graphify-out/obsidian/ exists, navigate its _COMMUNITY_*.md overview notes and follow [[wikilinks]] between nodes instead of reading raw files
+- If graphify-out/wiki/index.md exists (and no obsidian/ vault), navigate the wiki instead of reading raw files
 - After modifying code files in this session, run `python3 -c "from graphify.watch import _rebuild_code; from pathlib import Path; _rebuild_code(Path('.'))"` to keep the graph current
 """
 
@@ -170,7 +171,8 @@ This project has a graphify knowledge graph at graphify-out/.
 
 Rules:
 - Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
-- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- If graphify-out/obsidian/ exists, navigate its _COMMUNITY_*.md overview notes and follow [[wikilinks]] between nodes instead of reading raw files
+- If graphify-out/wiki/index.md exists (and no obsidian/ vault), navigate the wiki instead of reading raw files
 - After modifying code files in this session, run `python3 -c "from graphify.watch import _rebuild_code; from pathlib import Path; _rebuild_code(Path('.'))"` to keep the graph current
 """
 
@@ -648,6 +650,13 @@ def main() -> None:
         print("    --type T                query type: query|path_query|explain (default: query)")
         print("    --nodes N1 N2 ...       source node labels cited in the answer")
         print("    --memory-dir DIR        memory directory (default: graphify-out/memory)")
+        print("  --validate-profile <vault-path>")
+        print("                          run four-layer profile preflight against a vault (PROF-05)")
+        print("                          \u2014 prints errors/warnings, exits 1 on errors, 0 otherwise")
+        print("  --obsidian              export an already-built graphify-out/graph.json to an Obsidian vault (MRG-03)")
+        print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
+        print("    --obsidian-dir <path>   output vault directory (default graphify-out/obsidian)")
+        print("    --dry-run               print the merge plan via format_merge_plan without writing files")
         print("  benchmark [graph.json]  measure token reduction vs naive full-corpus approach")
         print("  hook install            install post-commit/post-checkout git hooks (all platforms)")
         print("  hook uninstall          remove git hooks")
@@ -678,6 +687,122 @@ def main() -> None:
         return
 
     cmd = sys.argv[1]
+
+    # --validate-profile <vault-path> (D-78, PROF-05)
+    # Thin wrapper over graphify.profile.validate_profile_preflight. Read-only.
+    # Never writes. Never runs the extract/build/cluster pipeline.
+    if cmd == "--validate-profile":
+        if len(sys.argv) < 3:
+            print("Usage: graphify --validate-profile <vault-path>", file=sys.stderr)
+            sys.exit(2)
+        from graphify.profile import validate_profile_preflight
+        result = validate_profile_preflight(Path(sys.argv[2]))
+        for err in result.errors:
+            print(f"error: {err}", file=sys.stderr)
+        for warn in result.warnings:
+            print(f"warning: {warn}", file=sys.stderr)
+        if result.errors:
+            sys.exit(1)
+        # D-77a literal: "profile ok — N rules, M templates validated"
+        print(
+            f"profile ok \u2014 {result.rule_count} rules, "
+            f"{result.template_count} templates validated"
+        )
+        sys.exit(0)
+
+    # --obsidian [--graph <path>] [--obsidian-dir <path>] [--dry-run] (D-78, MRG-03, MRG-05)
+    # Thin wrapper over graphify.export.to_obsidian. Loads an already-built
+    # graph.json from disk (same pattern as the `query` command), reconstructs
+    # `communities: dict[int, list[str]]` from node.community attributes, and
+    # calls to_obsidian. Never runs extract/build/cluster. The skill is still
+    # the pipeline driver for non-standalone use.
+    if cmd == "--obsidian":
+        graph_path = "graphify-out/graph.json"
+        obsidian_dir = "graphify-out/obsidian"
+        dry_run = False
+        args = sys.argv[2:]
+        i = 0
+        while i < len(args):
+            if args[i] == "--graph" and i + 1 < len(args):
+                graph_path = args[i + 1]; i += 2
+            elif args[i].startswith("--graph="):
+                graph_path = args[i].split("=", 1)[1]; i += 1
+            elif args[i] == "--obsidian-dir" and i + 1 < len(args):
+                obsidian_dir = args[i + 1]; i += 2
+            elif args[i].startswith("--obsidian-dir="):
+                obsidian_dir = args[i].split("=", 1)[1]; i += 1
+            elif args[i] == "--dry-run":
+                dry_run = True; i += 1
+            else:
+                print(f"error: unknown --obsidian option: {args[i]}", file=sys.stderr)
+                sys.exit(2)
+
+        # Load graph.json — reuse the exact query-command pattern.
+        gp = Path(graph_path).resolve()
+        if not gp.exists():
+            print(f"error: graph file not found: {gp}", file=sys.stderr)
+            print("hint: run /graphify to produce graphify-out/graph.json first", file=sys.stderr)
+            sys.exit(1)
+        if gp.suffix != ".json":
+            print("error: graph file must be a .json file", file=sys.stderr)
+            sys.exit(1)
+        try:
+            import json as _json
+            from networkx.readwrite import json_graph
+            _raw = _json.loads(gp.read_text(encoding="utf-8"))
+            try:
+                G = json_graph.node_link_graph(_raw, edges="links")
+            except TypeError:
+                G = json_graph.node_link_graph(_raw)
+        except Exception as exc:
+            print(f"error: could not load graph: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        # Reconstruct communities dict from node["community"] attribute
+        # (written by to_json at graphify/export.py). Nodes with a
+        # None community (isolates) are skipped.
+        communities: dict[int, list[str]] = {}
+        for node_id, data in G.nodes(data=True):
+            cid = data.get("community")
+            if cid is None:
+                continue
+            try:
+                cid_int = int(cid)
+            except (TypeError, ValueError):
+                continue
+            communities.setdefault(cid_int, []).append(node_id)
+
+        # Call the library — profile discovery happens inside to_obsidian
+        # itself (load_profile(out) falls back to _DEFAULT_PROFILE when the
+        # vault has no .graphify/profile.yaml). The CLI passes profile=None.
+        from graphify.export import to_obsidian
+        from graphify.merge import MergePlan, format_merge_plan
+        try:
+            result = to_obsidian(
+                G,
+                communities,
+                obsidian_dir,
+                dry_run=dry_run,
+            )
+        except Exception as exc:
+            print(f"error: to_obsidian failed: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        if isinstance(result, MergePlan):
+            # Dry-run path: print the full grouped plan via the Phase 5 D-76 helper
+            print(format_merge_plan(result), end="")
+        else:
+            # Normal run: print a one-line summary from MergeResult.plan.summary
+            summary = getattr(getattr(result, "plan", None), "summary", {}) or {}
+            total = sum(summary.values()) if summary else 0
+            created = summary.get("CREATE", 0)
+            updated = summary.get("UPDATE", 0)
+            print(
+                f"wrote obsidian vault at {Path(obsidian_dir).resolve()} "
+                f"\u2014 {total} actions ({created} CREATE, {updated} UPDATE)"
+            )
+        sys.exit(0)
+
     if cmd == "install":
         # Default to windows platform on Windows, claude elsewhere
         default_platform = "windows" if platform.system() == "Windows" else "claude"

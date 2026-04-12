@@ -1,0 +1,617 @@
+"""Profile loading, validation, deep merge, and safety helpers for Obsidian export."""
+from __future__ import annotations
+
+import datetime
+import hashlib
+import re
+import sys
+import unicodedata
+from pathlib import Path
+from typing import NamedTuple
+
+
+class PreflightResult(NamedTuple):
+    """Return value for validate_profile_preflight (D-77, D-77a).
+
+    Supports attribute access (result.rule_count) AND tuple unpacking
+    (errors, warnings, *_ = result). NamedTuple is immutable and costs
+    nothing over a plain tuple at runtime.
+
+    Fields:
+      errors:          schema + template errors (layers 1 + 2) — non-empty → skill exits 1
+      warnings:        dead-rule + path-safety findings (layers 3 + 4) — non-fatal
+      rule_count:      len(merged_profile["mapping_rules"]) at preflight time
+      template_count:  number of .graphify/templates/<type>.md overrides that PASSED layer 2 validation
+    """
+    errors: list[str]
+    warnings: list[str]
+    rule_count: int
+    template_count: int
+
+
+# ---------------------------------------------------------------------------
+# Default profile — Ideaverse ACE folder structure (D-15)
+# ---------------------------------------------------------------------------
+
+_DEFAULT_PROFILE: dict = {
+    "folder_mapping": {
+        "moc": "Atlas/Maps/",
+        "thing": "Atlas/Dots/Things/",
+        "statement": "Atlas/Dots/Statements/",
+        "person": "Atlas/Dots/People/",
+        "source": "Atlas/Sources/",
+        "default": "Atlas/Dots/",
+    },
+    "naming": {"convention": "title_case"},
+    "merge": {
+        "strategy": "update",
+        # D-27 + D-65: `created` must survive re-runs — set ONCE at first
+        # CREATE by Phase 2, never rewritten by Phase 4 merge UPDATE path.
+        "preserve_fields": ["rank", "mapState", "tags", "created"],
+        # D-65: user overrides merge-module's built-in _DEFAULT_FIELD_POLICIES
+        # table. Empty default means Plan 03's table wins unchanged.
+        "field_policies": {},
+    },
+    "mapping_rules": [],
+    "obsidian": {
+        "atlas_root": "Atlas",
+        "dataview": {
+            "moc_query": "TABLE file.folder as Folder, type, source_file\nFROM #community/${community_tag}\nSORT file.name ASC",
+        },
+    },
+    # Phase 3 extensions (D-48, D-52)
+    "topology": {"god_node": {"top_n": 10}},
+    "mapping": {"moc_threshold": 3},
+}
+
+_VALID_TOP_LEVEL_KEYS = {
+    "folder_mapping", "naming", "merge", "mapping_rules", "obsidian",
+    "topology", "mapping",
+}
+
+_VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
+
+_VALID_MERGE_STRATEGIES = {"update", "skip", "replace"}
+
+# Phase 4 D-64: per-key merge policy modes. `replace` overwrites scalar on
+# every UPDATE, `union` deduplicates list contributions from both sides,
+# `preserve` never touches the key. Unknown keys at dispatch time default to
+# `preserve` (conservative) — Plan 03's policy dispatcher enforces that.
+_VALID_FIELD_POLICY_MODES: frozenset[str] = frozenset({"replace", "union", "preserve"})
+
+# Characters that require quoting when present anywhere in a YAML scalar.
+# Covers flow-context indicators and structural chars (WR-01).
+_YAML_SPECIAL = set(':#[]{},')
+
+# Characters that require quoting when they appear as the FIRST character
+# of a YAML scalar — they are interpreted as block/directive/anchor markers.
+_YAML_LEADING_INDICATORS = set('-?!&*|>%@`')
+
+# Strings that YAML 1.1 (used by many parsers) interprets as bool/null
+# rather than plain strings, regardless of case.
+_YAML_RESERVED_WORDS: frozenset[str] = frozenset({
+    "yes", "no", "true", "false", "null", "on", "off", "~",
+})
+
+# Numeric-looking scalars that YAML parses as int, float, or octal.
+_YAML_NUMERIC_RE = re.compile(
+    r"^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$"   # int / float / scientific
+    r"|^0x[0-9a-fA-F]+$"                            # hex
+    r"|^0o[0-7]+$"                                  # octal (YAML 1.2)
+    r"|^0[0-7]+$"                                   # octal (YAML 1.1)
+    r"|^\.\w+$"                                     # .inf / .nan
+)
+
+# Control characters other than ordinary space that corrupt YAML scalars.
+_YAML_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x85\u2028\u2029]")
+
+
+# ---------------------------------------------------------------------------
+# Deep merge (D-02)
+# ---------------------------------------------------------------------------
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge *override* into a copy of *base*. Override wins at leaf level."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Profile loading (PROF-01, PROF-02, D-04)
+# ---------------------------------------------------------------------------
+
+def load_profile(vault_dir: str | Path) -> dict:
+    """Discover and load a vault profile, merging over built-in defaults.
+
+    Returns the merged profile dict. Falls back to defaults when no
+    profile.yaml exists or when PyYAML is not installed.
+    """
+    profile_path = Path(vault_dir) / ".graphify" / "profile.yaml"
+    if not profile_path.exists():
+        return _deep_merge(_DEFAULT_PROFILE, {})
+
+    try:
+        import yaml  # type: ignore[import-untyped]
+    except ImportError:
+        print(
+            "[graphify] PyYAML not installed — cannot read profile.yaml. "
+            "Install with: pip install graphifyy[obsidian]",
+            file=sys.stderr,
+        )
+        return _deep_merge(_DEFAULT_PROFILE, {})
+
+    # Guard against empty YAML returning None (Pitfall 1)
+    user_data = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
+
+    errors = validate_profile(user_data)
+    if errors:
+        for err in errors:
+            print(f"[graphify] profile error: {err}", file=sys.stderr)
+        return _deep_merge(_DEFAULT_PROFILE, {})
+
+    return _deep_merge(_DEFAULT_PROFILE, user_data)
+
+
+# ---------------------------------------------------------------------------
+# Profile validation (PROF-04, D-03)
+# ---------------------------------------------------------------------------
+
+def validate_profile(profile: dict) -> list[str]:
+    """Validate a profile dict. Returns a list of error strings — empty means valid."""
+    if not isinstance(profile, dict):
+        return ["Profile must be a YAML mapping (dict)"]
+
+    errors: list[str] = []
+
+    # Unknown top-level keys
+    for key in profile:
+        if key not in _VALID_TOP_LEVEL_KEYS:
+            errors.append(f"Unknown profile key '{key}' — valid keys are: {sorted(_VALID_TOP_LEVEL_KEYS)}")
+
+    # naming section
+    naming = profile.get("naming")
+    if naming is not None:
+        if not isinstance(naming, dict):
+            errors.append("'naming' must be a mapping (dict)")
+        else:
+            convention = naming.get("convention")
+            if convention is not None and convention not in _VALID_NAMING_CONVENTIONS:
+                errors.append(
+                    f"Invalid naming convention '{convention}' — "
+                    f"valid values are: {sorted(_VALID_NAMING_CONVENTIONS)}"
+                )
+
+    # merge section
+    merge = profile.get("merge")
+    if merge is not None:
+        if not isinstance(merge, dict):
+            errors.append("'merge' must be a mapping (dict)")
+        else:
+            strategy = merge.get("strategy")
+            if strategy is not None and strategy not in _VALID_MERGE_STRATEGIES:
+                errors.append(
+                    f"Invalid merge strategy '{strategy}' — "
+                    f"valid values are: {sorted(_VALID_MERGE_STRATEGIES)}"
+                )
+            preserve = merge.get("preserve_fields")
+            if preserve is not None and not isinstance(preserve, list):
+                errors.append("'merge.preserve_fields' must be a list")
+            # Phase 4 D-65: optional per-key merge policy overrides.
+            # Users map frontmatter field name -> one of
+            # _VALID_FIELD_POLICY_MODES. Validation keeps the accumulator
+            # pattern (error list, never raise).
+            field_policies = merge.get("field_policies")
+            if field_policies is not None:
+                if not isinstance(field_policies, dict):
+                    errors.append(
+                        "'merge.field_policies' must be a mapping (dict) of "
+                        "field-name -> policy-mode"
+                    )
+                else:
+                    for fp_key, fp_value in field_policies.items():
+                        if not isinstance(fp_key, str):
+                            errors.append(
+                                f"merge.field_policies key {fp_key!r} must be a "
+                                f"string (got {type(fp_key).__name__})"
+                            )
+                            continue
+                        if fp_value not in _VALID_FIELD_POLICY_MODES:
+                            errors.append(
+                                f"merge.field_policies.{fp_key} has invalid mode "
+                                f"{fp_value!r} — valid modes are: "
+                                f"{sorted(_VALID_FIELD_POLICY_MODES)}"
+                            )
+
+    # folder_mapping section
+    folder_mapping = profile.get("folder_mapping")
+    if folder_mapping is not None:
+        if not isinstance(folder_mapping, dict):
+            errors.append("'folder_mapping' must be a mapping (dict)")
+        else:
+            for name, path_val in folder_mapping.items():
+                if not isinstance(path_val, str):
+                    errors.append(f"folder_mapping.{name} must be a string, got {type(path_val).__name__}")
+                elif ".." in path_val:
+                    errors.append(
+                        f"folder_mapping.{name} contains '..' — "
+                        "path traversal sequences are not allowed in folder mappings"
+                    )
+                elif Path(path_val).is_absolute():
+                    # Absolute paths escape the vault entirely (WR-07).
+                    # validate_vault_path catches these at use-time, but
+                    # rejecting them early gives a clearer error message.
+                    errors.append(
+                        f"folder_mapping.{name} is an absolute path — "
+                        "only relative paths are allowed in folder mappings"
+                    )
+                elif path_val.startswith("~"):
+                    # Home-expansion would also escape the vault (WR-07).
+                    errors.append(
+                        f"folder_mapping.{name} starts with '~' — "
+                        "home-relative paths are not allowed in folder mappings"
+                    )
+
+    # topology section (Phase 3, D-48)
+    topology = profile.get("topology")
+    if topology is not None:
+        if not isinstance(topology, dict):
+            errors.append("'topology' must be a mapping (dict)")
+        else:
+            god_node = topology.get("god_node")
+            if god_node is not None:
+                if not isinstance(god_node, dict):
+                    errors.append("'topology.god_node' must be a mapping (dict)")
+                else:
+                    top_n = god_node.get("top_n")
+                    if top_n is not None:
+                        # bool-before-int guard (T-3-03) — bool is a subclass
+                        # of int in Python; pattern mirrors profile.py:326-329.
+                        if isinstance(top_n, bool) or not isinstance(top_n, int):
+                            errors.append(
+                                f"topology.god_node.top_n must be an integer "
+                                f"(got {type(top_n).__name__})"
+                            )
+                        elif top_n < 0:
+                            errors.append(
+                                f"topology.god_node.top_n must be ≥ 0 (got {top_n})"
+                            )
+
+    # mapping section (Phase 3, D-52)
+    mapping = profile.get("mapping")
+    if mapping is not None:
+        if not isinstance(mapping, dict):
+            errors.append("'mapping' must be a mapping (dict)")
+        else:
+            threshold = mapping.get("moc_threshold")
+            if threshold is not None:
+                if isinstance(threshold, bool) or not isinstance(threshold, int):
+                    errors.append(
+                        f"mapping.moc_threshold must be an integer "
+                        f"(got {type(threshold).__name__})"
+                    )
+                elif threshold < 1:
+                    errors.append(
+                        f"mapping.moc_threshold must be ≥ 1 (got {threshold})"
+                    )
+
+    # mapping_rules section — delegate to validate_rules (Phase 3, D-44/D-45)
+    mapping_rules = profile.get("mapping_rules")
+    if mapping_rules is not None:
+        if not isinstance(mapping_rules, list):
+            errors.append("'mapping_rules' must be a list")
+        else:
+            # Function-local import breaks the circular dependency
+            # (graphify.mapping imports from graphify.templates which imports
+            # from graphify.profile). See plan 03-03 T-3-11.
+            from graphify.mapping import validate_rules
+            errors.extend(validate_rules(mapping_rules))
+
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Vault path validation (MRG-04)
+# ---------------------------------------------------------------------------
+
+def validate_vault_path(candidate: str | Path, vault_dir: str | Path) -> Path:
+    """Resolve *candidate* relative to *vault_dir* and verify it stays inside.
+
+    Raises ValueError if the resolved path escapes the vault directory.
+    """
+    vault_base = Path(vault_dir).resolve()
+    resolved = (vault_base / candidate).resolve()
+    try:
+        resolved.relative_to(vault_base)
+    except ValueError:
+        raise ValueError(
+            f"Profile-derived path {candidate!r} would escape vault directory {vault_base}. "
+            "Check folder_mapping values for path traversal sequences."
+        )
+    return resolved
+
+
+# ---------------------------------------------------------------------------
+# Safety helpers
+# ---------------------------------------------------------------------------
+
+def safe_frontmatter_value(value: str) -> str:
+    """Sanitize a value for use in YAML frontmatter.
+
+    Wraps in double quotes when the value would be misinterpreted by YAML
+    parsers. Covers (WR-01):
+      - Structural characters: `:#[]{},`
+      - Leading indicator characters: -?!&*|>%@` (backtick)
+      - YAML 1.1 reserved words: yes/no/true/false/null/on/off/~
+      - Numeric-looking strings parsed as int/float/octal/hex
+      - Newlines and other control characters (stripped before quoting check)
+
+    Replaces newlines/CR with spaces and strips other control chars to
+    prevent multi-line injection (Pitfall 3).
+    """
+    # Replace newlines with spaces (Pitfall 3)
+    value = value.replace("\n", " ").replace("\r", " ")
+    # Strip remaining control characters (tab and others left as-is would
+    # corrupt the YAML stream)
+    value = _YAML_CONTROL_RE.sub("", value)
+
+    needs_quoting = (
+        # Any structural/flow-context character anywhere in the value
+        any(ch in _YAML_SPECIAL for ch in value)
+        # Leading indicator character at position 0
+        or (value and value[0] in _YAML_LEADING_INDICATORS)
+        # Reserved word (case-insensitive)
+        or value.lower() in _YAML_RESERVED_WORDS
+        # Looks like a number, hex, octal, .inf, or .nan
+        or bool(_YAML_NUMERIC_RE.match(value))
+    )
+
+    if needs_quoting:
+        # Escape internal double quotes before wrapping
+        value = value.replace('"', '\\"')
+        return f'"{value}"'
+
+    return value
+
+
+def safe_tag(name: str) -> str:
+    """Slugify a community name into a valid Obsidian tag component.
+
+    Produces lowercase, hyphen-separated strings. Leading digits get
+    an 'x' prefix. Empty input returns 'community'.
+    """
+    slug = name.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    slug = slug.strip("-")
+    if slug and slug[0].isdigit():
+        slug = "x" + slug
+    return slug or "community"
+
+
+def safe_filename(label: str, max_len: int = 200) -> str:
+    """Sanitize a label for use as a filename.
+
+    Applies NFC Unicode normalization (FIX-04), strips OS-illegal characters,
+    and caps length with a hash suffix to avoid collisions (FIX-05, D-06).
+    """
+    name = unicodedata.normalize("NFC", label)
+    # Strip OS-illegal, Obsidian-problematic, and control characters.
+    # Control chars (including \n, \r, \t) break wikilink targets — a label
+    # like "line1\nline2" would otherwise produce [[line1\nline2|...]] which
+    # Obsidian cannot parse (UAT-05 gap adjacent to CR-01 alias fix).
+    name = re.sub(
+        r'[\\/*?:"<>|#^[\]\x00-\x1f\x7f\u0085\u2028\u2029]', "", name
+    ).strip() or "unnamed"
+    if len(name) > max_len:
+        suffix = hashlib.sha256(name.encode()).hexdigest()[:8]
+        name = name[:max_len - 9] + "_" + suffix
+    return name
+
+
+def _dump_frontmatter(fields: dict) -> str:
+    """Emit a YAML frontmatter block including --- delimiters.
+
+    Rules:
+      - Preserves dict insertion order
+      - None values are skipped (not emitted)
+      - list → YAML block list (`key:\\n  - item`) with every item passed
+        through safe_frontmatter_value(str(item))
+      - bool → `true` / `false` (lowercase); checked before int because
+        bool is a subclass of int in Python
+      - int → unquoted integer literal
+      - float → `f"{v:.2f}"` unquoted
+      - datetime.date → `v.isoformat()` unquoted (YYYY-MM-DD)
+      - str / other → `safe_frontmatter_value(str(value))`
+    """
+    lines: list[str] = ["---"]
+    for key, value in fields.items():
+        if value is None:
+            continue
+        if isinstance(value, list):
+            lines.append(f"{key}:")
+            for item in value:
+                lines.append(f"  - {safe_frontmatter_value(str(item))}")
+        elif isinstance(value, bool):
+            # bool before int: isinstance(True, int) is True in Python
+            lines.append(f"{key}: {'true' if value else 'false'}")
+        elif isinstance(value, int):
+            lines.append(f"{key}: {value}")
+        elif isinstance(value, float):
+            lines.append(f"{key}: {value:.2f}")
+        elif isinstance(value, datetime.date):
+            lines.append(f"{key}: {value.isoformat()}")
+        else:
+            lines.append(f"{key}: {safe_frontmatter_value(str(value))}")
+    lines.append("---")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Preflight composite validator (D-77, D-77a, PROF-05) — read-only four-layer check
+# ---------------------------------------------------------------------------
+
+# D-77 path-safety thresholds
+_PATH_SAFETY_MAX_LEN = 240           # Windows MAX_PATH 260 with 20-char headroom
+_PATH_SAFETY_MAX_SEGMENTS = 4        # UX: Obsidian file tree gets noisy past 4 levels
+_PATH_SAFETY_SIM_FILENAME = "X" * 200  # D-06 filename cap, worst-case
+
+
+def validate_profile_preflight(
+    vault_dir: str | Path,
+) -> PreflightResult:
+    """Four-layer preflight validation of a vault's .graphify/ directory.
+
+    Returns PreflightResult(errors, warnings, rule_count, template_count).
+    Never raises on validation problems. Never writes. Never mutates the vault.
+
+    Layers (D-77):
+      1. Schema  (errors)   — validate_profile on the merged profile
+      2. Templates (errors) — validate_template for each override present
+      3. Dead rules (warnings) — mapping._detect_dead_rules
+      4. Path safety (warnings) — folder length + nesting thresholds
+
+    Caller contract (D-77a): skill exits 1 if errors non-empty, 0 otherwise.
+    On clean validation the skill prints
+      `profile ok — {result.rule_count} rules, {result.template_count} templates validated`
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    rule_count = 0
+    template_count = 0
+
+    vault_path = Path(vault_dir)
+    if not vault_path.exists():
+        return PreflightResult(
+            errors=[f"vault_dir does not exist: {vault_path}"],
+            warnings=[],
+            rule_count=0,
+            template_count=0,
+        )
+    if not vault_path.is_dir():
+        return PreflightResult(
+            errors=[f"vault_dir is not a directory: {vault_path}"],
+            warnings=[],
+            rule_count=0,
+            template_count=0,
+        )
+
+    graphify_dir = vault_path / ".graphify"
+    profile_path = graphify_dir / "profile.yaml"
+
+    # No .graphify directory → no user profile at all; all counts are 0 by
+    # definition (D-77a: N/M suffix reflects user-authored overrides only).
+    if not graphify_dir.exists():
+        return PreflightResult(errors=[], warnings=[], rule_count=0, template_count=0)
+
+    # Step A: load user YAML (if any). Mirrors load_profile's PyYAML guard.
+    user_data: dict = {}
+    if profile_path.exists():
+        try:
+            import yaml  # type: ignore[import-untyped]
+        except ImportError:
+            errors.append(
+                "PyYAML not installed — cannot read profile.yaml. "
+                "Install with: pip install graphifyy[obsidian]"
+            )
+            return PreflightResult(errors, warnings, rule_count, template_count)
+        try:
+            user_data = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            errors.append(f".graphify/profile.yaml parse error: {exc}")
+            return PreflightResult(errors, warnings, rule_count, template_count)
+        if not isinstance(user_data, dict):
+            errors.append(".graphify/profile.yaml top-level must be a mapping (dict)")
+            return PreflightResult(errors, warnings, rule_count, template_count)
+
+    # LAYER 1: Schema — validate_profile on the raw user data (errors only)
+    errors.extend(validate_profile(user_data))
+
+    # Build the effective merged profile (for layers 3 + 4).
+    merged = _deep_merge(_DEFAULT_PROFILE, user_data)
+
+    # LAYER 2: Templates — check every override present in .graphify/templates/
+    templates_dir = graphify_dir / "templates"
+    if templates_dir.exists() and templates_dir.is_dir():
+        # Function-local import to avoid templates.py → profile.py cycle
+        from graphify.templates import (
+            validate_template as _validate_template,
+            _REQUIRED_PER_TYPE,
+        )
+        for note_type, required in _REQUIRED_PER_TYPE.items():
+            tpl_file = templates_dir / f"{note_type}.md"
+            if not tpl_file.exists():
+                continue
+            # Path-confinement: templates/<type>.md must stay inside vault
+            try:
+                validate_vault_path(Path(".graphify") / "templates" / f"{note_type}.md", vault_path)
+            except ValueError as exc:
+                errors.append(f"templates/{note_type}.md: {exc}")
+                continue
+            try:
+                text = tpl_file.read_text(encoding="utf-8")
+            except OSError as exc:
+                errors.append(f"templates/{note_type}.md: read failed: {exc}")
+                continue
+            tpl_errors = _validate_template(text, required)
+            if tpl_errors:
+                for err in tpl_errors:
+                    errors.append(f"templates/{note_type}.md: {err}")
+            else:
+                # Only templates that PASSED validation count toward template_count.
+                template_count += 1
+
+    # LAYER 3: Dead mapping rules (warnings only)
+    rules = merged.get("mapping_rules") or []
+    if isinstance(rules, list):
+        rule_count = len(rules)
+        if rules:
+            # Function-local import — matches validate_profile's existing pattern
+            from graphify.mapping import _detect_dead_rules
+            warnings.extend(_detect_dead_rules(rules))
+
+    # LAYER 4: Path safety (warnings only)
+    folder_candidates: list[tuple[str, str]] = []   # (origin, folder)
+    folder_mapping = merged.get("folder_mapping") or {}
+    if isinstance(folder_mapping, dict):
+        for key, val in folder_mapping.items():
+            if isinstance(val, str):
+                folder_candidates.append((f"folder_mapping.{key}", val))
+    if isinstance(rules, list):
+        for idx, rule in enumerate(rules):
+            if not isinstance(rule, dict):
+                continue
+            then = rule.get("then")
+            if not isinstance(then, dict):
+                continue
+            rule_folder = then.get("folder")
+            if isinstance(rule_folder, str):
+                folder_candidates.append(
+                    (f"mapping_rules[{idx}].then.folder", rule_folder)
+                )
+
+    for origin, folder in folder_candidates:
+        segments = [s for s in folder.strip("/").split("/") if s]
+        if len(segments) > _PATH_SAFETY_MAX_SEGMENTS:
+            warnings.append(
+                f"{origin}: {len(segments)} path segments exceeds "
+                f"{_PATH_SAFETY_MAX_SEGMENTS}-level nesting recommendation "
+                f"(Obsidian UX)"
+            )
+        simulated = str(vault_path / folder / _PATH_SAFETY_SIM_FILENAME)
+        if len(simulated) > _PATH_SAFETY_MAX_LEN:
+            warnings.append(
+                f"{origin}: worst-case path length "
+                f"{len(simulated)} exceeds {_PATH_SAFETY_MAX_LEN}-char budget "
+                f"(Windows MAX_PATH headroom)"
+            )
+
+    return PreflightResult(
+        errors=errors,
+        warnings=warnings,
+        rule_count=rule_count,
+        template_count=template_count,
+    )

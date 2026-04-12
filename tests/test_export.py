@@ -1,6 +1,7 @@
 import json
 import tempfile
 from pathlib import Path
+import networkx as nx
 from graphify.build import build_from_json
 from graphify.cluster import cluster
 from graphify.export import to_json, to_cypher, to_graphml, to_html
