@@ -119,4 +119,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-04-12*
-*Last updated: 2026-04-12 after research synthesis*
+*Last updated: 2026-04-12 — traceability confirmed after roadmap creation (25/25 mapped)*

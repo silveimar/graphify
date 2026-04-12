@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: "Context Persistence & Agent Memory"
-status: defining_requirements
-stopped_at: Defining requirements
+status: roadmap_complete
+stopped_at: Roadmap created — ready for Phase 6 planning
 last_updated: "2026-04-12"
-last_activity: 2026-04-12 — Milestone v1.1 started
+last_activity: 2026-04-12 — v1.1 roadmap created (25/25 requirements mapped to Phases 6–8)
 progress:
   total_phases: 3
   completed_phases: 0
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-12 after v1.1 milestone start)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile
-**Current focus:** v1.1 Context Persistence & Agent Memory — defining requirements
+**Current focus:** v1.1 Context Persistence & Agent Memory — roadmap complete, ready for Phase 6
 
 ## Current Position
 
 Milestone: v1.1 Context Persistence & Agent Memory
-Phase: Not started (defining requirements)
+Phase: Phase 6 (Graph Delta Analysis & Staleness) — not started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-12 — Milestone v1.1 started
+Status: Roadmap complete — awaiting `/gsd-plan-phase 6`
+Last activity: 2026-04-12 — Roadmap created; 25 v1.1 requirements mapped to Phases 6–8
 
 Progress: [░░░░░░░░░░] 0% (v1.1)
 
@@ -58,29 +58,48 @@ Detailed per-plan metrics are preserved in phase SUMMARY.md files and in `.plann
 
 ### Decisions
 
-All milestone decisions are logged in:
+All v1.0 milestone decisions are logged in:
 - **PROJECT.md Key Decisions table** — the 8 architectural decisions that shape v1.1+ work
 - **`.planning/milestones/v1.0-MILESTONE-AUDIT.md`** — full decision trail with verification evidence
 - **Phase SUMMARY.md files** — tactical D-xx decisions locked during plan execution (D-01..D-72)
 
-Carry-forward decisions relevant to the next milestone:
-- **D-73**: CLI is utilities-only; skill drives the full pipeline. New CLI flags should be direct utilities (not pipeline verbs).
-- **D-74**: `to_obsidian()` is a notes pipeline, not a vault-config-file manager. OBS-01/02 remain out of scope unless plugin-side integration is prioritized.
+Carry-forward decisions relevant to v1.1:
+- **D-73**: CLI is utilities-only; skill drives the full pipeline. New CLI flags should be direct utilities (not pipeline verbs). New `graphify snapshot` and `graphify approve` subcommands follow this pattern.
+- **D-74**: `to_obsidian()` is a notes pipeline, not a vault-config-file manager. OBS-01/02 remain out of scope.
+
+### v1.1 Phase Architecture Notes
+
+From research synthesis (`.planning/research/SUMMARY.md`):
+
+- **Phase 6** adds `snapshot.py` (NEW, ~200 lines) and `delta.py` (NEW, ~150 lines); extends `__main__.py` with `snapshot` subcommand. No changes to existing pipeline stages.
+- **Phase 7** extends `serve.py` with four mutation tool handlers and annotation/proposal state; adds `graphify approve` CLI. Critical invariant: `graph.json` is never mutated by MCP tools.
+- **Phase 8** extends `merge.py` with `detect_user_edits()`, `merge_with_user_blocks()`, and `PARTIAL_UPDATE` action type; writes `vault-manifest.json` atomically after each `apply_merge_plan`.
+- Phases 6 and 7 can be built in parallel (no shared module dependency); Phase 8 depends on Phase 7's proposal flow.
+- All features are stdlib-only additions — no new required dependencies.
+
+### Critical Pitfalls (from research)
+
+1. MCP tools must NEVER mutate `graph.json` — use JSONL append sidecar only
+2. Annotations use JSONL append-only (not read-modify-write JSON) for concurrency safety
+3. `propose_vault_note` writes only to `graphify-out/proposals/` — never to vault until `graphify approve`
+4. Staleness detection uses SHA256 hash as authoritative signal (not mtime alone)
+5. Snapshot directory prunes in `save_snapshot()` on every write (default cap: 10)
+6. `peer_id` defaults to `"anonymous"` — never `os.environ["USER"]` or `socket.gethostname()`
+7. User note body protected by `PARTIAL_UPDATE` action — sentinel blocks are inviolable
 
 ### Pending Todos
 
-None.
+- Pre-Phase 7 prerequisite: confirm `graphify install` creates/updates `.gitignore` with `graphify-out/` entry; add if absent
+- Phase 7 planning: benchmark JSONL compaction time for >10K annotation records (target <500ms)
+- Phase 8 planning: confirm PyYAML round-trip for `graphify_body_hash` field (no unexpected quoting/folding)
 
 ### Blockers/Concerns
 
-None. The two pre-milestone concerns ("Attribute-based mapping rule priority edge cases" and "Pre-integration backward-compat audit of test_export.py fixtures") were both resolved during Phase 3 and Phase 5 execution respectively.
-
-**Open housekeeping for v1.1 planning:**
-- SUMMARY.md frontmatter field names are inconsistent across phases 2-5 (schema drift — see retrospective). Pick a canonical field name when v1.1 starts.
-- Phase 01 has the only `VALIDATION.md` (Nyquist). Phases 2-5 shipped without. Consider running `/gsd-validate-phase N` retroactively if Nyquist coverage is a v1.1 policy requirement.
+None.
 
 ## Session Continuity
 
-Last session: 2026-04-12T00:05:59.589Z
-Stopped at: v1.0 milestone complete — retrospective written, ready for `/gsd-new-milestone`
+Last session: 2026-04-12
+Stopped at: v1.1 roadmap created — 25/25 requirements mapped
 Resume file: None
+Next action: `/gsd-plan-phase 6`
