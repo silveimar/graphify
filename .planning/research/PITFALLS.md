@@ -1,510 +1,389 @@
-# Domain Pitfalls: Configurable Obsidian Vault Adapter
+# Pitfalls Research: v1.1 Context Persistence & Agent Memory
 
-**Domain:** Obsidian vault generation / knowledge graph injection into existing vaults
-**Researched:** 2026-04-09
-**Confidence:** HIGH (based on YAML spec, Obsidian docs behavior, and analysis of existing export.py)
+**Domain:** Adding graph persistence, MCP mutations, annotation storage, and bidirectional merge to an existing pure-function CLI pipeline
+**Researched:** 2026-04-12
+**Confidence:** HIGH — grounded in graphify's existing codebase (serve.py, merge.py, cache.py, security.py), gap analysis from 7 reference repositories, and PROJECT.md v1.1 requirements
 
 ---
 
 ## Critical Pitfalls
 
-These mistakes cause data loss, vault corruption, or silent breakage that is hard to detect.
+Mistakes that cause rewrites, data loss, or silent corruption.
 
 ---
 
-### Pitfall 1: YAML Frontmatter — Unquoted Special Characters Break the Vault Note
+### Pitfall 1: Snapshot Storage Grows Unbounded
 
 **What goes wrong:**
-Node labels containing `:`, `#`, `[`, `]`, `{`, `}`, `>`, `|`, `*`, `&`, or `!` are written directly into YAML frontmatter values without quoting, producing malformed YAML. Obsidian silently drops the entire frontmatter block for that note. The note renders without properties; Dataview queries return nothing; the graph view loses color groupings.
+`graphify-out/snapshots/` accumulates one full graph JSON per run with no eviction policy. A codebase re-indexed daily accumulates hundreds of megabytes. The snapshot directory also contains index metadata (e.g. a manifest JSON listing all snapshots); if that file is never pruned it grows without bound. At scale, users notice the `graphify-out/` directory dwarfs the codebase itself.
 
 **Why it happens:**
-The existing `export.py` writes frontmatter lines as bare f-strings:
+The cache module (`cache.py`) uses a content-addressed hash-per-file scheme that naturally evicts stale entries when source files change. Snapshot storage is different: each snapshot is a full graph state keyed by run timestamp, not by content hash. There is no natural eviction trigger. First implementations copy the cache pattern without realizing the semantics differ.
+
+**How to avoid:**
+Implement a two-tier retention policy at snapshot write time, not as a separate cleanup job:
+- **Keep**: The last N snapshots (default: 10), configurable in `graphify-out/snapshots/manifest.json`
+- **Archive**: Compress snapshots older than N using `gzip` (stdlib, no new dependency) into `graphify-out/snapshots/archive/`
+- **Prune**: Delete archived snapshots older than configurable TTL (default: 30 days)
+
+Apply the CPR summary+archive pattern: each snapshot writes two files — `{timestamp}-summary.json` (lightweight: node count, edge count, community count, top-5 god nodes) and `{timestamp}-full.json.gz` (compressed full graph). Load only the summary into agent context; the full diff is on-demand.
+
 ```python
-f'source_file: "{data.get("source_file", "")}"'
+def _prune_snapshots(snapshot_dir: Path, keep: int = 10) -> None:
+    entries = sorted(snapshot_dir.glob("*-summary.json"))
+    for old in entries[:-keep]:
+        full = old.with_name(old.name.replace("-summary.json", "-full.json.gz"))
+        old.unlink(missing_ok=True)
+        full.unlink(missing_ok=True)
 ```
-This double-quotes source_file but the value itself can still contain `"` characters, causing YAML parse failure. Labels used in tag values (e.g., `community/{name}`) are not quoted and not sanitized for YAML-invalid chars.
 
-**Consequences:**
-- Obsidian Properties panel shows "Invalid YAML" warning
-- All Dataview queries referencing `FROM #community/...` return 0 results
-- `graph.json` color groups silently apply to no nodes
-- User sees blank notes, blames graphify, loses trust
+Write this into `snapshot.py::save_snapshot()` so pruning is automatic on every write. Never leave pruning to a separate manual command.
 
-**Prevention:**
-Use PyYAML's `yaml.dump()` exclusively for ALL frontmatter serialization — never hand-craft YAML strings. PyYAML correctly quotes values that need it and handles all edge cases. Specifically:
-```python
-import yaml
-frontmatter = yaml.dump({"source_file": label, "tags": tag_list}, allow_unicode=True, default_flow_style=False)
-```
-Never interpolate node labels, community names, or any graph-derived string directly into a YAML line with an f-string.
+**Warning signs:**
+- `graphify-out/snapshots/` grows by megabytes per run
+- Manifest JSON exceeds 1 MB
+- Users report slow `--obsidian` runs (iterating the snapshots directory to find the latest)
 
-**Detection (warning signs):**
-- Node labels containing `:` (e.g., `http://example.com`, `key: value`) — very common in code graphs
-- Community names with spaces that get used as raw tag values
-- Source file paths containing `#` (common in URLs stored as source_file)
-
-**Phase:** Implement PyYAML-based serialization from day one in the profile loader and template renderer. Do not defer.
+**Phase to address:** Phase 6 (Delta Analysis) — must be in the initial snapshot write path.
 
 ---
 
-### Pitfall 2: YAML Frontmatter — Wikilinks Inside List Fields Break Obsidian's Backlink Index
+### Pitfall 2: MCP Mutation Tools Break the Pure-Function Invariant of serve.py
 
 **What goes wrong:**
-Obsidian's parser treats `[[Note Name]]` inside a YAML list field (e.g., `up:`, `related:`) as a resolved wikilink only if the field uses the bare wikilink syntax, not the quoted string form. If the value is `"[[Note Name]]"` (double-quoted YAML string), Obsidian does not register a backlink from `Note Name` to the current note. The link appears to work visually but the backlink panel and graph view miss the edge.
+Adding `annotate_node`, `add_edge`, `flag_importance` tools to `serve.py` requires the server to hold mutable state. The current `serve()` function loads the graph once at startup into `G` (a module-level NetworkX graph) and serves it as a read-only resource. Adding mutation tools that modify `G` in place create a shared-mutable-state problem: tool A modifies `G`, tool B reads a mutated `G`, a re-run of the CLI replaces `graphify-out/graph.json` and `G` is now stale, mutation state is lost without any warning to the agent.
 
 **Why it happens:**
-PyYAML will quote `[[Note Name]]` as a string because `[` is a special YAML character, producing `"[[Note Name]]"`. This is valid YAML but defeats Obsidian's backlink resolution.
+MCP servers are long-lived processes. `serve.py`'s `G` variable is initialized once at `serve()` startup and never refreshed. Write-back tools that mutate `G` do so against a potentially stale snapshot. When the CLI re-runs and writes a new `graph.json`, the MCP server is still holding the old `G` — mutations are silently discarded when the server restarts.
 
-**Consequences:**
-- `up:` and `related:` fields appear correct in the Properties panel
-- Graph view is missing edges (MOC → Dot connections vanish)
-- Dataview queries using `FROM [[MOC Name]]` return 0 results
-- Extremely hard to debug because the notes look correct on inspection
+**How to avoid:**
+Separate the graph state from the annotation state into two distinct persistence layers:
 
-**Prevention:**
-For wikilink list fields (`up:`, `related:`, `collections:`), do not use PyYAML for those specific keys. Instead write the YAML block manually using a known-safe pattern:
+1. **Graph state** (`graph.json`): read-only within the MCP server, always loaded fresh from disk at tool call time for read tools (use a `_reload_if_stale()` check comparing `graph.json` mtime vs. load time). Never mutate `G` in-place.
+
+2. **Annotation state** (`annotations.json`): the only write target for MCP mutation tools. Annotations are a separate file, not embedded into `graph.json`. Reads merge `graph.json` + `annotations.json` at query time.
+
 ```python
-def _wikilink_yaml_list(field: str, targets: list[str]) -> list[str]:
-    lines = [f"{field}:"]
-    for t in targets:
-        # Sanitize the target name itself, then write bare [[]] syntax
-        safe = sanitize_label(t)  # strips control chars, caps length
-        lines.append(f"  - \"[[{safe}]]\"")
-    return lines
+# In serve.py — reload-on-stale pattern for read tools
+def _reload_if_stale(state: _ServerState) -> nx.Graph:
+    mtime = Path(state.graph_path).stat().st_mtime
+    if mtime > state.loaded_at:
+        state.G = _load_graph(state.graph_path)
+        state.loaded_at = mtime
+    return state.G
 ```
-Note that Obsidian parses `"[[Note]]"` (quoted) correctly for backlinks in YAML list items — the double-quote wrapping is required by YAML spec when the value starts with `[`, and Obsidian's parser handles this case. Verify this behavior against the Obsidian release notes for the target minimum version.
 
-**Detection (warning signs):**
-- Any frontmatter field that is supposed to carry wikilinks
-- Profile YAML declares `format: wikilink` for a field mapping
-- Running Dataview `FROM [[SomeNote]]` returns 0 when notes exist with `related: [[SomeNote]]`
+Mutation tools write only to `annotations.json` via atomic write (temp file + `os.replace()`). They never touch `graph.json`. This keeps the pure-function invariant of the extraction pipeline intact.
 
-**Phase:** Phase 1 (frontmatter generation). Write a test that parses the output YAML and verifies backlinks are registered (check `.obsidian/cache` or parse output and assert the `[[]]` syntax is present).
+**Warning signs:**
+- A mutation tool handler accesses `G.nodes[nid]` and modifies attributes in place
+- `serve.py` has no mtime check before reading graph data
+- Annotations are embedded as node attributes in `graph.json`
+
+**Phase to address:** Phase 7 (MCP Write-Back) — design decision must be locked before any mutation tool is implemented.
 
 ---
 
-### Pitfall 3: Merge Strategy — Overwriting User-Edited Frontmatter Fields
+### Pitfall 3: annotations.json Corruption Under Concurrent Access
 
 **What goes wrong:**
-The adapter re-runs and writes a fresh note, replacing the user's hand-edited `rank:`, `mapState:`, or custom fields with the default values from the template. The user's curation work is silently destroyed. This is the single most trust-destroying failure mode for an injection tool operating on an existing vault.
+Two MCP tool calls arrive near-simultaneously (possible when an agent spawns parallel tool calls). Both call `annotate_node`, both read `annotations.json`, both modify their in-memory copy, and both write. The second write silently overwrites the first. Result: one annotation is lost. No error is raised; the agent believes both annotations were saved.
 
 **Why it happens:**
-Naive implementation reads the template, fills placeholders, and writes the file. No round-trip parse of the existing note's frontmatter before writing.
+The current `cache.py` uses `os.replace()` after a temp write — atomic at the OS level for single-writer scenarios. But two concurrent readers + two concurrent writers create a read-modify-write race: read(A) → read(B) → write(A) → write(B, discarding A's change).
 
-**Consequences:**
-- Permanent data loss (unless the vault is in git)
-- User cannot trust graphify to run on a live vault
-- Adoption blocker — the tool is too dangerous to use on real vaults
-
-**Prevention:**
-Implement a frontmatter merge with a field preservation list. On update:
-1. Parse the existing note's frontmatter into a dict (handle missing/malformed frontmatter gracefully)
-2. Apply the template-generated frontmatter as the base
-3. For each field in `profile.yaml`'s `preserve_fields` list, restore the value from the existing note (if present)
-4. Write the merged result
-
-Default `preserve_fields` should include at minimum: `rank`, `mapState`, `created`, and any field the profile does not generate.
+**How to avoid:**
+Use file locking for all annotation writes. Python's `fcntl.flock()` (POSIX) or `msvcrt.locking()` (Windows) provide advisory locks. Since graphify already targets Python 3.10+ and the constraint is "no new required dependencies," use a cross-platform lock via a lock file:
 
 ```python
-def merge_frontmatter(existing: dict, generated: dict, preserve: list[str]) -> dict:
-    merged = {**generated}
-    for field in preserve:
-        if field in existing:
-            merged[field] = existing[field]
-    return merged
+import fcntl
+import contextlib
+
+@contextlib.contextmanager
+def _annotation_lock(lock_path: Path):
+    with open(lock_path, "w") as lf:
+        try:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
 ```
 
-**Detection (warning signs):**
-- Profile defines fields the user might also manually set (`rank`, `mapState`, custom fields)
-- Any re-run of graphify on a vault that has been open for editing
+For Windows compatibility (where `fcntl` is absent), fall back to a `threading.Lock()` — sufficient since a single MCP server process is single-process even if async. The async MCP event loop is single-threaded; concurrent tool calls are awaited not threaded. Document this assumption.
 
-**Phase:** Phase 1 (merge strategy design). Must be implemented before any real vault is tested. Cannot be added as a later enhancement — the schema must account for it from the start.
+Alternative that avoids all locking complexity: make annotation writes append-only (JSONL format, one JSON object per line). Read = load all lines and merge. Write = append one line. Append to a file is atomic for small writes on all major filesystems. Compaction (rewrite to deduplicated JSON) happens on startup only.
+
+The JSONL append pattern is strongly preferred — simpler, testable, and matches the CPR session log pattern.
+
+**Warning signs:**
+- `annotations.json` is read, modified in Python dict, then written back as a full file rewrite
+- No lock or append-only strategy is used
+- Tests don't simulate concurrent writes
+
+**Phase to address:** Phase 7 (MCP Write-Back) — choose JSONL append before the first annotation tool is implemented.
 
 ---
 
-### Pitfall 4: File Naming — Unicode Normalization Causes Duplicate or Phantom Notes
+### Pitfall 4: Obsidian Merge Conflicts Between Graphify-Generated and User-Authored Content
 
 **What goes wrong:**
-A node label `"café"` stored as NFC (U+00E9 `é`) produces filename `café.md`. On macOS (HFS+/APFS, NFD normalization) the filesystem stores it as `cafe\u0301.md`. When graphify re-runs and generates the NFC form again, Python's `Path.exists()` says the file does not exist (NFC ≠ NFD at the bytes level on Linux/ext4), so a new file is created. The vault now has two notes for the same node. On macOS they appear as one file; on Linux sync targets they appear as two.
+v1.0's merge engine uses sentinel blocks to separate graphify-managed content from user-authored content within a note. The round-trip (Phase 8) must detect user modifications to sentinel-protected content and decide how to merge them. The failure mode: graphify re-runs, detects a user-modified block, and either (a) silently overwrites user edits with the freshly-generated content, or (b) raises `SKIP_CONFLICT` and writes nothing, leaving stale graphify content in place. Both are wrong.
 
 **Why it happens:**
-macOS normalizes filenames to NFD internally. Python's `pathlib` on macOS will transparently handle this for local operations, but string comparison of filenames across platforms breaks when NFC vs NFD differ.
+The v1.0 merge engine has six action types (`CREATE`, `UPDATE`, `SKIP_PRESERVE`, `SKIP_CONFLICT`, `REPLACE`, `ORPHAN`). `SKIP_CONFLICT` fires on `malformed_sentinel` or `malformed_frontmatter`. But user-modified content WITHIN a sentinel block (the user edited the body of a graphify-generated note) is not a conflict — it is legitimate user authorship that must be preserved while still allowing the graphify-managed frontmatter to update.
 
-**Consequences:**
-- Duplicate notes appear in vault after cross-platform sync (Obsidian Sync, iCloud, git)
-- Wikilinks to the NFC form resolve on macOS but break on Linux/Windows
-- Phantom backlinks in graph view
+**How to avoid:**
+Extend `merge.py`'s action vocabulary with a `PARTIAL_UPDATE` action. This action:
+1. Rewrites the frontmatter section (graphify-managed, field-policy-driven as in v1.0)
+2. Leaves the note body below the sentinel intact (user-authored)
+3. Updates only the sentinel-delimited graphify-managed sections within the body if the node data changed
 
-**Prevention:**
-Normalize all filenames to NFC before use:
+The key invariant: user text outside sentinel blocks is never touched. User text inside sentinel blocks is preserved if the sentinel is detected as user-modified (detect modification by hashing the sentinel content at last-write time and storing the hash in the frontmatter as `graphify_body_hash`).
+
 ```python
-import unicodedata
-def normalize_filename(name: str) -> str:
-    return unicodedata.normalize("NFC", name)
+# In merge.py — add to MergeAction.action valid set
+_VALID_ACTIONS = frozenset({..., "PARTIAL_UPDATE"})
+
+# In compute_merge_plan — classify
+if existing_body_hash != stored_graphify_hash:
+    action = "PARTIAL_UPDATE"  # user modified body; update frontmatter only
 ```
-Apply this normalization at the point of filename generation, not display. Store the normalized form in the `node_filename` mapping and use it consistently for both file writes and wikilink generation.
 
-**Detection (warning signs):**
-- Any node labels sourced from document text (very common — paper titles, person names)
-- Vault is synced across macOS and Linux/Windows
+**Warning signs:**
+- Users report edited notes being overwritten on re-run
+- The `SKIP_CONFLICT` rate is high in dry-run output (users manually modified notes)
+- `merge.py`'s `apply_merge_plan()` has no branch for body-vs-frontmatter distinction
 
-**Phase:** Phase 1 (filename generation). One-line fix, but must be in from the start.
+**Phase to address:** Phase 8 (Obsidian Round-Trip) — extend the merge engine before any round-trip detection is implemented.
 
 ---
 
-### Pitfall 5: OS Path Limits and Folder Nesting Cause Silent Write Failures
+### Pitfall 5: Staleness Metadata Becomes Stale Itself (Meta-Staleness)
 
 **What goes wrong:**
-The profile maps nodes to nested folders like `Atlas/Dots/Things/`. Long node labels (256 chars, already the current `sanitize_label` cap) plus deep folder nesting exceed the 255-byte limit on Linux/ext4 for filename components and the ~260-char limit on Windows for full paths. `Path.write_text()` raises `OSError: File name too long` or `FileNotFoundError` (Windows path limit). The error may be swallowed by a broad except clause, silently skipping note generation.
+Each node carries `extracted_at` (when graphify last processed the node) and `source_modified_at` (when the source file was last modified). The delta report flags nodes where `source_modified_at > extracted_at` as stale. But if the user renames a source file, the node's `source_file` path no longer exists. The node is not flagged as stale (the old path is stored and no comparison is made) — it becomes a ghost node: valid-looking but disconnected from any actual file.
+
+Second-order problem: if `extracted_at` is stored as an absolute timestamp, nodes extracted before a machine clock adjustment (NTP sync, timezone change, system migration) will have incorrect staleness classifications.
 
 **Why it happens:**
-`sanitize_label` caps at 256 characters — which is already at the filesystem limit for the filename component alone, before adding `.md` (3 bytes). With folder prefix, it easily exceeds limits.
+Staleness metadata is a simple comparison: `source_modified_at > extracted_at`. It does not account for file renames, moves, or deletions. It also does not account for clock skew between systems.
 
-**Consequences:**
-- Silent note generation failures (nodes skipped without warning)
-- Inconsistent vault — some nodes have notes, others don't
-- Wikilinks to missing notes appear as unresolved in Obsidian
+**How to avoid:**
+Store staleness metadata in two layers:
+1. **Path-based**: `source_file` + `source_modified_at` (mtime from `os.stat()`)
+2. **Hash-based**: `source_hash` (SHA256 of file contents at extraction time, consistent with `cache.py`'s `file_hash()`)
 
-**Prevention:**
-Cap filenames at 200 characters (leaves room for folder depth, `.md` extension, and deduplication suffixes like `_2`). Emit a warning log for every truncation. For Windows compatibility, also strip trailing dots and spaces (Windows disallows them):
-```python
-_WINDOWS_RESERVED = re.compile(r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$', re.IGNORECASE)
+Staleness check order:
+1. If `source_file` does not exist → `GHOST` status (file was deleted or renamed)
+2. If `source_hash` differs from current `file_hash(source_file)` → `STALE` (file was modified)
+3. If `source_hash` matches → `FRESH` (no change, regardless of mtime)
 
-def safe_filename(label: str, max_len: int = 200) -> str:
-    name = unicodedata.normalize("NFC", label)
-    name = re.sub(r'[\\/*?:"<>|#^\[\]]', "", name).strip(" .")
-    if _WINDOWS_RESERVED.match(name):
-        name = f"_{name}"
-    return name[:max_len] or "unnamed"
-```
+Use hash comparison as the authoritative staleness signal, not mtime. This matches `cache.py`'s existing pattern and avoids clock-skew false positives.
 
-**Detection (warning signs):**
-- Profile folder mapping places notes 3+ levels deep (`Atlas/Dots/Things/`)
-- Graph contains nodes from codebases with long fully-qualified class names
+For ghost nodes, the delta report should prominently surface them as requiring either re-extraction (if the file was renamed) or pruning (if it was deleted).
 
-**Phase:** Phase 1. Tighten the filename cap in `safe_name()` before folder-mapping is added.
+**Warning signs:**
+- Staleness check uses only `mtime` comparison
+- `source_file` path is not checked for existence before computing staleness
+- Delta report shows nodes as FRESH when their source files were deleted
+
+**Phase to address:** Phase 6 (Delta Analysis) — staleness schema must be correct from the first snapshot.
 
 ---
 
-### Pitfall 6: Template Rendering — Placeholder Collision with User Content
+### Pitfall 6: Peer Identity Tracking Leaks Sensitive Information
 
 **What goes wrong:**
-A template uses `{{label}}` as a placeholder. A node's label contains `{{` or `}}` literally (e.g., a code symbol like `{{MyComponent}}` in a React codebase, or a Jinja2/Handlebars template fragment extracted from docs). The simple string substitution replaces the placeholder, but the label value itself contains the delimiter, creating malformed output or injecting false placeholders that get substituted in a second pass.
+Annotations stored in `annotations.json` carry `peer_id` and `session_id` to track which agent or user session produced an annotation. If `peer_id` is set to a value derived from machine hostname, username, API key prefix, or other environmental data, the annotation file becomes a sensitive artifact. Pushing `graphify-out/` to a public repository (a common developer workflow) would expose machine identity, user identity, or API key fragments.
+
+Second-order: if `session_id` is a UUID derived from a timestamp + machine ID (as Python's `uuid.uuid1()` does), it embeds MAC address information in the annotation file.
 
 **Why it happens:**
-Simple `str.replace("{{label}}", value)` is safe for single-pass substitution IF the replacement value cannot contain the delimiter. But node labels from code graphs routinely contain `{`, `}`, `{{`, `}}`.
+The Honcho-inspired peer model requires tracking WHO annotated what. The obvious implementation pulls identity from the environment — `os.environ.get("USER")`, `socket.gethostname()`, or Claude session metadata. These are convenient but sensitive.
 
-**Consequences:**
-- Malformed note body (missing text, corrupted structure)
-- If a multi-pass substitution is ever added, arbitrary content injection from label into template
-- Template fields like `{{created}}` appear literally in notes if the node label replaces `{{label}}` with a value that consumed part of the template
+**How to avoid:**
+Use only user-controlled, explicitly-provided identity, not environment-derived identity:
+- `peer_id` must be explicitly set in graphify config or passed as a CLI flag: `graphify mcp --peer-id myagent`. If not set, default to the anonymous string `"anonymous"` (not to hostname or username).
+- `session_id` must be a UUID4 (random, not time+MAC). Use `uuid.uuid4()` exclusively.
+- Add `graphify-out/` to the default `.gitignore` template that `graphify install` creates. Add an explicit note in the annotations schema that `graphify-out/annotations.json` may contain session metadata and should not be committed to public repositories.
 
-**Prevention:**
-Use a single-pass substitution with non-colliding delimiters and escape the replacement value before substitution. The safest approach: replace all occurrences of each placeholder exactly once, and sanitize the replacement value by escaping `{` and `}` before insertion:
 ```python
-def render_template(template: str, context: dict[str, str]) -> str:
-    result = template
-    for key, value in context.items():
-        # Escape braces in value to prevent collision
-        safe_value = str(value).replace("{", "&#123;").replace("}", "&#125;")
-        result = result.replace(f"{{{{{key}}}}}", safe_value)
-    return result
+import uuid
+def new_session_id() -> str:
+    return str(uuid.uuid4())  # random, no MAC address
+
+def resolve_peer_id(cli_flag: str | None) -> str:
+    if cli_flag:
+        return sanitize_label(cli_flag)[:64]  # user-provided, sanitized
+    return "anonymous"  # never derive from environment
 ```
-Alternatively, use `string.Template` with `$label` syntax — `$` is extremely rare in node labels. Document the chosen delimiter in the profile schema so users writing custom templates know the syntax.
 
-**Detection (warning signs):**
-- Nodes extracted from JavaScript/TypeScript, JSX, Jinja2, Go templates, or Helm charts
-- Any node label containing `{` or `}`
-- Template placeholders that overlap with Obsidian Templater plugin syntax (`{{` is Templater syntax too)
+**Warning signs:**
+- `peer_id` is assigned from `os.environ.get("USER")` or `socket.gethostname()`
+- `session_id` is generated with `uuid.uuid1()`
+- No `.gitignore` guidance for `graphify-out/`
 
-**Phase:** Phase 1 (template renderer). Test with node labels containing `{{`, `}}`, `$`, and backticks.
+**Phase to address:** Phase 7 (MCP Write-Back) — peer identity schema must be defined before the first annotation is written.
 
 ---
 
-### Pitfall 7: Security — Path Traversal via profile.yaml Folder Mapping
+### Pitfall 7: propose_vault_note Allows Agent-Driven Arbitrary File Writes
 
 **What goes wrong:**
-A profile.yaml `folder_mapping` entry specifies `folder: "../../.ssh"` or `folder: "/etc/passwd"`. The adapter resolves the output path as the vault root joined with the configured folder, and writes note files outside the vault directory. This is a directory traversal vulnerability via configuration file.
+The `propose_vault_note` MCP tool is supposed to require human approval before writing to the vault. If the approval gate is not implemented atomically — if the tool writes the note and then asks for approval, or if the approval check can be bypassed by a crafted tool argument — an agent can write arbitrary content to arbitrary paths inside the vault. Combined with path traversal via the note title (e.g., a note titled `../../.ssh/authorized_keys`), this is a remote code execution risk.
 
 **Why it happens:**
-Folder values from `profile.yaml` are used as path components without validation. The profile could be from an untrusted source (auto-downloaded, committed by a collaborator, or crafted by a malicious vault template).
+The Letta-Obsidian reference implementation (`propose_obsidian_note`) writes to a staging area and requires human approval. Implementing this correctly requires: (1) never writing to the target path until approval is confirmed, (2) validating the target path before staging, and (3) ensuring the approval mechanism is synchronous and cannot be skipped by the agent.
 
-**Consequences:**
-- Arbitrary file write to any path writable by the graphify process
-- Potential overwrite of SSH keys, shell configs, or other critical files
-- On systems where graphify runs with elevated privileges, severe
+**How to avoid:**
+Implement a strict two-step flow:
+1. `propose_vault_note` writes ONLY to a staging directory (`graphify-out/proposals/{uuid}.json`) containing the proposed note content and target path. Returns a proposal ID. Never writes to the vault.
+2. A separate human-facing command (`graphify approve-proposal {id}`) reads the staged proposal, validates the target path via `validate_vault_path()` from `security.py`, confirms with the user (terminal prompt or `--yes` flag), and only then writes.
 
-**Prevention:**
-Apply the same `validate_graph_path()` pattern from `security.py` to all profile-configured output paths. Resolve the final path and assert it is inside the configured vault output directory:
+All path validation must happen at write time (step 2), not at proposal time (step 1), because the vault root may have changed between steps.
+
+The note content must pass through the existing frontmatter sanitization pipeline (`safe_frontmatter_value`, `safe_tag`, `safe_filename` from `profile.py`). Never write raw agent-supplied content to the vault without sanitization.
+
 ```python
-def validate_vault_path(path: Path, vault_root: Path) -> Path:
-    resolved = (vault_root / path).resolve()
-    try:
-        resolved.relative_to(vault_root.resolve())
-    except ValueError:
-        raise ValueError(
-            f"Profile folder mapping {path!r} escapes vault root {vault_root}. "
-            "Only paths inside the vault directory are permitted."
-        )
-    return resolved
-```
-Validate every path-producing profile field: `folder_mapping`, `template_dir`, `output_dir` override.
-
-**Detection (warning signs):**
-- Any profile field that is used to construct a file path
-- Profile loaded from `.graphify/profile.yaml` inside an untrusted vault
-- `folder_mapping` entries that contain `..`, absolute paths, or drive letters
-
-**Phase:** Phase 1 (profile loader). Security check must be in the loader, not deferred to write time.
-
----
-
-### Pitfall 8: graph.json — Incorrect Format Breaks Obsidian Graph View Silently
-
-**What goes wrong:**
-The current `export.py` writes `.obsidian/graph.json` with `colorGroups[].query` as `"tag:#community/..."`. Obsidian's graph view query syntax does not use `tag:#` — it uses `tag:#tagname` only in search, not in graph filter queries. In the graph view, the filter syntax is `tag:tagname` (no `#`). The color groups are written but never applied because the query syntax is wrong.
-
-**Why it happens:**
-Obsidian has two subtly different query syntaxes: the search bar (`tag:#foo`) and the graph view filter (`tag:foo`). They look similar but the `#` prefix is only for search.
-
-**Consequences:**
-- Graph view shows all nodes in the default color (gray)
-- Community color coding appears to be working (the JSON is written) but has zero visual effect
-- Very hard to debug because the file is syntactically valid JSON
-
-**Prevention:**
-In `graph.json` `colorGroups`, use `tag:community/name` without the `#`:
-```json
-{
-  "colorGroups": [
-    {
-      "query": "tag:community/Machine_Learning",
-      "color": {"a": 1, "rgb": 16711680}
+# serve.py — propose_vault_note handler
+def _tool_propose_vault_note(arguments: dict) -> str:
+    title = sanitize_label(arguments.get("title", ""))[:200]
+    content = arguments.get("content", "")  # sanitized at approval time
+    proposal = {
+        "id": str(uuid.uuid4()),
+        "title": title,
+        "content": content,  # raw, not yet written
+        "proposed_at": datetime.datetime.utcnow().isoformat(),
+        "peer_id": state.peer_id,
     }
-  ]
-}
-```
-Additionally, Obsidian's `graph.json` schema has evolved across versions. Validate against a known working vault's `graph.json` rather than relying on documentation. The `colorGroups` format was introduced in Obsidian 0.12 and has been stable, but `hideAttachments`, `showTags`, and other fields change between versions — only write fields that are explicitly needed.
-
-**Detection (warning signs):**
-- Graph view shows no community colors despite `graph.json` being present
-- Obsidian console (Ctrl+Shift+I) shows JSON parse errors or unknown fields
-
-**Phase:** Phase 1 (graph.json generation). Fix the `#` prefix bug immediately — it exists in the current codebase.
-
----
-
-### Pitfall 9: Dataview Query — Tag Format Restrictions Break Queries
-
-**What goes wrong:**
-Obsidian tags (and therefore Dataview `FROM #tag` queries) have strict format rules: tags cannot contain spaces, cannot start with a number, and cannot contain most special characters except `/` (for nested tags) and `-` (hyphen). A community name like `"Machine Learning 2024"` maps to tag `community/Machine_Learning_2024` only if spaces are replaced. But community names like `"C++ Core"`, `"2D Rendering"`, or `"async/await"` produce tags that are either invalid or collide after sanitization.
-
-**Why it happens:**
-The current `export.py` does `.replace(' ', '_')` on community names for tag generation, which handles spaces but not digits-at-start, slashes (produces nested tag `community/async/await` which Obsidian treats as three-level nesting), or special chars like `+`, `.`, `(`, `)`.
-
-**Consequences:**
-- Invalid tags are silently ignored by Dataview
-- `FROM #community/C++_Core` matches nothing
-- Slashes in community names create unintended tag nesting (`community/async/await` is tag `community` > `async` > `await`)
-- Dataview queries on community overview notes return 0 results
-
-**Prevention:**
-Apply comprehensive tag sanitization:
-```python
-import re
-
-def sanitize_tag(name: str) -> str:
-    """Produce a valid Obsidian tag segment from an arbitrary string."""
-    # Replace spaces and special chars with hyphens
-    tag = re.sub(r'[^a-zA-Z0-9\-_]', '-', name)
-    # Collapse multiple hyphens
-    tag = re.sub(r'-+', '-', tag).strip('-')
-    # Tags cannot start with a digit
-    if tag and tag[0].isdigit():
-        tag = f"g-{tag}"
-    return tag or "unnamed"
-```
-Apply this to every tag segment individually, including community name segments used in nested tags.
-
-**Detection (warning signs):**
-- Community names from LLM-generated labels (highly variable, often contain special chars)
-- Node labels sourced from code (frequently contain `+`, `*`, `<`, `>`, `::`, `/`)
-- Any Dataview query returning 0 results when matching notes exist
-
-**Phase:** Phase 1. Fix `safe_name()` usage in tag generation. Add a test asserting that a community named `"C++ Core/2D"` produces a valid Obsidian tag.
-
----
-
-### Pitfall 10: Wikilink Generation — Duplicate Display Names Across Different Nodes
-
-**What goes wrong:**
-Two nodes with different IDs but the same label (e.g., two `__init__` functions from different Python modules) both produce the same base filename. The current `export.py` deduplicates by appending `_1`, `_2`, etc. But a wikilink `[[__init__]]` in one note resolves to whichever note Obsidian finds first — the numeric suffix must appear in the wikilink too. If the wikilink omits the suffix, Obsidian resolves it to the wrong note, and the graph view shows a collapsed node.
-
-**Why it happens:**
-The deduplication logic tracks `node_filename[node_id]` correctly, but the ORDER in which `G.nodes(data=True)` iterates is not deterministic across Python versions or graph mutations. Node `__init__` from `module_a` might get suffix `_1` on one run and `_2` on the next run, making wikilinks in previously generated notes stale.
-
-**Consequences:**
-- Wikilinks point to wrong notes after re-run
-- Obsidian shows unresolved links (red in graph view) when notes do exist
-- Community member lists in overview notes link to wrong nodes
-
-**Prevention:**
-Sort nodes deterministically before assigning filenames — sort by `source_file` + `label` to produce a stable ordering:
-```python
-sorted_nodes = sorted(G.nodes(data=True), key=lambda nd: (nd[1].get("source_file",""), nd[1].get("label", nd[0])))
-```
-Also generate aliases in the frontmatter for deduplicated nodes so Obsidian can find them by either name:
-```yaml
-aliases:
-  - __init__
+    # Write ONLY to staging — never to vault
+    staging = Path("graphify-out/proposals") / f"{proposal['id']}.json"
+    staging.parent.mkdir(parents=True, exist_ok=True)
+    staging.write_text(json.dumps(proposal, ensure_ascii=False), encoding="utf-8")
+    return f"Proposal {proposal['id']} staged. Run: graphify approve-proposal {proposal['id']}"
 ```
 
-**Detection (warning signs):**
-- Any codebase with common function/class names (`__init__`, `main`, `index`, `handler`)
-- Re-running graphify on the same project and seeing different deduplication suffixes
+**Warning signs:**
+- `propose_vault_note` writes to the vault directory (not to `graphify-out/proposals/`)
+- Path validation happens before staging rather than at approval time
+- Agent-supplied note title is used directly in path construction without `safe_filename()`
+- No human-in-the-loop confirmation step exists in the implementation
 
-**Phase:** Phase 1 (filename generation). Add a test with two nodes that have identical labels and assert deterministic suffix assignment across multiple runs.
-
----
-
-## Moderate Pitfalls
+**Phase to address:** Phase 7 (MCP Write-Back) — staging-only pattern must be the architecture from day one.
 
 ---
 
-### Pitfall 11: YAML Multiline Strings — Folded/Literal Block Scalars in Frontmatter
+## Technical Debt Patterns
 
-**What goes wrong:**
-PyYAML, when serializing a string containing newlines, produces a literal block scalar (`|`) or folded scalar (`>`). Obsidian's Properties panel does not render multi-line YAML string values correctly — it shows the raw `|` or `>` character followed by the content as a single broken line. This affects `description:` or `summary:` fields populated from graph analysis data.
+Shortcuts that seem reasonable but create long-term problems.
 
-**Prevention:**
-For frontmatter fields, strip newlines from all string values before YAML serialization. If a description field needs multiple sentences, join them with a space or use a YAML list instead of a multiline string. Pass `width=float('inf')` to `yaml.dump()` to prevent PyYAML from line-wrapping long strings (which also triggers block scalar output).
-
-**Phase:** Phase 1. Add sanitization in the frontmatter builder for any field sourced from analysis text.
-
----
-
-### Pitfall 12: Merge — Frontmatter Field Ordering Changes Trigger False Diffs
-
-**What goes wrong:**
-The existing note has frontmatter in user-authored order (`up:`, `related:`, `tags:`, `created:`). The adapter writes the merged frontmatter in template-defined order (`created:`, `tags:`, `up:`, `related:`). Git (if the vault is versioned) shows the entire frontmatter block as changed on every run, even when no values changed. This noise pollutes git history and causes confusion.
-
-**Prevention:**
-After merging frontmatter dicts, write fields in the order they appear in the existing note first, then append any new fields. Implement a key-ordered merge:
-```python
-def ordered_merge(existing_keys: list[str], merged: dict) -> dict:
-    result = {}
-    for k in existing_keys:
-        if k in merged:
-            result[k] = merged[k]
-    for k, v in merged.items():
-        if k not in result:
-            result[k] = v
-    return result
-```
-
-**Phase:** Phase 2 (merge strategy refinement). Acceptable to defer until after initial merge is working, but must be addressed before production use.
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Embedding annotations into `graph.json` node attributes | Single file to manage | Every annotation write requires rewriting the full graph JSON; concurrent access corrupts the graph; CI/CD pipeline re-runs lose all annotations (graph.json is regenerated) | Never — annotations must be a separate file |
+| Storing full graph in each snapshot (uncompressed) | Simple implementation | Storage grows by graph size per run; for large codebases (5K+ nodes) each snapshot is multi-MB | Never for production; acceptable for a proof-of-concept only |
+| Loading graph.json once at serve() startup and never reloading | Simple in-memory access | Stale reads after CLI re-runs; mutation tools modify stale state; no way to refresh without restarting the MCP server | Acceptable only for read-only MCP servers with no mutation tools |
+| Using os.environ USER/hostname as peer_id | Zero config | Leaks machine identity in annotation files committed to repos | Never — always use explicit config or "anonymous" |
+| Writing vault notes directly from propose_vault_note without staging | Simpler implementation | Bypasses human approval gate; enables agent-driven arbitrary file writes | Never — staging is non-negotiable |
+| JSONL append for annotations without periodic compaction | No locking needed, crash-safe | File grows unbounded; reads must scan entire file; duplicate annotations for same node accumulate | Acceptable for MVP; add compaction (load → deduplicate → rewrite) at startup before v1.1 ships |
 
 ---
 
-### Pitfall 13: Profile YAML — Missing Fields Cause Silent Fallback to Wrong Defaults
+## Integration Gotchas
 
-**What goes wrong:**
-A profile.yaml is partially defined (user configured `folder_mapping` but omitted `merge_strategy`). The adapter uses a hardcoded default for `merge_strategy` that differs from what the user expects. Since no error is raised, the user does not know the profile is incomplete, and notes are silently overwritten.
+Common mistakes when connecting new v1.1 features to existing graphify modules.
 
-**Prevention:**
-Implement strict schema validation for profile.yaml using a schema dict (no Pydantic, to avoid new dependencies). Log a warning for every missing optional field, listing the default being applied. For required fields, raise `ValueError` with a clear message pointing to the profile key. Provide a `graphify --validate-profile` command that reports missing/invalid fields.
-
-**Phase:** Phase 1 (profile loader). Schema validation must be in the loader.
-
----
-
-### Pitfall 14: Template — Missing Placeholder Context Keys Produce Literal Placeholder Text in Notes
-
-**What goes wrong:**
-A template contains `{{community_label}}` but the template renderer is called for a node type that does not have community data (e.g., an orphan node). The renderer finds no value for `community_label` in the context dict and leaves `{{community_label}}` literally in the note body. Obsidian renders this as text. Dataview queries that filter on empty fields return unexpected results.
-
-**Prevention:**
-The renderer must require that all placeholders in a template be present in the context. On missing key: either raise `KeyError` with the template name and missing key, or substitute a configurable empty string and emit a warning. Never silently leave placeholder text in output. Implement a `validate_template(template_str, context_keys)` function that extracts all `{{...}}` tokens and checks them against available keys before rendering.
-
-**Phase:** Phase 1 (template renderer).
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| `serve.py` + mutation tools | Adding mutation tools to `_handlers` dict that modify `G` directly | Keep `G` as read-only; write-back tools write ONLY to `annotations.json` via `_annotations_write()` helper |
+| `cache.py` + snapshot persistence | Reusing `cache_dir()` for snapshots (conflates extraction cache with run history) | Create a separate `snapshot_dir()` returning `graphify-out/snapshots/`; do not mix cache and snapshot storage |
+| `merge.py` + round-trip detection | Treating user-modified sentinel blocks as `SKIP_CONFLICT` | Add `PARTIAL_UPDATE` action that rewrites frontmatter only while preserving body; detect via `graphify_body_hash` stored in frontmatter |
+| `security.py` + annotation writes | Forgetting to call `validate_graph_path()` on the annotations file path | Annotations path must pass `validate_graph_path()` before every write; the path is fixed (`graphify-out/annotations.jsonl`) but the check must be there for CI enforcement |
+| `security.py` + proposal vault path | Validating vault path at proposal time (before user confirms) | Validate vault path at approval time only; `propose_vault_note` writes to `graphify-out/proposals/` which is always valid |
+| `profile.py` + round-trip merge | Reusing `_DEFAULT_FIELD_POLICIES` for the new `graphify_body_hash` field | Add `graphify_body_hash: "replace"` to `_DEFAULT_FIELD_POLICIES` in `merge.py` so it is always refreshed on UPDATE |
+| `analyze.py` + delta report | Running god-node analysis on the delta (new/removed nodes only) instead of the full graph | Delta analysis compares two full graphs; god-node ranking runs on each full graph independently, then changes are diffed |
 
 ---
 
-### Pitfall 15: Obsidian Alias Resolution — Spaces in Filenames vs. Underscores in Wikilinks
+## Performance Traps
 
-**What goes wrong:**
-Obsidian resolves `[[Machine Learning]]` to a file named `Machine Learning.md`. But `[[Machine_Learning]]` does NOT resolve to `Machine Learning.md` — underscores are not treated as spaces in wikilinks. The existing `safe_name()` strips only the listed forbidden characters but preserves spaces. If any code path normalizes spaces to underscores for tag generation but reuses the same string for wikilink generation, links break.
+Patterns that work at small scale but fail as usage grows.
 
-**Prevention:**
-Maintain strict separation between filename strings (spaces allowed, used for wikilinks) and tag strings (spaces replaced with hyphens/underscores). Never share the same sanitized string between both use cases. Define explicit functions: `to_filename(label)` and `to_tag(label)`, and use them consistently.
-
-**Phase:** Phase 1. The existing code already separates `safe_name` from tag generation mostly correctly, but the new profile system must enforce this distinction explicitly.
-
----
-
-## Minor Pitfalls
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Loading full graph JSON for every read tool call (no caching) | MCP query latency spikes; server pegged on large graphs | Load once at startup; use mtime-based reload only when graph.json changes | ~500 nodes (50ms reads become seconds for BFS) |
+| Full snapshot diff (node-by-node Python dict comparison) | GRAPH_DELTA.md generation takes >10 seconds | Use NetworkX's built-in set operations: `set(G1.nodes()) - set(G2.nodes())` for additions/removals; avoid per-node attribute comparison unless needed | ~2000 nodes |
+| Scanning entire `annotations.jsonl` on every read | MCP annotation reads slow; large annotation files cause tool timeouts | Build an in-memory index of `{node_id: [annotation_indices]}` at server startup; rebuild index on file change | ~10,000 annotations |
+| Writing snapshot manifest JSON with full metadata for every snapshot | Manifest grows proportionally to snapshot count; loading manifest to find latest snapshot becomes slow | Manifest stores only `{timestamp, summary_path, full_path, node_count}` (not full node lists); cap manifest at last 100 entries | ~100 snapshots |
+| Uncompressed full-graph snapshots | `graphify-out/snapshots/` fills disk; slow snapshot loading | Compress full snapshots with `gzip` (stdlib `gzip.open()`, no new dependency); summary snapshots remain uncompressed for fast access | ~5 runs on a 10K-node graph |
 
 ---
 
-### Pitfall 16: graph.json — Writing to Existing Vault Overwrites User's Graph Settings
+## Security Mistakes
 
-**What goes wrong:**
-The adapter writes `.obsidian/graph.json` with only community color groups, overwriting the user's existing graph view settings (display depth, filters, show tags toggle, show orphans setting, link strength).
+Domain-specific security issues for v1.1 features.
 
-**Prevention:**
-Read the existing `graph.json` if present, merge only the `colorGroups` array, and write back. Do not overwrite other keys. If `.obsidian/graph.json` does not exist, write only the `colorGroups` key with a minimal valid structure.
-
-**Phase:** Phase 1 (graph.json generation). The current export.py already has this bug — it overwrites unconditionally.
-
----
-
-### Pitfall 17: Unicode in Tag Values — Emoji and Non-Latin Scripts
-
-**What goes wrong:**
-Community names with emoji (`"🧠 AI Core"`) or non-Latin scripts (`"机器学习"`) produce tags that are technically valid in Obsidian (which supports Unicode tags) but may break Dataview's `FROM #tag` query parser in older plugin versions. The `#` character in the middle of a tag segment (e.g., from a label containing `#`) silently terminates the tag.
-
-**Prevention:**
-The `sanitize_tag()` function (see Pitfall 9) should strip emoji and non-ASCII characters from tag segments if the profile targets maximum compatibility. Offer a profile setting `tag_charset: ascii|unicode` with `ascii` as the safe default for compatibility.
-
-**Phase:** Phase 2. Low priority unless vault targets older Dataview versions.
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Accepting agent-supplied `peer_id` without sanitization | Agent injects control characters or HTML into annotation metadata; stored in `annotations.jsonl` and read back into MCP responses | Run `sanitize_label()` (from `security.py`) on all peer_id and session_id values before storing |
+| Using annotation `content` field directly in MCP tool response without sanitization | XSS-equivalent in agents that render MCP tool responses as HTML; stored malicious content replayed to future agents | Run `sanitize_label()` on annotation content at read time before returning in MCP response |
+| Proposal staging directory path not validated | Agent supplies `../../../etc/cron.d/graphify` as staging subpath | Staging directory is hardcoded to `graphify-out/proposals/` by server logic, not derived from agent input; proposal filename is server-generated UUID4, never agent-supplied |
+| Delta report embedding raw node labels without HTML escaping | `GRAPH_DELTA.md` is rendered in Obsidian which processes markdown; malicious node label (`<script>alert()</script>`) executes in Obsidian's embedded browser pane | Apply `html.escape()` to all node labels before embedding in `GRAPH_DELTA.md`; already done in `export.py` for HTML viz — same pattern applies to delta markdown |
+| `propose_vault_note` content written to staging without size cap | Agent supplies 100MB string as note content; fills `graphify-out/proposals/` | Cap proposal content at `_MAX_TEXT_BYTES` from `security.py` (10 MB) before staging |
+| Annotation timestamp stored as agent-supplied string | Agent lies about when annotation was made; disrupts temporal analysis of peer behavior | `timestamp` in annotations is always `datetime.datetime.utcnow().isoformat()` from server side; never accepted from agent input |
 
 ---
 
-### Pitfall 18: Wikilink Aliases — Display Text Containing `|` Breaks the Link
+## "Looks Done But Isn't" Checklist
 
-**What goes wrong:**
-Obsidian wikilink syntax for aliases is `[[Target|Display Text]]`. If the display text itself contains `|`, the link is malformed. Node labels from code graphs (e.g., `A|B` as a type union in TypeScript) can contain `|`.
+Things that appear complete in v1.1 but are missing critical pieces.
 
-**Prevention:**
-When generating wikilinks with display text, strip or replace `|` in the display portion: `display.replace("|", "or")` or `display.replace("|", " | ")` (the space-padded version is not interpreted as alias separator by Obsidian).
-
-**Phase:** Phase 1 (wikilink builder). Small guard, easy to miss.
-
----
-
-## Phase-Specific Warnings
-
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Profile loader (YAML parsing) | Missing fields silently using wrong defaults (P13) | Strict schema validation with explicit warnings for every defaulted field |
-| Frontmatter generation | Unquoted special chars breaking YAML (P1), wikilinks not registering backlinks (P2) | Use PyYAML for all non-wikilink fields; manual wikilink list rendering with tested pattern |
-| Filename generation | Unicode normalization duplicates (P4), OS path limits (P5), determinism (P10) | NFC normalization + 200-char cap + sort-stable deduplication, all in Phase 1 |
-| Template renderer | Placeholder collision from node labels (P6), missing keys (P14) | Single-pass substitution with brace-escaped values; pre-render validation of all placeholders |
-| Merge strategy | User edits overwritten (P3), field ordering diffs (P12) | Preserve list from profile; ordered merge respecting existing field sequence |
-| Security (path traversal) | profile.yaml folder mapping escaping vault root (P7) | `validate_vault_path()` in profile loader before any path is used |
-| graph.json generation | Wrong query syntax (P8), overwriting user settings (P16) | Fix `tag:#` → `tag:` immediately; read-merge-write instead of overwrite |
-| Tag generation | Invalid Dataview tag format (P9), emoji/Unicode compat (P17) | `sanitize_tag()` applied to every segment; profile setting for charset |
-| Wikilink generation | Alias `|` in display text (P18), space vs underscore confusion (P15) | Separate `to_filename()` / `to_tag()` / `to_wikilink()` functions; strip `|` from display text |
+- [ ] **Snapshot persistence:** Snapshots write and load correctly — but verify pruning runs automatically on every `save_snapshot()` call, not only when a separate `--prune` flag is passed
+- [ ] **MCP mutations:** `annotate_node` saves to `annotations.jsonl` — but verify the MCP server's in-memory annotation index is updated after each write (so subsequent `query_graph` calls reflect the new annotation without restarting the server)
+- [ ] **Delta report:** `GRAPH_DELTA.md` shows new/removed nodes — but verify community migration is tracked (a node moving from community 2 to community 0 is a significant structural change that must appear in the delta)
+- [ ] **Staleness metadata:** `extracted_at` and `source_modified_at` are stored on nodes — but verify `source_hash` is also stored and used as the authoritative staleness signal (not mtime alone)
+- [ ] **Peer identity:** `peer_id` is stored on annotations — but verify it defaults to `"anonymous"` when `--peer-id` is not passed and is never derived from `os.environ` or `socket.gethostname()`
+- [ ] **Round-trip merge:** User-authored content below sentinel blocks is preserved on re-run — but verify that a note with NO sentinel blocks (user created the note manually in Obsidian before graphify ran) produces `CREATE` action, not `SKIP_CONFLICT`
+- [ ] **propose_vault_note:** Staging writes succeed — but verify that the approval step calls `validate_vault_path()` from `security.py` at write time, not at proposal time
+- [ ] **Annotation JSONL:** Append writes work — but verify compaction (deduplication of annotations for the same node) runs at server startup to prevent unbounded growth
 
 ---
 
-## Existing Code Baseline Issues (Pre-existing Bugs in export.py)
+## Recovery Strategies
 
-The following bugs exist in the current `to_obsidian()` implementation and should be fixed as part of this milestone:
+When pitfalls occur despite prevention.
 
-1. **graph.json query uses `tag:#community/...`** — should be `tag:community/...` (no `#`) for graph view filter syntax (P8)
-2. **graph.json overwrites unconditionally** — no read-merge (P16)
-3. **Frontmatter hand-crafted with f-strings** — no PyYAML, no protection against `:`, `"`, `#` in values (P1)
-4. **Node iteration order not sorted** — deduplication suffix assignment is non-deterministic (P10)
-5. **Tag generation uses only `.replace(' ', '_')`** — does not handle `/`, `+`, digits-at-start, etc. (P9)
-6. **`sanitize_label` cap is 256 chars** — too long when combined with folder nesting (P5)
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Snapshot directory filled disk | MEDIUM | Delete `graphify-out/snapshots/` entirely; re-run graphify to generate fresh baseline; no code data is lost (snapshots are derived from graph.json) |
+| annotations.jsonl corrupted by concurrent write | LOW | Validate each JSONL line independently; skip malformed lines; compact the file by rewriting only valid lines; data loss is bounded to the concurrent write window |
+| User-authored content overwritten by merge bug | HIGH | Restore from vault's git history (recommend users keep vault in git); if no git, content is unrecoverable; implement `--dry-run` as mandatory first step before any re-run on edited vaults |
+| Ghost nodes flooding delta report (source files moved) | LOW | Run `graphify --prune-ghosts` to remove nodes whose `source_file` no longer exists; re-run extraction on the new paths |
+| peer_id leaking sensitive data in committed annotations | HIGH | Rotate: remove `graphify-out/annotations.jsonl` from git history using `git filter-repo`; add `graphify-out/` to `.gitignore` immediately; regenerate annotations with `"anonymous"` peer_id |
+| propose_vault_note written malicious content before approval gate | HIGH | Delete `graphify-out/proposals/` directory; audit vault for unexpected files; implement staging-only pattern as emergency patch |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| Snapshot unbounded growth (P1) | Phase 6 (Delta Analysis) | `save_snapshot()` test: write 15 snapshots, assert only 10 remain in `graphify-out/snapshots/`; assert archived ones are compressed |
+| MCP mutation breaks read-only invariant (P2) | Phase 7 (MCP Write-Back) | `serve.py` test: mutation tool call does not modify `G` in-place; `graph.json` mtime unchanged after annotation write |
+| annotations.json concurrent write corruption (P3) | Phase 7 (MCP Write-Back) | JSONL append test: simulate two concurrent append writes; assert both entries are readable in final file |
+| Obsidian merge conflict on user-modified body (P4) | Phase 8 (Obsidian Round-Trip) | `merge.py` test: note with user-modified body below sentinel produces `PARTIAL_UPDATE`, not `SKIP_CONFLICT`; user body is preserved in output |
+| Staleness metadata meta-staleness (P5) | Phase 6 (Delta Analysis) | `snapshot.py` test: node with deleted `source_file` is classified `GHOST`, not `FRESH`; hash comparison used over mtime for STALE classification |
+| Peer identity leaking sensitive data (P6) | Phase 7 (MCP Write-Back) | `annotations.py` test: `resolve_peer_id(None)` returns `"anonymous"`; `new_session_id()` returns UUID4 (no MAC component: `uuid.UUID(s).version == 4`) |
+| propose_vault_note arbitrary file write (P7) | Phase 7 (MCP Write-Back) | `serve.py` test: `propose_vault_note` writes ONLY to `graphify-out/proposals/`; vault directory is unchanged after tool call; path traversal in title is blocked at approval time |
+
+---
+
+## Sources
+
+- graphify codebase: `graphify/serve.py` (MCP server architecture, read-only invariant), `graphify/merge.py` (action vocabulary, sentinel blocks, field policies), `graphify/cache.py` (hash-based storage pattern, `os.replace()` atomic write), `graphify/security.py` (`sanitize_label`, `validate_graph_path`, path confinement model)
+- `.planning/PROJECT.md` v1.1 requirements (snapshot persistence, MCP write-back, peer identity, `propose_vault_note`, Obsidian round-trip, per-node staleness metadata)
+- `.planning/notes/repo-gap-analysis.md` (Honcho peer model, CPR summary+archive pattern, Letta-Obsidian `propose_obsidian_note` staging architecture, Context Constitution staleness-as-first-class, smolcluster bounded staleness)
+- Python stdlib: `uuid` module docs (uuid1 MAC address risk, uuid4 randomness guarantee), `fcntl` POSIX advisory locks, `gzip` compression, `os.replace()` atomicity guarantees
+
+---
+*Pitfalls research for: v1.1 Context Persistence & Agent Memory — graphify*
+*Researched: 2026-04-12*

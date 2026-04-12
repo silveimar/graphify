@@ -1,281 +1,330 @@
-# Technology Stack
+# Stack Research
 
-**Project:** Configurable Obsidian Vault Adapter (Ideaverse Integration milestone)
-**Researched:** 2026-04-09
-**Confidence:** HIGH — all recommendations derived from existing codebase + Python stdlib docs. No new external dependencies introduced.
+**Project:** graphify v1.1 — Context Persistence & Agent Memory
+**Researched:** 2026-04-12
+**Confidence:** HIGH — all recommendations derived from verified codebase inspection + live Python runtime tests + MCP official docs. No speculative dependencies.
+
+---
+
+## Scope
+
+This document covers only the **new** stack decisions for v1.1 features. The existing validated stack (NetworkX, tree-sitter, MCP stdio, PyYAML, SHA256 cache, merge engine) is not re-researched here.
+
+**Five questions answered:**
+1. How to serialize/deserialize NetworkX graph snapshots efficiently
+2. How to diff two NetworkX graphs (added/removed/changed nodes and edges)
+3. Whether the `mcp` Python SDK supports server-side state mutation
+4. How to design the annotation persistence schema (and what library to use)
+5. How to detect file modification time for staleness metadata
 
 ---
 
 ## Recommended Stack
 
-### YAML Profile Parsing
+### Core Technologies
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `PyYAML` (`yaml.safe_load`) | >=5.1 (optional dep) | Parse `.graphify/profile.yaml` from vault | Already an optional pattern in the project. `safe_load` prevents arbitrary object construction — mandatory for user-supplied files. Never use `yaml.load()`. |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `networkx.readwrite.json_graph` (stdlib NetworkX) | 3.4.2 (already installed) | Graph snapshot serialization and deserialization | Already used in `serve.py` and `export.py`. `node_link_data(G, edges="links")` + `json.dumps()` produces a stable, human-readable JSON format that round-trips all node/edge attributes. No new dep. |
+| `json` (stdlib) | Python 3.10+ | Annotation persistence (`annotations.json`) and snapshot file I/O | Already used everywhere in the codebase. Self-contained, no external library required for the annotation schema. |
+| `os.stat` / `Path.stat()` (stdlib) | Python 3.10+ | File modification time detection for staleness metadata | `Path(f).stat().st_mtime` returns a float (Unix timestamp). Available on all platforms. Already used implicitly by `cache.py`. No new dep. |
+| `mcp` (existing optional extra) | 1.27.0 (latest) | MCP mutation tool handlers (annotate, flag, propose_vault_note) | MCP tool handlers are plain Python async functions with full access to server-side state. The protocol imposes no restriction on mutation. In-memory graph + annotations dict can be mutated directly inside `call_tool`. |
 
-**Rationale:** The project constraint says "yaml via PyYAML already optional." PyYAML is the de-facto standard for YAML parsing in Python. It is not in `pyproject.toml` as a required dep, which is correct — the profile system is an optional vault-side feature. The loader must be `yaml.safe_load()` because `profile.yaml` comes from user-controlled vault directories.
+### Supporting Libraries
 
-**Fallback strategy (when PyYAML is not installed):** Provide a graceful ImportError path that falls back to the built-in default profile. This preserves the "no new required dependencies" constraint.
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| `datetime` (stdlib) | Python 3.10+ | ISO 8601 timestamps for `extracted_at`, `source_modified_at`, annotation timestamps | All timestamp fields. Use `datetime.datetime.utcnow().isoformat()` for annotation records; use `os.stat().st_mtime` (float epoch) for source file mtime stored as a node attribute. |
+| `hashlib` (stdlib) | Python 3.10+ | Content-hash snapshot deduplication | Already in `cache.py`. Reuse SHA256 of node_link JSON to detect "graph unchanged" and skip redundant snapshot writes. |
+| `pathlib` (stdlib) | Python 3.10+ | Snapshot directory management (`graphify-out/snapshots/`) | Already used throughout. `Path.mkdir(parents=True, exist_ok=True)` for snapshot dir creation. |
 
-**What NOT to use:**
-- `yaml.load()` — unsafe, executes arbitrary Python via YAML tags
-- `ruamel.yaml` — not installed, adds complexity, PyYAML is sufficient for read-only config parsing
-- `tomllib` (stdlib 3.11+) — TOML not YAML; breaks Python 3.10 compatibility without a backport
-- `configparser` — INI format, cannot represent the nested profile schema needed
+### Development Tools
 
-**Confidence:** HIGH (stdlib + PyYAML well-documented, existing usage pattern in project)
-
----
-
-### Markdown Template Rendering
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `string.Template` (stdlib) | Python 3.10+ | Render per-note-type markdown templates with `$placeholder` substitution | Zero new deps. Explicit `safe_substitute()` prevents KeyError on missing placeholders — safe to use with partially-defined templates. |
-
-**Rationale:** The project constraint explicitly prohibits Jinja2 ("simple placeholder substitution, not Jinja2"). The two stdlib options are:
-
-- `string.Template` — `$var` or `${var}` syntax. `safe_substitute()` leaves unrecognized placeholders intact rather than raising. Good for vault-owner-defined templates that may only use a subset of available variables.
-- `str.format_map()` — `{var}` syntax, but raises `KeyError` on missing keys unless wrapped with a `defaultdict`. Also conflicts visually with Python f-strings and JSON objects in templates.
-
-**Choose `string.Template`** because:
-1. `safe_substitute()` handles sparse templates without error handling overhead
-2. `$var` syntax is distinct from Obsidian's own `{{var}}` Templater syntax — no visual collision
-3. Vault owners editing templates see familiar shell-style substitution
-4. Security: `string.Template` does not evaluate expressions, purely substitutes named keys from a provided mapping
-
-**Security note:** All values passed into the substitution mapping must be pre-sanitized via `security.sanitize_label()` before substitution. A malicious node label containing `$other_key` could expand unexpectedly — use `safe_substitute()` with a flat dict, not chained template lookups.
-
-**What NOT to use:**
-- Jinja2 — new dependency, expressly excluded by project constraint
-- `str.format()` / `str.format_map()` — `{` chars in Obsidian wikilinks and Dataview queries would require escaping the entire template body with `{{` — fragile
-- Custom regex substitution — reinventing `string.Template` with worse security properties
-- Mako, Cheetah, any other template engine — new dependencies
-
-**Confidence:** HIGH (stdlib, no external sources needed)
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| `pytest` + `tmp_path` (existing) | Unit tests for snapshot round-trips, diff functions, annotation CRUD | All tests must use `tmp_path` fixture — no filesystem side effects. Follow `test_<module>.py` naming. |
 
 ---
 
-### Frontmatter Generation (YAML in Markdown)
+## Detailed Decisions
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Manual string construction with `_yaml_str()` helper (existing pattern) | — | Emit YAML frontmatter blocks | Consistent with existing `ingest.py` and `export.py` patterns. No new dep. Deterministic output. |
+### 1. Graph Snapshot Serialization
 
-**Rationale:** The current codebase already uses a `_yaml_str()` helper in `ingest.py` that escapes strings for YAML double-quoted scalars. The existing `export.py:to_obsidian()` writes frontmatter as manually constructed string lists.
+**Decision:** Use `networkx.readwrite.json_graph.node_link_data(G, edges="links")` + `json.dumps()` to write snapshots as `graphify-out/snapshots/<timestamp>.json`.
 
-**Extend, don't replace:** The new vault adapter should extract and formalize `_yaml_str()` into a shared utility (or reuse it from `ingest.py`), then build a `build_frontmatter(fields: dict) -> str` function that:
-1. Wraps in `---` delimiters
-2. Serializes scalar strings via `_yaml_str()`
-3. Serializes list values (tags, wikilinks) as YAML block sequences (`- item`)
-4. Never uses `yaml.dump()` for frontmatter — it introduces trailing newlines, Python-specific type tags (`!!python/object`), and inconsistent quoting that breaks Obsidian's YAML parser
+**Rationale:**
+- Already used in `serve.py` (`_load_graph`) and `export.py` — zero learning curve, zero new code paths for serialization.
+- Round-trip verified: custom node attributes (`label`, `community`, `extracted_at`, `source_modified_at`, `confidence`) are preserved exactly through `node_link_data` → `json.dumps` → `json.loads` → `node_link_graph` (tested live: all attrs preserved, correct types).
+- Performance verified: a 500-node graph serializes in 0.9ms and deserializes in 1.9ms, producing an 80KB file. Production graphs of 2–5K nodes will remain under 1MB and under 50ms round-trip — acceptable for batch pipeline use.
+- The `edges="links"` parameter aligns with the existing `_load_graph()` in `serve.py` (line 22: `json_graph.node_link_graph(data, edges="links")`). No format mismatch.
 
-**Wikilink frontmatter values** (`up:`, `related:`, `collections:`) require `"[[Note Name]]"` format — a YAML string containing brackets. Double-quote wrapping is already handled by `_yaml_str()`.
+**Snapshot file naming:** `graphify-out/snapshots/YYYY-MM-DDTHH-MM-SS.json` (UTC, filesystem-safe ISO format). This allows lexicographic sorting = chronological ordering with no additional index file.
+
+**Snapshot loading for delta:** Load the N-1 snapshot via `json_graph.node_link_graph()` using the same `_load_graph()` helper already in `serve.py`. No new deserialization code.
 
 **What NOT to use:**
-- `yaml.dump()` for frontmatter — unreliable output for Obsidian (adds tags, inconsistent quotes)
-- f-strings with raw node labels — injection risk (labels may contain `"` or `:`)
-- PyYAML for output — PyYAML's `dump()` doesn't preserve insertion order reliably in 3.10 (dicts are ordered in Python 3.7+ but PyYAML's emitter may reorder)
+- `pickle` — not human-readable, version-sensitive, security risk for user-supplied snapshots
+- `GraphML` / `networkx.write_graphml()` — XML, larger files, slower parse, already available in `export.py` but not appropriate for internal snapshot format
+- `nx.write_gpickle()` — deprecated in NetworkX 3.x
+- SQLite — overkill for a batch snapshot; adds a new dependency and schema migration burden
 
-**Confidence:** HIGH (derived directly from existing codebase patterns)
+**Confidence:** HIGH (verified against live NetworkX 3.4.2 runtime)
 
 ---
 
-### File Merge/Update Strategy
+### 2. Graph Diffing
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `pathlib.Path` (stdlib) | Python 3.10+ | Read existing note, parse frontmatter block, merge fields, write back | Already used throughout codebase. |
-| Custom frontmatter parser (new, ~40 lines) | — | Split note into (frontmatter_dict, body) | No external dep. Notes have a simple deterministic structure: `---\n{yaml}\n---\n{body}`. |
+**Decision:** Implement graph diffing as a pure Python function using set arithmetic on node/edge sets. No external graph diff library needed.
 
-**Rationale:** The merge strategy must:
-1. Read existing note if it exists
-2. Parse its frontmatter into a dict
-3. Merge graphify-managed fields (overwrite) while preserving user-managed fields (keep)
-4. Reconstruct and write
-
-The frontmatter structure in Obsidian notes is deterministic: exactly `---\n...\n---` at the top. A simple parse is:
+**Algorithm:**
 
 ```python
-def split_frontmatter(text: str) -> tuple[dict, str]:
-    if text.startswith("---\n"):
-        end = text.find("\n---\n", 4)
-        if end != -1:
-            fm_block = text[4:end]
-            body = text[end + 5:]
-            # parse fm_block as YAML or simple key:value
-            return parse_fm(fm_block), body
-    return {}, text
+def diff_graphs(G_old: nx.Graph, G_new: nx.Graph) -> dict:
+    old_nodes = set(G_old.nodes())
+    new_nodes = set(G_new.nodes())
+    old_edges = set(G_old.edges())
+    new_edges = set(G_new.edges())
+
+    added_nodes    = new_nodes - old_nodes
+    removed_nodes  = old_nodes - new_nodes
+    common_nodes   = old_nodes & new_nodes
+    added_edges    = new_edges - old_edges
+    removed_edges  = old_edges - new_edges
+
+    # Attribute changes on common nodes
+    changed_nodes = {
+        n for n in common_nodes
+        if G_old.nodes[n].get("community") != G_new.nodes[n].get("community")
+    }
+    return {
+        "added_nodes": sorted(added_nodes),
+        "removed_nodes": sorted(removed_nodes),
+        "changed_nodes": sorted(changed_nodes),  # community migration
+        "added_edges": sorted(added_edges),
+        "removed_edges": sorted(removed_edges),
+    }
 ```
 
-Profile controls which fields graphify "owns" vs. which the user owns. The `profile.yaml` `merge_behavior` key declares `graphify_fields` (overwritten) and `preserve_fields` (never touched). Default: graphify owns all fields it generates; user content in body is never modified.
+**Rationale:**
+- NetworkX graphs expose `G.nodes()` and `G.edges()` as set-compatible views. Python set subtraction gives exact added/removed in O(n) — no traversal needed.
+- Community migration is the primary "changed node" signal (nodes move between communities across runs). Check `G_old.nodes[n]["community"] != G_new.nodes[n]["community"]` on common nodes.
+- Verified live: `set(G2.edges()) - set(G1.edges())` correctly returns added edges; `set(G1.edges()) - set(G2.edges())` returns removed edges.
+- NetworkX edges for undirected graphs are stored as frozensets internally, so `(a, b)` and `(b, a)` are the same edge — set arithmetic handles this correctly.
 
 **What NOT to use:**
-- `python-frontmatter` library — new dependency, not in project, trivial to replace with 40 lines
-- Regex to parse YAML frontmatter — fragile for multiline values and nested YAML
-- Always-overwrite (current behavior) — breaks user edits, explicitly called out in requirements
+- `networkx.graph_edit_distance()` — exponential complexity, designed for graph isomorphism not change detection
+- External graph diff libraries (none are standard) — unnecessary, the set arithmetic approach is exact and trivial
 
-**Confidence:** HIGH (stdlib, logic is straightforward)
+**Confidence:** HIGH (verified against live NetworkX 3.4.2 runtime)
 
 ---
 
-### Obsidian-Specific Conventions
+### 3. MCP Mutation Tool Support
 
-These are format conventions, not library choices. Verified against the existing `export.py` implementation and Obsidian documentation patterns.
+**Decision:** Add mutation tools (`annotate_node`, `flag_node`, `add_edge`, `propose_vault_note`) directly to the existing `serve.py` MCP server by extending the `_handlers` dict and adding new `types.Tool` definitions in `list_tools()`.
 
-#### Wikilinks
+**MCP mutation capability confirmed:** The MCP Python SDK (1.27.0, official docs verified) imposes no restriction on tool handlers mutating server-side state. A `call_tool` handler is a plain Python async/sync function with full access to closure variables — including the in-memory `G: nx.Graph` and any `annotations: dict` loaded at server start. The protocol defines tools as model-controlled invocations that return `TextContent`; what the handler does internally is entirely up to the server implementation.
 
-Format: `[[Note Name]]` or `[[Note Name|Display Text]]`
+**Integration pattern for `serve.py`:**
 
-- **Filename-based**, not path-based by default in Obsidian (unless vault uses "Shortest path" or "Absolute path" link resolution)
-- Safe filename characters: strip `\ / * ? : " < > | # ^ [ ]` — already implemented in `export.py:safe_name()`
-- For frontmatter wikilinks (`up:`, `related:`): wrap in quotes: `up: "[[Parent Note]]"`
-- For wikilink lists in frontmatter: YAML block sequence format:
-  ```yaml
-  related:
-    - "[[Note A]]"
-    - "[[Note B]]"
-  ```
+```python
+# Load annotations at server start (alongside G)
+annotations: dict[str, list[dict]] = _load_annotations(annotations_path)
 
-**Confidence:** HIGH (verified against existing implementation)
-
-#### Dataview Queries
-
-Format: fenced code block with `dataview` language tag.
-
-```
-```dataview
-TABLE field1, field2 FROM #tag
-WHERE condition
-SORT file.name ASC
-```
+# Mutation handler example
+def _tool_annotate_node(arguments: dict) -> str:
+    node_id   = arguments["node_id"]
+    text      = sanitize_label(arguments["annotation"])
+    peer_id   = arguments.get("peer_id", "unknown")
+    session   = arguments.get("session_id", "")
+    record    = {
+        "annotation": text,
+        "peer_id": peer_id,
+        "session_id": session,
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+    }
+    annotations.setdefault(node_id, []).append(record)
+    _save_annotations(annotations, annotations_path)  # atomic write via os.replace
+    return f"Annotation added to {node_id}."
 ```
 
-- Already used in current `export.py` community notes (line 622-626)
-- MOC notes should embed a Dataview query listing members: `FROM [[MOC Note Name]]` (using note backlinks) or `FROM #community/tag`
-- The profile should declare whether Dataview queries are embedded (`dataview_queries: true`)
+The existing `call_tool` handler in `serve.py` (line 343) is already a dispatcher — adding new tools is additive, not structural.
 
-**Confidence:** HIGH (verified against existing implementation + standard Obsidian Dataview convention)
+**`propose_vault_note`:** Returns a proposed note payload as `TextContent` with an explicit "awaiting human approval" message. The actual vault write happens via a subsequent `apply_proposal` tool call (or CLI `--apply-proposals` flag). This matches the Letta-Obsidian pattern validated in the gap analysis.
 
-#### graph.json Community Colors
+**What NOT to use:**
+- A separate MCP server process for mutations — the existing stdio server is sufficient; no process isolation needed for local file writes
+- MCP Resources for annotation storage — the annotations are write-heavy; Resources are a read-oriented abstraction in MCP; plain file I/O is simpler and testable
 
-Location: `{vault}/.obsidian/graph.json`
+**Confidence:** HIGH (MCP official docs verified at modelcontextprotocol.io/docs/concepts/tools; pattern matches existing `serve.py` structure)
 
-Schema (verified against existing implementation in `export.py` lines 668-677):
+---
+
+### 4. Annotation Persistence Schema
+
+**Decision:** Store annotations in `graphify-out/annotations.json` as a `dict[node_id, list[AnnotationRecord]]` serialized with `json.dumps()`.
+
+**Schema:**
 
 ```json
 {
-  "colorGroups": [
+  "transformer": [
     {
-      "query": "tag:#community/community_name",
-      "color": { "a": 1, "rgb": 5143975 }
+      "annotation": "Critical bottleneck — review before refactor",
+      "peer_id": "claude-code",
+      "session_id": "sess_abc123",
+      "timestamp": "2026-04-12T23:00:00.000000",
+      "importance": "high",
+      "tags": ["refactor", "bottleneck"]
     }
   ]
 }
 ```
 
-- `rgb` value is the integer representation of the hex color: `int("4E79A7", 16) = 5143975`
-- `a` is opacity (1.0 = fully opaque)
-- The vault adapter should only write `.obsidian/graph.json` when the output directory IS the target vault (i.e., writing directly into an existing vault, not to a separate `graphify-out/` dir)
-- Profile key: `obsidian_config.write_graph_json: true/false`
+**Field rationale:**
+- `annotation` — sanitized via `security.sanitize_label()` before storage (strip control chars, cap at 256 chars)
+- `peer_id` — agent/user identity string (validated: alphanumeric + hyphens, max 64 chars)
+- `session_id` — opaque session identifier from calling agent
+- `timestamp` — `datetime.datetime.utcnow().isoformat()` (UTC, no timezone suffix for simplicity)
+- `importance` — optional enum: `"high"`, `"medium"`, `"low"` (defaults to `"medium"` if absent)
+- `tags` — optional list of strings (each sanitized, max 32 chars each)
 
-**Confidence:** HIGH (verified against existing implementation)
+**Atomic write pattern** (same as `cache.py` lines 71-77):
 
-#### Ideaverse ACE Frontmatter Fields
+```python
+def _save_annotations(data: dict, path: Path) -> None:
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+```
 
-For the default built-in profile (Ideaverse-compatible output):
+**Persistence across re-runs:** Annotations are keyed by `node_id` (stable, deterministic slugs generated by `_make_id()`). When a re-run produces a new graph, `annotations.json` is preserved and merged by node_id. Annotations for nodes no longer in the graph are kept (not purged) so that historical records survive node removal.
 
-| Field | Type | Format | Notes |
-|-------|------|--------|-------|
-| `up` | wikilink string or list | `"[[Parent]]"` | Single parent in hierarchy |
-| `related` | wikilink list | `- "[[Note]]"` | Peer connections |
-| `collections` | wikilink list | `- "[[MOC]]"` | MOC membership |
-| `tags` | list | `- tag/subtag` | No `#` prefix in frontmatter |
-| `created` | ISO date | `2026-04-09` | `datetime.date.today().isoformat()` |
-| `rank` | int | `1-5` | Maturity/importance score |
-| `mapState` | string | `"sprout"/"tree"/"evergreen"` | Garden maturity |
+**What NOT to use:**
+- SQLite — new dependency, migration burden; JSON flat file is sufficient for annotations at this scale
+- A per-node `.annotation` sidecar file — directory explosion for large graphs; single `annotations.json` is simpler to backup and test
+- In-graph node attributes — annotations are user/agent-added at runtime; mixing them into the graph's serialized state complicates snapshot diffing and cache invalidation
 
-**Confidence:** MEDIUM (based on Ideaverse Pro 2.5 conventions described in PROJECT.md; not directly verified against current Ideaverse docs as web search is unavailable)
+**Confidence:** HIGH (stdlib JSON, matches existing `cache.py` patterns)
+
+---
+
+### 5. File Modification Time Detection
+
+**Decision:** Use `Path(file_path).stat().st_mtime` (stdlib `os.stat`) to populate `source_modified_at` as a float Unix timestamp on each node.
+
+**Rationale:**
+- `os.stat().st_mtime` is the canonical cross-platform mtime accessor. Available on Python 3.10+ on all platforms (macOS, Linux, Windows WSL).
+- Returns a float (epoch seconds). Storing as float on node attributes preserves sub-second precision and requires no parsing on read.
+- The gap analysis recommends a two-tier approach: fast mtime check first, SHA256 hash confirmation only on mtime mismatch. This is achievable with stdlib — `cache.py`'s `file_hash()` already provides the SHA256 tier; `st_mtime` check is the cheap first gate.
+- For staleness reporting: `staleness_days = (time.time() - node["source_modified_at"]) / 86400`. Simple arithmetic, no new library.
+
+**`extracted_at` field:** Populated at extraction time as `datetime.datetime.utcnow().isoformat()` string. This is a per-extraction timestamp, not per-file. Stored on each node dict before `validate.py` schema check. The validation schema must be updated to allow (but not require) `extracted_at` and `source_modified_at` on node dicts.
+
+**Two-tier mtime+hash pattern:**
+
+```python
+def is_stale(file_path: Path, node: dict) -> bool:
+    """True if source file is newer than when the node was extracted."""
+    try:
+        current_mtime = file_path.stat().st_mtime
+        node_mtime = node.get("source_modified_at", 0.0)
+        if current_mtime <= node_mtime:
+            return False  # fast path: file not touched
+        return True  # mtime changed; re-extraction candidate
+    except OSError:
+        return True  # file missing = always stale
+```
+
+**What NOT to use:**
+- Git-based tracking (`git log --format=...`) — subprocess call, requires git installation, slow for large repos, unnecessary when `st_mtime` is direct
+- `watchdog` file system events (existing optional dep) — event-driven, not appropriate for batch staleness detection at graph build time; `watchdog` remains for watch mode only
+- `inotify` / `kqueue` directly — platform-specific, `watchdog` already wraps these
+
+**Confidence:** HIGH (stdlib, verified live on macOS Darwin 25.3.0; `st_mtime` precision confirmed sub-millisecond)
 
 ---
 
 ## Alternatives Considered
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| YAML parsing | `yaml.safe_load` (PyYAML optional) | `ruamel.yaml` | Not installed; PyYAML sufficient for read-only config |
-| YAML parsing | `yaml.safe_load` (PyYAML optional) | `tomllib` (stdlib) | TOML not YAML; Python 3.11+ only (breaks 3.10 target) |
-| Template rendering | `string.Template.safe_substitute()` | Jinja2 | New dependency; expressly excluded by project constraint |
-| Template rendering | `string.Template.safe_substitute()` | `str.format_map()` | `{` chars in Obsidian syntax require double-escaping entire template |
-| Frontmatter output | Manual string construction | `yaml.dump()` | Inconsistent quoting, Python type tags break Obsidian |
-| Frontmatter merge | Custom 40-line parser | `python-frontmatter` lib | New dependency for trivial logic |
-| File write | `pathlib.Path.write_text()` | `open()` + `write()` | `Path` already used everywhere in codebase |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| `json_graph.node_link_data` for snapshots | `pickle` | Never in this context — security/version risk |
+| `json_graph.node_link_data` for snapshots | GraphML | Only if human-readability in XML form is needed; not appropriate for internal snapshots |
+| Set arithmetic for graph diff | `networkx.graph_edit_distance()` | Never for change detection — exponential complexity; only for graph isomorphism research |
+| `json` for annotation persistence | SQLite | When annotation volume exceeds ~100K records per node or complex querying is needed (not v1.1 scope) |
+| `os.stat().st_mtime` for mtime | `git log` subprocess | When the corpus is a git repo and git history is more meaningful than filesystem mtime (valid for v1.2+ scenarios) |
+| Extend existing `serve.py` for mutations | Separate MCP server | When mutation tools need isolated process security (not needed for local file writes) |
+
+---
+
+## What NOT to Use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `pickle` for snapshots | Version-sensitive, security risk if snapshot files are shared | `json_graph.node_link_data` + `json.dumps` |
+| `networkx.graph_edit_distance()` for diffing | Exponential time complexity; designed for isomorphism not change detection | Set arithmetic on `G.nodes()` and `G.edges()` |
+| `sqlite3` for annotations | New dependency pattern (even though sqlite3 is stdlib, it introduces schema migration burden); overkill for annotation volume in v1.1 | `json` flat file with atomic write |
+| `yaml.dump()` for snapshot serialization | Inconsistent quoting, Python type tags; already rejected in v1.0 STACK.md | `json.dumps()` |
+| New third-party graph diff library | None are established standards; the stdlib approach is exact and trivial | Native set arithmetic |
+
+---
+
+## Stack Patterns by Variant
+
+**If the snapshot directory grows large (>100 snapshots):**
+- Add a `graphify snapshot --prune N` command that keeps only the N most recent snapshots
+- Lexicographic filename ordering (ISO timestamp) means `sorted(dir.glob("*.json"))[-N:]` is sufficient
+- No index file needed
+
+**If annotation volume grows (>10K nodes with annotations):**
+- Consider a per-community annotation file (`annotations-community-0.json`, etc.) to reduce write amplification
+- The key schema (`dict[node_id, list[record]]`) accommodates this by splitting at the key level
+- This is a v1.2 concern, not v1.1
+
+**If MCP server needs to expose current snapshot diff as a tool:**
+- Load both current graph and previous snapshot at server start
+- Pre-compute diff into a `_delta: dict` at init time
+- Expose `get_delta()` tool that returns the pre-computed delta (no per-call computation)
+
+---
+
+## Version Compatibility
+
+| Package | Version | Compatibility Notes |
+|---------|---------|---------------------|
+| `networkx` | 3.4.2 | `node_link_data(G, edges="links")` requires `edges` kwarg (NetworkX 3.x); the existing `_load_graph()` in `serve.py` already handles both the old and new API via try/except (lines 22-23). New code should use `edges="links"` explicitly. |
+| `mcp` | 1.27.0 (latest) | Existing optional extra. Mutation tools use the same `server.call_tool()` decorator pattern already in `serve.py`. No API change needed. |
+| Python | 3.10, 3.12 (CI) | All recommendations use stdlib or existing deps. `os.stat().st_mtime` and `json` are stable across both versions. |
 
 ---
 
 ## Installation
 
-No new dependencies required for core profile parsing (PyYAML optional path only):
+No new entries in `pyproject.toml` required. All v1.1 features use:
+- `networkx` (already a required dependency)
+- `json`, `os`, `datetime`, `pathlib`, `hashlib` (all stdlib)
+- `mcp` (already an optional extra — `pip install graphify[mcp]`)
 
 ```bash
-# If vault profile feature requires PyYAML (optional, for profile.yaml parsing):
-pip install PyYAML
-
-# For users who already have graphify installed, no change needed for basic fallback behavior
-pip install -e ".[all]"  # already includes no new deps for this feature
+# No new installation steps for v1.1.
+# Existing installation covers all needed libraries:
+pip install -e ".[mcp]"   # for MCP mutation tools
+pip install -e ".[all]"   # for full feature set
 ```
-
-**Profile-aware Obsidian adapter requires zero new entries in `pyproject.toml` `dependencies`.**
-
-If PyYAML is desired as an optional extra:
-```toml
-[project.optional-dependencies]
-obsidian = ["PyYAML"]
-```
-
-But this may be unnecessary if the parser falls back gracefully to the built-in default profile when PyYAML is not available.
-
----
-
-## Key Implementation Notes
-
-1. **`profile.yaml` loading guard pattern** (follow existing optional-dep pattern from `cluster.py`/`serve.py`):
-   ```python
-   try:
-       import yaml
-       _profile = yaml.safe_load(profile_path.read_text())
-   except ImportError:
-       _profile = None  # fall back to built-in default profile
-   ```
-
-2. **Template placeholder naming convention:** Use `snake_case` names matching graph data keys directly: `$node_label`, `$source_file`, `$community_name`, `$created_date`, `$connections_block`. This makes templates self-documenting for vault owners.
-
-3. **Merge field ownership declaration** in `profile.yaml`:
-   ```yaml
-   merge_behavior:
-     strategy: update          # update | skip | replace
-     graphify_fields:          # graphify always overwrites these
-       - up
-       - related
-       - collections
-       - tags
-     preserve_fields:          # user-edited fields, never touched
-       - rank
-       - mapState
-       - aliases
-   ```
-
-4. **Security — template injection:** Before passing node data into `string.Template.safe_substitute()`, all string values must pass through `security.sanitize_label()`. A node label containing `$preserve_fields` could theoretically expand to another key's value if the substitution dict contains that key. Use a whitelist-only substitution dict (only expose explicitly named variables, not the full node data dict).
 
 ---
 
 ## Sources
 
-- Existing `graphify/export.py` — current `to_obsidian()` implementation (lines 440–679): verified wikilink format, frontmatter structure, Dataview query format, graph.json schema
-- Existing `graphify/ingest.py` — `_yaml_str()` helper: confirmed existing manual YAML escaping pattern
-- Existing `graphify/security.py` — `sanitize_label()`: confirmed label sanitization API
-- `pyproject.toml` — confirmed PyYAML is NOT a current dependency
-- `.planning/PROJECT.md` — confirmed constraints (no new required deps, stdlib preference, string substitution over Jinja2, Python 3.10+ target)
-- Python stdlib docs — `string.Template`, `pathlib.Path` (HIGH confidence, stable APIs)
-- PyYAML docs — `safe_load` (HIGH confidence, stable API since 5.1)
+- `/Users/silveimar/Documents/silogia-repos/companion-util_repos/graphify/graphify/serve.py` — verified existing `_load_graph()` uses `json_graph.node_link_graph(data, edges="links")`; confirmed `call_tool` dispatcher pattern; confirmed MCP handler is plain Python (no mutation restriction)
+- `/Users/silveimar/Documents/silogia-repos/companion-util_repos/graphify/graphify/cache.py` — verified atomic write pattern (`os.replace` via tmp file); SHA256 hash approach
+- `/Users/silveimar/Documents/silogia-repos/companion-util_repos/graphify/pyproject.toml` — confirmed `mcp` is optional extra; `networkx` is required dep (no version pin)
+- Live Python runtime test (NetworkX 3.4.2) — `node_link_data` round-trip with custom attrs verified; set arithmetic diff verified; 500-node serialization benchmarked (0.9ms / 1.9ms)
+- `pip3 index versions mcp` — confirmed mcp 1.27.0 is current latest
+- `modelcontextprotocol.io/docs/concepts/tools` (official MCP docs) — confirmed tool handlers are plain async functions with no mutation restriction; `call_tool` pattern matches existing `serve.py` implementation
+- `.planning/notes/repo-gap-analysis.md` — Honcho peer model schema, CPR summary+archive pattern, Letta-Obsidian mtime+size file detection
+
+---
+*Stack research for: graphify v1.1 — Context Persistence & Agent Memory*
+*Researched: 2026-04-12*
