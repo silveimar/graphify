@@ -41,9 +41,21 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - [x] `graphify --obsidian --dry-run` previews all changes without writing any files _(v1.0, Phase 5)_
 - [x] `graphify --validate-profile <vault-path>` runs a four-layer preflight (schema → templates → dead-rules → path-safety) and exits with appropriate status _(v1.0, Phase 5)_
 
-### Active (v1.1+ candidates — deferred from v1.0 Out of Scope, unscoped until next milestone)
+### Active (v1.1 — Context Persistence & Agent Memory)
 
-_None yet. Next milestone to be defined via `/gsd-new-milestone`. Candidates captured from this milestone's exploration and v2 requirements list (see `.planning/milestones/v1.0-REQUIREMENTS.md`):_
+- [ ] Graph snapshot persistence in `graphify-out/snapshots/` for run-over-run comparison
+- [ ] `GRAPH_DELTA.md` output showing new/removed nodes, community migration, connectivity changes
+- [ ] Per-node staleness metadata (`extracted_at`, `source_modified_at`, confidence decay)
+- [ ] Summary+archive delta pattern (summary for agent context, full diff for search)
+- [ ] MCP mutation tools: annotate nodes, add edges, flag importance, tag with context
+- [ ] Peer identity tracking on annotations (agent name, session ID, timestamp)
+- [ ] Session-scoped graph views via MCP
+- [ ] `propose_vault_note` MCP tool with human approval before write
+- [ ] Annotations persist in `graphify-out/annotations.json` across re-runs
+- [ ] Obsidian round-trip: detect user-modified notes on `--obsidian` re-run
+- [ ] Preserve user-authored content blocks during merge (extend v1.0 merge engine)
+
+### Deferred (v1.2+ — template engine extensions from v1.0)
 
 - [ ] Conditional template sections (`{{#if_god_node}}...{{/if}}` guards) — TMPL-01
 - [ ] Loop blocks for connections in templates (`{{#connections}}...{{/connections}}`) — TMPL-02
@@ -120,19 +132,26 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
+## Current Milestone: v1.1 Context Persistence & Agent Memory
+
+**Goal:** Make graphify a persistent, evolving context layer — not just a one-shot graph builder. Enables agents to read AND write to the knowledge graph across sessions, and gives users visibility into how their codebase/corpus changes over time.
+
+**Target features:**
+- Graph delta analysis with per-node staleness metadata and snapshot persistence
+- MCP write-back with peer modeling, session-scoped views, and `propose_vault_note` tool
+- Obsidian round-trip awareness preserving user-authored content on re-run
+
+**Informed by:** Gap analysis against 12 articles + 7 repositories. See `.planning/notes/april-research-gap-analysis.md` and `.planning/notes/repo-gap-analysis.md`.
+
 ## Current State
 
 **Milestone v1.0 — Ideaverse Integration — Configurable Vault Adapter: ✅ SHIPPED 2026-04-11**
 
-All five v1.0 phases delivered and verified. The configurable vault adapter is the production `to_obsidian()` code path; there is no separate opt-in flag.
+All five v1.0 phases delivered and verified. The configurable vault adapter is the production `to_obsidian()` code path; there is no separate opt-in flag. 5 phases, 22 plans, 31/31 requirements, 872 tests passing. See `.planning/milestones/` for full archives.
 
-- **Phase 1 (Foundation)** — ✅ Complete & verified. `graphify/profile.py` delivers profile loading, validation, safe-filename/tag helpers, and security primitives. Retroactive `01-VERIFICATION.md` closes the evidence gap found by milestone audit.
-- **Phase 2 (Template Engine)** — ✅ Complete & verified (5/5 must-haves). `graphify/templates.py` renders MOC, Community, Thing, Statement, Person, and Source notes via `string.Template` + 6 built-in `.md` templates shipped in the wheel. `render_note()` / `render_moc()` / `render_community_overview()` are the public entry points.
-- **Phase 3 (Mapping Engine)** — ✅ Complete & verified (5/5 must-haves). `graphify/mapping.py` drives topology + attribute classification with first-match-wins precedence. `ClassificationContext` and `_NOTE_TYPES` are the shared types consumed downstream.
-- **Phase 4 (Merge Engine)** — ✅ Complete & verified (28/28 must-haves). `graphify/merge.py` delivers `compute_merge_plan` (pure) and `apply_merge_plan` (atomic writes, content-hash skip, ORPHAN-preservation). `MergePlan`, `MergeAction`, `RenderedNote`, `split_rendered_note`, `format_merge_plan` all exported.
-- **Phase 5 (Integration & CLI)** — ✅ Complete & re-verified (3/3 must-haves). Refactored `to_obsidian()` wires all four modules into a single entry point. `graphify --obsidian [--dry-run]` and `graphify --validate-profile` land in `__main__.py:691-740`. Gap-closure plan 05-06 and subsequent WR-01/WR-02 code-review fixes finished the milestone.
+**Milestone v1.1 — Context Persistence & Agent Memory: ○ DEFINING REQUIREMENTS**
 
-**Next up:** `/gsd-new-milestone` — define v1.1 scope from the "Active (v1.1+ candidates)" list above plus any new requirements that emerge from using v1.0 in production.
+Phases 6–8 scoped. Requirements being defined.
 
 ---
-*Last updated: 2026-04-11 after v1.0 milestone completion*
+*Last updated: 2026-04-12 after v1.1 milestone start*

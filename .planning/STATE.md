@@ -1,36 +1,37 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: "Ideaverse Integration — Configurable Vault Adapter"
-status: complete
-stopped_at: Milestone v1.0 shipped
-last_updated: "2026-04-12T00:05:59.589Z"
-last_activity: 2026-04-11 — v1.0 milestone archived; retrospective written
+milestone: v1.1
+milestone_name: "Context Persistence & Agent Memory"
+status: defining_requirements
+stopped_at: Defining requirements
+last_updated: "2026-04-12"
+last_activity: 2026-04-12 — Milestone v1.1 started
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 22
-  completed_plans: 22
-  percent: 100
+  total_phases: 3
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-11 after v1.0 milestone completion)
+See: .planning/PROJECT.md (updated 2026-04-12 after v1.1 milestone start)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile
-**Current focus:** Planning next milestone — run `/gsd-new-milestone` to scope v1.1
+**Current focus:** v1.1 Context Persistence & Agent Memory — defining requirements
 
 ## Current Position
 
-Milestone: v1.0 Ideaverse Integration — Configurable Vault Adapter — **SHIPPED 2026-04-11**
-Phase: — (between milestones)
-Status: Complete
-Last activity: 2026-04-11 — v1.0 milestone archived; retrospective written
+Milestone: v1.1 Context Persistence & Agent Memory
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-12 — Milestone v1.1 started
 
-Progress: [██████████] 100% (v1.0)
+Progress: [░░░░░░░░░░] 0% (v1.1)
 
 ## Performance Metrics
 
