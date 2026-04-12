@@ -6,9 +6,9 @@
 [![PyPI](https://img.shields.io/pypi/v/graphifyy)](https://pypi.org/project/graphifyy/)
 [![Sponsor](https://img.shields.io/badge/sponsor-safishamsi-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/safishamsi)
 
-**AI 코딩 어시스턴트를 위한 스킬.** Claude Code, Codex, OpenCode, OpenClaw, Factory Droid, 또는 Trae에서 `/graphify`를 입력하면 파일을 읽고 지식 그래프를 구축하여, 미처 몰랐던 구조를 보여줍니다. 코드베이스를 더 빠르게 이해하고, 아키텍처 결정의 "이유"를 찾아보세요.
+**AI 코딩 어시스턴트를 위한 스킬.** Claude Code, Codex, OpenCode, Cursor, Gemini CLI, GitHub Copilot CLI, Aider, OpenClaw, Factory Droid, Trae, 또는 Google Antigravity에서 `/graphify`를 입력하면 파일을 읽고 지식 그래프를 구축하여, 미처 몰랐던 구조를 보여줍니다. 코드베이스를 더 빠르게 이해하고, 아키텍처 결정의 "이유"를 찾아보세요.
 
-완전한 멀티모달 지원. 코드, PDF, 마크다운, 스크린샷, 다이어그램, 화이트보드 사진, 심지어 다른 언어로 된 이미지까지 — graphify는 Claude Vision을 사용하여 이 모든 것에서 개념과 관계를 추출하고 하나의 그래프로 연결합니다. tree-sitter AST를 통해 20개 언어를 지원합니다(Python, JS, TS, Go, Rust, Java, C, C++, Ruby, C#, Kotlin, Scala, PHP, Swift, Lua, Zig, PowerShell, Elixir, Objective-C, Julia).
+완전한 멀티모달 지원. 코드, PDF, 마크다운, 스크린샷, 다이어그램, 화이트보드 사진, 다른 언어로 된 이미지, 그리고 비디오 및 오디오 파일까지 — graphify는 이 모든 것에서 개념과 관계를 추출하고 하나의 그래프로 연결합니다. 비디오는 코퍼스에서 파생된 도메인 인식 프롬프트를 사용하여 Whisper로 로컬 전사됩니다. tree-sitter AST를 통해 22개 언어를 지원합니다(Python, JS, TS, Go, Rust, Java, C, C++, Ruby, C#, Kotlin, Scala, PHP, Swift, Lua, Zig, PowerShell, Elixir, Objective-C, Julia, Vue, Svelte).
 
 > Andrej Karpathy는 논문, 트윗, 스크린샷, 메모를 모아두는 `/raw` 폴더를 관리합니다. graphify는 바로 그 문제에 대한 답입니다 — 원본 파일을 직접 읽는 것 대비 쿼리당 토큰 소비가 71.5배 적고, 세션 간에 영속적이며, 발견한 것과 추측한 것을 정직하게 구분합니다.
 
@@ -46,7 +46,7 @@ graphify는 두 번의 패스로 실행됩니다. 첫 번째는 결정론적 AST
 
 ## 설치
 
-**필수 요구사항:** Python 3.10+ 및 다음 중 하나: [Claude Code](https://claude.ai/code), [Codex](https://openai.com/codex), [OpenCode](https://opencode.ai), [OpenClaw](https://openclaw.ai), [Factory Droid](https://factory.ai), 또는 [Trae](https://trae.ai)
+**필수 요구사항:** Python 3.10+ 및 다음 중 하나: [Claude Code](https://claude.ai/code), [Codex](https://openai.com/codex), [OpenCode](https://opencode.ai), [Cursor](https://cursor.com), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli), [Aider](https://aider.chat), [OpenClaw](https://openclaw.ai), [Factory Droid](https://factory.ai), [Trae](https://trae.ai), 또는 [Google Antigravity](https://antigravity.google)
 
 ```bash
 pip install graphifyy && graphify install
@@ -62,12 +62,17 @@ pip install graphifyy && graphify install
 | Claude Code (Windows) | `graphify install` (자동 감지) 또는 `graphify install --platform windows` |
 | Codex | `graphify install --platform codex` |
 | OpenCode | `graphify install --platform opencode` |
+| GitHub Copilot CLI | `graphify install --platform copilot` |
+| Aider | `graphify install --platform aider` |
 | OpenClaw | `graphify install --platform claw` |
 | Factory Droid | `graphify install --platform droid` |
 | Trae | `graphify install --platform trae` |
 | Trae CN | `graphify install --platform trae-cn` |
+| Gemini CLI | `graphify install --platform gemini` |
+| Cursor | `graphify cursor install` |
+| Google Antigravity | `graphify antigravity install` |
 
-Codex 사용자는 병렬 추출을 위해 `~/.codex/config.toml`의 `[features]` 아래에 `multi_agent = true`도 필요합니다. Factory Droid는 병렬 서브에이전트 디스패치에 `Task` 도구를 사용합니다. OpenClaw는 순차 추출을 사용합니다(해당 플랫폼의 병렬 에이전트 지원은 아직 초기 단계입니다). Trae는 병렬 서브에이전트 디스패치에 Agent 도구를 사용하며 PreToolUse 훅을 **지원하지 않습니다** — AGENTS.md가 상시 작동 메커니즘입니다.
+Codex 사용자는 병렬 추출을 위해 `~/.codex/config.toml`의 `[features]` 아래에 `multi_agent = true`도 필요합니다. Factory Droid는 병렬 서브에이전트 디스패치에 `Task` 도구를 사용합니다. OpenClaw과 Aider는 순차 추출을 사용합니다(해당 플랫폼의 병렬 에이전트 지원은 아직 초기 단계입니다). Trae는 병렬 서브에이전트 디스패치에 Agent 도구를 사용하며 PreToolUse 훅을 **지원하지 않습니다** — AGENTS.md가 상시 작동 메커니즘입니다.
 
 그런 다음 AI 코딩 어시스턴트를 열고 입력하세요:
 
@@ -243,6 +248,25 @@ graphify query "..." --graph path/to/graph.json
 **Git 훅** (`graphify hook install`) - post-commit 및 post-checkout 훅을 설치합니다. 모든 커밋과 브랜치 전환 후 그래프가 자동으로 재빌드됩니다. 재빌드가 실패하면 훅이 0이 아닌 코드로 종료하여 git이 에러를 표시하고 조용히 계속 진행하지 않습니다. 백그라운드 프로세스가 필요 없습니다.
 
 **위키** (`--wiki`) - 커뮤니티 및 갓 노드별 위키피디아 스타일 마크다운 문서와 `index.md` 진입점. 어떤 에이전트든 `index.md`를 가리키면 JSON을 파싱하는 대신 파일을 읽어서 지식 베이스를 탐색할 수 있습니다.
+
+## Obsidian vault 어댑터 (Ideaverse 통합)
+
+`--obsidian`은 지식 그래프를 구조화된 Obsidian vault로 내보냅니다 — 적절한 프론트매터, wikilinks, 태그, Dataview 쿼리, 폴더 배치를 포함합니다. 어댑터는 완전히 프로파일 기반이며, 대상 vault의 `.graphify/profile.yaml`을 읽고 vault 프레임워크에 맞는 노트를 생성합니다.
+
+프로파일이 없으면 기본적으로 [Ideaverse](https://ideaverse.com) 호환 ACE 구조(`Atlas/Maps/`, `Atlas/Dots/Things/` 등)를 생성합니다. Ideaverse, PARA, 커스텀 설정 등 모든 Obsidian vault 프레임워크를 위한 커스텀 프로파일을 작성할 수 있으며 코드 변경은 필요 없습니다.
+
+```bash
+# 프로파일 검증
+graphify --validate-profile ~/vaults/myproject
+
+# 병합 계획 미리보기 (파일 기록 없음)
+graphify --obsidian --obsidian-dir ~/vaults/myproject --dry-run
+
+# 전체 내보내기
+graphify --obsidian --obsidian-dir ~/vaults/myproject
+```
+
+3가지 병합 전략 지원: `update`(기본값, 사용자 편집 필드 보존), `skip`(기존 노트를 덮어쓰지 않음), `replace`(완전 덮어쓰기). 그래프에서 삭제된 노드의 노트는 자동으로 삭제되지 않습니다.
 
 ## 실전 예제
 

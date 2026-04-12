@@ -5,9 +5,9 @@
 [![CI](https://github.com/safishamsi/graphify/actions/workflows/ci.yml/badge.svg?branch=v3)](https://github.com/safishamsi/graphify/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/graphifyy)](https://pypi.org/project/graphifyy/)
 
-**一个面向 AI 编码助手的技能。** 在 Claude Code、Codex、OpenCode、OpenClaw、Factory Droid 或 Trae 中输入 `/graphify`，它会读取你的文件、构建知识图谱，并把原本不明显的结构关系还给你。更快理解代码库，找到架构决策背后的"为什么"。
+**一个面向 AI 编码助手的技能。** 在 Claude Code、Codex、OpenCode、Cursor、Gemini CLI、GitHub Copilot CLI、Aider、OpenClaw、Factory Droid、Trae 或 Google Antigravity 中输入 `/graphify`，它会读取你的文件、构建知识图谱，并把原本不明显的结构关系还给你。更快理解代码库，找到架构决策背后的"为什么"。
 
-完全多模态。你可以直接丢进去代码、PDF、Markdown、截图、流程图、白板照片，甚至其他语言的图片 —— graphify 会用 Claude vision 从这些内容中提取概念和关系，并把它们连接到同一张图里。
+完全多模态。你可以直接丢进去代码、PDF、Markdown、截图、流程图、白板照片、甚至其他语言的图片、视频和音频文件 —— graphify 从这些内容中提取概念和关系，并把它们连接到同一张图里。视频通过 Whisper 本地转录，使用从语料库派生的领域感知提示词。tree-sitter AST 支持 22 种语言（Python、JS、TS、Go、Rust、Java、C、C++、Ruby、C#、Kotlin、Scala、PHP、Swift、Lua、Zig、PowerShell、Elixir、Objective-C、Julia、Vue、Svelte）。
 
 > Andrej Karpathy 会维护一个 `/raw` 文件夹，把论文、推文、截图和笔记都丢进去。graphify 就是在解决这类问题 —— 相比直接读取原始文件，每次查询的 token 消耗可降低 **71.5 倍**，结果还能跨会话持久保存，并且会明确区分哪些内容是实际发现的，哪些只是合理推断。
 
@@ -33,7 +33,7 @@ graphify 分两轮执行。第一轮是确定性的 AST 提取，对代码文件
 
 ## 安装
 
-**要求：** Python 3.10+，并且使用以下平台之一：[Claude Code](https://claude.ai/code)、[Codex](https://openai.com/codex)、[OpenCode](https://opencode.ai)、[OpenClaw](https://openclaw.ai)、[Factory Droid](https://factory.ai) 或 [Trae](https://trae.ai)
+**要求：** Python 3.10+，并且使用以下平台之一：[Claude Code](https://claude.ai/code)、[Codex](https://openai.com/codex)、[OpenCode](https://opencode.ai)、[Cursor](https://cursor.com)、[Gemini CLI](https://github.com/google-gemini/gemini-cli)、[GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli)、[Aider](https://aider.chat)、[OpenClaw](https://openclaw.ai)、[Factory Droid](https://factory.ai)、[Trae](https://trae.ai) 或 [Google Antigravity](https://antigravity.google)
 
 ```bash
 pip install graphifyy && graphify install
@@ -45,15 +45,21 @@ pip install graphifyy && graphify install
 
 | 平台 | 安装命令 |
 |------|----------|
-| Claude Code | `graphify install` |
+| Claude Code (Linux/Mac) | `graphify install` |
+| Claude Code (Windows) | `graphify install`（自动检测）或 `graphify install --platform windows` |
 | Codex | `graphify install --platform codex` |
 | OpenCode | `graphify install --platform opencode` |
+| GitHub Copilot CLI | `graphify install --platform copilot` |
+| Aider | `graphify install --platform aider` |
 | OpenClaw | `graphify install --platform claw` |
 | Factory Droid | `graphify install --platform droid` |
 | Trae | `graphify install --platform trae` |
 | Trae CN | `graphify install --platform trae-cn` |
+| Gemini CLI | `graphify install --platform gemini` |
+| Cursor | `graphify cursor install` |
+| Google Antigravity | `graphify antigravity install` |
 
-Codex 用户还需要在 `~/.codex/config.toml` 的 `[features]` 下打开 `multi_agent = true`，这样才能并行提取。OpenClaw 目前的并行 agent 支持还比较早期，所以使用顺序提取。Trae 使用 Agent 工具进行并行子代理调度，**不支持** PreToolUse hook，因此 AGENTS.md 是其常驻机制。
+Codex 用户还需要在 `~/.codex/config.toml` 的 `[features]` 下打开 `multi_agent = true`，这样才能并行提取。OpenClaw 和 Aider 目前的并行 agent 支持还比较早期，所以使用顺序提取。Trae 使用 Agent 工具进行并行子代理调度，**不支持** PreToolUse hook，因此 AGENTS.md 是其常驻机制。
 
 然后打开你的 AI 编码助手，输入：
 
@@ -163,10 +169,12 @@ graphify trae-cn uninstall
 
 | 类型 | 扩展名 | 提取方式 |
 |------|--------|----------|
-| 代码 | `.py .ts .js .go .rs .java .c .cpp .rb .cs .kt .scala .php` | tree-sitter AST + 调用图 + docstring / 注释中的 rationale |
+| 代码 | `.py .ts .js .jsx .tsx .go .rs .java .c .cpp .rb .cs .kt .scala .php .swift .lua .zig .ps1 .ex .exs .m .mm .jl .vue .svelte` | tree-sitter AST + 调用图 + docstring / 注释中的 rationale |
 | 文档 | `.md .txt .rst` | 通过 Claude 提取概念、关系和设计动机 |
+| Office | `.docx .xlsx` | 转换为 Markdown 后通过 Claude 提取（需要 `pip install graphifyy[office]`） |
 | 论文 | `.pdf` | 引文挖掘 + 概念提取 |
 | 图片 | `.png .jpg .webp .gif` | Claude vision —— 截图、图表、任意语言都可以 |
+| 视频/音频 | `.mp4 .mov .mkv .webm .avi .m4v .mp3 .wav .m4a .ogg` | 本地 faster-whisper 转录后通过 Claude 提取（需要 `pip install graphifyy[video]`） |
 
 ## 你会得到什么
 
@@ -191,6 +199,25 @@ graphify trae-cn uninstall
 **Git hooks**（`graphify hook install`）—— 安装 `post-commit` 和 `post-checkout` hook。每次 commit 后、每次切分支后都会自动重建图谱，不需要额外开一个后台进程。
 
 **Wiki**（`--wiki`）—— 为每个 community 和 god node 生成类似维基百科的 Markdown 文章，并提供 `index.md` 作为入口。任何 agent 只要读 `index.md`，就能通过普通文件导航整个知识库，而不必直接解析 JSON。
+
+## Obsidian vault 适配器（Ideaverse 集成）
+
+`--obsidian` 将知识图谱导出为结构化的 Obsidian vault，包含正确的 frontmatter、wikilinks、标签、Dataview 查询和文件夹布局。适配器完全由配置文件驱动 —— 它读取目标 vault 中的 `.graphify/profile.yaml` 并生成符合你 vault 框架的笔记。
+
+没有配置文件时，默认生成与 [Ideaverse](https://ideaverse.com) 兼容的 ACE 结构（`Atlas/Maps/`、`Atlas/Dots/Things/` 等）。你也可以为任何 Obsidian vault 框架编写自定义 profile —— Ideaverse、PARA 或自定义方案 —— 无需修改代码。
+
+```bash
+# 验证 profile
+graphify --validate-profile ~/vaults/myproject
+
+# 预览合并计划（不写入文件）
+graphify --obsidian --obsidian-dir ~/vaults/myproject --dry-run
+
+# 完整导出
+graphify --obsidian --obsidian-dir ~/vaults/myproject
+```
+
+支持三种合并策略：`update`（默认，保留用户编辑的字段）、`skip`（不覆盖已有笔记）、`replace`（完全覆盖）。从图谱中删除的节点不会自动删除对应笔记。
 
 ## Worked examples
 

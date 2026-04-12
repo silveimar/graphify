@@ -205,6 +205,12 @@ When the user types `/graphify`, invoke the Skill tool with `skill: "graphify"` 
 /graphify ./raw --obsidian                          # also generate Obsidian vault (opt-in)
 /graphify ./raw --obsidian --obsidian-dir ~/vaults/myproject  # write vault to a specific directory
 
+# standalone Obsidian vault export (profile-driven, merge-aware)
+graphify --obsidian                                   # export graph.json → Obsidian vault
+graphify --obsidian --obsidian-dir ~/vaults/myproject # write to a specific vault directory
+graphify --obsidian --dry-run                         # preview merge plan without writing
+graphify --validate-profile ~/vaults/myproject        # validate .graphify/profile.yaml before export
+
 /graphify add https://arxiv.org/abs/1706.03762        # fetch a paper, save, update graph
 /graphify add https://x.com/karpathy/status/...       # fetch a tweet
 /graphify add <video-url>                              # download audio, transcribe, add to graph
@@ -319,6 +325,55 @@ Audio never leaves your machine. All transcription runs locally.
 **Git hooks** (`graphify hook install`) - installs post-commit and post-checkout hooks. Graph rebuilds automatically after every commit and every branch switch. If a rebuild fails, the hook exits with a non-zero code so git surfaces the error instead of silently continuing. No background process needed.
 
 **Wiki** (`--wiki`) - Wikipedia-style markdown articles per community and god node, with an `index.md` entry point. Point any agent at `index.md` and it can navigate the knowledge base by reading files instead of parsing JSON.
+
+## Obsidian vault adapter (Ideaverse integration)
+
+`--obsidian` exports the knowledge graph as a structured Obsidian vault with proper frontmatter, wikilinks, tags, Dataview queries, and folder placement. The adapter is fully profile-driven — it reads a `.graphify/profile.yaml` from the target vault and generates notes that fit your vault's framework.
+
+**How it works:**
+
+1. **Profile loading** — discovers `.graphify/profile.yaml` in the vault. No profile? Falls back to a built-in default that produces an [Ideaverse](https://ideaverse.com)-compatible ACE structure (`Atlas/Maps/`, `Atlas/Dots/Things/`, etc.).
+2. **Classification** — routes each graph node to a note type (MOC, thing, statement, person, source) based on topology (god nodes, degree) and attributes (`file_type`). Custom mapping rules supported.
+3. **Template rendering** — generates markdown with YAML frontmatter, `[[wikilinks]]` to related nodes, Dataview queries for MOCs, and community tags. Override any template by placing a `<type>.md` file in `.graphify/templates/`.
+4. **Merge planning** — compares new notes against existing vault notes. Preserves user-edited fields (configurable via `merge.preserve_fields`), handles orphans (nodes deleted from graph don't auto-delete notes), and supports three strategies: `update` (default), `skip`, `replace`.
+5. **Atomic write** — executes the merge plan, writing only changed files. `--dry-run` previews the plan without writing.
+
+```yaml
+# .graphify/profile.yaml (optional — defaults to Ideaverse ACE)
+folder_mapping:
+  moc: "Atlas/Maps/"
+  thing: "Atlas/Dots/Things/"
+  statement: "Atlas/Dots/Statements/"
+  person: "Atlas/Dots/People/"
+  source: "Atlas/Sources/"
+  default: "Atlas/Dots/"
+
+naming:
+  convention: title_case  # or kebab-case, preserve
+
+merge:
+  strategy: update
+  preserve_fields: [rank, mapState, tags, created]
+  field_policies:
+    tags: union  # union, replace, or preserve
+
+mapping_rules:
+  - when: { file_type: person }
+    then: { note_type: person, folder: "Atlas/Dots/People/" }
+```
+
+```bash
+# validate your profile before exporting
+graphify --validate-profile ~/vaults/myproject
+
+# export with dry-run preview
+graphify --obsidian --obsidian-dir ~/vaults/myproject --dry-run
+
+# full export
+graphify --obsidian --obsidian-dir ~/vaults/myproject
+```
+
+The adapter works with any Obsidian vault framework — Ideaverse, PARA, custom setups — driven entirely by the declarative profile. No code changes needed.
 
 ## Worked examples
 

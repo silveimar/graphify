@@ -21,6 +21,10 @@ Each stage is a single function in its own module. They communicate through plai
 | `analyze.py` | `analyze(G)` | graph → analysis dict (god nodes, surprises, questions) |
 | `report.py` | `render_report(G, analysis)` | graph + analysis → GRAPH_REPORT.md string |
 | `export.py` | `export(G, out_dir, ...)` | graph → Obsidian vault, graph.json, graph.html, graph.svg |
+| `profile.py` | `load_profile(vault_dir)` | vault path → merged profile dict (`.graphify/profile.yaml` + defaults) |
+| `templates.py` | `render_note(node_id, G, ...)` | node + profile → rendered markdown with frontmatter and wikilinks |
+| `mapping.py` | `classify(G, communities, profile)` | graph + profile → `MappingResult` (note type, folder, context per node) |
+| `merge.py` | `compute_merge_plan(vault_dir, notes, profile)` | rendered notes + existing vault → `MergePlan` (CREATE/UPDATE/SKIP actions) |
 | `ingest.py` | `ingest(url, ...)` | URL → file saved to corpus dir |
 | `cache.py` | `check_semantic_cache / save_semantic_cache` | files → (cached, uncached) split |
 | `security.py` | validation helpers | URL / path / label → validated or raises |
@@ -72,6 +76,23 @@ All external input passes through `graphify/security.py` before use:
 - Node labels → `sanitize_label()` (strips control chars, caps 256 chars, HTML-escapes)
 
 See `SECURITY.md` for the full threat model.
+
+## Obsidian vault adapter (Ideaverse integration)
+
+The `--obsidian` export is profile-driven. Four new modules form a pipeline within the export stage:
+
+```
+load_profile() → classify() → render_note()/render_moc() → compute_merge_plan() → apply_merge_plan()
+```
+
+| Module | Role |
+|--------|------|
+| `profile.py` | Discovers `.graphify/profile.yaml` in vault, deep-merges over built-in defaults (Ideaverse ACE structure). Validates schema, provides safety helpers (`safe_filename`, `safe_frontmatter_value`, `safe_tag`, `validate_vault_path`). |
+| `templates.py` | 6 built-in note templates (moc, thing, statement, person, source, community) using `${placeholder}` syntax. User overrides via `.graphify/templates/<type>.md`. Renders frontmatter, wikilinks, Dataview queries, navigation callouts. |
+| `mapping.py` | Routes nodes to note types via attribute rules (`file_type: person`) and topology rules (god nodes → things, communities → MOCs). Returns `MappingResult` with per-node and per-community classification contexts. |
+| `merge.py` | Plans and executes vault writes. Compares rendered notes against existing vault files. Preserves user-edited fields, handles orphans (never auto-deletes), supports three strategies: `update`, `skip`, `replace`. `--dry-run` returns the plan without writing. |
+
+The `to_obsidian()` function in `export.py` orchestrates these four modules. When no profile exists, the built-in default produces Ideaverse-compatible output (`Atlas/Maps/`, `Atlas/Dots/Things/`, etc.).
 
 ## Testing
 
