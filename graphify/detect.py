@@ -18,7 +18,7 @@ class FileType(str, Enum):
 
 _MANIFEST_PATH = "graphify-out/manifest.json"
 
-CODE_EXTENSIONS = {'.py', '.ts', '.js', '.jsx', '.tsx', '.go', '.rs', '.java', '.cpp', '.cc', '.cxx', '.c', '.h', '.hpp', '.rb', '.swift', '.kt', '.kts', '.cs', '.scala', '.php', '.lua', '.toc', '.zig', '.ps1', '.ex', '.exs', '.m', '.mm', '.jl'}
+CODE_EXTENSIONS = {'.py', '.ts', '.js', '.jsx', '.tsx', '.go', '.rs', '.java', '.cpp', '.cc', '.cxx', '.c', '.h', '.hpp', '.rb', '.swift', '.kt', '.kts', '.cs', '.scala', '.php', '.lua', '.toc', '.zig', '.ps1', '.ex', '.exs', '.m', '.mm', '.jl', '.vue', '.svelte'}
 DOC_EXTENSIONS = {'.md', '.txt', '.rst'}
 PAPER_EXTENSIONS = {'.pdf'}
 IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'}
@@ -69,7 +69,7 @@ def _looks_like_paper(path: Path) -> bool:
     """Heuristic: does this text file read like an academic paper?"""
     try:
         # Only scan first 3000 chars for speed
-        text = path.read_text(errors="ignore")[:3000]
+        text = path.read_text(encoding="utf-8", errors="ignore")[:3000]
         hits = sum(1 for pattern in _PAPER_SIGNALS if pattern.search(text))
         return hits >= _PAPER_SIGNAL_THRESHOLD
     except Exception:
@@ -80,6 +80,9 @@ _ASSET_DIR_MARKERS = {".imageset", ".xcassets", ".appiconset", ".colorset", ".la
 
 
 def classify_file(path: Path) -> FileType | None:
+    # Compound extensions must be checked before simple suffix lookup
+    if path.name.lower().endswith(".blade.php"):
+        return FileType.CODE
     ext = path.suffix.lower()
     if ext in CODE_EXTENSIONS:
         return FileType.CODE
@@ -226,7 +229,7 @@ def count_words(path: Path) -> int:
             return len(docx_to_markdown(path).split())
         if ext == ".xlsx":
             return len(xlsx_to_markdown(path).split())
-        return len(path.read_text(errors="ignore").split())
+        return len(path.read_text(encoding="utf-8", errors="ignore").split())
     except Exception:
         return 0
 
@@ -239,6 +242,13 @@ _SKIP_DIRS = {
     "site-packages", "lib64",
     ".pytest_cache", ".mypy_cache", ".ruff_cache",
     ".tox", ".eggs", "*.egg-info",
+}
+
+# Large generated files that are never useful to extract
+_SKIP_FILES = {
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
+    "Cargo.lock", "poetry.lock", "Gemfile.lock",
+    "composer.lock", "go.sum", "go.work.sum",
 }
 
 def _is_noise_dir(part: str) -> bool:
@@ -271,7 +281,7 @@ def _load_graphifyignore(root: Path) -> list[str]:
     while True:
         ignore_file = current / ".graphifyignore"
         if ignore_file.exists():
-            for line in ignore_file.read_text(errors="ignore").splitlines():
+            for line in ignore_file.read_text(encoding="utf-8", errors="ignore").splitlines():
                 line = line.strip()
                 if line and not line.startswith("#"):
                     patterns.append(line)
@@ -357,6 +367,8 @@ def detect(root: Path, *, follow_symlinks: bool = False) -> dict:
                     and not _is_ignored(dp / d, root, ignore_patterns)
                 ]
             for fname in filenames:
+                if fname in _SKIP_FILES:
+                    continue
                 p = dp / fname
                 if p not in seen:
                     seen.add(p)
@@ -427,7 +439,7 @@ def detect(root: Path, *, follow_symlinks: bool = False) -> dict:
 def load_manifest(manifest_path: str = _MANIFEST_PATH) -> dict[str, float]:
     """Load the file modification time manifest from a previous run."""
     try:
-        return json.loads(Path(manifest_path).read_text())
+        return json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     except Exception:
         return {}
 
@@ -442,7 +454,7 @@ def save_manifest(files: dict[str, list[str]], manifest_path: str = _MANIFEST_PA
             except OSError:
                 pass  # file deleted between detect() and manifest write - skip it
     Path(manifest_path).parent.mkdir(parents=True, exist_ok=True)
-    Path(manifest_path).write_text(json.dumps(manifest, indent=2))
+    Path(manifest_path).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
 def detect_incremental(root: Path, manifest_path: str = _MANIFEST_PATH) -> dict:

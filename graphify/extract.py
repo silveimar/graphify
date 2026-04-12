@@ -112,8 +112,18 @@ def _import_python(node, source: bytes, file_nid: str, stem: str, edges: list, s
     elif t == "import_from_statement":
         module_node = node.child_by_field_name("module_name")
         if module_node:
-            raw = _read_text(module_node, source).lstrip(".")
-            tgt_nid = _make_id(raw)
+            raw = _read_text(module_node, source)
+            if raw.startswith("."):
+                # Relative import - resolve to full path so IDs match file node IDs
+                dots = len(raw) - len(raw.lstrip("."))
+                module_name = raw.lstrip(".")
+                base = Path(str_path).parent
+                for _ in range(dots - 1):
+                    base = base.parent
+                rel = (module_name.replace(".", "/") + ".py") if module_name else "__init__.py"
+                tgt_nid = _make_id(str(base / rel))
+            else:
+                tgt_nid = _make_id(raw)
             edges.append({
                 "source": file_nid,
                 "target": tgt_nid,
@@ -129,18 +139,32 @@ def _import_js(node, source: bytes, file_nid: str, stem: str, edges: list, str_p
     for child in node.children:
         if child.type == "string":
             raw = _read_text(child, source).strip("'\"` ")
-            module_name = raw.lstrip("./").split("/")[-1]
-            if module_name:
+            if not raw:
+                break
+            if raw.startswith("."):
+                # Relative import - resolve to full path so IDs match file node IDs
+                resolved = Path(str_path).parent / raw
+                # TypeScript ESM: imports written as .js but actual file is .ts/.tsx
+                if resolved.suffix == ".js":
+                    resolved = resolved.with_suffix(".ts")
+                elif resolved.suffix == ".jsx":
+                    resolved = resolved.with_suffix(".tsx")
+                tgt_nid = _make_id(str(resolved))
+            else:
+                # Bare/scoped import (node_modules) - use last segment; dropped as external
+                module_name = raw.split("/")[-1]
+                if not module_name:
+                    break
                 tgt_nid = _make_id(module_name)
-                edges.append({
-                    "source": file_nid,
-                    "target": tgt_nid,
-                    "relation": "imports_from",
-                    "confidence": "EXTRACTED",
-                    "source_file": str_path,
-                    "source_location": f"L{node.start_point[0] + 1}",
-                    "weight": 1.0,
-                })
+            edges.append({
+                "source": file_nid,
+                "target": tgt_nid,
+                "relation": "imports_from",
+                "confidence": "EXTRACTED",
+                "source_file": str_path,
+                "source_location": f"L{node.start_point[0] + 1}",
+                "weight": 1.0,
+            })
             break
 
 
@@ -673,7 +697,7 @@ def _extract_generic(path: Path, config: LanguageConfig) -> dict:
             "weight": weight,
         })
 
-    file_nid = _make_id(stem)
+    file_nid = _make_id(str(path))
     add_node(file_nid, path.name, 1)
 
     def walk(node, parent_class_nid: str | None = None) -> None:
@@ -1004,7 +1028,7 @@ def _extract_python_rationale(path: Path, result: dict) -> None:
     nodes = result["nodes"]
     edges = result["edges"]
     seen_ids = {n["id"] for n in nodes}
-    file_nid = _make_id(stem)
+    file_nid = _make_id(str(path))
 
     def _get_docstring(body_node) -> tuple[str, int] | None:
         if not body_node:
@@ -1141,6 +1165,53 @@ def extract_php(path: Path) -> dict:
     return _extract_generic(path, _PHP_CONFIG)
 
 
+def extract_blade(path: Path) -> dict:
+    """Extract @include, <livewire:> components, and wire:click bindings from Blade templates."""
+    import re
+    try:
+        src = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {"error": f"cannot read {path}"}
+
+    file_nid = _make_id(str(path))
+    nodes = [{"id": file_nid, "label": path.name, "file_type": "code",
+              "source_file": str(path), "source_location": None}]
+    edges = []
+
+    # @include('path.to.partial') or @include("path.to.partial")
+    for m in re.finditer(r"@include\(['\"]([^'\"]+)['\"]", src):
+        tgt = m.group(1).replace(".", "/")
+        tgt_nid = _make_id(tgt)
+        if tgt_nid not in {n["id"] for n in nodes}:
+            nodes.append({"id": tgt_nid, "label": m.group(1), "file_type": "code",
+                          "source_file": str(path), "source_location": None})
+        edges.append({"source": file_nid, "target": tgt_nid, "relation": "includes",
+                      "confidence": "EXTRACTED", "confidence_score": 1.0,
+                      "source_file": str(path), "source_location": None, "weight": 1.0})
+
+    # <livewire:component.name /> or <livewire:component.name>
+    for m in re.finditer(r"<livewire:([\w.\-]+)", src):
+        tgt_nid = _make_id(m.group(1))
+        if tgt_nid not in {n["id"] for n in nodes}:
+            nodes.append({"id": tgt_nid, "label": m.group(1), "file_type": "code",
+                          "source_file": str(path), "source_location": None})
+        edges.append({"source": file_nid, "target": tgt_nid, "relation": "uses_component",
+                      "confidence": "EXTRACTED", "confidence_score": 1.0,
+                      "source_file": str(path), "source_location": None, "weight": 1.0})
+
+    # wire:click="methodName"
+    for m in re.finditer(r'wire:click=["\']([^"\']+)["\']', src):
+        tgt_nid = _make_id(m.group(1))
+        if tgt_nid not in {n["id"] for n in nodes}:
+            nodes.append({"id": tgt_nid, "label": m.group(1), "file_type": "code",
+                          "source_file": str(path), "source_location": None})
+        edges.append({"source": file_nid, "target": tgt_nid, "relation": "binds_method",
+                      "confidence": "EXTRACTED", "confidence_score": 1.0,
+                      "source_file": str(path), "source_location": None, "weight": 1.0})
+
+    return {"nodes": nodes, "edges": edges}
+
+
 def extract_lua(path: Path) -> dict:
     """Extract functions, methods, require() imports, and calls from a .lua file."""
     return _extract_generic(path, _LUA_CONFIG)
@@ -1200,7 +1271,7 @@ def extract_julia(path: Path) -> dict:
             "weight": weight,
         })
 
-    file_nid = _make_id(stem)
+    file_nid = _make_id(str(path))
     add_node(file_nid, path.name, 1)
 
     def _func_name_from_signature(sig_node) -> str | None:
@@ -1415,7 +1486,7 @@ def extract_go(path: Path) -> dict:
             "weight": weight,
         })
 
-    file_nid = _make_id(stem)
+    file_nid = _make_id(str(path))
     add_node(file_nid, path.name, 1)
 
     def walk(node) -> None:
@@ -1603,7 +1674,7 @@ def extract_rust(path: Path) -> dict:
             "weight": weight,
         })
 
-    file_nid = _make_id(stem)
+    file_nid = _make_id(str(path))
     add_node(file_nid, path.name, 1)
 
     def walk(node, parent_impl_nid: str | None = None) -> None:
@@ -1761,7 +1832,7 @@ def extract_zig(path: Path) -> dict:
                       "confidence": confidence, "source_file": str_path,
                       "source_location": f"L{line}", "weight": weight})
 
-    file_nid = _make_id(stem)
+    file_nid = _make_id(str(path))
     add_node(file_nid, path.name, 1)
 
     def _extract_import(node) -> None:
@@ -1916,7 +1987,7 @@ def extract_powershell(path: Path) -> dict:
                       "confidence": confidence, "source_file": str_path,
                       "source_location": f"L{line}", "weight": weight})
 
-    file_nid = _make_id(stem)
+    file_nid = _make_id(str(path))
     add_node(file_nid, path.name, 1)
 
     _PS_SKIP = frozenset({
@@ -2205,7 +2276,7 @@ def extract_objc(path: Path) -> dict:
                       "confidence": confidence, "source_file": str_path,
                       "source_location": f"L{line}", "weight": weight})
 
-    file_nid = _make_id(stem)
+    file_nid = _make_id(str(path))
     add_node(file_nid, path.name, 1)
 
     def _read(node) -> str:
@@ -2403,7 +2474,7 @@ def extract_elixir(path: Path) -> dict:
                       "confidence": confidence, "source_file": str_path,
                       "source_location": f"L{line}", "weight": weight})
 
-    file_nid = _make_id(stem)
+    file_nid = _make_id(str(path))
     add_node(file_nid, path.name, 1)
 
     _IMPORT_KEYWORDS = frozenset({"alias", "import", "require", "use"})
@@ -2622,6 +2693,8 @@ def extract(paths: list[Path]) -> dict:
         ".m": extract_objc,
         ".mm": extract_objc,
         ".jl": extract_julia,
+        ".vue": extract_js,
+        ".svelte": extract_js,
     }
 
     total = len(paths)
@@ -2629,7 +2702,11 @@ def extract(paths: list[Path]) -> dict:
     for i, path in enumerate(paths):
         if total >= _PROGRESS_INTERVAL and i % _PROGRESS_INTERVAL == 0 and i > 0:
             print(f"  AST extraction: {i}/{total} files ({i * 100 // total}%)", flush=True)
-        extractor = _DISPATCH.get(path.suffix)
+        # .blade.php must be checked before suffix lookup since Path.suffix returns .php
+        if path.name.endswith(".blade.php"):
+            extractor = extract_blade
+        else:
+            extractor = _DISPATCH.get(path.suffix)
         if extractor is None:
             continue
         cached = load_cached(path, root)
@@ -2668,7 +2745,7 @@ def extract(paths: list[Path]) -> dict:
     }
 
 
-def collect_files(target: Path, *, follow_symlinks: bool = False) -> list[Path]:
+def collect_files(target: Path, *, follow_symlinks: bool = False, root: Path | None = None) -> list[Path]:
     if target.is_file():
         return [target]
     _EXTENSIONS = {
@@ -2678,12 +2755,20 @@ def collect_files(target: Path, *, follow_symlinks: bool = False) -> list[Path]:
         ".lua", ".toc", ".zig", ".ps1",
         ".m", ".mm",
     }
+    from graphify.detect import _load_graphifyignore, _is_ignored
+    ignore_root = root if root is not None else target
+    patterns = _load_graphifyignore(ignore_root)
+
+    def _ignored(p: Path) -> bool:
+        return bool(patterns and _is_ignored(p, ignore_root, patterns))
+
     if not follow_symlinks:
         results: list[Path] = []
         for ext in sorted(_EXTENSIONS):
             results.extend(
                 p for p in target.rglob(f"*{ext}")
                 if not any(part.startswith(".") for part in p.parts)
+                and not _ignored(p)
             )
         return sorted(results)
     # Walk with symlink following + cycle detection
@@ -2701,7 +2786,7 @@ def collect_files(target: Path, *, follow_symlinks: bool = False) -> list[Path]:
             continue
         for fname in filenames:
             p = dp / fname
-            if p.suffix in _EXTENSIONS and not fname.startswith("."):
+            if p.suffix in _EXTENSIONS and not fname.startswith(".") and not _ignored(p):
                 results.append(p)
     return sorted(results)
 

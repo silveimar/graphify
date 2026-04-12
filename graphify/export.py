@@ -297,7 +297,7 @@ def to_json(G: nx.Graph, communities: dict[int, list[str]], output_path: str) ->
             conf = link.get("confidence", "EXTRACTED")
             link["confidence_score"] = _CONFIDENCE_SCORE_DEFAULTS.get(conf, 1.0)
     data["hyperedges"] = getattr(G, "graph", {}).get("hyperedges", [])
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
 
@@ -324,7 +324,7 @@ def to_cypher(G: nx.Graph, output_path: str) -> None:
             f"MATCH (a {{id: '{u_esc}'}}), (b {{id: '{v_esc}'}}) "
             f"MERGE (a)-[:{rel} {{confidence: '{conf}'}}]->(b);"
         )
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
 
@@ -348,7 +348,7 @@ def to_html(
 
     node_community = _node_community_map(communities)
     degree = dict(G.degree())
-    max_deg = max(degree.values()) if degree else 1
+    max_deg = max(degree.values(), default=1) or 1
 
     # Build nodes list for vis.js
     vis_nodes = []
@@ -398,10 +398,14 @@ def to_html(
         n = len(communities.get(cid, []))
         legend_data.append({"cid": cid, "color": color, "label": lbl, "count": n})
 
-    nodes_json = json.dumps(vis_nodes)
-    edges_json = json.dumps(vis_edges)
-    legend_json = json.dumps(legend_data)
-    hyperedges_json = json.dumps(getattr(G, "graph", {}).get("hyperedges", []))
+    # Escape </script> sequences so embedded JSON cannot break out of the script tag
+    def _js_safe(obj) -> str:
+        return json.dumps(obj).replace("</", "<\\/")
+
+    nodes_json = _js_safe(vis_nodes)
+    edges_json = _js_safe(vis_edges)
+    legend_json = _js_safe(legend_data)
+    hyperedges_json = _js_safe(getattr(G, "graph", {}).get("hyperedges", []))
     title = _html.escape(sanitize_label(str(output_path)))
     stats = f"{G.number_of_nodes()} nodes &middot; {G.number_of_edges()} edges &middot; {len(communities)} communities"
 
@@ -608,7 +612,9 @@ def to_canvas(
     CANVAS_COLORS = ["1", "2", "3", "4", "5", "6"]  # red, orange, yellow, green, cyan, purple
 
     def safe_name(label: str) -> str:
-        return re.sub(r'[\\/*?:"<>|#^[\]]', "", label.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")).strip() or "unnamed"
+        cleaned = re.sub(r'[\\/*?:"<>|#^[\]]', "", label.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")).strip()
+        cleaned = re.sub(r"\.(md|mdx|markdown)$", "", cleaned, flags=re.IGNORECASE)
+        return cleaned or "unnamed"
 
     # Build node_filenames if not provided (same dedup logic as to_obsidian)
     # FIX-02: Sort nodes for deterministic dedup across re-runs.
@@ -866,7 +872,7 @@ def to_svg(
     pos = nx.spring_layout(G, seed=42, k=2.0 / (G.number_of_nodes() ** 0.5 + 1))
 
     degree = dict(G.degree())
-    max_deg = max(degree.values()) if degree else 1
+    max_deg = max(degree.values(), default=1) or 1
 
     node_colors = [COMMUNITY_COLORS[node_community.get(n, 0) % len(COMMUNITY_COLORS)] for n in G.nodes()]
     node_sizes = [300 + 1200 * (degree.get(n, 1) / max_deg) for n in G.nodes()]

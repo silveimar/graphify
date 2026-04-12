@@ -2,6 +2,62 @@
 
 Full release notes with details on each version: [GitHub Releases](https://github.com/safishamsi/graphify/releases)
 
+## 0.4.7 (2026-04-12)
+
+- Fix: `watch` semantic edge preservation was always empty — `graph.json` uses `links` key but code read `edges` (#269)
+- Fix: `graphify claw install` now writes to `.openclaw/` (correct OpenClaw directory) instead of `.claw/` (#208)
+- Add: Blade template support — `@include`, `<livewire:>` components, and `wire:click` bindings extracted from `.blade.php` files (#242)
+- Docs: WSL/Linux MCP setup note — package name is `graphifyy`, use `.venv/bin/python3` in `.mcp.json` (#250)
+
+## 0.4.6 (2026-04-12)
+
+- Add: Google Antigravity support — `graphify antigravity install` writes `.agent/rules/graphify.md` (always-on rules) and `.agent/workflows/graphify.md` (`/graphify` slash command) (#203, #199, #53)
+
+## 0.4.5 (2026-04-12)
+
+- Fix: MCP server no longer crashes with `ValidationError` on blank lines sent between JSON messages by some clients (#201)
+
+## 0.4.4 (2026-04-12)
+
+- Fix: `watch` now preserves INFERRED/AMBIGUOUS edges (code↔doc rationale links) across rebuilds — previously all cross-type edges were dropped (#261)
+- Fix: Codex hook no longer emits `permissionDecision:allow` which codex-cli 0.120.0 rejects (#249)
+- Fix: Common lockfiles (`package-lock.json`, `yarn.lock`, `Cargo.lock`, etc.) are now skipped during detection, preventing token drain on large JS/Rust/Python projects (#266)
+
+## 0.4.3 (2026-04-12)
+
+- Fix: JS/TS relative imports now resolve to full-path node IDs — previously all `imports_from` edges were silently dropped on large TypeScript codebases (#256)
+- Fix: Python relative imports (`from .foo import bar`) now resolve correctly to full-path node IDs (#256)
+- Fix: `watch --rebuild_code` now merges fresh AST with existing semantic nodes from docs/papers instead of overwriting them (#253)
+- Fix: Windows hooks now fall back to `python` if `python3` is not found; exits cleanly if neither has graphify installed (#244)
+- Fix: `surprising_connections` / `suggest_questions` no longer crash with `KeyError` on stale `_src`/`_tgt` edge hints after node merges (#226)
+- Add: `.vue` and `.svelte` files now recognized as code and included in extraction (#254)
+
+## 0.4.2 (2026-04-11)
+
+- Fix: same-basename files in different directories produced colliding node IDs — now uses full path (#211)
+- Fix: edges using `from`/`to` keys instead of `source`/`target` were silently dropped (#216)
+- Fix: empty graphs (no edges) crashed `to_html` with `ZeroDivisionError` (#217)
+- Fix: post-commit hook skipped `.tsx`, `.jsx`, and other valid code extensions due to stale allowlist (#222)
+- Fix: NetworkX ≤3.1 serialises edges as `links` — now accepted alongside `edges` (#212)
+- Fix: version warning fired during `install`/`uninstall` and duplicated on shared paths (#220)
+- Fix: all file IO now uses `encoding="utf-8"` — prevents crashes on Windows with CJK or emoji labels; hook writes use `newline="\n"` to prevent CRLF shebang breakage (#204)
+- Fix: Obsidian export — node labels ending in `.md` produced `.md.md` filenames; `GRAPH_REPORT.md` now links to community hub files so vault stays in one connected component (#221)
+
+## 0.4.1 (2026-04-10)
+
+- Fix: `collect_files()` in `extract.py` now respects `.graphifyignore` — previously ignored patterns, causing thousands of unwanted files (e.g. `node_modules/`) to be scanned (#188)
+- Fix: skill.md Step B2 now explicitly requires `subagent_type="general-purpose"` — using `Explore` type silently dropped extraction results since it is read-only and cannot write chunk files (#195)
+- Fix: Step B3 now warns when chunk files are missing from disk instead of silently skipping them
+
+## 0.4.0 (2026-04-10)
+
+- Branch: v4 — video and audio corpus support
+- Add: drop `.mp4`, `.mp3`, `.wav`, `.mov`, `.webm`, `.m4a`, `.ogg`, `.mkv`, `.avi`, `.m4v` files into any corpus and graphify transcribes them locally with faster-whisper before extraction
+- Add: YouTube and URL download via yt-dlp — `/graphify add https://youtube.com/...` downloads audio-only and feeds it through the same Whisper pipeline
+- Add: domain-aware Whisper prompts — the coding agent reads god nodes from the corpus and writes a one-sentence domain hint for Whisper itself, no separate API call
+- Add: `graphify-out/transcripts/` cache — transcripts cached by filename; YouTube URLs cached by hash so re-runs skip already-transcribed files
+- Requires: `pip install 'graphifyy[video]'` for faster-whisper and yt-dlp
+
 ## 0.3.29 (2026-04-10)
 
 - Add: video and audio corpus support — drop `.mp4`, `.mp3`, `.wav`, `.mov`, `.webm`, `.m4a`, `.ogg`, `.mkv`, `.avi`, `.m4v` files into any corpus and graphify transcribes them with faster-whisper before extraction

@@ -20,13 +20,21 @@ if [ -n "$GRAPHIFY_BIN" ]; then
     # Allowlist: only keep characters valid in a filesystem path to prevent
     # injection if the shebang contains shell metacharacters
     case "$GRAPHIFY_PYTHON" in
-        *[!a-zA-Z0-9/_.-]*) GRAPHIFY_PYTHON="python3" ;;
+        *[!a-zA-Z0-9/_.-]*) GRAPHIFY_PYTHON="" ;;
     esac
-    if ! "$GRAPHIFY_PYTHON" -c "import graphify" 2>/dev/null; then
-        GRAPHIFY_PYTHON="python3"
+    if [ -n "$GRAPHIFY_PYTHON" ] && ! "$GRAPHIFY_PYTHON" -c "import graphify" 2>/dev/null; then
+        GRAPHIFY_PYTHON=""
     fi
-else
-    GRAPHIFY_PYTHON="python3"
+fi
+# Fall back: try python3, then python (Windows has no python3 shim)
+if [ -z "$GRAPHIFY_PYTHON" ]; then
+    if command -v python3 >/dev/null 2>&1 && python3 -c "import graphify" 2>/dev/null; then
+        GRAPHIFY_PYTHON="python3"
+    elif command -v python >/dev/null 2>&1 && python -c "import graphify" 2>/dev/null; then
+        GRAPHIFY_PYTHON="python"
+    else
+        exit 0
+    fi
 fi
 """
 
@@ -46,19 +54,13 @@ $GRAPHIFY_PYTHON -c "
 import os, sys
 from pathlib import Path
 
-CODE_EXTS = {
-    '.py', '.ts', '.js', '.go', '.rs', '.java', '.cpp', '.c', '.rb', '.swift',
-    '.kt', '.cs', '.scala', '.php', '.cc', '.cxx', '.hpp', '.h', '.kts',
-}
-
 changed_raw = os.environ.get('GRAPHIFY_CHANGED', '')
 changed = [Path(f.strip()) for f in changed_raw.strip().splitlines() if f.strip()]
-code_changed = [f for f in changed if f.suffix.lower() in CODE_EXTS and f.exists()]
 
-if not code_changed:
+if not changed:
     sys.exit(0)
 
-print(f'[graphify hook] {len(code_changed)} code file(s) changed - rebuilding graph...')
+print(f'[graphify hook] {len(changed)} file(s) changed - rebuilding graph...')
 
 try:
     from graphify.watch import _rebuild_code
@@ -119,12 +121,12 @@ def _install_hook(hooks_dir: Path, name: str, script: str, marker: str) -> str:
     """Install a single git hook, appending if an existing hook is present."""
     hook_path = hooks_dir / name
     if hook_path.exists():
-        content = hook_path.read_text()
+        content = hook_path.read_text(encoding="utf-8")
         if marker in content:
             return f"already installed at {hook_path}"
-        hook_path.write_text(content.rstrip() + "\n\n" + script)
+        hook_path.write_text(content.rstrip() + "\n\n" + script, encoding="utf-8", newline="\n")
         return f"appended to existing {name} hook at {hook_path}"
-    hook_path.write_text("#!/bin/sh\n" + script)
+    hook_path.write_text("#!/bin/sh\n" + script, encoding="utf-8", newline="\n")
     hook_path.chmod(0o755)
     return f"installed at {hook_path}"
 
@@ -134,7 +136,7 @@ def _uninstall_hook(hooks_dir: Path, name: str, marker: str, marker_end: str) ->
     hook_path = hooks_dir / name
     if not hook_path.exists():
         return f"no {name} hook found - nothing to remove."
-    content = hook_path.read_text()
+    content = hook_path.read_text(encoding="utf-8")
     if marker not in content:
         return f"graphify hook not found in {name} - nothing to remove."
     new_content = re.sub(
@@ -146,7 +148,7 @@ def _uninstall_hook(hooks_dir: Path, name: str, marker: str, marker_end: str) ->
     if not new_content or new_content in ("#!/bin/bash", "#!/bin/sh"):
         hook_path.unlink()
         return f"removed {name} hook at {hook_path}"
-    hook_path.write_text(new_content + "\n")
+    hook_path.write_text(new_content + "\n", encoding="utf-8", newline="\n")
     return f"graphify removed from {name} at {hook_path} (other hook content preserved)"
 
 
@@ -189,7 +191,7 @@ def status(path: Path = Path(".")) -> str:
         p = hooks_dir / name
         if not p.exists():
             return "not installed"
-        return "installed" if marker in p.read_text() else "not installed (hook exists but graphify not found)"
+        return "installed" if marker in p.read_text(encoding="utf-8") else "not installed (hook exists but graphify not found)"
 
     commit = _check("post-commit", _HOOK_MARKER)
     checkout = _check("post-checkout", _CHECKOUT_MARKER)
