@@ -1747,3 +1747,258 @@ class TestUserModifiedDetection:
         # Not user-modified (hash matches), but has_user_blocks=True → source="both"
         assert action.user_modified is False
         assert action.source == "both"
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 Plan 02 Task 1 — User sentinel parser (RED tests)
+# ---------------------------------------------------------------------------
+
+
+class TestUserSentinelParser:
+
+    def test_single_pair(self):
+        """Single USER_START/END pair returns list with one tuple."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = (
+            "Some text before.\n"
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "My user content.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+            "Some text after.\n"
+        )
+        result = _parse_user_sentinel_blocks(body)
+        assert len(result) == 1
+        start_idx, end_idx, content = result[0]
+        assert "My user content." in content
+
+    def test_multiple_pairs(self):
+        """Two USER_START/END pairs returns list with two tuples, each preserving content."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = (
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "Block one.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+            "Middle text.\n"
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "Block two.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+        )
+        result = _parse_user_sentinel_blocks(body)
+        assert len(result) == 2
+        assert "Block one." in result[0][2]
+        assert "Block two." in result[1][2]
+
+    def test_no_sentinels(self):
+        """Body with no USER_START/END sentinels returns empty list."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = "Just some content without any sentinels.\n"
+        result = _parse_user_sentinel_blocks(body)
+        assert result == []
+
+    def test_malformed_start_no_end(self, capsys):
+        """START without END returns empty list and prints warning to stderr."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = (
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "Some content with no end marker.\n"
+        )
+        result = _parse_user_sentinel_blocks(body)
+        assert result == []
+        captured = capsys.readouterr()
+        assert "[graphify]" in captured.err
+        assert "malformed" in captured.err.lower()
+
+    def test_nested_start(self, capsys):
+        """Two STARTs before an END returns empty list and prints warning to stderr."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = (
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "Some nested content.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+        )
+        result = _parse_user_sentinel_blocks(body)
+        assert result == []
+        captured = capsys.readouterr()
+        assert "[graphify]" in captured.err
+        assert "nested" in captured.err.lower()
+
+    def test_whitespace_tolerance(self):
+        """Extra spaces inside the sentinel comment still match."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = (
+            "<!--  GRAPHIFY_USER_START  -->\n"
+            "Whitespace tolerant content.\n"
+            "<!--  GRAPHIFY_USER_END  -->\n"
+        )
+        result = _parse_user_sentinel_blocks(body)
+        assert len(result) == 1
+        assert "Whitespace tolerant content." in result[0][2]
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 Plan 02 Task 1 — User sentinel preservation (RED tests)
+# ---------------------------------------------------------------------------
+
+
+class TestUserSentinelPreservation:
+
+    def test_replace_preserves_user_blocks(self, tmp_path):
+        """REPLACE action on file containing user sentinel blocks — user block content survives."""
+        from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = Path("Atlas/Dots/Things/Transformer.md")
+        target = vault / target_rel
+
+        # Add user sentinel block to existing file
+        existing_text = target.read_text(encoding="utf-8")
+        user_block = "\n<!-- GRAPHIFY_USER_START -->\nMy personal notes about this.\n<!-- GRAPHIFY_USER_END -->\n"
+        target.write_text(existing_text + user_block, encoding="utf-8")
+
+        # Render a note and use REPLACE strategy
+        existing_fm = _parse_frontmatter(target.read_text(encoding="utf-8"))
+        new_fields = dict(existing_fm)
+        rn = {
+            "node_id": "transformer",
+            "target_path": target_rel,
+            "frontmatter_fields": new_fields,
+            "body": "# Transformer\n\nNew body content from graphify.\n",
+        }
+        profile = {"merge": {"strategy": "replace"}}
+        plan = compute_merge_plan(vault, {"transformer": rn}, profile)
+        assert plan.actions[0].action == "REPLACE"
+        apply_merge_plan(plan, vault, {"transformer": rn}, profile)
+
+        after = target.read_text(encoding="utf-8")
+        assert "My personal notes about this." in after, \
+            "REPLACE must preserve user sentinel block content (D-08)"
+
+    def test_update_preserves_user_blocks(self, tmp_path):
+        """UPDATE action on file with user sentinel blocks — user block content survives."""
+        from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = Path("Atlas/Dots/Things/Transformer.md")
+        target = vault / target_rel
+
+        # Add user sentinel block to existing file
+        existing_text = target.read_text(encoding="utf-8")
+        user_block = "\n<!-- GRAPHIFY_USER_START -->\nMy update notes.\n<!-- GRAPHIFY_USER_END -->\n"
+        target.write_text(existing_text + user_block, encoding="utf-8")
+
+        # Render with changed source_file to trigger UPDATE
+        existing_fm = _parse_frontmatter(target.read_text(encoding="utf-8"))
+        new_fields = dict(existing_fm)
+        new_fields["source_file"] = "src/transformer_v2.py"
+        body_start = target.read_text(encoding="utf-8").index("---", 4) + 3
+        rn = {
+            "node_id": "transformer",
+            "target_path": target_rel,
+            "frontmatter_fields": new_fields,
+            "body": target.read_text(encoding="utf-8")[body_start:],
+        }
+        plan = compute_merge_plan(vault, {"transformer": rn}, {})
+        assert plan.actions[0].action == "UPDATE"
+        apply_merge_plan(plan, vault, {"transformer": rn}, {})
+
+        after = target.read_text(encoding="utf-8")
+        assert "My update notes." in after, \
+            "UPDATE must preserve user sentinel block content (D-08)"
+
+    def test_create_has_no_user_blocks(self, tmp_path):
+        """CREATE action produces clean output — no user blocks are relevant."""
+        from graphify.merge import compute_merge_plan, apply_merge_plan
+        vault = _copy_vault_fixture("empty", tmp_path)
+        target_rel = Path("Atlas/Dots/Things/Transformer.md")
+        rn = {
+            "node_id": "transformer",
+            "target_path": target_rel,
+            "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+            "body": "# Transformer\nNew creation.\n",
+        }
+        plan = compute_merge_plan(vault, {"transformer": rn}, {})
+        assert plan.actions[0].action == "CREATE"
+        apply_merge_plan(plan, vault, {"transformer": rn}, {})
+
+        after = (vault / target_rel).read_text(encoding="utf-8")
+        assert "# Transformer" in after
+        assert "New creation." in after
+        # No spurious sentinel markers
+        assert "GRAPHIFY_USER_START" not in after
+
+    def test_extract_restore_roundtrip(self):
+        """Extract user blocks from text, restore into different text — sentinel markers and content present."""
+        from graphify.merge import _extract_user_blocks, _restore_user_blocks
+        original = (
+            "Preamble text.\n"
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "Important user content.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+            "Postamble text.\n"
+        )
+        user_blocks = _extract_user_blocks(original)
+        assert len(user_blocks) == 1
+        assert "Important user content." in user_blocks[0]
+        assert "GRAPHIFY_USER_START" in user_blocks[0]
+        assert "GRAPHIFY_USER_END" in user_blocks[0]
+
+        new_text = "---\ntype: thing\n---\n# New Content\nGraphify body.\n"
+        restored = _restore_user_blocks(new_text, user_blocks)
+        assert "Important user content." in restored
+        assert "GRAPHIFY_USER_START" in restored
+        assert "GRAPHIFY_USER_END" in restored
+        assert "Graphify body." in restored
+
+    def test_has_user_blocks_in_manifest(self, tmp_path):
+        """apply_merge_plan where written file contains user sentinels → manifest has_user_blocks=True."""
+        from graphify.merge import apply_merge_plan, compute_merge_plan
+        vault = _copy_vault_fixture("empty", tmp_path)
+        manifest_path = tmp_path / "graphify-out" / "vault-manifest.json"
+        target_rel = Path("Atlas/Dots/Things/Transformer.md")
+        # Note body contains user sentinel blocks
+        body_with_user_block = (
+            "# Transformer\n"
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "User notes here.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+        )
+        rn = {
+            "node_id": "transformer",
+            "target_path": target_rel,
+            "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+            "body": body_with_user_block,
+        }
+        plan = compute_merge_plan(vault, {"transformer": rn}, {})
+        apply_merge_plan(
+            plan, vault, {"transformer": rn}, {},
+            manifest_path=manifest_path,
+        )
+        import json
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert len(manifest) == 1
+        entry = next(iter(manifest.values()))
+        assert entry["has_user_blocks"] is True, \
+            "has_user_blocks must be True when file contains user sentinel blocks"
+
+    def test_no_sentinels_manifest_false(self, tmp_path):
+        """apply_merge_plan where written file has no sentinels → has_user_blocks=False."""
+        from graphify.merge import apply_merge_plan, compute_merge_plan
+        vault = _copy_vault_fixture("empty", tmp_path)
+        manifest_path = tmp_path / "graphify-out" / "vault-manifest.json"
+        target_rel = Path("Atlas/Dots/Things/Transformer.md")
+        rn = {
+            "node_id": "transformer",
+            "target_path": target_rel,
+            "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+            "body": "# Transformer\nNo user blocks here.\n",
+        }
+        plan = compute_merge_plan(vault, {"transformer": rn}, {})
+        apply_merge_plan(
+            plan, vault, {"transformer": rn}, {},
+            manifest_path=manifest_path,
+        )
+        import json
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert len(manifest) == 1
+        entry = next(iter(manifest.values()))
+        assert entry["has_user_blocks"] is False, \
+            "has_user_blocks must be False when file has no user sentinel blocks"

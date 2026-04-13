@@ -259,6 +259,149 @@ def _parse_frontmatter(body: str) -> dict | None:
 _SENTINEL_START_RE = re.compile(r"<!--\s*graphify:([A-Za-z_][A-Za-z0-9_]*):start\s*-->")
 _SENTINEL_END_RE = re.compile(r"<!--\s*graphify:([A-Za-z_][A-Za-z0-9_]*):end\s*-->")
 
+# ---------------------------------------------------------------------------
+# User sentinel block patterns (D-01, D-08) — separate ownership zones
+# ---------------------------------------------------------------------------
+
+# User sentinel patterns are distinct from graphify's managed sentinel patterns
+# (graphify:name:start/end). They use UPPERCASE identifiers so the two cannot
+# be confused — graphify patterns use lowercase names, user patterns use UPPER.
+_USER_SENTINEL_START_RE = re.compile(r"<!--\s*GRAPHIFY_USER_START\s*-->")
+_USER_SENTINEL_END_RE = re.compile(r"<!--\s*GRAPHIFY_USER_END\s*-->")
+
+
+def _parse_user_sentinel_blocks(body: str) -> list[tuple[int, int, str]]:
+    """Parse user sentinel blocks from body text.
+
+    Returns list of (start_line_idx, end_line_idx, content) tuples where
+    content is the lines BETWEEN the sentinel markers (exclusive of marker lines).
+
+    Per D-02: malformed sentinels (START without END, nested STARTs) print a
+    warning to stderr and return [] — note treated as having no user blocks.
+    Per D-03 (Claude's Discretion): multiple USER_START/END pairs are supported.
+
+    Returns empty list when no user sentinel blocks are present.
+    """
+    import sys
+    lines = body.split("\n")
+    result: list[tuple[int, int, str]] = []
+    open_idx: int | None = None  # line index of open START marker
+
+    for idx, line in enumerate(lines):
+        if _USER_SENTINEL_START_RE.search(line):
+            if open_idx is not None:
+                # Nested START — malformed
+                print(
+                    "[graphify] malformed user sentinel: nested START markers — ignoring user blocks",
+                    file=sys.stderr,
+                )
+                return []
+            open_idx = idx
+            continue
+        if _USER_SENTINEL_END_RE.search(line):
+            if open_idx is None:
+                # END without START — treat as malformed per D-02 but just skip
+                # (only warn about START without END, not orphan END)
+                continue
+            content = "\n".join(lines[open_idx + 1 : idx])
+            result.append((open_idx, idx, content))
+            open_idx = None
+
+    if open_idx is not None:
+        # START without matching END
+        print(
+            "[graphify] malformed user sentinel: START without matching END — ignoring user blocks",
+            file=sys.stderr,
+        )
+        return []
+
+    return result
+
+
+def _has_user_sentinel_blocks(body: str) -> bool:
+    """Return True iff body contains at least one complete USER_START/END pair.
+
+    Lightweight check used by _build_manifest_from_result to set has_user_blocks
+    without running the full parser. Uses simple regex search — both markers
+    must be present (order not checked here; false positives from inverted order
+    are acceptable for the manifest boolean).
+    """
+    return bool(_USER_SENTINEL_START_RE.search(body) and _USER_SENTINEL_END_RE.search(body))
+
+
+def _extract_user_blocks(text: str) -> list[str]:
+    """Extract complete user sentinel block strings (including marker lines) from text.
+
+    Returns list of strings, each being the full block:
+        "<!-- GRAPHIFY_USER_START -->\\nuser content\\n<!-- GRAPHIFY_USER_END -->"
+
+    Used before rewriting a file to capture user content for later restoration.
+    Malformed sentinels (per _parse_user_sentinel_blocks semantics) return [].
+    """
+    blocks = _parse_user_sentinel_blocks(text)
+    if not blocks:
+        return []
+    lines = text.split("\n")
+    result: list[str] = []
+    for start_idx, end_idx, _ in blocks:
+        # Include the marker lines themselves
+        block_lines = lines[start_idx : end_idx + 1]
+        result.append("\n".join(block_lines))
+    return result
+
+
+def _restore_user_blocks(new_text: str, user_blocks: list[str]) -> str:
+    """Restore captured user sentinel blocks into new_text.
+
+    Strategy:
+    - If new_text contains empty USER_START/END pairs (from a template), replace
+      them in order with the captured blocks.
+    - If new_text has no sentinel markers but user_blocks is non-empty, append
+      the blocks at the end (before any final trailing newline).
+
+    This ensures user content survives even if the template structure changes.
+    """
+    if not user_blocks:
+        return new_text
+
+    # Check if new_text has any user sentinel markers to replace
+    has_markers = _USER_SENTINEL_START_RE.search(new_text) is not None
+
+    if has_markers:
+        # Replace existing empty pairs in order
+        result = new_text
+        for block in user_blocks:
+            # Find the next empty pair and replace it with the captured block
+            # An "empty pair" is <!-- GRAPHIFY_USER_START -->\n<!-- GRAPHIFY_USER_END -->
+            # but we also handle pairs with whitespace-only content between them.
+            # Use a simple approach: find next START, find its END, replace the range.
+            start_match = _USER_SENTINEL_START_RE.search(result)
+            if start_match is None:
+                # No more markers — append remaining blocks at the end
+                result = _append_user_block(result, block)
+                continue
+            end_match = _USER_SENTINEL_END_RE.search(result, start_match.end())
+            if end_match is None:
+                # Orphaned START — append block at end
+                result = _append_user_block(result, block)
+                continue
+            # Replace the range [start_match.start(), end_match.end()] with block
+            result = result[:start_match.start()] + block + result[end_match.end():]
+        return result
+    else:
+        # Append all user blocks at end
+        result = new_text
+        for block in user_blocks:
+            result = _append_user_block(result, block)
+        return result
+
+
+def _append_user_block(text: str, block: str) -> str:
+    """Append a user sentinel block to text, before any trailing newline."""
+    if text.endswith("\n"):
+        return text + block + "\n"
+    return text + "\n" + block + "\n"
+
 
 class _MalformedSentinel(Exception):
     """Private signal — compute_merge_plan catches this and emits
@@ -992,7 +1135,7 @@ def _build_manifest_from_result(
             "node_id": rn["node_id"] if rn else "",
             "note_type": rn["frontmatter_fields"].get("type", "unknown") if rn else "unknown",
             "community_id": rn["frontmatter_fields"].get("community", None) if rn else None,
-            "has_user_blocks": False,  # Will be set to True in Plan 02 when sentinel parser lands
+            "has_user_blocks": _has_user_sentinel_blocks(path.read_text(encoding="utf-8")),
         }
         new_manifest[rel_key] = entry
 
@@ -1057,6 +1200,16 @@ def _synthesize_file_text(
     if action.action in ("CREATE", "REPLACE"):
         fm_text = _dump_frontmatter(rendered_note["frontmatter_fields"])
         body = rendered_note["body"]
+        # D-08: preserve user sentinel blocks from existing file during REPLACE.
+        # even with strategy=replace, the user's explicit preservation zones survive.
+        if action.action == "REPLACE" and existing_text is not None:
+            user_blocks = _extract_user_blocks(existing_text)
+            if user_blocks:
+                if body.startswith("\n"):
+                    result_text = fm_text + body
+                else:
+                    result_text = fm_text + "\n" + body
+                return _restore_user_blocks(result_text, user_blocks)
         # Ensure exactly one newline between frontmatter block and body
         if body.startswith("\n"):
             return fm_text + body
@@ -1069,14 +1222,23 @@ def _synthesize_file_text(
             raise ValueError("UPDATE action on file with unparseable frontmatter")
         body_start = _find_body_start(existing_text)
         existing_body = existing_text[body_start:]
+        # D-08: extract user sentinel blocks before merge so we can restore them.
+        # The graphify-managed sentinel merge (_merge_body_blocks) handles graphify
+        # sections; user blocks are a separate layer on top.
+        user_blocks = _extract_user_blocks(existing_body)
         merged_fm, _ = _merge_frontmatter(parsed_fm, rendered_note["frontmatter_fields"], profile)
         existing_blocks = _parse_sentinel_blocks(existing_body)
         new_blocks = _parse_sentinel_blocks(rendered_note["body"])
         merged_body, _ = _merge_body_blocks(existing_body, existing_blocks, new_blocks)
         fm_text = _dump_frontmatter(merged_fm)
         if merged_body.startswith("\n"):
-            return fm_text + merged_body
-        return fm_text + "\n" + merged_body
+            result_text = fm_text + merged_body
+        else:
+            result_text = fm_text + "\n" + merged_body
+        # Restore user sentinel blocks if any were present
+        if user_blocks:
+            return _restore_user_blocks(result_text, user_blocks)
+        return result_text
 
     raise ValueError(f"_synthesize_file_text cannot handle action {action.action!r}")
 
@@ -1141,12 +1303,17 @@ def apply_merge_plan(
             continue
 
         existing_text: str | None = None
-        if action.action == "UPDATE":
-            try:
-                existing_text = target.read_text(encoding="utf-8")
-            except OSError as exc:
-                failed.append((target, f"read existing failed: {exc}"))
-                continue
+        if action.action in ("UPDATE", "REPLACE"):
+            # Read existing text for UPDATE (required for merge) and REPLACE
+            # (needed for D-08 user sentinel block preservation).
+            if target.exists():
+                try:
+                    existing_text = target.read_text(encoding="utf-8")
+                except OSError as exc:
+                    if action.action == "UPDATE":
+                        failed.append((target, f"read existing failed: {exc}"))
+                        continue
+                    # For REPLACE, a read failure just means no user blocks to preserve
 
         try:
             new_text = _synthesize_file_text(action, rendered, existing_text, profile)
