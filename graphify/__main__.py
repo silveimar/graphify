@@ -895,6 +895,7 @@ def main() -> None:
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
         print("    --obsidian-dir <path>   output vault directory (default graphify-out/obsidian)")
         print("    --dry-run               print the merge plan via format_merge_plan without writing files")
+        print("    --force                 force update of user-modified notes (preserves sentinel blocks)")
         print("  snapshot               save current graph.json as a snapshot (DELTA-07)")
         print("    --name <label>         optional label suffix for snapshot filename")
         print("    --cap <N>              max snapshots to retain (default: 10)")
@@ -972,6 +973,7 @@ def main() -> None:
         graph_path = "graphify-out/graph.json"
         obsidian_dir = "graphify-out/obsidian"
         dry_run = False
+        force = False
         args = sys.argv[2:]
         i = 0
         while i < len(args):
@@ -985,6 +987,8 @@ def main() -> None:
                 obsidian_dir = args[i].split("=", 1)[1]; i += 1
             elif args[i] == "--dry-run":
                 dry_run = True; i += 1
+            elif args[i] == "--force":
+                force = True; i += 1
             else:
                 print(f"error: unknown --obsidian option: {args[i]}", file=sys.stderr)
                 sys.exit(2)
@@ -1035,6 +1039,7 @@ def main() -> None:
                 communities,
                 obsidian_dir,
                 dry_run=dry_run,
+                force=force,
             )
         except Exception as exc:
             print(f"error: to_obsidian failed: {exc}", file=sys.stderr)

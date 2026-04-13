@@ -455,6 +455,7 @@ def to_obsidian(
     community_labels: dict[int, str] | None = None,
     cohesion: dict[int, float] | None = None,
     dry_run: bool = False,
+    force: bool = False,
 ) -> "MergeResult | MergePlan":
     """Export graph as an Obsidian vault using the profile-driven pipeline.
 
@@ -467,6 +468,8 @@ def to_obsidian(
     `community_labels` feeds per-community display names into the classification
     pipeline via profile-independent merge into classify()'s per_community ctx.
     `cohesion` is passed through to classify() for per-community cohesion scores.
+    `force` bypasses user-modified detection (D-10): user-modified notes are
+    updated/replaced as if unmodified. User sentinel blocks (D-08) still preserved.
     """
     # Function-local imports so `graphify install` (which touches export.py through
     # __init__.py's lazy map) doesn't force heavy deps at CLI entry time.
@@ -478,6 +481,8 @@ def to_obsidian(
         apply_merge_plan,
         RenderedNote,
         split_rendered_note,
+        _load_manifest,
+        _save_manifest,
     )
 
     out = Path(output_dir)
@@ -491,6 +496,13 @@ def to_obsidian(
             f"to_obsidian: output_dir {out} exists but is not a directory"
         )
     out.mkdir(parents=True, exist_ok=True)
+
+    # Manifest lives in the parent of the vault dir (typically graphify-out/).
+    # vault-manifest.json is a graphify sidecar alongside graph.json.
+    # _load_manifest gracefully returns {} when the file is absent (first run).
+    _vault_dir = out.resolve()
+    manifest_path = _vault_dir.parent / "vault-manifest.json"
+    manifest = _load_manifest(manifest_path)
 
     # D-74: always run the new pipeline. No `if profile is None` branching.
     if profile is None:
@@ -589,10 +601,16 @@ def to_obsidian(
     plan = compute_merge_plan(
         out, rendered_notes, profile,
         skipped_node_ids=skipped,
+        manifest=manifest,
+        force=force,
     )
     if dry_run:
         return plan
-    return apply_merge_plan(plan, out, rendered_notes, profile)
+    return apply_merge_plan(
+        plan, out, rendered_notes, profile,
+        manifest_path=manifest_path,
+        old_manifest=manifest,
+    )
 
 
 def to_canvas(
