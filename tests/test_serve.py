@@ -19,6 +19,9 @@ from graphify.serve import (
     _make_flag_record,
     _make_edge_record,
     _filter_annotations,
+    _make_proposal_record,
+    _save_proposal,
+    _list_proposals,
 )
 
 
@@ -358,3 +361,118 @@ def test_peer_id_never_from_env():
     import graphify.serve as serve_mod
     source = open(serve_mod.__file__).read()
     assert "os.environ" not in source, "serve.py must not read os.environ (peer_id must never be auto-detected)"
+
+
+# ============================================================================
+# Task 1 (Plan 02): Proposal staging helpers
+# ============================================================================
+
+# --- _make_proposal_record ---
+
+def test_make_proposal_record_fields():
+    record = _make_proposal_record(
+        {"title": "My Note", "body_markdown": "# Hello"},
+        session_id="sess-abc",
+    )
+    for field in ("record_id", "title", "note_type", "body_markdown", "suggested_folder",
+                  "tags", "rationale", "peer_id", "session_id", "timestamp", "status"):
+        assert field in record, f"Missing field: {field}"
+    assert record["session_id"] == "sess-abc"
+    assert record["title"] == "My Note"
+    assert record["body_markdown"] == "# Hello"
+
+
+def test_make_proposal_record_sanitizes():
+    record = _make_proposal_record(
+        {"title": "\x00evil", "body_markdown": "ok"},
+        session_id="sess-1",
+    )
+    assert "\x00" not in record["title"]
+    assert "evil" in record["title"]
+
+
+def test_make_proposal_record_default_peer():
+    record = _make_proposal_record({"title": "T", "body_markdown": "B"}, session_id="s1")
+    assert record["peer_id"] == "anonymous"
+
+
+def test_make_proposal_record_status_pending():
+    record = _make_proposal_record({"title": "T", "body_markdown": "B"}, session_id="s1")
+    assert record["status"] == "pending"
+
+
+def test_make_proposal_record_default_note_type():
+    record = _make_proposal_record({"title": "T", "body_markdown": "B"}, session_id="s1")
+    assert record["note_type"] == "note"
+
+
+def test_make_proposal_record_tags_sanitized():
+    record = _make_proposal_record(
+        {"title": "T", "body_markdown": "B", "tags": ["good", "\x01bad"]},
+        session_id="s1",
+    )
+    assert record["tags"] == ["good", "bad"]
+
+
+# --- _save_proposal ---
+
+def test_save_proposal_creates_dir(tmp_path):
+    out_dir = tmp_path / "graphify-out"
+    record = _make_proposal_record({"title": "T", "body_markdown": "B"}, session_id="s1")
+    _save_proposal(out_dir, record)
+    proposals_dir = out_dir / "proposals"
+    assert proposals_dir.is_dir()
+    files = list(proposals_dir.glob("*.json"))
+    assert len(files) == 1
+
+
+def test_save_proposal_filename_is_uuid(tmp_path):
+    out_dir = tmp_path / "graphify-out"
+    record = _make_proposal_record(
+        {"title": "My Important Note", "body_markdown": "body"},
+        session_id="s1",
+    )
+    _save_proposal(out_dir, record)
+    proposals_dir = out_dir / "proposals"
+    files = list(proposals_dir.glob("*.json"))
+    assert len(files) == 1
+    filename = files[0].name
+    # Filename must be {record_id}.json — never based on title
+    assert filename == f"{record['record_id']}.json"
+    assert "My_Important_Note" not in filename
+    assert "My Important Note" not in filename
+
+
+# --- _list_proposals ---
+
+def test_list_proposals_empty(tmp_path):
+    out_dir = tmp_path / "graphify-out"
+    result = _list_proposals(out_dir)
+    assert result == []
+
+
+def test_list_proposals_returns_records(tmp_path):
+    out_dir = tmp_path / "graphify-out"
+    r1 = _make_proposal_record({"title": "A", "body_markdown": "a"}, session_id="s1")
+    r2 = _make_proposal_record({"title": "B", "body_markdown": "b"}, session_id="s1")
+    _save_proposal(out_dir, r1)
+    _save_proposal(out_dir, r2)
+    result = _list_proposals(out_dir)
+    assert len(result) == 2
+    ids = {r["record_id"] for r in result}
+    assert r1["record_id"] in ids
+    assert r2["record_id"] in ids
+
+
+def test_list_proposals_skips_corrupt(tmp_path):
+    out_dir = tmp_path / "graphify-out"
+    proposals_dir = out_dir / "proposals"
+    proposals_dir.mkdir(parents=True)
+    # Write a valid proposal
+    r1 = _make_proposal_record({"title": "A", "body_markdown": "a"}, session_id="s1")
+    _save_proposal(out_dir, r1)
+    # Write a corrupt JSON file
+    (proposals_dir / "corrupt.json").write_text("NOT VALID JSON", encoding="utf-8")
+    result = _list_proposals(out_dir)
+    assert len(result) == 1
+    assert result[0]["record_id"] == r1["record_id"]
