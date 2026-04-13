@@ -787,19 +787,28 @@ def _compute_merge_plan_for_approve(vault_path, rendered_notes, profile, **kwarg
     return compute_merge_plan(vault_path, rendered_notes, profile, **kwargs)
 
 
-def _apply_merge_plan_for_approve(plan, vault_path, rendered_notes, profile):
+def _apply_merge_plan_for_approve(plan, vault_path, rendered_notes, profile,
+                                   *, manifest_path=None, old_manifest=None):
     from graphify.merge import apply_merge_plan
-    return apply_merge_plan(plan, vault_path, rendered_notes, profile)
+    return apply_merge_plan(plan, vault_path, rendered_notes, profile,
+                            manifest_path=manifest_path, old_manifest=old_manifest)
 
 
-def _approve_and_write_proposal(proposals_dir: Path, record_id: str, vault_path: Path) -> dict:
+def _load_manifest_for_approve(manifest_path: Path) -> dict:
+    from graphify.merge import _load_manifest
+    return _load_manifest(manifest_path)
+
+
+def _approve_and_write_proposal(proposals_dir: Path, record_id: str, vault_path: Path,
+                                 *, force: bool = False) -> dict:
     """Approve a proposal and write it to the vault via the merge engine.
 
     Raises FileNotFoundError if the proposal does not exist.
     Raises ValueError if record_id attempts path traversal.
     Calls validate_vault_path on the suggested_folder to confine vault writes (T-07-11).
+    When force=True, bypasses user-modified detection (SKIP_PRESERVE) but sentinel blocks
+    remain protected regardless.
     """
-    import os as _os
     # Path confinement: ensure resolved path stays inside proposals_dir
     path = (proposals_dir / f"{record_id}.json").resolve()
     if not str(path).startswith(str(proposals_dir.resolve())):
@@ -830,27 +839,34 @@ def _approve_and_write_proposal(proposals_dir: Path, record_id: str, vault_path:
     }
     rendered = {proposal["record_id"]: rn}
 
-    # Run through the merge engine
-    plan = _compute_merge_plan_for_approve(vault_path, rendered, profile)
-    _apply_merge_plan_for_approve(plan, vault_path, rendered, profile)
+    # Load manifest for user-modified detection (D-01)
+    manifest_path = Path("graphify-out") / "vault-manifest.json"
+    old_manifest = _load_manifest_for_approve(manifest_path)
 
-    # Mark approved and rewrite proposal file.
-    # Note: if this status write fails after merge has already written vault files,
-    # the proposal stays "pending" and a re-run may re-apply.  The merge engine
-    # handles re-writes idempotently so this is safe, but we warn to aid debugging.
-    proposal["status"] = "approved"
-    tmp = path.with_suffix(".tmp")
-    try:
-        tmp.write_text(json.dumps(proposal, indent=2, ensure_ascii=False), encoding="utf-8")
-        _os.replace(tmp, path)
-    except Exception:
-        print(
-            f"[graphify] warning: merge succeeded but failed to mark proposal "
-            f"{record_id} as approved — re-run may re-apply (idempotent)",
-            file=sys.stderr,
-        )
-        tmp.unlink(missing_ok=True)
-        raise
+    # Run through the merge engine with manifest and force flag threaded through
+    plan = _compute_merge_plan_for_approve(vault_path, rendered, profile,
+                                           manifest=old_manifest, force=force)
+    result = _apply_merge_plan_for_approve(plan, vault_path, rendered, profile,
+                                           manifest_path=manifest_path,
+                                           old_manifest=old_manifest)
+
+    # Warn and leave proposal pending when user has modified the note (D-04)
+    skipped_user_modified = [
+        a for a in result.plan.actions
+        if a.action == "SKIP_PRESERVE" and getattr(a, "user_modified", False)
+    ]
+    if skipped_user_modified:
+        for action in skipped_user_modified:
+            print(
+                f"[graphify] Note {action.path.name!r} was user-modified, skipping. "
+                f"Use --force to override.",
+                file=sys.stderr,
+            )
+        # Proposal stays pending — do NOT delete (D-04)
+        return proposal
+
+    # Delete proposal file on success (D-05)
+    path.unlink()
     return proposal
 
 
@@ -1187,6 +1203,7 @@ def main() -> None:
         approve_all = False
         target_id = None
         out_dir = Path("graphify-out")
+        force = False
         i = 0
         while i < len(args):
             if args[i] == "--vault" and i + 1 < len(args):
@@ -1199,6 +1216,8 @@ def main() -> None:
                 reject_all = True; i += 1
             elif args[i] == "--all":
                 approve_all = True; i += 1
+            elif args[i] == "--force":
+                force = True; i += 1
             elif args[i] == "--out-dir" and i + 1 < len(args):
                 out_dir = Path(args[i + 1]); i += 2
             elif args[i].startswith("--out-dir="):
@@ -1261,7 +1280,7 @@ def main() -> None:
                 sys.exit(0)
             for p in proposals:
                 try:
-                    _approve_and_write_proposal(proposals_dir, p["record_id"], vault_path)
+                    _approve_and_write_proposal(proposals_dir, p["record_id"], vault_path, force=force)
                     print(f"Approved: {p['record_id'][:8]} \u2014 {p.get('title', 'untitled')}")
                 except Exception as exc:
                     print(f"error approving {p['record_id'][:8]}: {exc}", file=sys.stderr)
@@ -1273,7 +1292,7 @@ def main() -> None:
                 print("error: --vault is required for approve operations", file=sys.stderr)
                 sys.exit(2)
             try:
-                r = _approve_and_write_proposal(proposals_dir, target_id, vault_path)
+                r = _approve_and_write_proposal(proposals_dir, target_id, vault_path, force=force)
                 print(f"Approved: {r['record_id'][:8]} \u2014 {r.get('title', 'untitled')}")
             except FileNotFoundError as exc:
                 print(f"error: {exc}", file=sys.stderr)
