@@ -43,10 +43,10 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 ### Active (v1.1 — Context Persistence & Agent Memory)
 
-- [ ] Graph snapshot persistence in `graphify-out/snapshots/` for run-over-run comparison
-- [ ] `GRAPH_DELTA.md` output showing new/removed nodes, community migration, connectivity changes
-- [ ] Per-node staleness metadata (`extracted_at`, `source_modified_at`, confidence decay)
-- [ ] Summary+archive delta pattern (summary for agent context, full diff for search)
+- [x] Graph snapshot persistence in `graphify-out/snapshots/` for run-over-run comparison _(v1.1, Phase 6: Graph Delta Analysis & Staleness)_
+- [x] `GRAPH_DELTA.md` output showing new/removed nodes, community migration, connectivity changes _(v1.1, Phase 6)_
+- [x] Per-node staleness metadata (`extracted_at`, `source_hash`, `source_mtime`) with three-state classification (FRESH/STALE/GHOST) _(v1.1, Phase 6)_
+- [x] Summary+archive delta pattern (summary for agent context, full diff for search) _(v1.1, Phase 6)_
 - [ ] MCP mutation tools: annotate nodes, add edges, flag importance, tag with context
 - [ ] Peer identity tracking on annotations (agent name, session ID, timestamp)
 - [ ] Session-scoped graph views via MCP
@@ -154,4 +154,4 @@ All five v1.0 phases delivered and verified. The configurable vault adapter is t
 Phases 6–8 scoped. Requirements being defined.
 
 ---
-*Last updated: 2026-04-12 after v1.1 milestone start*
+*Last updated: 2026-04-13 — Phase 6 (Graph Delta Analysis & Staleness) complete*
