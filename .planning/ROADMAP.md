@@ -99,7 +99,12 @@ Configurable output adapter replacing the monolithic `to_obsidian()` with a four
   3. Every graph node carries `extracted_at`, `source_hash`, and a staleness state (FRESH / STALE / GHOST) so user or agent can judge data freshness without re-running extraction
   4. Running `graphify snapshot` saves a named snapshot without requiring a full pipeline re-run, and the `graphify-out/snapshots/` directory never exceeds the configured retention limit
   5. Per-node connectivity delta (degree change, new/lost edge counts) is visible in the delta output, not just node-level presence/absence
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Snapshot module (save/load/prune/list) + provenance metadata injection in extract.py
+- [ ] 06-02-PLAN.md — Delta computation (set-arithmetic diff, staleness classification, GRAPH_DELTA.md rendering)
+- [ ] 06-03-PLAN.md — CLI wiring (graphify snapshot command, auto-snapshot+auto-delta pipeline helper)
 
 ### Phase 7: MCP Write-Back with Peer Modeling
 **Goal**: Agents can annotate, flag, and propose notes on the knowledge graph across sessions, with full provenance and a human-in-the-loop for vault writes
@@ -134,7 +139,7 @@ Configurable output adapter replacing the monolithic `to_obsidian()` with a four
 | 3. Mapping Engine | v1.0 | 4/4 | Complete | 2026-04-11 |
 | 4. Merge Engine | v1.0 | 6/6 | Complete | 2026-04-11 |
 | 5. Integration & CLI | v1.0 | 6/6 | Complete | 2026-04-11 |
-| 6. Graph Delta Analysis & Staleness | v1.1 | 0/? | Not started | — |
+| 6. Graph Delta Analysis & Staleness | v1.1 | 0/3 | Planned | — |
 | 7. MCP Write-Back with Peer Modeling | v1.1 | 0/? | Not started | — |
 | 8. Obsidian Round-Trip Awareness | v1.1 | 0/? | Not started | — |
 | 9. Multi-Perspective Analysis (Council Protocol) | v1.2 | 0/? | Planned | — |
@@ -149,4 +154,4 @@ Configurable output adapter replacing the monolithic `to_obsidian()` with a four
 | 18. Focus-Aware Graph Context | v1.3 | 0/? | Planned | — |
 
 ---
-*Last updated: 2026-04-12 — v1.1 roadmap created with full phase detail for Phases 6–8 (DELTA-01..08, MCP-01..10, TRIP-01..07; 25/25 requirements mapped). v1.2–v1.3 milestones preserved from prior exploration sessions.*
+*Last updated: 2026-04-12 — Phase 6 planned: 3 plans in 2 waves (06-01 snapshot module, 06-02 delta module, 06-03 CLI wiring). v1.2–v1.3 milestones preserved from prior exploration sessions.*
