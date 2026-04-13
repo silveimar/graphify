@@ -749,6 +749,13 @@ def main() -> None:
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
         print("    --obsidian-dir <path>   output vault directory (default graphify-out/obsidian)")
         print("    --dry-run               print the merge plan via format_merge_plan without writing files")
+        print("  snapshot               save current graph.json as a snapshot (DELTA-07)")
+        print("    --name <label>         optional label suffix for snapshot filename")
+        print("    --cap <N>              max snapshots to retain (default: 10)")
+        print("    --graph <path>         path to graph.json (default graphify-out/graph.json)")
+        print("    --from <path>          compare FROM this snapshot (for delta generation)")
+        print("    --to <path>            compare TO this snapshot (for delta generation)")
+        print("    --delta                also generate GRAPH_DELTA.md comparing against previous snapshot")
         print("  benchmark [graph.json]  measure token reduction vs naive full-corpus approach")
         print("  hook install            install post-commit/post-checkout git hooks (all platforms)")
         print("  hook uninstall          remove git hooks")
@@ -896,6 +903,110 @@ def main() -> None:
                 f"\u2014 {total} actions ({created} CREATE, {updated} UPDATE)"
             )
         sys.exit(0)
+
+    if cmd == "snapshot":
+        graph_path = "graphify-out/graph.json"
+        name = None
+        cap = 10
+        from_path = None
+        to_path = None
+        gen_delta = False
+        args = sys.argv[2:]
+        i = 0
+        while i < len(args):
+            if args[i] == "--graph" and i + 1 < len(args):
+                graph_path = args[i + 1]; i += 2
+            elif args[i].startswith("--graph="):
+                graph_path = args[i].split("=", 1)[1]; i += 1
+            elif args[i] == "--name" and i + 1 < len(args):
+                name = args[i + 1]; i += 2
+            elif args[i].startswith("--name="):
+                name = args[i].split("=", 1)[1]; i += 1
+            elif args[i] == "--cap" and i + 1 < len(args):
+                cap = int(args[i + 1]); i += 2
+            elif args[i].startswith("--cap="):
+                cap = int(args[i].split("=", 1)[1]); i += 1
+            elif args[i] == "--from" and i + 1 < len(args):
+                from_path = args[i + 1]; i += 2
+            elif args[i].startswith("--from="):
+                from_path = args[i].split("=", 1)[1]; i += 1
+            elif args[i] == "--to" and i + 1 < len(args):
+                to_path = args[i + 1]; i += 2
+            elif args[i].startswith("--to="):
+                to_path = args[i].split("=", 1)[1]; i += 1
+            elif args[i] == "--delta":
+                gen_delta = True; i += 1
+            else:
+                print(f"error: unknown snapshot option: {args[i]}", file=sys.stderr)
+                sys.exit(2)
+
+        # If --from and --to are specified, compare two snapshots (D-07)
+        if from_path and to_path:
+            from graphify.snapshot import load_snapshot
+            from graphify.delta import compute_delta, render_delta_md
+            G_old, comm_old, _ = load_snapshot(Path(from_path))
+            G_new, comm_new, _ = load_snapshot(Path(to_path))
+            d = compute_delta(G_old, comm_old, G_new, comm_new)
+            md = render_delta_md(d, G_new=G_new, communities_new=comm_new)
+            out = Path("graphify-out/GRAPH_DELTA.md")
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(md, encoding="utf-8")
+            print(f"delta written: {out}")
+            return
+
+        # Load graph.json — reuse the exact --obsidian pattern
+        gp = Path(graph_path).resolve()
+        if not gp.exists():
+            print(f"error: graph file not found: {gp}", file=sys.stderr)
+            print("hint: run /graphify to produce graphify-out/graph.json first", file=sys.stderr)
+            sys.exit(1)
+        if gp.suffix != ".json":
+            print("error: graph file must be a .json file", file=sys.stderr)
+            sys.exit(1)
+        try:
+            import json as _json
+            from networkx.readwrite import json_graph
+            _raw = _json.loads(gp.read_text(encoding="utf-8"))
+            try:
+                G = json_graph.node_link_graph(_raw, edges="links")
+            except TypeError:
+                G = json_graph.node_link_graph(_raw)
+        except Exception as exc:
+            print(f"error: could not load graph: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        # Reconstruct communities dict from node["community"] attribute
+        communities: dict[int, list[str]] = {}
+        for node_id, data in G.nodes(data=True):
+            cid = data.get("community")
+            if cid is None:
+                continue
+            try:
+                cid_int = int(cid)
+            except (TypeError, ValueError):
+                continue
+            communities.setdefault(cid_int, []).append(node_id)
+
+        from graphify.snapshot import save_snapshot
+        saved = save_snapshot(G, communities, name=name, cap=cap)
+        print(f"snapshot saved: {saved}")
+
+        if gen_delta:
+            from graphify.snapshot import list_snapshots, load_snapshot
+            from graphify.delta import compute_delta, render_delta_md
+            snaps = list_snapshots()
+            if len(snaps) >= 2:
+                prev = snaps[-2]  # second-to-last is previous
+                G_old, comm_old, _ = load_snapshot(prev)
+                d = compute_delta(G_old, comm_old, G, communities)
+                md = render_delta_md(d, G_new=G, communities_new=communities)
+            else:
+                md = render_delta_md({}, first_run=True)
+            out = Path("graphify-out/GRAPH_DELTA.md")
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(md, encoding="utf-8")
+            print(f"delta written: {out}")
+        return
 
     if cmd == "install":
         # Default to windows platform on Windows, claude elsewhere

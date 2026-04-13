@@ -1,8 +1,15 @@
 # tests for graphify/delta.py — delta computation, staleness, rendering
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
 import networkx as nx
 import pytest
+from networkx.readwrite import json_graph
 
 from graphify.delta import classify_staleness, compute_delta, render_delta_md
 
@@ -209,3 +216,88 @@ def test_render_delta_md_staleness(tmp_path):
     }
     md = render_delta_md(delta, G_new=G_new)
     assert "Stale" in md or "GHOST" in md
+
+
+# --- CLI integration tests ---
+
+
+def _write_graph_json(path: Path, nodes, edges=None, communities=None):
+    """Write a graph.json fixture at the given path."""
+    G = nx.Graph()
+    for n in nodes:
+        cid = None
+        if communities:
+            for c, members in communities.items():
+                if n in members:
+                    cid = c
+                    break
+        G.add_node(n, label=n, file_type="code", source_file=f"{n}.py", community=cid)
+    for src, tgt in (edges or []):
+        G.add_edge(src, tgt, relation="calls", confidence="EXTRACTED")
+    try:
+        data = json_graph.node_link_data(G, edges="links")
+    except TypeError:
+        data = json_graph.node_link_data(G)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_cli_snapshot_help():
+    """Running graphify --help shows 'snapshot' in output."""
+    result = subprocess.run(
+        [sys.executable, "-m", "graphify", "--help"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert "snapshot" in result.stdout
+
+
+def test_cli_snapshot_saves_file(tmp_path):
+    """graphify snapshot --graph {path} creates a snapshot file."""
+    graph_json = tmp_path / "graphify-out" / "graph.json"
+    _write_graph_json(graph_json, ["a", "b"], [("a", "b")], {0: ["a", "b"]})
+    result = subprocess.run(
+        [sys.executable, "-m", "graphify", "snapshot", "--graph", str(graph_json)],
+        capture_output=True, text=True, timeout=30, cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert "snapshot saved:" in result.stdout
+    snaps = list((tmp_path / "graphify-out" / "snapshots").glob("*.json"))
+    assert len(snaps) >= 1
+
+
+def test_cli_snapshot_with_name(tmp_path):
+    """graphify snapshot --name test-label creates file with 'test-label' in name."""
+    graph_json = tmp_path / "graphify-out" / "graph.json"
+    _write_graph_json(graph_json, ["a", "b"], [("a", "b")], {0: ["a", "b"]})
+    result = subprocess.run(
+        [sys.executable, "-m", "graphify", "snapshot", "--graph", str(graph_json), "--name", "test-label"],
+        capture_output=True, text=True, timeout=30, cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    snaps = list((tmp_path / "graphify-out" / "snapshots").glob("*.json"))
+    assert any("test-label" in s.stem for s in snaps)
+
+
+def test_cli_snapshot_from_to(tmp_path):
+    """graphify snapshot --from snap1 --to snap2 writes GRAPH_DELTA.md."""
+    from graphify.snapshot import save_snapshot
+
+    G1 = _make_graph(["a", "b"], [("a", "b")])
+    comms1 = {0: ["a", "b"]}
+    snap1 = save_snapshot(G1, comms1, root=tmp_path, name="snap1")
+    time.sleep(0.05)
+
+    G2 = _make_graph(["a", "b", "c"], [("a", "b"), ("b", "c")])
+    comms2 = {0: ["a", "b"], 1: ["c"]}
+    snap2 = save_snapshot(G2, comms2, root=tmp_path, name="snap2")
+
+    result = subprocess.run(
+        [sys.executable, "-m", "graphify", "snapshot", "--from", str(snap1), "--to", str(snap2)],
+        capture_output=True, text=True, timeout=30, cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert "delta written:" in result.stdout
+    delta_file = tmp_path / "graphify-out" / "GRAPH_DELTA.md"
+    assert delta_file.exists()
+    content = delta_file.read_text(encoding="utf-8")
+    assert "Graph Delta Report" in content
