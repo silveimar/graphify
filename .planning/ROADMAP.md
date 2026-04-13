@@ -151,7 +151,11 @@ Plans:
   1. Running `graphify approve <id> --vault <path>` on a vault with user-modified notes triggers SKIP_PRESERVE for those notes (same behavior as `--obsidian` re-run)
   2. After `graphify approve` writes a note, `vault-manifest.json` is updated with the new content hash
   3. Running `/graphify` (skill invocation) on a corpus that has been graphified before produces `GRAPH_DELTA.md` and saves a snapshot to `graphify-out/snapshots/` without requiring a separate `graphify snapshot` command
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 08.1-01-PLAN.md — Approve manifest threading, --force flag, SKIP_PRESERVE warning, proposal deletion
+- [ ] 08.1-02-PLAN.md — Wire auto_snapshot_and_delta into skill.md pipeline (full + cluster-only paths)
 
 ### Phase 8.2: MCP Query Enhancements
 **Goal**: Agents can query node staleness state and retrieve agent-created edges through the MCP server
@@ -161,7 +165,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Calling MCP `get_node` returns `extracted_at`, `source_hash`, and a staleness classification (FRESH/STALE/GHOST) alongside existing fields
   2. A new MCP tool `get_agent_edges` returns edges from `agent-edges.json`, filterable by peer_id and session_id
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 08.1-01-PLAN.md — Approve manifest threading, --force flag, SKIP_PRESERVE warning, proposal deletion
+- [ ] 08.1-02-PLAN.md — Wire auto_snapshot_and_delta into skill.md pipeline (full + cluster-only paths)
 
 ## Progress
 
@@ -175,7 +183,7 @@ Plans:
 | 6. Graph Delta Analysis & Staleness | v1.1 | 3/3 | Complete | 2026-04-12 |
 | 7. MCP Write-Back with Peer Modeling | v1.1 | 3/3 | Complete | 2026-04-13 |
 | 8. Obsidian Round-Trip Awareness | v1.1 | 3/3 | Complete | 2026-04-13 |
-| 8.1 Approve & Pipeline Wiring | v1.1 | 0/? | Planned | — |
+| 8.1 Approve & Pipeline Wiring | v1.1 | 0/2 | Planned | — |
 | 8.2 MCP Query Enhancements | v1.1 | 0/? | Planned | — |
 | 9. Multi-Perspective Analysis (Council Protocol) | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
