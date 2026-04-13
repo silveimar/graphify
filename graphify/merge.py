@@ -1365,14 +1365,35 @@ def format_merge_plan(plan: MergePlan) -> str:
 
     Output shape is locked in CONTEXT.md D-76:
       - Header line `Merge Plan — N actions` + separator `=====...`
+      - D-12 round-trip preamble (only when user-modified notes present)
       - Six-line summary block (CREATE/UPDATE/SKIP_PRESERVE/SKIP_CONFLICT/REPLACE/ORPHAN)
       - One per-group section per non-empty action kind, actions sorted by
         str(path) for determinism.
+      - D-11 source annotations ([user]/[both]) on per-action lines when applicable.
     """
     total = len(plan.actions)
     lines: list[str] = []
     lines.append(f"Merge Plan \u2014 {total} actions")
     lines.append("=" * 24)
+
+    # D-12: Round-trip awareness preamble — only shown when user-modified notes exist
+    # or when any action has a non-default source annotation. Keeps v1.0 output clean
+    # when no manifest is in play (no user-modified notes → no preamble).
+    user_modified_count = sum(1 for a in plan.actions if a.user_modified)
+    has_non_default_source = any(a.source != "graphify" for a in plan.actions)
+    if user_modified_count > 0 or has_non_default_source:
+        summary_pre = plan.summary or {}
+        graphify_only_count = sum(
+            1 for a in plan.actions
+            if a.action in ("UPDATE", "REPLACE", "SKIP_PRESERVE") and not a.user_modified
+        )
+        new_count = summary_pre.get("CREATE", 0)
+        lines.append(
+            f"{user_modified_count} notes user-modified (will be preserved), "
+            f"{graphify_only_count} notes graphify-only (will update), "
+            f"{new_count} new notes (will create)"
+        )
+        lines.append("")
 
     # Summary block: always emit all six keys in locked order, even at zero.
     # Right-pad labels to 15 chars so counts align (matches CONTEXT.md example).
@@ -1406,15 +1427,30 @@ def format_merge_plan(plan: MergePlan) -> str:
 
 
 def _format_action_suffix(action: MergeAction) -> str:
-    """Build the trailing parenthetical/bracket for a single action row."""
+    """Build the trailing parenthetical/bracket for a single action row.
+
+    D-11: Prepend [user] or [both] source annotation when source is non-default.
+    Default source="graphify" produces no annotation (clean output for v1.0 plans).
+    """
+    parts: list[str] = []
+
+    # D-11: source annotation — only shown for non-default source values
+    if action.source == "user":
+        parts.append("[user]")
+    elif action.source == "both":
+        parts.append("[both]")
+
     if action.action == "UPDATE":
-        return f"  ({len(action.changed_fields)} fields, {len(action.changed_blocks)} blocks)"
-    if action.action == "SKIP_CONFLICT":
+        parts.append(f"({len(action.changed_fields)} fields, {len(action.changed_blocks)} blocks)")
+    elif action.action == "SKIP_CONFLICT":
         kind = action.conflict_kind or "unknown"
-        return f"  [{kind}]"
-    if action.action == "ORPHAN":
-        return f"  ({action.reason})"
-    return ""
+        parts.append(f"[{kind}]")
+    elif action.action == "ORPHAN":
+        parts.append(f"({action.reason})")
+    elif action.action == "SKIP_PRESERVE" and action.user_modified:
+        parts.append("(user-modified)")
+
+    return ("  " + "  ".join(parts)) if parts else ""
 
 
 # ---------------------------------------------------------------------------
