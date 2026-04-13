@@ -940,6 +940,11 @@ def main() -> None:
                 print(f"error: unknown snapshot option: {args[i]}", file=sys.stderr)
                 sys.exit(2)
 
+        # Validate --from/--to pairing
+        if bool(from_path) != bool(to_path):
+            print("error: --from and --to must be specified together", file=sys.stderr)
+            sys.exit(2)
+
         # If --from and --to are specified, compare two snapshots (D-07)
         if from_path and to_path:
             from graphify.snapshot import load_snapshot
