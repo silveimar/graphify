@@ -11,6 +11,14 @@ from graphify.serve import (
     _dfs,
     _subgraph_to_text,
     _load_graph,
+    _append_annotation,
+    _compact_annotations,
+    _load_agent_edges,
+    _save_agent_edges,
+    _make_annotate_record,
+    _make_flag_record,
+    _make_edge_record,
+    _filter_annotations,
 )
 
 
@@ -151,3 +159,196 @@ def test_load_graph_missing_file(tmp_path):
     graphify_dir.mkdir()
     with pytest.raises(SystemExit):
         _load_graph(str(graphify_dir / "nonexistent.json"))
+
+
+# ============================================================================
+# Task 1: Sidecar persistence helpers
+# ============================================================================
+
+# --- _append_annotation ---
+
+def test_append_annotation_creates_file(tmp_path):
+    out_dir = tmp_path / "graphify-out"
+    record1 = {"node_id": "n1", "text": "first", "peer_id": "alice"}
+    record2 = {"node_id": "n2", "text": "second", "peer_id": "bob"}
+    _append_annotation(out_dir, record1)
+    _append_annotation(out_dir, record2)
+    ann_file = out_dir / "annotations.jsonl"
+    assert ann_file.exists()
+    lines = ann_file.read_text().strip().splitlines()
+    assert len(lines) == 2
+    assert json.loads(lines[0]) == record1
+    assert json.loads(lines[1]) == record2
+
+
+# --- _compact_annotations ---
+
+def test_compact_annotations_missing_file(tmp_path):
+    result = _compact_annotations(tmp_path / "annotations.jsonl")
+    assert result == []
+
+
+def test_compact_annotations_dedup(tmp_path):
+    path = tmp_path / "annotations.jsonl"
+    records = [
+        {"node_id": "n1", "annotation_type": "annotation", "peer_id": "alice", "text": "first"},
+        {"node_id": "n1", "annotation_type": "annotation", "peer_id": "alice", "text": "last"},
+        {"node_id": "n2", "annotation_type": "annotation", "peer_id": "alice", "text": "other"},
+    ]
+    with open(path, "w") as f:
+        for r in records:
+            f.write(json.dumps(r) + "\n")
+    result = _compact_annotations(path)
+    assert len(result) == 2
+    # duplicate key keeps last record
+    n1_records = [r for r in result if r["node_id"] == "n1"]
+    assert len(n1_records) == 1
+    assert n1_records[0]["text"] == "last"
+
+
+def test_compact_annotations_corrupt_line(tmp_path):
+    path = tmp_path / "annotations.jsonl"
+    path.write_text('{"node_id":"n1","annotation_type":"annotation","peer_id":"alice","text":"ok"}\nNOT VALID JSON\n')
+    result = _compact_annotations(path)
+    assert len(result) == 1
+    assert result[0]["node_id"] == "n1"
+
+
+# --- _load_agent_edges ---
+
+def test_load_agent_edges_missing(tmp_path):
+    result = _load_agent_edges(tmp_path / "agent-edges.json")
+    assert result == []
+
+
+def test_load_agent_edges_valid(tmp_path):
+    path = tmp_path / "agent-edges.json"
+    edges = [{"source": "a", "target": "b", "relation": "calls"}]
+    path.write_text(json.dumps(edges))
+    result = _load_agent_edges(path)
+    assert result == edges
+
+
+# --- _save_agent_edges ---
+
+def test_save_agent_edges_atomic(tmp_path):
+    out_dir = tmp_path / "graphify-out"
+    edges = [{"source": "x", "target": "y", "relation": "imports"}]
+    _save_agent_edges(out_dir, edges)
+    target = out_dir / "agent-edges.json"
+    assert target.exists()
+    assert json.loads(target.read_text()) == edges
+    # No leftover .tmp file
+    assert not (out_dir / "agent-edges.tmp").exists()
+
+
+# ============================================================================
+# Task 2: Mutation tools, record helpers, and filter
+# ============================================================================
+
+# --- _make_annotate_record ---
+
+def test_make_annotate_record_defaults():
+    record = _make_annotate_record("n1", "some text", "anonymous", "sess-001")
+    assert record["annotation_type"] == "annotation"
+    assert record["peer_id"] == "anonymous"
+    assert record["node_id"] == "n1"
+    assert record["text"] == "some text"
+    assert record["session_id"] == "sess-001"
+    # record_id should be a uuid4 format (36 chars with dashes)
+    assert len(record["record_id"]) == 36
+    assert record["record_id"].count("-") == 4
+    # timestamp is ISO-8601
+    assert "T" in record["timestamp"]
+    assert record["timestamp"].endswith("+00:00") or record["timestamp"].endswith("Z") or "UTC" in record["timestamp"] or "+" in record["timestamp"]
+
+
+def test_make_annotate_record_sanitizes():
+    xss = "<script>alert('xss')</script>"
+    record = _make_annotate_record("n1", xss, "anonymous", "sess-001")
+    assert "<script>" not in record["text"]
+
+
+# --- _make_flag_record ---
+
+def test_make_flag_record_valid():
+    record = _make_flag_record("n1", "high", "alice", "sess-001")
+    assert record["annotation_type"] == "flag"
+    assert record["importance"] == "high"
+    assert record["peer_id"] == "alice"
+
+
+def test_make_flag_record_invalid():
+    with pytest.raises(ValueError):
+        _make_flag_record("n1", "critical", "alice", "sess-001")
+
+
+# --- _make_edge_record ---
+
+def test_make_edge_record():
+    record = _make_edge_record("a", "b", "imports", "alice", "sess-001")
+    assert record["confidence"] == "INFERRED"
+    assert record["source"] == "a"
+    assert record["target"] == "b"
+    assert record["relation"] == "imports"
+    assert "record_id" in record
+    assert "timestamp" in record
+
+
+def test_make_edge_record_never_modifies_graph():
+    G = nx.Graph()
+    G.add_node("a")
+    G.add_node("b")
+    initial_edges = G.number_of_edges()
+    _make_edge_record("a", "b", "calls", "anon", "sess-001")
+    assert G.number_of_edges() == initial_edges
+
+
+# --- _filter_annotations ---
+
+def test_filter_annotations_no_filter():
+    annotations = [
+        {"node_id": "n1", "peer_id": "alice", "session_id": "s1", "timestamp": "2026-01-01T00:00:00+00:00"},
+        {"node_id": "n2", "peer_id": "bob", "session_id": "s2", "timestamp": "2026-01-02T00:00:00+00:00"},
+    ]
+    result = _filter_annotations(annotations, None, None, None, None)
+    assert len(result) == 2
+
+
+def test_filter_annotations_by_peer():
+    annotations = [
+        {"node_id": "n1", "peer_id": "alice", "session_id": "s1", "timestamp": "2026-01-01T00:00:00+00:00"},
+        {"node_id": "n2", "peer_id": "bob", "session_id": "s2", "timestamp": "2026-01-02T00:00:00+00:00"},
+    ]
+    result = _filter_annotations(annotations, "alice", None, None, None)
+    assert len(result) == 1
+    assert result[0]["peer_id"] == "alice"
+
+
+def test_filter_annotations_by_session():
+    annotations = [
+        {"node_id": "n1", "peer_id": "alice", "session_id": "s1", "timestamp": "2026-01-01T00:00:00+00:00"},
+        {"node_id": "n2", "peer_id": "bob", "session_id": "s2", "timestamp": "2026-01-02T00:00:00+00:00"},
+    ]
+    result = _filter_annotations(annotations, None, "s2", None, None)
+    assert len(result) == 1
+    assert result[0]["session_id"] == "s2"
+
+
+def test_filter_annotations_by_time_range():
+    annotations = [
+        {"node_id": "n1", "peer_id": "alice", "session_id": "s1", "timestamp": "2026-01-01T00:00:00+00:00"},
+        {"node_id": "n2", "peer_id": "bob", "session_id": "s2", "timestamp": "2026-01-02T00:00:00+00:00"},
+        {"node_id": "n3", "peer_id": "carol", "session_id": "s3", "timestamp": "2026-01-03T00:00:00+00:00"},
+    ]
+    result = _filter_annotations(annotations, None, None, "2026-01-01T12:00:00+00:00", "2026-01-02T12:00:00+00:00")
+    assert len(result) == 1
+    assert result[0]["node_id"] == "n2"
+
+
+# --- Security invariants ---
+
+def test_peer_id_never_from_env():
+    import graphify.serve as serve_mod
+    source = open(serve_mod.__file__).read()
+    assert "os.environ" not in source, "serve.py must not read os.environ (peer_id must never be auto-detected)"
