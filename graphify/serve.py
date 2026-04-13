@@ -116,6 +116,59 @@ def _make_edge_record(source: str, target: str, relation: str, peer_id: str, ses
     }
 
 
+def _make_proposal_record(arguments: dict, session_id: str) -> dict:
+    """Create a validated proposal record. All string inputs are sanitized."""
+    title = sanitize_label(arguments.get("title", ""))
+    note_type = sanitize_label(arguments.get("note_type", "note"))
+    body_markdown = sanitize_label(arguments.get("body_markdown", ""))
+    suggested_folder = sanitize_label(arguments.get("suggested_folder", ""))
+    rationale = sanitize_label(arguments.get("rationale", ""))
+    tags = [sanitize_label(t) for t in arguments.get("tags", [])]
+    peer_id = sanitize_label(arguments.get("peer_id", "anonymous"))
+    record_id = str(uuid.uuid4())
+    timestamp = datetime.now(timezone.utc).isoformat()
+    return {
+        "record_id": record_id,
+        "title": title,
+        "note_type": note_type,
+        "body_markdown": body_markdown,
+        "suggested_folder": suggested_folder,
+        "tags": tags,
+        "rationale": rationale,
+        "peer_id": peer_id,
+        "session_id": session_id,
+        "timestamp": timestamp,
+        "status": "pending",
+    }
+
+
+def _save_proposal(out_dir: Path, record: dict) -> None:
+    """Write a proposal record as JSON to graphify-out/proposals/{record_id}.json."""
+    proposals_dir = out_dir / "proposals"
+    proposals_dir.mkdir(parents=True, exist_ok=True)
+    (proposals_dir / f"{record['record_id']}.json").write_text(
+        json.dumps(record, indent=2), encoding="utf-8"
+    )
+
+
+def _list_proposals(out_dir: Path) -> list[dict]:
+    """Return all proposal dicts from graphify-out/proposals/, sorted by timestamp ascending.
+
+    Returns empty list if proposals dir does not exist. Skips corrupt JSON files.
+    """
+    proposals_dir = out_dir / "proposals"
+    if not proposals_dir.exists():
+        return []
+    proposals = []
+    for path in proposals_dir.glob("*.json"):
+        try:
+            proposals.append(json.loads(path.read_text(encoding="utf-8")))
+        except (json.JSONDecodeError, OSError):
+            continue
+    proposals.sort(key=lambda r: r.get("timestamp", ""))
+    return proposals
+
+
 def _filter_annotations(
     annotations: list[dict],
     peer_id: str | None,
@@ -400,17 +453,17 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             ),
             types.Tool(
                 name="propose_vault_note",
-                description="Propose a new vault note for human review before writing. Implemented in Plan 02.",
+                description="Stage a proposed vault note for human approval. Does NOT write to the vault — only to graphify-out/proposals/.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "title": {"type": "string", "description": "Suggested note title"},
-                        "note_type": {"type": "string", "description": "Note type (e.g. Thing, Source, MOC)"},
-                        "body_markdown": {"type": "string", "description": "Note body in markdown"},
+                        "title": {"type": "string", "description": "Note title"},
+                        "note_type": {"type": "string", "default": "note", "description": "Note type (e.g., note, person, source)"},
+                        "body_markdown": {"type": "string", "description": "Full markdown content for the note body"},
                         "suggested_folder": {"type": "string", "description": "Suggested vault folder path"},
                         "tags": {"type": "array", "items": {"type": "string"}, "description": "Tags for the note"},
-                        "rationale": {"type": "string", "description": "Why this note is being proposed"},
-                        "peer_id": {"type": "string", "description": "Peer identifier (default: anonymous)"},
+                        "rationale": {"type": "string", "description": "Why the agent proposes this note"},
+                        "peer_id": {"type": "string", "default": "anonymous"},
                     },
                     "required": ["title", "body_markdown"],
                 },
@@ -588,8 +641,10 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         return json.dumps(record)
 
     def _tool_propose_vault_note(arguments: dict) -> str:
-        """Propose a new vault note for human review. Implemented in Plan 02."""
-        return "Not implemented yet"
+        """Stage a proposed vault note for human review. Writes to graphify-out/proposals/ only (T-07-09)."""
+        record = _make_proposal_record(arguments, _session_id)
+        _save_proposal(_out_dir, record)
+        return json.dumps({"record_id": record["record_id"], "status": "pending"})
 
     def _tool_get_annotations(arguments: dict) -> str:
         """Return annotations, optionally filtered by peer_id, session_id, or time range."""
