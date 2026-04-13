@@ -133,7 +133,12 @@ Plans:
   3. Running `--obsidian --dry-run` shows which notes have user modifications and what merge action would be applied to each, before any file is touched
   4. `vault-manifest.json` is written atomically after each successful merge and records content hashes for all graphify-managed notes, enabling accurate change detection on the next run
   5. Merge plan output includes per-note modification source (graphify-generated, user-modified, or both) so the user has an audit trail of what changed and why
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Vault manifest I/O helpers, MergeAction extension, user-modified detection in compute/apply_merge_plan
+- [ ] 08-02-PLAN.md — User sentinel block parsing and preservation in _synthesize_file_text
+- [ ] 08-03-PLAN.md — CLI --force flag, manifest/force threading through to_obsidian, format_merge_plan dry-run enhancements
 
 ## Progress
 
@@ -146,7 +151,7 @@ Plans:
 | 5. Integration & CLI | v1.0 | 6/6 | Complete | 2026-04-11 |
 | 6. Graph Delta Analysis & Staleness | v1.1 | 0/3 | Planned | — |
 | 7. MCP Write-Back with Peer Modeling | v1.1 | 3/3 | Complete   | 2026-04-13 |
-| 8. Obsidian Round-Trip Awareness | v1.1 | 0/? | Not started | — |
+| 8. Obsidian Round-Trip Awareness | v1.1 | 0/3 | Planned | — |
 | 9. Multi-Perspective Analysis (Council Protocol) | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
 | 11. Narrative Mode | v1.2 | 0/? | Planned | — |
@@ -159,4 +164,4 @@ Plans:
 | 18. Focus-Aware Graph Context | v1.3 | 0/? | Planned | — |
 
 ---
-*Last updated: 2026-04-12 — Phase 7 planned: 3 plans in 3 waves (07-01 sidecar+mutation tools, 07-02 propose_vault_note, 07-03 approve CLI). v1.2-v1.3 milestones preserved from prior exploration sessions.*
+*Last updated: 2026-04-13 — Phase 8 planned: 3 plans in 3 waves (08-01 manifest+detection, 08-02 sentinel parsing, 08-03 CLI+dry-run). v1.2-v1.3 milestones preserved from prior exploration sessions.*
