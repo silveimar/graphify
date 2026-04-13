@@ -118,7 +118,7 @@ def test_format_proposal_summary():
 # ---------------------------------------------------------------------------
 
 def test_approve_and_write_proposal_calls_merge(tmp_path, monkeypatch):
-    """Calls compute_merge_plan and apply_merge_plan; sets proposal status to 'approved'."""
+    """Calls compute_merge_plan and apply_merge_plan; proposal file deleted on success."""
     from graphify.__main__ import _approve_and_write_proposal
     record = _make_proposal(tmp_path, "Vault Note Title")
     proposals_dir = tmp_path / "proposals"
@@ -142,7 +142,7 @@ def test_approve_and_write_proposal_calls_merge(tmp_path, monkeypatch):
         from graphify.merge import MergePlan
         return MergePlan(actions=[], orphans=[], summary={})
 
-    def fake_apply_merge_plan(plan, vault_dir, rendered_notes, profile):
+    def fake_apply_merge_plan(plan, vault_dir, rendered_notes, profile, *, manifest_path=None, old_manifest=None):
         called["apply"] = True
         from graphify.merge import MergeResult
         return MergeResult(plan=plan, succeeded=[], failed=[], skipped_identical=[])
@@ -154,11 +154,201 @@ def test_approve_and_write_proposal_calls_merge(tmp_path, monkeypatch):
 
     result = _approve_and_write_proposal(proposals_dir, record["record_id"], vault_dir)
 
-    assert result["status"] == "approved"
-    on_disk = json.loads((proposals_dir / f"{record['record_id']}.json").read_text(encoding="utf-8"))
-    assert on_disk["status"] == "approved"
+    # Proposal file deleted on successful approve (D-05)
+    assert not (proposals_dir / f"{record['record_id']}.json").exists()
     assert called["compute"]
     assert called["apply"]
+
+
+def test_approve_deletes_proposal(tmp_path, monkeypatch):
+    """Proposal JSON file is removed from disk after a successful approve."""
+    from graphify.__main__ import _approve_and_write_proposal
+    record = _make_proposal(tmp_path, "Delete Me")
+    proposals_dir = tmp_path / "proposals"
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+
+    def fake_load_profile(vault_path):
+        return {}
+
+    def fake_validate_vault_path(candidate, vault_dir):
+        return vault_dir / "Atlas" / "Dots" / "Things" / "Delete Me.md"
+
+    def fake_compute_merge_plan(vault_dir, rendered_notes, profile, **kwargs):
+        from graphify.merge import MergePlan
+        return MergePlan(actions=[], orphans=[], summary={})
+
+    def fake_apply_merge_plan(plan, vault_dir, rendered_notes, profile, *, manifest_path=None, old_manifest=None):
+        from graphify.merge import MergeResult
+        return MergeResult(plan=plan, succeeded=[], failed=[], skipped_identical=[])
+
+    monkeypatch.setattr("graphify.__main__._load_profile_for_approve", fake_load_profile)
+    monkeypatch.setattr("graphify.__main__._validate_vault_path_for_approve", fake_validate_vault_path)
+    monkeypatch.setattr("graphify.__main__._compute_merge_plan_for_approve", fake_compute_merge_plan)
+    monkeypatch.setattr("graphify.__main__._apply_merge_plan_for_approve", fake_apply_merge_plan)
+
+    proposal_file = proposals_dir / f"{record['record_id']}.json"
+    assert proposal_file.exists()
+
+    _approve_and_write_proposal(proposals_dir, record["record_id"], vault_dir)
+
+    assert not proposal_file.exists()
+
+
+def test_approve_writes_manifest(tmp_path, monkeypatch):
+    """apply_merge_plan receives manifest_path and old_manifest kwargs after approve."""
+    from graphify.__main__ import _approve_and_write_proposal
+    record = _make_proposal(tmp_path, "Manifest Note")
+    proposals_dir = tmp_path / "proposals"
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+
+    apply_kwargs_captured = {}
+
+    def fake_load_profile(vault_path):
+        return {}
+
+    def fake_validate_vault_path(candidate, vault_dir):
+        return vault_dir / "Atlas" / "Dots" / "Things" / "Manifest Note.md"
+
+    def fake_compute_merge_plan(vault_dir, rendered_notes, profile, **kwargs):
+        from graphify.merge import MergePlan
+        return MergePlan(actions=[], orphans=[], summary={})
+
+    def fake_apply_merge_plan(plan, vault_dir, rendered_notes, profile, *, manifest_path=None, old_manifest=None):
+        apply_kwargs_captured["manifest_path"] = manifest_path
+        apply_kwargs_captured["old_manifest"] = old_manifest
+        from graphify.merge import MergeResult
+        return MergeResult(plan=plan, succeeded=[], failed=[], skipped_identical=[])
+
+    monkeypatch.setattr("graphify.__main__._load_profile_for_approve", fake_load_profile)
+    monkeypatch.setattr("graphify.__main__._validate_vault_path_for_approve", fake_validate_vault_path)
+    monkeypatch.setattr("graphify.__main__._compute_merge_plan_for_approve", fake_compute_merge_plan)
+    monkeypatch.setattr("graphify.__main__._apply_merge_plan_for_approve", fake_apply_merge_plan)
+
+    _approve_and_write_proposal(proposals_dir, record["record_id"], vault_dir)
+
+    # manifest_path and old_manifest must be threaded through
+    assert "manifest_path" in apply_kwargs_captured
+    assert apply_kwargs_captured["manifest_path"] is not None
+    assert isinstance(apply_kwargs_captured["old_manifest"], dict)
+
+
+def test_approve_skips_user_modified(tmp_path, monkeypatch):
+    """When note is user-modified, SKIP_PRESERVE prevents deletion of proposal file."""
+    from graphify.__main__ import _approve_and_write_proposal
+    from graphify.merge import MergeAction, MergePlan, MergeResult
+    record = _make_proposal(tmp_path, "User Modified Note")
+    proposals_dir = tmp_path / "proposals"
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+
+    def fake_load_profile(vault_path):
+        return {}
+
+    def fake_validate_vault_path(candidate, vault_dir):
+        return vault_dir / "Atlas" / "Dots" / "Things" / "User Modified Note.md"
+
+    skip_action = MergeAction(
+        path=vault_dir / "Atlas" / "Dots" / "Things" / "User Modified Note.md",
+        action="SKIP_PRESERVE",
+        reason="user-modified",
+        user_modified=True,
+    )
+
+    def fake_compute_merge_plan(vault_dir, rendered_notes, profile, **kwargs):
+        return MergePlan(actions=[skip_action], orphans=[], summary={})
+
+    def fake_apply_merge_plan(plan, vault_dir, rendered_notes, profile, *, manifest_path=None, old_manifest=None):
+        return MergeResult(plan=plan, succeeded=[], failed=[], skipped_identical=[])
+
+    monkeypatch.setattr("graphify.__main__._load_profile_for_approve", fake_load_profile)
+    monkeypatch.setattr("graphify.__main__._validate_vault_path_for_approve", fake_validate_vault_path)
+    monkeypatch.setattr("graphify.__main__._compute_merge_plan_for_approve", fake_compute_merge_plan)
+    monkeypatch.setattr("graphify.__main__._apply_merge_plan_for_approve", fake_apply_merge_plan)
+
+    proposal_file = proposals_dir / f"{record['record_id']}.json"
+    assert proposal_file.exists()
+
+    _approve_and_write_proposal(proposals_dir, record["record_id"], vault_dir)
+
+    # Proposal must NOT be deleted — stays pending so user can --force later
+    assert proposal_file.exists()
+
+
+def test_approve_user_modified_warning(tmp_path, monkeypatch, capsys):
+    """A SKIP_PRESERVE+user_modified action prints a warning to stderr."""
+    from graphify.__main__ import _approve_and_write_proposal
+    from graphify.merge import MergeAction, MergePlan, MergeResult
+    record = _make_proposal(tmp_path, "Modified Note")
+    proposals_dir = tmp_path / "proposals"
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+
+    def fake_load_profile(vault_path):
+        return {}
+
+    def fake_validate_vault_path(candidate, vault_dir):
+        return vault_dir / "Modified Note.md"
+
+    skip_action = MergeAction(
+        path=vault_dir / "Modified Note.md",
+        action="SKIP_PRESERVE",
+        reason="user-modified",
+        user_modified=True,
+    )
+
+    def fake_compute_merge_plan(vault_dir, rendered_notes, profile, **kwargs):
+        return MergePlan(actions=[skip_action], orphans=[], summary={})
+
+    def fake_apply_merge_plan(plan, vault_dir, rendered_notes, profile, *, manifest_path=None, old_manifest=None):
+        return MergeResult(plan=plan, succeeded=[], failed=[], skipped_identical=[])
+
+    monkeypatch.setattr("graphify.__main__._load_profile_for_approve", fake_load_profile)
+    monkeypatch.setattr("graphify.__main__._validate_vault_path_for_approve", fake_validate_vault_path)
+    monkeypatch.setattr("graphify.__main__._compute_merge_plan_for_approve", fake_compute_merge_plan)
+    monkeypatch.setattr("graphify.__main__._apply_merge_plan_for_approve", fake_apply_merge_plan)
+
+    _approve_and_write_proposal(proposals_dir, record["record_id"], vault_dir)
+
+    err = capsys.readouterr().err
+    assert "was user-modified, skipping" in err
+    assert "--force" in err
+
+
+def test_approve_force_flag(tmp_path, monkeypatch):
+    """force=True is forwarded to compute_merge_plan as force=True kwarg."""
+    from graphify.__main__ import _approve_and_write_proposal
+    record = _make_proposal(tmp_path, "Force Note")
+    proposals_dir = tmp_path / "proposals"
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+
+    compute_kwargs_captured = {}
+
+    def fake_load_profile(vault_path):
+        return {}
+
+    def fake_validate_vault_path(candidate, vault_dir):
+        return vault_dir / "Force Note.md"
+
+    def fake_compute_merge_plan(vault_dir, rendered_notes, profile, **kwargs):
+        compute_kwargs_captured.update(kwargs)
+        from graphify.merge import MergePlan
+        return MergePlan(actions=[], orphans=[], summary={})
+
+    def fake_apply_merge_plan(plan, vault_dir, rendered_notes, profile, *, manifest_path=None, old_manifest=None):
+        from graphify.merge import MergeResult
+        return MergeResult(plan=plan, succeeded=[], failed=[], skipped_identical=[])
+
+    monkeypatch.setattr("graphify.__main__._load_profile_for_approve", fake_load_profile)
+    monkeypatch.setattr("graphify.__main__._validate_vault_path_for_approve", fake_validate_vault_path)
+    monkeypatch.setattr("graphify.__main__._compute_merge_plan_for_approve", fake_compute_merge_plan)
+    monkeypatch.setattr("graphify.__main__._apply_merge_plan_for_approve", fake_apply_merge_plan)
+
+    _approve_and_write_proposal(proposals_dir, record["record_id"], vault_dir, force=True)
+
+    assert compute_kwargs_captured.get("force") is True
 
 
 # ---------------------------------------------------------------------------
