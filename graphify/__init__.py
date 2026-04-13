@@ -48,6 +48,7 @@ def __getattr__(name):
         "load_snapshot": ("graphify.snapshot", "load_snapshot"),
         "list_snapshots": ("graphify.snapshot", "list_snapshots"),
         "snapshots_dir": ("graphify.snapshot", "snapshots_dir"),
+        "auto_snapshot_and_delta": ("graphify.snapshot", "auto_snapshot_and_delta"),
     }
     if name in _map:
         import importlib

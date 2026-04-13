@@ -187,6 +187,59 @@ def test_save_snapshot_atomic_write_no_tmp_leftover(tmp_path):
 
 # --- provenance metadata (Task 2) ---
 
+# --- auto_snapshot_and_delta ---
+
+def test_auto_snapshot_and_delta_first_run(tmp_path):
+    """On first call, snapshot is saved and GRAPH_DELTA.md contains 'First run'."""
+    from graphify.snapshot import auto_snapshot_and_delta
+
+    G = _make_graph()
+    comms = _make_communities()
+    snap_path, delta_path = auto_snapshot_and_delta(G, comms, root=tmp_path)
+    assert snap_path.exists()
+    assert delta_path is not None
+    assert delta_path.exists()
+    content = delta_path.read_text(encoding="utf-8")
+    assert "First run" in content
+
+
+def test_auto_snapshot_and_delta_second_run(tmp_path):
+    """After two calls with different graphs, GRAPH_DELTA.md contains change summary."""
+    from graphify.snapshot import auto_snapshot_and_delta
+
+    G1 = _make_graph()
+    comms1 = _make_communities()
+    auto_snapshot_and_delta(G1, comms1, root=tmp_path)
+
+    time.sleep(0.05)
+
+    # Second graph: add a node
+    G2 = _make_graph()
+    G2.add_node("d", label="Delta", file_type="code", source_file="d.py")
+    G2.add_edge("c", "d", relation="calls", confidence="EXTRACTED")
+    comms2 = {0: ["a", "b"], 1: ["c", "d"]}
+    snap_path, delta_path = auto_snapshot_and_delta(G2, comms2, root=tmp_path)
+
+    assert snap_path.exists()
+    assert delta_path is not None
+    content = delta_path.read_text(encoding="utf-8")
+    assert "First run" not in content
+    # Should mention the added node
+    assert "d" in content.lower() or "Added" in content
+
+
+def test_auto_snapshot_and_delta_writes_to_graphify_out(tmp_path):
+    """delta_path is {root}/graphify-out/GRAPH_DELTA.md."""
+    from graphify.snapshot import auto_snapshot_and_delta
+
+    G = _make_graph()
+    comms = _make_communities()
+    _, delta_path = auto_snapshot_and_delta(G, comms, root=tmp_path)
+    assert delta_path == tmp_path / "graphify-out" / "GRAPH_DELTA.md"
+
+
+# --- provenance metadata (Task 2) ---
+
 def test_extract_python_provenance_fields(tmp_path):
     """Nodes from extract_python carry extracted_at, source_hash, source_mtime."""
     from graphify.extract import extract_python

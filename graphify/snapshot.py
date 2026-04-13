@@ -80,6 +80,44 @@ def save_snapshot(
     return target
 
 
+def auto_snapshot_and_delta(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    root: Path = Path("."),
+    cap: int = 10,
+) -> tuple[Path, Path | None]:
+    """Save snapshot and generate GRAPH_DELTA.md if a previous snapshot exists.
+
+    Returns (snapshot_path, delta_path_or_None).
+    Called by skill after cluster() returns (D-11, D-13).
+    """
+    # Get list of existing snapshots BEFORE saving the new one
+    existing = list_snapshots(root)
+
+    # Save current snapshot
+    snap_path = save_snapshot(G, communities, root=root, cap=cap)
+
+    # Generate delta if there was a previous snapshot
+    if existing:
+        from .delta import compute_delta, render_delta_md
+
+        prev_path = existing[-1]  # most recent before this save
+        G_old, communities_old, _ = load_snapshot(prev_path)
+        delta = compute_delta(G_old, communities_old, G, communities)
+        md_content = render_delta_md(delta, G_new=G, communities_new=communities)
+    else:
+        from .delta import render_delta_md
+
+        md_content = render_delta_md({}, first_run=True)
+
+    out_dir = Path(root) / "graphify-out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    delta_path = out_dir / "GRAPH_DELTA.md"
+    delta_path.write_text(md_content, encoding="utf-8")
+
+    return snap_path, delta_path
+
+
 def load_snapshot(path: Path) -> tuple[nx.Graph, dict[int, list[str]], dict]:
     """Load a snapshot from disk.
 
