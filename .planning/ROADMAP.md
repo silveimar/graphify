@@ -183,7 +183,7 @@ Plans:
 | 7. MCP Write-Back with Peer Modeling | v1.1 | 3/3 | Complete | 2026-04-13 |
 | 8. Obsidian Round-Trip Awareness | v1.1 | 3/3 | Complete | 2026-04-13 |
 | 8.1 Approve & Pipeline Wiring | v1.1 | 2/2 | Complete | 2026-04-13 |
-| 8.2 MCP Query Enhancements | v1.1 | 0/1 | Planned | — |
+| 8.2 MCP Query Enhancements | v1.1 | 1/1 | Complete | 2026-04-13 |
 | 9. Multi-Perspective Analysis (Council Protocol) | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
 | 11. Narrative Mode | v1.2 | 0/? | Planned | — |
