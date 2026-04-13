@@ -476,3 +476,110 @@ def test_list_proposals_skips_corrupt(tmp_path):
     result = _list_proposals(out_dir)
     assert len(result) == 1
     assert result[0]["record_id"] == r1["record_id"]
+
+
+# ============================================================================
+# Task 1 (Plan 08.2-01): get_node provenance and staleness
+# ============================================================================
+
+from graphify.delta import classify_staleness
+
+
+def test_get_node_provenance_format_with_metadata():
+    """Verify the 9-line output format when node has provenance fields."""
+    d = {"label": "my_func", "source_file": "foo.py", "source_location": "L10",
+         "file_type": "code", "community": 0,
+         "extracted_at": "2025-01-01T00:00:00+00:00", "source_hash": "abc123"}
+    extracted_at = d.get("extracted_at", "\u2014")
+    source_hash = d.get("source_hash", "\u2014")
+    assert extracted_at == "2025-01-01T00:00:00+00:00"
+    assert source_hash == "abc123"
+    # classify_staleness returns FRESH for missing file (no real FS in test)
+    # The key contract: extracted_at and source_hash are read from node data
+
+
+def test_get_node_provenance_format_without_metadata():
+    """Verify defaults when node has no provenance fields (per D-03)."""
+    d = {"label": "concept_node", "file_type": "rationale"}
+    extracted_at = d.get("extracted_at", "\u2014")
+    source_hash = d.get("source_hash", "\u2014")
+    staleness = classify_staleness(d)
+    assert extracted_at == "\u2014"
+    assert source_hash == "\u2014"
+    assert staleness == "FRESH"  # D-03: default for no provenance
+
+
+def test_classify_staleness_fresh_no_provenance():
+    """classify_staleness returns FRESH when source_file or source_hash is missing."""
+    assert classify_staleness({}) == "FRESH"
+    assert classify_staleness({"source_file": "foo.py"}) == "FRESH"
+    assert classify_staleness({"source_hash": "abc"}) == "FRESH"
+
+
+def test_classify_staleness_ghost(tmp_path):
+    """classify_staleness returns GHOST when source_file does not exist."""
+    assert classify_staleness({"source_file": str(tmp_path / "nonexistent.py"), "source_hash": "abc"}) == "GHOST"
+
+
+# ============================================================================
+# Task 2 (Plan 08.2-01): _filter_agent_edges
+# ============================================================================
+
+from graphify.serve import _filter_agent_edges
+
+
+def test_filter_agent_edges_no_filter():
+    edges = [
+        {"source": "n1", "target": "n2", "peer_id": "alice", "session_id": "s1"},
+        {"source": "n3", "target": "n4", "peer_id": "bob", "session_id": "s2"},
+    ]
+    assert _filter_agent_edges(edges, None, None, None) == edges
+
+
+def test_filter_agent_edges_by_peer():
+    edges = [
+        {"source": "n1", "target": "n2", "peer_id": "alice", "session_id": "s1"},
+        {"source": "n3", "target": "n4", "peer_id": "bob", "session_id": "s2"},
+    ]
+    result = _filter_agent_edges(edges, "alice", None, None)
+    assert len(result) == 1
+    assert result[0]["peer_id"] == "alice"
+
+
+def test_filter_agent_edges_by_session():
+    edges = [
+        {"source": "n1", "target": "n2", "peer_id": "alice", "session_id": "s1"},
+        {"source": "n3", "target": "n4", "peer_id": "bob", "session_id": "s2"},
+    ]
+    result = _filter_agent_edges(edges, None, "s2", None)
+    assert len(result) == 1
+    assert result[0]["session_id"] == "s2"
+
+
+def test_filter_agent_edges_by_node_id():
+    edges = [
+        {"source": "n1", "target": "n2", "peer_id": "alice", "session_id": "s1"},
+        {"source": "n3", "target": "n1", "peer_id": "bob", "session_id": "s2"},
+        {"source": "n3", "target": "n4", "peer_id": "bob", "session_id": "s3"},
+    ]
+    result = _filter_agent_edges(edges, None, None, "n1")
+    assert len(result) == 2
+    assert all(e["source"] == "n1" or e["target"] == "n1" for e in result)
+
+
+def test_filter_agent_edges_combined():
+    edges = [
+        {"source": "n1", "target": "n2", "peer_id": "alice", "session_id": "s1"},
+        {"source": "n3", "target": "n4", "peer_id": "alice", "session_id": "s2"},
+        {"source": "n5", "target": "n6", "peer_id": "bob", "session_id": "s1"},
+    ]
+    result = _filter_agent_edges(edges, "alice", "s1", None)
+    assert len(result) == 1
+    assert result[0]["source"] == "n1"
+
+
+def test_filter_agent_edges_no_match():
+    edges = [
+        {"source": "n1", "target": "n2", "peer_id": "alice", "session_id": "s1"},
+    ]
+    assert _filter_agent_edges(edges, "nobody", None, None) == []

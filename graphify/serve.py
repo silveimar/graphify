@@ -9,6 +9,7 @@ from pathlib import Path
 import networkx as nx
 from networkx.readwrite import json_graph
 from graphify.security import sanitize_label
+from graphify.delta import classify_staleness
 
 
 def _append_annotation(out_dir: Path, record: dict) -> None:
@@ -186,6 +187,23 @@ def _filter_annotations(
         result = [r for r in result if r.get("timestamp", "") >= time_from]
     if time_to is not None:
         result = [r for r in result if r.get("timestamp", "") <= time_to]
+    return result
+
+
+def _filter_agent_edges(
+    edges: list[dict],
+    peer_id: str | None,
+    session_id: str | None,
+    node_id: str | None,
+) -> list[dict]:
+    """Filter agent-edge list by optional peer_id, session_id, or node_id (source or target)."""
+    result = list(edges)
+    if peer_id is not None:
+        result = [e for e in result if e.get("peer_id") == peer_id]
+    if session_id is not None:
+        result = [e for e in result if e.get("session_id") == session_id]
+    if node_id is not None:
+        result = [e for e in result if e.get("source") == node_id or e.get("target") == node_id]
     return result
 
 
@@ -481,6 +499,21 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
                     },
                 },
             ),
+            types.Tool(
+                name="get_agent_edges",
+                description=(
+                    "Query agent-inferred edges from agent-edges.json, optionally filtered "
+                    "by peer_id, session_id, or node_id (matches source or target)."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "peer_id": {"type": "string", "description": "Filter by peer identifier"},
+                        "session_id": {"type": "string", "description": "Filter by session ID"},
+                        "node_id": {"type": "string", "description": "Filter edges involving a specific node (source or target)"},
+                    },
+                },
+            ),
         ]
 
     def _reload_if_stale() -> None:
@@ -518,6 +551,9 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         if not matches:
             return f"No node matching '{label}' found."
         nid, d = matches[0]
+        staleness = classify_staleness(d)
+        extracted_at = d.get("extracted_at", "\u2014")
+        source_hash = d.get("source_hash", "\u2014")
         return "\n".join([
             f"Node: {d.get('label', nid)}",
             f"  ID: {nid}",
@@ -525,6 +561,9 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             f"  Type: {d.get('file_type', '')}",
             f"  Community: {d.get('community', '')}",
             f"  Degree: {G.degree(nid)}",
+            f"  Extracted At: {extracted_at}",
+            f"  Source Hash: {source_hash}",
+            f"  Staleness: {staleness}",
         ])
 
     def _tool_get_neighbors(arguments: dict) -> str:
@@ -655,6 +694,14 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         results = _filter_annotations(_annotations, peer_id, session_id, time_from, time_to)
         return json.dumps(results)
 
+    def _tool_get_agent_edges(arguments: dict) -> str:
+        """Return agent-inferred edges, optionally filtered by peer_id, session_id, or node_id."""
+        peer_id = arguments.get("peer_id") or None
+        session_id = arguments.get("session_id") or None
+        node_id = arguments.get("node_id") or None
+        results = _filter_agent_edges(_agent_edges, peer_id, session_id, node_id)
+        return json.dumps(results)
+
     _handlers = {
         "query_graph": _tool_query_graph,
         "get_node": _tool_get_node,
@@ -668,6 +715,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "add_edge": _tool_add_edge,
         "propose_vault_note": _tool_propose_vault_note,
         "get_annotations": _tool_get_annotations,
+        "get_agent_edges": _tool_get_agent_edges,
     }
 
     @server.call_tool()
