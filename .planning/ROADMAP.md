@@ -40,7 +40,7 @@ Configurable output adapter replacing the monolithic `to_obsidian()` with a four
 **Phases:**
 
 - [ ] Phase 6: Graph Delta Analysis & Staleness — Compare current run against previous run; surface added/removed/changed nodes, community migration, and connectivity changes. Output `GRAPH_DELTA.md` using CPR summary+archive pattern. Persist graph snapshots in `graphify-out/snapshots/` with automatic FIFO retention. Attach per-node staleness metadata (`extracted_at`, `source_hash`, staleness state) so agents can judge how much to trust each graph claim. _(Informed by: letta-ai/context-constitution staleness-as-first-class principle, EliaAlberti/cpr summary+archive pattern)_
-- [ ] Phase 7: MCP Write-Back with Peer Modeling — Extend MCP server with mutation tools: `annotate_node`, `add_edge`, `flag_node` with crash-safe JSONL append persistence. Add peer identity tracking (peer_id, session_id, timestamp) and session-scoped graph views. Add `propose_vault_note` tool that stages proposals for human approval before any vault write. `graph.json` is never mutated by agent tools. _(Informed by: plastic-labs/honcho peer-centric entity model, letta-ai/letta-obsidian `propose_obsidian_note` approval pattern)_
+- [x] Phase 7: MCP Write-Back with Peer Modeling — Extend MCP server with mutation tools: `annotate_node`, `add_edge`, `flag_node` with crash-safe JSONL append persistence. Add peer identity tracking (peer_id, session_id, timestamp) and session-scoped graph views. Add `propose_vault_note` tool that stages proposals for human approval before any vault write. `graph.json` is never mutated by agent tools. _(Informed by: plastic-labs/honcho peer-centric entity model, letta-ai/letta-obsidian `propose_obsidian_note` approval pattern)_ (completed 2026-04-13)
 - [ ] Phase 8: Obsidian Round-Trip Awareness — On `--obsidian` re-run, detect user-modified notes via content-hash manifest and preserve user-authored content blocks during merge. Extend v1.0 merge engine with `PARTIAL_UPDATE` action and user-space sentinel blocks. `--dry-run` reports which notes have user modifications. User content always wins — graphify never overwrites content between user sentinel markers.
 
 **Carried forward from v1.0 v2 scope** (may be folded into phases above or addressed separately):
@@ -116,12 +116,12 @@ Plans:
   3. Agent can call `propose_vault_note` to stage a proposed note; the note lands in `graphify-out/proposals/` and the vault is untouched until the user runs `graphify approve` to review and accept/reject
   4. Agent can query annotations filtered by peer, session, or time range, and retrieve only annotations relevant to a specific session context
   5. `graph.json` (pipeline ground truth) is never modified by any MCP mutation tool; all agent state lives in `annotations.jsonl` and `agent-edges.json` sidecars
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 07-01-PLAN.md — Sidecar persistence + mutation tools (annotate_node, flag_node, add_edge) + query tool (get_annotations) + mtime reload
 - [x] 07-02-PLAN.md — propose_vault_note tool with proposal staging to graphify-out/proposals/
-- [ ] 07-03-PLAN.md — graphify approve CLI subcommand (list/approve/reject/batch)
+- [x] 07-03-PLAN.md — graphify approve CLI subcommand (list/approve/reject/batch)
 
 ### Phase 8: Obsidian Round-Trip Awareness
 **Goal**: Users can freely edit graphify-injected vault notes between runs without losing their changes on the next `--obsidian` re-run
@@ -145,7 +145,7 @@ Plans:
 | 4. Merge Engine | v1.0 | 6/6 | Complete | 2026-04-11 |
 | 5. Integration & CLI | v1.0 | 6/6 | Complete | 2026-04-11 |
 | 6. Graph Delta Analysis & Staleness | v1.1 | 0/3 | Planned | — |
-| 7. MCP Write-Back with Peer Modeling | v1.1 | 2/3 | In Progress|  |
+| 7. MCP Write-Back with Peer Modeling | v1.1 | 3/3 | Complete   | 2026-04-13 |
 | 8. Obsidian Round-Trip Awareness | v1.1 | 0/? | Not started | — |
 | 9. Multi-Perspective Analysis (Council Protocol) | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
