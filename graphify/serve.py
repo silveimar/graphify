@@ -43,7 +43,7 @@ def _compact_annotations(path: Path) -> list[dict]:
     deduped = list(records.values())
     tmp = path.with_suffix(".tmp")
     try:
-        tmp.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in deduped) + ("\n" if deduped else ""), encoding="utf-8")
+        tmp.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in deduped), encoding="utf-8")
         os.replace(tmp, path)
     except Exception:
         tmp.unlink(missing_ok=True)
