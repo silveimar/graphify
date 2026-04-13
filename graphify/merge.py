@@ -322,11 +322,14 @@ def _has_user_sentinel_blocks(body: str) -> bool:
     """Return True iff body contains at least one complete USER_START/END pair.
 
     Lightweight check used by _build_manifest_from_result to set has_user_blocks
-    without running the full parser. Uses simple regex search — both markers
-    must be present (order not checked here; false positives from inverted order
-    are acceptable for the manifest boolean).
+    without running the full parser. Verifies that START appears before END to
+    avoid false positives from inverted marker order.
     """
-    return bool(_USER_SENTINEL_START_RE.search(body) and _USER_SENTINEL_END_RE.search(body))
+    start_match = _USER_SENTINEL_START_RE.search(body)
+    end_match = _USER_SENTINEL_END_RE.search(body)
+    if not start_match or not end_match:
+        return False
+    return start_match.start() < end_match.start()
 
 
 def _extract_user_blocks(text: str) -> list[str]:
