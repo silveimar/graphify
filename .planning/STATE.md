@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Context Persistence & Agent Memory
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-04-13T01:11:07.803Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-04-13T01:15:44.987Z"
 last_activity: 2026-04-13
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-12 after v1.1 milestone start)
 
 Milestone: v1.1 Context Persistence & Agent Memory
 Phase: 06 (graph-delta-analysis-staleness) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-13
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0% (v1.1)
 
 Detailed per-plan metrics are preserved in phase SUMMARY.md files and in `.planning/milestones/v1.0-ROADMAP.md`.
 | Phase 06 P01 | 3min | 2 tasks | 4 files |
+| Phase 06 P02 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,7 @@ Carry-forward decisions relevant to v1.1:
 - **D-73**: CLI is utilities-only; skill drives the full pipeline. New CLI flags should be direct utilities (not pipeline verbs). New `graphify snapshot` and `graphify approve` subcommands follow this pattern.
 - **D-74**: `to_obsidian()` is a notes pipeline, not a vault-config-file manager. OBS-01/02 remain out of scope.
 - [Phase 06]: Provenance computed once per file in _extract_generic, not per node — avoids repeated SHA256 hashing
+- [Phase 06]: Mtime fast-gate skips SHA256 when mtime unchanged; nodes without provenance default to FRESH
 
 ### v1.1 Phase Architecture Notes
 
@@ -103,7 +105,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-13T01:11:07.801Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-04-13T01:15:44.985Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None
 Next action: `/gsd-plan-phase 6`

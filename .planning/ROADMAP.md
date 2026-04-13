@@ -103,7 +103,7 @@ Configurable output adapter replacing the monolithic `to_obsidian()` with a four
 
 Plans:
 - [x] 06-01-PLAN.md — Snapshot module (save/load/prune/list) + provenance metadata injection in extract.py
-- [ ] 06-02-PLAN.md — Delta computation (set-arithmetic diff, staleness classification, GRAPH_DELTA.md rendering)
+- [x] 06-02-PLAN.md — Delta computation (set-arithmetic diff, staleness classification, GRAPH_DELTA.md rendering)
 - [ ] 06-03-PLAN.md — CLI wiring (graphify snapshot command, auto-snapshot+auto-delta pipeline helper)
 
 ### Phase 7: MCP Write-Back with Peer Modeling
