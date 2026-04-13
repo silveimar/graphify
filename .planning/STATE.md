@@ -1,13 +1,13 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: "Context Persistence & Agent Memory"
-status: roadmap_complete
-stopped_at: Roadmap created — ready for Phase 6 planning
-last_updated: "2026-04-12"
-last_activity: 2026-04-12 — v1.1 roadmap created (25/25 requirements mapped to Phases 6–8)
+milestone_name: Context Persistence & Agent Memory
+status: completed
+stopped_at: Phase 6 context gathered
+last_updated: "2026-04-13T00:38:31.670Z"
+last_activity: 2026-04-12 — Roadmap created; 25 v1.1 requirements mapped to Phases 6–8
 progress:
-  total_phases: 3
+  total_phases: 1
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -59,11 +59,13 @@ Detailed per-plan metrics are preserved in phase SUMMARY.md files and in `.plann
 ### Decisions
 
 All v1.0 milestone decisions are logged in:
+
 - **PROJECT.md Key Decisions table** — the 8 architectural decisions that shape v1.1+ work
 - **`.planning/milestones/v1.0-MILESTONE-AUDIT.md`** — full decision trail with verification evidence
 - **Phase SUMMARY.md files** — tactical D-xx decisions locked during plan execution (D-01..D-72)
 
 Carry-forward decisions relevant to v1.1:
+
 - **D-73**: CLI is utilities-only; skill drives the full pipeline. New CLI flags should be direct utilities (not pipeline verbs). New `graphify snapshot` and `graphify approve` subcommands follow this pattern.
 - **D-74**: `to_obsidian()` is a notes pipeline, not a vault-config-file manager. OBS-01/02 remain out of scope.
 
@@ -99,7 +101,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-12
-Stopped at: v1.1 roadmap created — 25/25 requirements mapped
-Resume file: None
+Last session: 2026-04-13T00:38:31.662Z
+Stopped at: Phase 6 context gathered
+Resume file: .planning/phases/06-graph-delta-analysis-staleness/06-CONTEXT.md
 Next action: `/gsd-plan-phase 6`
