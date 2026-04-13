@@ -168,7 +168,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 08.2-01-PLAN.md — Provenance in get_node + get_agent_edges query tool with peer/session/node filtering
+- [x] 08.2-01-PLAN.md — Provenance in get_node + get_agent_edges query tool with peer/session/node filtering
 
 ## Progress
 
