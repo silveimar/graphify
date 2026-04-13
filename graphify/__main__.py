@@ -959,7 +959,9 @@ def main() -> None:
             G_new, comm_new, _ = load_snapshot(Path(to_path))
             d = compute_delta(G_old, comm_old, G_new, comm_new)
             md = render_delta_md(d, G_new=G_new, communities_new=comm_new)
-            out = Path("graphify-out/GRAPH_DELTA.md")
+            # Derive output dir from graph path so it works from any cwd
+            graph_root = Path(graph_path).resolve().parent.parent
+            out = graph_root / "graphify-out" / "GRAPH_DELTA.md"
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(md, encoding="utf-8")
             print(f"delta written: {out}")
@@ -1005,7 +1007,9 @@ def main() -> None:
         if gen_delta:
             from graphify.snapshot import list_snapshots, load_snapshot
             from graphify.delta import compute_delta, render_delta_md
-            snaps = list_snapshots()
+            # Use graph root so paths resolve correctly from any cwd
+            graph_root = gp.parent.parent
+            snaps = list_snapshots(graph_root)
             if len(snaps) >= 2:
                 prev = snaps[-2]  # second-to-last is previous
                 G_old, comm_old, _ = load_snapshot(prev)
@@ -1013,7 +1017,7 @@ def main() -> None:
                 md = render_delta_md(d, G_new=G, communities_new=communities)
             else:
                 md = render_delta_md({}, first_run=True)
-            out = Path("graphify-out/GRAPH_DELTA.md")
+            out = graph_root / "graphify-out" / "GRAPH_DELTA.md"
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(md, encoding="utf-8")
             print(f"delta written: {out}")
