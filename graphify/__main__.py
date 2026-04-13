@@ -1153,6 +1153,110 @@ def main() -> None:
             print(f"delta written: {out}")
         return
 
+    if cmd == "approve":
+        args = sys.argv[2:]
+        vault_path = None
+        reject = False
+        reject_all = False
+        approve_all = False
+        target_id = None
+        out_dir = Path("graphify-out")
+        i = 0
+        while i < len(args):
+            if args[i] == "--vault" and i + 1 < len(args):
+                vault_path = Path(args[i + 1]); i += 2
+            elif args[i].startswith("--vault="):
+                vault_path = Path(args[i].split("=", 1)[1]); i += 1
+            elif args[i] == "--reject":
+                reject = True; i += 1
+            elif args[i] == "--reject-all":
+                reject_all = True; i += 1
+            elif args[i] == "--all":
+                approve_all = True; i += 1
+            elif args[i] == "--out-dir" and i + 1 < len(args):
+                out_dir = Path(args[i + 1]); i += 2
+            elif args[i].startswith("--out-dir="):
+                out_dir = Path(args[i].split("=", 1)[1]); i += 1
+            elif not args[i].startswith("-"):
+                target_id = args[i]; i += 1
+            else:
+                print(f"error: unknown approve option: {args[i]}", file=sys.stderr)
+                sys.exit(2)
+
+        proposals_dir = out_dir / "proposals"
+
+        # No args: list all pending proposals
+        if not target_id and not approve_all and not reject_all and not reject:
+            proposals = _list_pending_proposals(out_dir)
+            if not proposals:
+                print("No pending proposals.")
+                sys.exit(0)
+            print(f"Pending proposals ({len(proposals)}):\n")
+            print(f"  {'ID':8s}  {'Title':40s}  {'Type':12s}  {'Peer':12s}  {'Timestamp':25s}")
+            _hr = "\u2500"
+            print(f"  {_hr*8}  {_hr*40}  {_hr*12}  {_hr*12}  {_hr*25}")
+            for p in proposals:
+                print(_format_proposal_summary(p))
+            print(f"\nApprove: graphify approve <id> --vault <path>")
+            print(f"Reject:  graphify approve --reject <id>")
+            sys.exit(0)
+
+        # --reject-all: reject all pending
+        if reject_all:
+            proposals = _list_pending_proposals(out_dir)
+            for p in proposals:
+                _reject_proposal(proposals_dir, p["record_id"])
+                print(f"Rejected: {p['record_id'][:8]} \u2014 {p.get('title', 'untitled')}")
+            print(f"\n{len(proposals)} proposal(s) rejected.")
+            sys.exit(0)
+
+        # --reject <id>: reject single
+        if reject and target_id:
+            try:
+                r = _reject_proposal(proposals_dir, target_id)
+                print(f"Rejected: {r['record_id'][:8]} \u2014 {r.get('title', 'untitled')}")
+            except FileNotFoundError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                sys.exit(1)
+            sys.exit(0)
+
+        if reject and not target_id:
+            print("error: --reject requires a proposal ID", file=sys.stderr)
+            sys.exit(2)
+
+        # --all --vault <path>: batch approve
+        if approve_all:
+            if not vault_path:
+                print("error: --vault is required for approve operations", file=sys.stderr)
+                sys.exit(2)
+            proposals = _list_pending_proposals(out_dir)
+            if not proposals:
+                print("No pending proposals to approve.")
+                sys.exit(0)
+            for p in proposals:
+                try:
+                    _approve_and_write_proposal(proposals_dir, p["record_id"], vault_path)
+                    print(f"Approved: {p['record_id'][:8]} \u2014 {p.get('title', 'untitled')}")
+                except Exception as exc:
+                    print(f"error approving {p['record_id'][:8]}: {exc}", file=sys.stderr)
+            sys.exit(0)
+
+        # <id> --vault <path>: approve single
+        if target_id:
+            if not vault_path:
+                print("error: --vault is required for approve operations", file=sys.stderr)
+                sys.exit(2)
+            try:
+                r = _approve_and_write_proposal(proposals_dir, target_id, vault_path)
+                print(f"Approved: {r['record_id'][:8]} \u2014 {r.get('title', 'untitled')}")
+            except FileNotFoundError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                sys.exit(1)
+            except Exception as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                sys.exit(1)
+            sys.exit(0)
+
     if cmd == "install":
         # Default to windows platform on Windows, claude elsewhere
         default_platform = "windows" if platform.system() == "Windows" else "claude"
