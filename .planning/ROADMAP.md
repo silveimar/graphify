@@ -39,9 +39,11 @@ Configurable output adapter replacing the monolithic `to_obsidian()` with a four
 
 **Phases:**
 
-- [ ] Phase 6: Graph Delta Analysis & Staleness — Compare current run against previous run; surface added/removed/changed nodes, community migration, and connectivity changes. Output `GRAPH_DELTA.md` using CPR summary+archive pattern. Persist graph snapshots in `graphify-out/snapshots/` with automatic FIFO retention. Attach per-node staleness metadata (`extracted_at`, `source_hash`, staleness state) so agents can judge how much to trust each graph claim. _(Informed by: letta-ai/context-constitution staleness-as-first-class principle, EliaAlberti/cpr summary+archive pattern)_
+- [x] Phase 6: Graph Delta Analysis & Staleness — Compare current run against previous run; surface added/removed/changed nodes, community migration, and connectivity changes. Output `GRAPH_DELTA.md` using CPR summary+archive pattern. Persist graph snapshots in `graphify-out/snapshots/` with automatic FIFO retention. Attach per-node staleness metadata (`extracted_at`, `source_hash`, staleness state) so agents can judge how much to trust each graph claim. _(Informed by: letta-ai/context-constitution staleness-as-first-class principle, EliaAlberti/cpr summary+archive pattern)_
 - [x] Phase 7: MCP Write-Back with Peer Modeling — Extend MCP server with mutation tools: `annotate_node`, `add_edge`, `flag_node` with crash-safe JSONL append persistence. Add peer identity tracking (peer_id, session_id, timestamp) and session-scoped graph views. Add `propose_vault_note` tool that stages proposals for human approval before any vault write. `graph.json` is never mutated by agent tools. _(Informed by: plastic-labs/honcho peer-centric entity model, letta-ai/letta-obsidian `propose_obsidian_note` approval pattern)_ (completed 2026-04-13)
 - [x] Phase 8: Obsidian Round-Trip Awareness — On `--obsidian` re-run, detect user-modified notes via content-hash manifest and preserve user-authored content blocks during merge. Extend v1.0 merge engine with `PARTIAL_UPDATE` action and user-space sentinel blocks. `--dry-run` reports which notes have user modifications. User content always wins — graphify never overwrites content between user sentinel markers. (completed 2026-04-13)
+- [ ] Phase 8.1: Approve & Pipeline Wiring — Thread vault manifest through `graphify approve` path so approved proposals respect user-modified detection and manifest updates. Wire `auto_snapshot_and_delta` into skill.md pipeline so snapshots and deltas generate automatically on every `/graphify` run. _(Gap closure: INT-01 high, INT-02 medium from v1.1 audit)_
+- [ ] Phase 8.2: MCP Query Enhancements — Extend MCP `get_node` to surface provenance fields (`extracted_at`, `source_hash`, staleness state). Add `get_agent_edges` query tool so agents can retrieve edges they previously created via `add_edge`. _(Gap closure: INT-03 low, INT-04 low from v1.1 audit)_
 
 **Carried forward from v1.0 v2 scope** (may be folded into phases above or addressed separately):
 
@@ -140,6 +142,27 @@ Plans:
 - [x] 08-02-PLAN.md — User sentinel block parsing and preservation in _synthesize_file_text
 - [x] 08-03-PLAN.md — CLI --force flag, manifest/force threading through to_obsidian, format_merge_plan dry-run enhancements
 
+### Phase 8.1: Approve & Pipeline Wiring
+**Goal**: The `graphify approve` path respects vault manifest (user-modified detection + manifest update), and the skill pipeline automatically generates snapshots and deltas on every run
+**Depends on**: Phase 8 (manifest I/O and auto_snapshot_and_delta implementations)
+**Requirements**: TRIP-01, TRIP-02, TRIP-03, TRIP-06, MCP-07, DELTA-01, DELTA-02
+**Gap Closure**: INT-01 (approve manifest threading), INT-02 (skill auto-snapshot), FLOW-01, FLOW-02
+**Success Criteria** (what must be TRUE):
+  1. Running `graphify approve <id> --vault <path>` on a vault with user-modified notes triggers SKIP_PRESERVE for those notes (same behavior as `--obsidian` re-run)
+  2. After `graphify approve` writes a note, `vault-manifest.json` is updated with the new content hash
+  3. Running `/graphify` (skill invocation) on a corpus that has been graphified before produces `GRAPH_DELTA.md` and saves a snapshot to `graphify-out/snapshots/` without requiring a separate `graphify snapshot` command
+**Plans:** TBD
+
+### Phase 8.2: MCP Query Enhancements
+**Goal**: Agents can query node staleness state and retrieve agent-created edges through the MCP server
+**Depends on**: Phase 8.1 (not strictly, but logical ordering)
+**Requirements**: DELTA-04, MCP-08
+**Gap Closure**: INT-03 (provenance in get_node), INT-04 (agent-edges query)
+**Success Criteria** (what must be TRUE):
+  1. Calling MCP `get_node` returns `extracted_at`, `source_hash`, and a staleness classification (FRESH/STALE/GHOST) alongside existing fields
+  2. A new MCP tool `get_agent_edges` returns edges from `agent-edges.json`, filterable by peer_id and session_id
+**Plans:** TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -149,9 +172,11 @@ Plans:
 | 3. Mapping Engine | v1.0 | 4/4 | Complete | 2026-04-11 |
 | 4. Merge Engine | v1.0 | 6/6 | Complete | 2026-04-11 |
 | 5. Integration & CLI | v1.0 | 6/6 | Complete | 2026-04-11 |
-| 6. Graph Delta Analysis & Staleness | v1.1 | 0/3 | Planned | — |
-| 7. MCP Write-Back with Peer Modeling | v1.1 | 3/3 | Complete   | 2026-04-13 |
-| 8. Obsidian Round-Trip Awareness | v1.1 | 3/3 | Complete   | 2026-04-13 |
+| 6. Graph Delta Analysis & Staleness | v1.1 | 3/3 | Complete | 2026-04-12 |
+| 7. MCP Write-Back with Peer Modeling | v1.1 | 3/3 | Complete | 2026-04-13 |
+| 8. Obsidian Round-Trip Awareness | v1.1 | 3/3 | Complete | 2026-04-13 |
+| 8.1 Approve & Pipeline Wiring | v1.1 | 0/? | Planned | — |
+| 8.2 MCP Query Enhancements | v1.1 | 0/? | Planned | — |
 | 9. Multi-Perspective Analysis (Council Protocol) | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
 | 11. Narrative Mode | v1.2 | 0/? | Planned | — |
@@ -164,4 +189,4 @@ Plans:
 | 18. Focus-Aware Graph Context | v1.3 | 0/? | Planned | — |
 
 ---
-*Last updated: 2026-04-13 — Phase 8 planned: 3 plans in 3 waves (08-01 manifest+detection, 08-02 sentinel parsing, 08-03 CLI+dry-run). v1.2-v1.3 milestones preserved from prior exploration sessions.*
+*Last updated: 2026-04-12 — Gap closure phases 8.1-8.2 added from v1.1 milestone audit. Phase 6 status corrected to Complete. v1.2-v1.3 milestones preserved from prior exploration sessions.*
