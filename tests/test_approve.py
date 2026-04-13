@@ -159,3 +159,66 @@ def test_approve_and_write_proposal_calls_merge(tmp_path, monkeypatch):
     assert on_disk["status"] == "approved"
     assert called["compute"]
     assert called["apply"]
+
+
+# ---------------------------------------------------------------------------
+# CLI integration tests (Task 2)
+# ---------------------------------------------------------------------------
+
+def test_cli_approve_list(tmp_path, monkeypatch, capsys):
+    """graphify approve --out-dir <dir> lists pending proposals."""
+    from graphify.__main__ import main
+    p1 = _make_proposal(tmp_path, "First Note")
+    p2 = _make_proposal(tmp_path, "Second Note")
+    monkeypatch.setattr("sys.argv", ["graphify", "approve", "--out-dir", str(tmp_path)])
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0
+    out = capsys.readouterr().out
+    # Both proposal IDs should appear in output (at least the first 8 chars)
+    assert p1["record_id"][:8] in out
+    assert p2["record_id"][:8] in out
+
+
+def test_cli_approve_no_vault_exits_2(tmp_path, monkeypatch):
+    """graphify approve <id> without --vault exits with code 2."""
+    from graphify.__main__ import main
+    _make_proposal(tmp_path, "Some Note")
+    monkeypatch.setattr("sys.argv", ["graphify", "approve", "some-id", "--out-dir", str(tmp_path)])
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 2
+
+
+def test_cli_approve_reject(tmp_path, monkeypatch, capsys):
+    """graphify approve --reject <id> sets proposal status to rejected."""
+    from graphify.__main__ import main
+    record = _make_proposal(tmp_path, "To Reject")
+    monkeypatch.setattr(
+        "sys.argv",
+        ["graphify", "approve", "--reject", record["record_id"], "--out-dir", str(tmp_path)],
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0
+    proposals_dir = tmp_path / "proposals"
+    on_disk = json.loads((proposals_dir / f"{record['record_id']}.json").read_text(encoding="utf-8"))
+    assert on_disk["status"] == "rejected"
+
+
+def test_cli_approve_reject_all(tmp_path, monkeypatch, capsys):
+    """graphify approve --reject-all rejects all pending proposals."""
+    from graphify.__main__ import main
+    r1 = _make_proposal(tmp_path, "Note One")
+    r2 = _make_proposal(tmp_path, "Note Two")
+    monkeypatch.setattr(
+        "sys.argv",
+        ["graphify", "approve", "--reject-all", "--out-dir", str(tmp_path)],
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0
+    proposals_dir = tmp_path / "proposals"
+    for r in (r1, r2):
+        on_disk = json.loads((proposals_dir / f"{r['record_id']}.json").read_text(encoding="utf-8"))
+        assert on_disk["status"] == "rejected"
