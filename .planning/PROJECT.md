@@ -56,6 +56,8 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - [x] Preserve user-authored content blocks during merge with GRAPHIFY_USER_START/END sentinel markers _(v1.1, Phase 8)_
 - [x] `--force` flag to override user-modified detection while preserving sentinel blocks _(v1.1, Phase 8)_
 - [x] Dry-run output shows user-modification status per note with source annotations _(v1.1, Phase 8)_
+- [x] MCP `get_node` surfaces provenance metadata (extracted_at, source_hash) and live staleness classification (FRESH/STALE/GHOST) _(v1.1, Phase 8.2: MCP Query Enhancements)_
+- [x] MCP `get_agent_edges` query tool with peer_id, session_id, and node_id filtering _(v1.1, Phase 8.2)_
 
 ### Deferred (v1.2+ — template engine extensions from v1.0)
 
@@ -163,9 +165,9 @@ This document evolves at phase transitions and milestone boundaries.
 
 All five v1.0 phases delivered and verified. The configurable vault adapter is the production `to_obsidian()` code path; there is no separate opt-in flag. 5 phases, 22 plans, 31/31 requirements, 872 tests passing. See `.planning/milestones/` for full archives.
 
-**Milestone v1.1 — Context Persistence & Agent Memory: ✅ COMPLETE (Phases 6–8)**
+**Milestone v1.1 — Context Persistence & Agent Memory: ✅ COMPLETE (Phases 6–8.2)**
 
-All three v1.1 phases delivered and verified. Phase 6: graph delta analysis + staleness. Phase 7: MCP write-back + peer modeling. Phase 8: Obsidian round-trip awareness with manifest-based user-modified detection and sentinel block preservation. 985 tests passing.
+All v1.1 phases delivered and verified. Phase 6: graph delta analysis + staleness. Phase 7: MCP write-back + peer modeling. Phase 8: Obsidian round-trip awareness with manifest-based user-modified detection and sentinel block preservation. Phase 8.1: pipeline wiring fixes. Phase 8.2: MCP query enhancements — node provenance in get_node + get_agent_edges query tool. 1000 tests passing.
 
 ---
-*Last updated: 2026-04-13 — Phase 8 (Obsidian Round-Trip Awareness) complete — v1.1 milestone complete*
+*Last updated: 2026-04-13 — Phase 8.2 (MCP Query Enhancements) complete — v1.1 milestone complete*
