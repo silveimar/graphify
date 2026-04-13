@@ -8,7 +8,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Any
-from .cache import load_cached, save_cached
+from datetime import datetime, timezone
+from .cache import load_cached, save_cached, file_hash
 
 
 def _make_id(*parts: str) -> str:
@@ -674,6 +675,15 @@ def _extract_generic(path: Path, config: LanguageConfig) -> dict:
     seen_ids: set[str] = set()
     function_bodies: list[tuple[str, object]] = []
 
+    # Provenance metadata (DELTA-03): born-with extracted_at + source_hash
+    _now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        _src_hash = file_hash(path)
+        _src_mtime = path.stat().st_mtime
+    except OSError:
+        _src_hash = ""
+        _src_mtime = None
+
     def add_node(nid: str, label: str, line: int) -> None:
         if nid not in seen_ids:
             seen_ids.add(nid)
@@ -683,6 +693,9 @@ def _extract_generic(path: Path, config: LanguageConfig) -> dict:
                 "file_type": "code",
                 "source_file": str_path,
                 "source_location": f"L{line}",
+                "extracted_at": _now_iso,
+                "source_hash": _src_hash,
+                "source_mtime": _src_mtime,
             })
 
     def add_edge(src: str, tgt: str, relation: str, line: int,

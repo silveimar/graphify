@@ -183,3 +183,50 @@ def test_save_snapshot_atomic_write_no_tmp_leftover(tmp_path):
     d = snapshots_dir(tmp_path)
     tmp_files = list(d.glob("*.tmp"))
     assert tmp_files == []
+
+
+# --- provenance metadata (Task 2) ---
+
+def test_extract_python_provenance_fields(tmp_path):
+    """Nodes from extract_python carry extracted_at, source_hash, source_mtime."""
+    from graphify.extract import extract_python
+
+    py_file = tmp_path / "sample.py"
+    py_file.write_text("class Foo:\n    def bar(self):\n        pass\n", encoding="utf-8")
+    result = extract_python(py_file)
+    nodes = result.get("nodes", [])
+    assert len(nodes) > 0, "extract_python should produce at least one node"
+    for n in nodes:
+        assert "extracted_at" in n, f"Node {n['id']} missing extracted_at"
+        assert "source_hash" in n, f"Node {n['id']} missing source_hash"
+        assert "source_mtime" in n, f"Node {n['id']} missing source_mtime"
+
+
+def test_provenance_source_hash_matches_file_hash(tmp_path):
+    """source_hash on extracted nodes matches cache.file_hash() for the same file."""
+    from graphify.extract import extract_python
+    from graphify.cache import file_hash
+
+    py_file = tmp_path / "hashcheck.py"
+    py_file.write_text("def hello():\n    return 1\n", encoding="utf-8")
+    result = extract_python(py_file)
+    nodes = result.get("nodes", [])
+    assert len(nodes) > 0
+    expected_hash = file_hash(py_file)
+    for n in nodes:
+        assert n["source_hash"] == expected_hash
+
+
+def test_provenance_extracted_at_is_iso8601(tmp_path):
+    """extracted_at is a valid ISO 8601 string."""
+    from datetime import datetime
+    from graphify.extract import extract_python
+
+    py_file = tmp_path / "isocheck.py"
+    py_file.write_text("x = 1\n", encoding="utf-8")
+    result = extract_python(py_file)
+    nodes = result.get("nodes", [])
+    assert len(nodes) > 0
+    for n in nodes:
+        # Should not raise
+        datetime.fromisoformat(n["extracted_at"])
