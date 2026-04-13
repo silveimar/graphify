@@ -423,6 +423,13 @@ questions = suggest_questions(G, communities, labels)
 report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, 'INPUT_PATH', suggested_questions=questions)
 Path('graphify-out/GRAPH_REPORT.md').write_text(report)
 to_json(G, communities, 'graphify-out/graph.json')
+from graphify.snapshot import auto_snapshot_and_delta
+_pre_snap_count = len(list(Path('graphify-out/snapshots').glob('*.json'))) if Path('graphify-out/snapshots').exists() else 0
+_snap_path, _delta_path = auto_snapshot_and_delta(G, communities, root=Path('.'))
+if _pre_snap_count > 0:
+    print(f'Snapshot saved ({G.number_of_nodes()} nodes). Delta: see GRAPH_DELTA.md')
+else:
+    print(f'Snapshot saved ({G.number_of_nodes()} nodes). No prior snapshot for delta comparison.')
 
 analysis = {
     'communities': {str(k): v for k, v in communities.items()},
@@ -953,6 +960,13 @@ labels = {cid: 'Community ' + str(cid) for cid in communities}
 report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, '.')
 Path('graphify-out/GRAPH_REPORT.md').write_text(report)
 to_json(G, communities, 'graphify-out/graph.json')
+from graphify.snapshot import auto_snapshot_and_delta
+_pre_snap_count = len(list(Path('graphify-out/snapshots').glob('*.json'))) if Path('graphify-out/snapshots').exists() else 0
+_snap_path, _delta_path = auto_snapshot_and_delta(G, communities, root=Path('.'))
+if _pre_snap_count > 0:
+    print(f'Snapshot saved ({G.number_of_nodes()} nodes). Delta: see GRAPH_DELTA.md')
+else:
+    print(f'Snapshot saved ({G.number_of_nodes()} nodes). No prior snapshot for delta comparison.')
 
 analysis = {
     'communities': {str(k): v for k, v in communities.items()},
