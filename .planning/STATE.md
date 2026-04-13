@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Context Persistence & Agent Memory
 status: executing
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-04-13T04:12:10.710Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-04-13T04:18:35.112Z"
 last_activity: 2026-04-13
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
-  percent: 78
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-12 after v1.1 milestone start)
 
 Milestone: v1.1 Context Persistence & Agent Memory
 Phase: 08 (obsidian-round-trip-awareness) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-13
 
@@ -60,6 +60,7 @@ Detailed per-plan metrics are preserved in phase SUMMARY.md files and in `.plann
 | Phase 07 P02 | 2 | 1 tasks | 2 files |
 | Phase 07 P03 | 4min | 2 tasks | 2 files |
 | Phase 08 P01 | 17min | 2 tasks | 2 files |
+| Phase 08 P02 | 3min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,9 @@ Carry-forward decisions relevant to v1.1:
 - [Phase 08]: _content_hash() uses content-only SHA256 (no path) — avoids macOS symlink mismatch that cache.file_hash() would cause
 - [Phase 08]: force=True bypasses user-modified detection; SKIP_PRESERVE with user_modified=True is the default for hash-mismatch notes (D-07)
 - [Phase 08]: has_user_blocks always False in Plan 01 manifest — sentinel parser deferred to Plan 02
+- [Phase 08]: D-03 resolved: multiple USER_START/END pairs per note supported — simpler for users and equally simple to implement
+- [Phase 08]: D-08 implemented: user sentinel blocks inviolable even for REPLACE strategy; apply_merge_plan reads existing_text for REPLACE to enable extraction
+- [Phase 08]: has_user_blocks stub resolved: _build_manifest_from_result now calls _has_user_sentinel_blocks on written file content
 
 ### v1.1 Phase Architecture Notes
 
@@ -122,7 +126,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-13T04:12:10.706Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-04-13T04:18:35.109Z
+Stopped at: Completed 08-02-PLAN.md
 Resume file: None
 Next action: `/gsd-plan-phase 6`

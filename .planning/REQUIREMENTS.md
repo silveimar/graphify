@@ -36,9 +36,9 @@ Requirements for v1.1 Context Persistence & Agent Memory. Each maps to roadmap p
 - [x] **TRIP-01**: `apply_merge_plan` writes `vault-manifest.json` recording content hash per note at merge time
 - [x] **TRIP-02**: On `--obsidian` re-run, graphify detects which notes the user has modified since last merge (hash comparison against manifest)
 - [x] **TRIP-03**: User-modified notes receive `UPDATE_PRESERVE_USER_BLOCKS` merge action: graphify-managed sections refresh, user-authored content blocks preserved
-- [ ] **TRIP-04**: User-space sentinel blocks (`<!-- GRAPHIFY_USER_START -->` / `<!-- GRAPHIFY_USER_END -->`) provide explicit preservation zones users can add to any note
+- [x] **TRIP-04**: User-space sentinel blocks (`<!-- GRAPHIFY_USER_START -->` / `<!-- GRAPHIFY_USER_END -->`) provide explicit preservation zones users can add to any note
 - [ ] **TRIP-05**: `--dry-run` output shows which notes have user modifications and what the merge plan would do with them
-- [ ] **TRIP-06**: Conflict resolution: user content always wins — graphify never overwrites content between user sentinel blocks
+- [x] **TRIP-06**: Conflict resolution: user content always wins — graphify never overwrites content between user sentinel blocks
 - [ ] **TRIP-07**: Merge plan output includes per-note modification source (graphify-generated, user-modified, or both) for audit trail
 
 ## v2 Requirements
@@ -107,9 +107,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRIP-01 | Phase 8 | Complete |
 | TRIP-02 | Phase 8 | Complete |
 | TRIP-03 | Phase 8 | Complete |
-| TRIP-04 | Phase 8 | Pending |
+| TRIP-04 | Phase 8 | Complete |
 | TRIP-05 | Phase 8 | Pending |
-| TRIP-06 | Phase 8 | Pending |
+| TRIP-06 | Phase 8 | Complete |
 | TRIP-07 | Phase 8 | Pending |
 
 **Coverage:**
