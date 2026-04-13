@@ -482,7 +482,6 @@ def to_obsidian(
         RenderedNote,
         split_rendered_note,
         _load_manifest,
-        _save_manifest,
     )
 
     out = Path(output_dir)
