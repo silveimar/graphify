@@ -930,6 +930,11 @@ def main() -> None:
         print("  trae-cn uninstall      remove graphify section from AGENTS.md")
         print("  antigravity install     write .agent/rules + .agent/workflows + skill (Google Antigravity)")
         print("  antigravity uninstall   remove .agent/rules, .agent/workflows, and skill")
+        print("  approve                list pending vault note proposals")
+        print("    <id> --vault <path>    approve and write a proposal to vault")
+        print("    --reject <id>          reject a proposal")
+        print("    --all --vault <path>   batch approve all pending proposals")
+        print("    --reject-all           batch reject all pending proposals")
         print()
         return
 
