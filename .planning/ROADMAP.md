@@ -154,8 +154,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 08.1-01-PLAN.md — Approve manifest threading, --force flag, SKIP_PRESERVE warning, proposal deletion
-- [ ] 08.1-02-PLAN.md — Wire auto_snapshot_and_delta into skill.md pipeline (full + cluster-only paths)
+- [x] 08.1-01-PLAN.md — Approve manifest threading, --force flag, SKIP_PRESERVE warning, proposal deletion
+- [x] 08.1-02-PLAN.md — Wire auto_snapshot_and_delta into skill.md pipeline (full + cluster-only paths)
 
 ### Phase 8.2: MCP Query Enhancements
 **Goal**: Agents can query node staleness state and retrieve agent-created edges through the MCP server
@@ -168,8 +168,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 08.1-01-PLAN.md — Approve manifest threading, --force flag, SKIP_PRESERVE warning, proposal deletion
-- [ ] 08.1-02-PLAN.md — Wire auto_snapshot_and_delta into skill.md pipeline (full + cluster-only paths)
+- [x] 08.1-01-PLAN.md — Approve manifest threading, --force flag, SKIP_PRESERVE warning, proposal deletion
+- [x] 08.1-02-PLAN.md — Wire auto_snapshot_and_delta into skill.md pipeline (full + cluster-only paths)
 
 ## Progress
 
