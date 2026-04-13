@@ -85,6 +85,11 @@ class MergeAction:
 
     See D-71 for field semantics. `action` is a Literal for type-checker
     benefit only — runtime validation uses the _VALID_ACTIONS set.
+
+    Phase 8 fields (backward-compatible — all have defaults):
+    - user_modified: True when the note's on-disk hash differs from the manifest entry
+    - has_user_blocks: True when the note contains GRAPHIFY_USER_START/END sentinel blocks
+    - source: "graphify" (unmodified), "user" (user-modified), or "both" (has user blocks)
     """
     path: Path
     action: Literal["CREATE", "UPDATE", "SKIP_PRESERVE", "SKIP_CONFLICT", "REPLACE", "ORPHAN"]
@@ -92,6 +97,9 @@ class MergeAction:
     changed_fields: list[str] = field(default_factory=list)
     changed_blocks: list[str] = field(default_factory=list)
     conflict_kind: str | None = None
+    user_modified: bool = False
+    has_user_blocks: bool = False
+    source: str = "graphify"
 
 
 @dataclass(frozen=True)
@@ -853,12 +861,110 @@ def compute_merge_plan(
 # ---------------------------------------------------------------------------
 
 import hashlib
+import json
 import os
+import sys
 
 
 def _hash_bytes(data: bytes) -> str:
     """SHA-256 hash of bytes — used for content-identical skip comparison."""
     return hashlib.sha256(data).hexdigest()
+
+
+def _content_hash(path: Path) -> str:
+    """SHA-256 of raw file bytes only — no path mixed in.
+
+    Unlike cache.file_hash() which includes the resolved path for cache key
+    disambiguation, this hashes ONLY content for round-trip change detection.
+    Per D-04: any file change (whitespace, frontmatter, body) counts.
+    """
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _load_manifest(manifest_path: Path) -> dict[str, dict]:
+    """Load vault-manifest.json, returning {} on missing or corrupt.
+
+    Per D-05: missing manifest degrades gracefully to v1.0 behavior
+    (all notes treated as unmodified). Corrupt manifest also returns {}
+    with a warning to stderr so the pipeline is never aborted.
+    """
+    if not manifest_path.exists():
+        return {}
+    try:
+        return json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        print(
+            "[graphify] vault-manifest.json corrupted or unreadable — treating all notes as unmodified",
+            file=sys.stderr,
+        )
+        return {}
+
+
+def _save_manifest(manifest_path: Path, manifest: dict[str, dict]) -> None:
+    """Write manifest atomically via tmp + os.replace (D-05).
+
+    Creates parent directories if absent. Raises OSError on failure
+    (after best-effort tmp cleanup).
+    """
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = manifest_path.with_suffix(".json.tmp")
+    try:
+        tmp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        os.replace(tmp, manifest_path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _build_manifest_from_result(
+    result: MergeResult,
+    rendered_notes: dict[str, RenderedNote],
+    vault_dir: Path,
+    old_manifest: dict[str, dict],
+) -> dict[str, dict]:
+    """Build a new manifest dict after an apply_merge_plan call.
+
+    Starts from old_manifest (retaining SKIP_PRESERVE entries), updates
+    entries for all succeeded + skipped_identical paths, and removes
+    entries for paths that no longer exist on disk.
+    """
+    # Index rendered_notes by resolved absolute path for lookup
+    notes_by_path: dict[Path, RenderedNote] = {}
+    for rn in rendered_notes.values():
+        try:
+            resolved = _validate_target(Path(rn["target_path"]), vault_dir)
+        except ValueError:
+            continue
+        notes_by_path[resolved] = rn
+
+    new_manifest: dict[str, dict] = dict(old_manifest)
+
+    # Update entries for paths that were actually written (succeeded) or
+    # confirmed identical (skipped_identical — content unchanged but we
+    # re-record the entry to confirm currency)
+    paths_to_record = list(result.succeeded) + list(result.skipped_identical)
+    for path in paths_to_record:
+        if not path.exists():
+            continue
+        rn = notes_by_path.get(path)
+        rel_key = str(path.relative_to(vault_dir))
+        entry: dict[str, object] = {
+            "content_hash": _content_hash(path),
+            "last_merged": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "target_path": rel_key,
+            "node_id": rn["node_id"] if rn else "",
+            "note_type": rn["frontmatter_fields"].get("type", "unknown") if rn else "unknown",
+            "community_id": rn["frontmatter_fields"].get("community", None) if rn else None,
+            "has_user_blocks": False,  # Will be set to True in Plan 02 when sentinel parser lands
+        }
+        new_manifest[rel_key] = entry
+
+    # Remove entries for paths that no longer exist on disk (orphaned from a prior run)
+    stale_keys = [k for k, v in new_manifest.items() if not (vault_dir / k).exists()]
+    for k in stale_keys:
+        del new_manifest[k]
+
+    return new_manifest
 
 
 def _write_atomic(target: Path, content: str) -> None:
@@ -943,6 +1049,9 @@ def apply_merge_plan(
     vault_dir: Path,
     rendered_notes: dict[str, RenderedNote],
     profile: dict,
+    *,
+    manifest_path: Path | None = None,
+    old_manifest: dict[str, dict] | None = None,
 ) -> MergeResult:
     """Consume a MergePlan and apply writes to disk.
 
@@ -957,6 +1066,10 @@ def apply_merge_plan(
 
     Re-validates every target path via _validate_target before writing
     (defense in depth; compute already did this).
+
+    Phase 8 (D-05): if manifest_path is not None, writes vault-manifest.json
+    atomically after all writes complete. Starts from old_manifest if provided
+    (retains entries for SKIP_PRESERVE notes).
     """
     vault_dir = Path(vault_dir).resolve()
     _cleanup_stale_tmp(vault_dir)
@@ -1021,12 +1134,21 @@ def apply_merge_plan(
         except OSError as exc:
             failed.append((target, f"write failed: {exc}"))
 
-    return MergeResult(
+    result = MergeResult(
         plan=plan,
         succeeded=succeeded,
         failed=failed,
         skipped_identical=skipped_identical,
     )
+
+    # Phase 8 (D-05): write vault-manifest.json atomically after all writes
+    if manifest_path is not None:
+        new_manifest = _build_manifest_from_result(
+            result, rendered_notes, vault_dir, old_manifest or {}
+        )
+        _save_manifest(manifest_path, new_manifest)
+
+    return result
 
 
 # ---------------------------------------------------------------------------

@@ -1495,3 +1495,154 @@ def test_split_rendered_note_roundtrip_with_dump_frontmatter():
     assert fm.get("type") == "thing"
     assert fm.get("tags") == ["community/transformer"]
     assert body == "body\n"
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 Plan 01 Task 1 — Vault Manifest I/O + MergeAction extension
+# ---------------------------------------------------------------------------
+
+
+class TestVaultManifest:
+
+    def test_save_load_roundtrip(self, tmp_path):
+        from graphify.merge import _save_manifest, _load_manifest
+        manifest_path = tmp_path / "vault-manifest.json"
+        data = {
+            "Atlas/Note.md": {
+                "content_hash": "abc123",
+                "last_merged": "2026-04-12T10:00:00+00:00",
+                "target_path": "Atlas/Note.md",
+                "node_id": "note",
+                "note_type": "thing",
+                "community_id": 0,
+                "has_user_blocks": False,
+            }
+        }
+        _save_manifest(manifest_path, data)
+        loaded = _load_manifest(manifest_path)
+        assert loaded == data
+
+    def test_load_missing_returns_empty(self, tmp_path):
+        from graphify.merge import _load_manifest
+        manifest_path = tmp_path / "nonexistent-manifest.json"
+        result = _load_manifest(manifest_path)
+        assert result == {}
+
+    def test_load_corrupt_returns_empty(self, tmp_path, capsys):
+        from graphify.merge import _load_manifest
+        manifest_path = tmp_path / "vault-manifest.json"
+        manifest_path.write_text("this is not valid json {{{{", encoding="utf-8")
+        result = _load_manifest(manifest_path)
+        assert result == {}
+        captured = capsys.readouterr()
+        assert "vault-manifest.json" in captured.err
+        assert "corrupted" in captured.err
+
+    def test_save_atomic_no_partial(self, tmp_path, monkeypatch):
+        """If the write fails mid-way, neither .json nor .json.tmp should remain."""
+        import json as json_mod
+        from graphify.merge import _save_manifest
+        manifest_path = tmp_path / "vault-manifest.json"
+
+        original_dumps = json_mod.dumps
+
+        def raising_dumps(*args, **kwargs):
+            raise OSError("simulated write failure")
+
+        monkeypatch.setattr(json_mod, "dumps", raising_dumps)
+        with pytest.raises(OSError):
+            _save_manifest(manifest_path, {"key": "value"})
+        # No partial .json file
+        assert not manifest_path.exists()
+        # No leftover .json.tmp
+        tmp_file = manifest_path.with_suffix(".json.tmp")
+        assert not tmp_file.exists()
+
+    def test_content_hash_content_only(self, tmp_path):
+        """Same content at different paths must produce the same hash."""
+        from graphify.merge import _content_hash
+        file_a = tmp_path / "a" / "note.md"
+        file_b = tmp_path / "b" / "note.md"
+        file_a.parent.mkdir(parents=True)
+        file_b.parent.mkdir(parents=True)
+        content = b"# Hello\nsome content\n"
+        file_a.write_bytes(content)
+        file_b.write_bytes(content)
+        assert _content_hash(file_a) == _content_hash(file_b)
+
+    def test_merge_action_new_fields_backward_compat(self):
+        """MergeAction constructed without new fields must use defaults."""
+        from graphify.merge import MergeAction
+        a = MergeAction(path=Path("x.md"), action="CREATE", reason="new")
+        assert a.user_modified is False
+        assert a.has_user_blocks is False
+        assert a.source == "graphify"
+
+    def test_apply_writes_manifest(self, tmp_path):
+        """apply_merge_plan with manifest_path must write vault-manifest.json."""
+        from graphify.merge import apply_merge_plan, compute_merge_plan
+        vault = _copy_vault_fixture("empty", tmp_path)
+        manifest_path = tmp_path / "graphify-out" / "vault-manifest.json"
+        rn = {
+            "node_id": "transformer",
+            "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+            "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+            "body": "# Transformer\n",
+        }
+        plan = compute_merge_plan(vault, {"transformer": rn}, {})
+        result = apply_merge_plan(
+            plan, vault, {"transformer": rn}, {},
+            manifest_path=manifest_path,
+        )
+        assert manifest_path.exists(), "vault-manifest.json must be written"
+        import json
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        # Find the entry for our note
+        assert len(manifest) == 1
+        entry = next(iter(manifest.values()))
+        assert "content_hash" in entry
+        assert "last_merged" in entry
+        assert "target_path" in entry
+        assert "node_id" in entry
+        assert "note_type" in entry
+        assert "community_id" in entry
+        assert "has_user_blocks" in entry
+        assert entry["node_id"] == "transformer"
+
+    def test_apply_skip_preserve_retains_old_entry(self, tmp_path):
+        """SKIP_PRESERVE notes must keep their prior manifest entry unchanged."""
+        from graphify.merge import apply_merge_plan, compute_merge_plan, MergeAction, MergePlan
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        manifest_path = tmp_path / "graphify-out" / "vault-manifest.json"
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        old_entry = {
+            "content_hash": "old_hash_value",
+            "last_merged": "2026-01-01T00:00:00+00:00",
+            "target_path": target_rel,
+            "node_id": "transformer",
+            "note_type": "thing",
+            "community_id": 0,
+            "has_user_blocks": False,
+        }
+        old_manifest = {target_rel: old_entry}
+        # Build a plan with SKIP_PRESERVE for that file
+        target_path = vault / target_rel
+        plan = MergePlan(
+            actions=[MergeAction(
+                path=target_path,
+                action="SKIP_PRESERVE",
+                reason="strategy=skip",
+            )],
+            orphans=[],
+            summary={"SKIP_PRESERVE": 1},
+        )
+        rn = _rendered_note_matching_pristine(vault)
+        apply_merge_plan(
+            plan, vault, {"transformer": rn}, {},
+            manifest_path=manifest_path,
+            old_manifest=old_manifest,
+        )
+        import json
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert target_rel in manifest
+        assert manifest[target_rel]["content_hash"] == "old_hash_value"
