@@ -722,11 +722,20 @@ def compute_merge_plan(
     *,
     skipped_node_ids: set[str] | None = None,
     previously_managed_paths: set[Path] | None = None,
+    manifest: dict[str, dict] | None = None,
+    force: bool = False,
 ) -> MergePlan:
     """Pure reconciliation of rendered notes against a vault on disk.
 
     Produces a MergePlan listing per-file MergeAction decisions. Never writes.
     Phase 5's --dry-run calls this directly.
+
+    Phase 8 (D-07, TRIP-02, TRIP-03):
+    - manifest: pre-loaded vault-manifest.json dict. When provided, notes whose
+      on-disk hash differs from the stored entry receive SKIP_PRESERVE with
+      user_modified=True, source="user" (user content always wins).
+    - force: when True, bypasses user-modified detection — notes are processed
+      normally even if their hash differs from the manifest (D-10).
     """
     vault_dir = Path(vault_dir).resolve()
     skipped_node_ids = skipped_node_ids or set()
@@ -761,6 +770,26 @@ def compute_merge_plan(
                 reason="new file",
             ))
             continue
+
+        # User-modified detection (D-07, TRIP-02, TRIP-03)
+        # Only runs when a manifest is provided and force is not set.
+        # If the on-disk hash differs from the stored entry the note is
+        # skipped entirely — user content always wins.
+        if manifest and not force:
+            rel_key = str(target_path.relative_to(vault_dir))
+            entry = manifest.get(rel_key)
+            if entry and "content_hash" in entry:
+                current_hash = _content_hash(target_path)
+                if current_hash != entry["content_hash"]:
+                    actions.append(MergeAction(
+                        path=target_path,
+                        action="SKIP_PRESERVE",
+                        reason="user-modified since last merge",
+                        user_modified=True,
+                        has_user_blocks=entry.get("has_user_blocks", False),
+                        source="user",
+                    ))
+                    continue
 
         # File exists — read and parse
         existing_text = target_path.read_text(encoding="utf-8")
@@ -823,12 +852,20 @@ def compute_merge_plan(
         _, changed_blocks = _merge_body_blocks(existing_body, existing_blocks, new_blocks)
 
         reason = "idempotent re-render" if not changed_fields and not changed_blocks else "update"
+        # Determine source — "both" when manifest records has_user_blocks for this note
+        note_source = "graphify"
+        if manifest:
+            rel_key = str(target_path.relative_to(vault_dir))
+            entry = manifest.get(rel_key, {})
+            if entry.get("has_user_blocks", False):
+                note_source = "both"
         actions.append(MergeAction(
             path=target_path,
             action="UPDATE",
             reason=reason,
             changed_fields=changed_fields,
             changed_blocks=changed_blocks,
+            source=note_source,
         ))
 
     # Orphan detection (D-72)

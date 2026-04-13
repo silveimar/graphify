@@ -1646,3 +1646,104 @@ class TestVaultManifest:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         assert target_rel in manifest
         assert manifest[target_rel]["content_hash"] == "old_hash_value"
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 Plan 01 Task 2 — User-modified detection in compute_merge_plan
+# ---------------------------------------------------------------------------
+
+
+class TestUserModifiedDetection:
+
+    def test_user_modified_gets_skip_preserve(self, tmp_path):
+        """Note whose hash differs from manifest entry receives SKIP_PRESERVE."""
+        from graphify.merge import compute_merge_plan, _content_hash
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        target_path = vault / target_rel
+        # Build manifest with a DIFFERENT hash so it looks user-modified
+        manifest = {target_rel: {"content_hash": "different_hash_value"}}
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=manifest)
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        assert action.action == "SKIP_PRESERVE"
+        assert action.user_modified is True
+        assert action.source == "user"
+        assert "user-modified" in action.reason
+
+    def test_hash_match_proceeds_normally(self, tmp_path):
+        """Note whose hash matches manifest entry gets normal UPDATE action."""
+        from graphify.merge import compute_merge_plan, _content_hash
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        target_path = vault / target_rel
+        # Build manifest with the MATCHING hash
+        real_hash = _content_hash(target_path)
+        manifest = {target_rel: {"content_hash": real_hash}}
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=manifest)
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        # Should NOT be a user-modified skip — should be UPDATE (idempotent)
+        assert action.action != "SKIP_PRESERVE" or action.user_modified is False
+        assert action.user_modified is False
+
+    def test_missing_manifest_normal_behavior(self, tmp_path):
+        """compute_merge_plan with manifest=None behaves like v1.0."""
+        from graphify.merge import compute_merge_plan
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=None)
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        # Must be UPDATE (normal v1.0 path) — not a user-modified SKIP_PRESERVE
+        assert action.action == "UPDATE"
+        assert action.user_modified is False
+
+    def test_corrupt_entry_no_content_hash(self, tmp_path):
+        """Manifest entry missing content_hash field — note processed normally."""
+        from graphify.merge import compute_merge_plan
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        # Entry without content_hash key
+        manifest = {target_rel: {"last_merged": "2026-01-01T00:00:00+00:00"}}
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=manifest)
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        # Should NOT be short-circuited to SKIP_PRESERVE by user-mod detection
+        assert action.user_modified is False
+
+    def test_force_overrides_user_modified(self, tmp_path):
+        """force=True bypasses user-modified detection — gets UPDATE not SKIP_PRESERVE."""
+        from graphify.merge import compute_merge_plan
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        manifest = {target_rel: {"content_hash": "different_hash_value"}}
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(
+            vault, {"transformer": rn}, {}, manifest=manifest, force=True
+        )
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        # With force=True, must NOT be SKIP_PRESERVE from user-modified detection
+        assert not (action.action == "SKIP_PRESERVE" and action.user_modified is True)
+        assert action.user_modified is False
+
+    def test_source_both_when_has_user_blocks(self, tmp_path):
+        """Note with has_user_blocks=True but matching hash gets source='both'."""
+        from graphify.merge import compute_merge_plan, _content_hash
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        target_path = vault / target_rel
+        real_hash = _content_hash(target_path)
+        # Entry with matching hash but has_user_blocks=True
+        manifest = {target_rel: {"content_hash": real_hash, "has_user_blocks": True}}
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=manifest)
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        # Not user-modified (hash matches), but has_user_blocks=True → source="both"
+        assert action.user_modified is False
+        assert action.source == "both"
