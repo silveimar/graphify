@@ -748,8 +748,12 @@ def _reject_proposal(proposals_dir: Path, record_id: str) -> dict:
     """Set status to 'rejected' for the given proposal. Rewrites the file atomically.
 
     Raises FileNotFoundError if the proposal does not exist.
+    Raises ValueError if record_id attempts path traversal.
     """
-    path = proposals_dir / f"{record_id}.json"
+    # Path confinement: ensure resolved path stays inside proposals_dir
+    path = (proposals_dir / f"{record_id}.json").resolve()
+    if not str(path).startswith(str(proposals_dir.resolve())):
+        raise ValueError(f"Invalid proposal ID: {record_id}")
     if not path.exists():
         raise FileNotFoundError(f"Proposal not found: {record_id}")
     import os as _os
@@ -792,10 +796,14 @@ def _approve_and_write_proposal(proposals_dir: Path, record_id: str, vault_path:
     """Approve a proposal and write it to the vault via the merge engine.
 
     Raises FileNotFoundError if the proposal does not exist.
+    Raises ValueError if record_id attempts path traversal.
     Calls validate_vault_path on the suggested_folder to confine vault writes (T-07-11).
     """
     import os as _os
-    path = proposals_dir / f"{record_id}.json"
+    # Path confinement: ensure resolved path stays inside proposals_dir
+    path = (proposals_dir / f"{record_id}.json").resolve()
+    if not str(path).startswith(str(proposals_dir.resolve())):
+        raise ValueError(f"Invalid proposal ID: {record_id}")
     if not path.exists():
         raise FileNotFoundError(f"Proposal not found: {record_id}")
 
