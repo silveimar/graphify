@@ -116,7 +116,12 @@ Plans:
   3. Agent can call `propose_vault_note` to stage a proposed note; the note lands in `graphify-out/proposals/` and the vault is untouched until the user runs `graphify approve` to review and accept/reject
   4. Agent can query annotations filtered by peer, session, or time range, and retrieve only annotations relevant to a specific session context
   5. `graph.json` (pipeline ground truth) is never modified by any MCP mutation tool; all agent state lives in `annotations.jsonl` and `agent-edges.json` sidecars
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Sidecar persistence + mutation tools (annotate_node, flag_node, add_edge) + query tool (get_annotations) + mtime reload
+- [ ] 07-02-PLAN.md — propose_vault_note tool with proposal staging to graphify-out/proposals/
+- [ ] 07-03-PLAN.md — graphify approve CLI subcommand (list/approve/reject/batch)
 
 ### Phase 8: Obsidian Round-Trip Awareness
 **Goal**: Users can freely edit graphify-injected vault notes between runs without losing their changes on the next `--obsidian` re-run
@@ -140,7 +145,7 @@ Plans:
 | 4. Merge Engine | v1.0 | 6/6 | Complete | 2026-04-11 |
 | 5. Integration & CLI | v1.0 | 6/6 | Complete | 2026-04-11 |
 | 6. Graph Delta Analysis & Staleness | v1.1 | 0/3 | Planned | — |
-| 7. MCP Write-Back with Peer Modeling | v1.1 | 0/? | Not started | — |
+| 7. MCP Write-Back with Peer Modeling | v1.1 | 0/3 | Planned | — |
 | 8. Obsidian Round-Trip Awareness | v1.1 | 0/? | Not started | — |
 | 9. Multi-Perspective Analysis (Council Protocol) | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
@@ -154,4 +159,4 @@ Plans:
 | 18. Focus-Aware Graph Context | v1.3 | 0/? | Planned | — |
 
 ---
-*Last updated: 2026-04-12 — Phase 6 planned: 3 plans in 2 waves (06-01 snapshot module, 06-02 delta module, 06-03 CLI wiring). v1.2–v1.3 milestones preserved from prior exploration sessions.*
+*Last updated: 2026-04-12 — Phase 7 planned: 3 plans in 3 waves (07-01 sidecar+mutation tools, 07-02 propose_vault_note, 07-03 approve CLI). v1.2-v1.3 milestones preserved from prior exploration sessions.*
