@@ -2002,3 +2002,109 @@ class TestUserSentinelPreservation:
         entry = next(iter(manifest.values()))
         assert entry["has_user_blocks"] is False, \
             "has_user_blocks must be False when file has no user sentinel blocks"
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 / Plan 03 — TestFormatMergePlanRoundTrip
+# Tests for format_merge_plan Source column (D-11) and summary preamble (D-12)
+# ---------------------------------------------------------------------------
+
+
+class TestFormatMergePlanRoundTrip:
+    """Tests for round-trip awareness enhancements to format_merge_plan."""
+
+    def test_format_preamble_with_user_modified(self):
+        """Plan with user_modified actions → preamble line present with correct counts."""
+        plan = _mk_plan([
+            MergeAction(
+                path=Path("notes/User.md"), action="SKIP_PRESERVE",
+                reason="user-modified", user_modified=True, source="user",
+            ),
+            MergeAction(
+                path=Path("notes/User2.md"), action="SKIP_PRESERVE",
+                reason="user-modified", user_modified=True, source="user",
+            ),
+            MergeAction(
+                path=Path("notes/Graphify.md"), action="UPDATE",
+                reason="update", source="graphify",
+                changed_fields=["title"], changed_blocks=[],
+            ),
+            MergeAction(
+                path=Path("notes/New.md"), action="CREATE",
+                reason="new", source="graphify",
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "2 notes user-modified (will be preserved)" in out
+        assert "1 notes graphify-only (will update)" in out
+        assert "1 new notes (will create)" in out
+
+    def test_format_preamble_absent_when_no_user_mods(self):
+        """Plan with only default source='graphify' actions → no preamble line."""
+        plan = _mk_plan([
+            MergeAction(path=Path("a.md"), action="CREATE", reason="new"),
+            MergeAction(
+                path=Path("b.md"), action="UPDATE", reason="update",
+                changed_fields=["x"], changed_blocks=[],
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "notes user-modified" not in out
+
+    def test_format_source_user_annotation(self):
+        """SKIP_PRESERVE action with source='user' → output line contains '[user]'."""
+        plan = _mk_plan([
+            MergeAction(
+                path=Path("UserNote.md"), action="SKIP_PRESERVE",
+                reason="user-modified", user_modified=True, source="user",
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "[user]" in out
+
+    def test_format_source_both_annotation(self):
+        """UPDATE action with source='both' → output line contains '[both]'."""
+        plan = _mk_plan([
+            MergeAction(
+                path=Path("BothNote.md"), action="UPDATE",
+                reason="update", source="both",
+                changed_fields=["x"], changed_blocks=[],
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "[both]" in out
+
+    def test_format_source_graphify_no_annotation(self):
+        """UPDATE action with source='graphify' (default) → no '[graphify]' annotation."""
+        plan = _mk_plan([
+            MergeAction(
+                path=Path("GraphifyNote.md"), action="UPDATE",
+                reason="update", source="graphify",
+                changed_fields=["x"], changed_blocks=[],
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "[graphify]" not in out
+
+    def test_format_user_modified_skip_preserve_suffix(self):
+        """SKIP_PRESERVE action with user_modified=True → line contains '(user-modified)'."""
+        plan = _mk_plan([
+            MergeAction(
+                path=Path("Modified.md"), action="SKIP_PRESERVE",
+                reason="user-modified", user_modified=True, source="user",
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "(user-modified)" in out
+
+    def test_format_backward_compat_empty_plan(self):
+        """Empty plan → no preamble, no source annotations — identical to v1.0 behavior."""
+        plan = _mk_plan()
+        out = format_merge_plan(plan)
+        assert "notes user-modified" not in out
+        assert "[user]" not in out
+        assert "[both]" not in out
+        assert "[graphify]" not in out
+        # Standard header still present
+        assert "Merge Plan — 0 actions" in out
+        assert "CREATE:" in out
