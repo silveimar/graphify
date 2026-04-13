@@ -41,6 +41,10 @@ def __getattr__(name):
         "RenderedNote": ("graphify.merge", "RenderedNote"),
         "validate_profile_preflight": ("graphify.profile", "validate_profile_preflight"),
         "PreflightResult": ("graphify.profile", "PreflightResult"),
+        "save_snapshot": ("graphify.snapshot", "save_snapshot"),
+        "load_snapshot": ("graphify.snapshot", "load_snapshot"),
+        "list_snapshots": ("graphify.snapshot", "list_snapshots"),
+        "snapshots_dir": ("graphify.snapshot", "snapshots_dir"),
     }
     if name in _map:
         import importlib
