@@ -368,14 +368,12 @@ def _restore_user_blocks(new_text: str, user_blocks: list[str]) -> str:
     has_markers = _USER_SENTINEL_START_RE.search(new_text) is not None
 
     if has_markers:
-        # Replace existing empty pairs in order
+        # Replace existing empty pairs in order, advancing past each replaced
+        # region so we never re-match a just-inserted user block's markers.
         result = new_text
+        search_from = 0
         for block in user_blocks:
-            # Find the next empty pair and replace it with the captured block
-            # An "empty pair" is <!-- GRAPHIFY_USER_START -->\n<!-- GRAPHIFY_USER_END -->
-            # but we also handle pairs with whitespace-only content between them.
-            # Use a simple approach: find next START, find its END, replace the range.
-            start_match = _USER_SENTINEL_START_RE.search(result)
+            start_match = _USER_SENTINEL_START_RE.search(result, search_from)
             if start_match is None:
                 # No more markers — append remaining blocks at the end
                 result = _append_user_block(result, block)
@@ -387,6 +385,7 @@ def _restore_user_blocks(new_text: str, user_blocks: list[str]) -> str:
                 continue
             # Replace the range [start_match.start(), end_match.end()] with block
             result = result[:start_match.start()] + block + result[end_match.end():]
+            search_from = start_match.start() + len(block)
         return result
     else:
         # Append all user blocks at end
