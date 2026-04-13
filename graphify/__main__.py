@@ -924,8 +924,14 @@ def main() -> None:
                 name = args[i].split("=", 1)[1]; i += 1
             elif args[i] == "--cap" and i + 1 < len(args):
                 cap = int(args[i + 1]); i += 2
+                if cap < 1:
+                    print("error: --cap must be at least 1", file=sys.stderr)
+                    sys.exit(2)
             elif args[i].startswith("--cap="):
                 cap = int(args[i].split("=", 1)[1]); i += 1
+                if cap < 1:
+                    print("error: --cap must be at least 1", file=sys.stderr)
+                    sys.exit(2)
             elif args[i] == "--from" and i + 1 < len(args):
                 from_path = args[i + 1]; i += 2
             elif args[i].startswith("--from="):

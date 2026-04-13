@@ -73,6 +73,8 @@ def save_snapshot(
         raise
 
     # FIFO prune: keep only newest `cap` snapshots
+    if cap < 1:
+        cap = 1
     snaps = sorted(d.glob("*.json"), key=lambda p: p.stat().st_mtime)
     for p in snaps[:-cap]:
         p.unlink(missing_ok=True)
