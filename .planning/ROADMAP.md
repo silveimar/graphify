@@ -165,11 +165,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Calling MCP `get_node` returns `extracted_at`, `source_hash`, and a staleness classification (FRESH/STALE/GHOST) alongside existing fields
   2. A new MCP tool `get_agent_edges` returns edges from `agent-edges.json`, filterable by peer_id and session_id
-**Plans:** 2 plans
+**Plans:** 1 plan
 
 Plans:
-- [x] 08.1-01-PLAN.md — Approve manifest threading, --force flag, SKIP_PRESERVE warning, proposal deletion
-- [x] 08.1-02-PLAN.md — Wire auto_snapshot_and_delta into skill.md pipeline (full + cluster-only paths)
+- [ ] 08.2-01-PLAN.md — Provenance in get_node + get_agent_edges query tool with peer/session/node filtering
 
 ## Progress
 
@@ -183,8 +182,8 @@ Plans:
 | 6. Graph Delta Analysis & Staleness | v1.1 | 3/3 | Complete | 2026-04-12 |
 | 7. MCP Write-Back with Peer Modeling | v1.1 | 3/3 | Complete | 2026-04-13 |
 | 8. Obsidian Round-Trip Awareness | v1.1 | 3/3 | Complete | 2026-04-13 |
-| 8.1 Approve & Pipeline Wiring | v1.1 | 0/2 | Planned | — |
-| 8.2 MCP Query Enhancements | v1.1 | 0/? | Planned | — |
+| 8.1 Approve & Pipeline Wiring | v1.1 | 2/2 | Complete | 2026-04-13 |
+| 8.2 MCP Query Enhancements | v1.1 | 0/1 | Planned | — |
 | 9. Multi-Perspective Analysis (Council Protocol) | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
 | 11. Narrative Mode | v1.2 | 0/? | Planned | — |
@@ -197,4 +196,4 @@ Plans:
 | 18. Focus-Aware Graph Context | v1.3 | 0/? | Planned | — |
 
 ---
-*Last updated: 2026-04-12 — Gap closure phases 8.1-8.2 added from v1.1 milestone audit. Phase 6 status corrected to Complete. v1.2-v1.3 milestones preserved from prior exploration sessions.*
+*Last updated: 2026-04-13 — Phase 8.2 plan created. Phase 8.1 marked complete. v1.2-v1.3 milestones preserved from prior exploration sessions.*
