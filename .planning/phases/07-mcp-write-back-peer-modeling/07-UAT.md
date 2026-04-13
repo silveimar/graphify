@@ -114,30 +114,19 @@ verified: graphify/__main__.py:814 calls _validate_vault_path_for_approve which 
 
 ### 21. CLI: approve not in --help
 expected: `graphify approve` listed in `graphify --help` output
-result: issue
-reported: "approve subcommand works but is not listed in graphify --help output"
-severity: minor
+result: pass
+fix_commit: 52cd9a0
+note: originally failed — approve help text was missing; fixed inline by adding 5 help lines to __main__.py
 
 ## Summary
 
 total: 21
-passed: 20
-issues: 1
+passed: 21
+issues: 0
 pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-- truth: "`graphify approve` listed in `graphify --help` output"
-  status: failed
-  reason: "User reported: approve subcommand works but is not listed in graphify --help output"
-  severity: minor
-  test: 21
-  root_cause: "approve subcommand was added to the if/elif dispatch in main() but the help text string at the top of main() was not updated to include it"
-  artifacts:
-    - path: "graphify/__main__.py"
-      issue: "help text missing approve subcommand"
-  missing:
-    - "Add approve usage lines to the help text in main()"
-  debug_session: ""
+[none — all gaps resolved]
