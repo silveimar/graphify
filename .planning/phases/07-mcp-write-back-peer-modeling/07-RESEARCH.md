@@ -527,22 +527,22 @@ def _approve_proposal(proposal_path: Path, vault_path: Path) -> None:
 
 Both assumptions are LOW risk given corroborating evidence in SUMMARY.md.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **agent-edges.json growth: load fully at startup vs. incremental append**
    - What we know: D-16 says single-server assumption; D-03 says JSONL compaction at startup for annotations
    - What's unclear: Whether `agent-edges.json` should also be JSONL or remain a full JSON array rewritten atomically
-   - Recommendation: Use full JSON array + `os.replace()` atomic write (D-02 separates the files for good reason; edges have different dedup semantics than annotations). For large edge sets (>10K), revisit in v1.2.
+   - RESOLVED: Use full JSON array + `os.replace()` atomic write (D-02 separates the files for good reason; edges have different dedup semantics than annotations). For large edge sets (>10K), revisit in v1.2.
 
 2. **JSONL compaction dedup key: what defines "same annotation"?**
    - What we know: D-03 says compact at startup; annotation_type + node_id + peer_id is the natural composite key
    - What's unclear: Whether two annotations for the same node/peer with different text are duplicates or updates
-   - Recommendation: Keep LAST record per (node_id, annotation_type, peer_id) tuple. Free text can change across sessions — latest is authoritative. This is left to Claude's discretion per CONTEXT.md.
+   - RESOLVED: Keep LAST record per (node_id, annotation_type, peer_id) tuple. Free text can change across sessions — latest is authoritative. This is left to Claude's discretion per CONTEXT.md.
 
 3. **graphify approve --vault absent: hard error or --dry-run fallback?**
    - What we know: D-11 requires explicit `--vault`; `graphify approve` (no args) should list proposals
    - What's unclear: Whether `graphify approve` with no `<id>` and no `--vault` is a list-only mode (valid without vault) or an error
-   - Recommendation: `graphify approve` (no args) = list pending proposals (no vault needed). `graphify approve <id>` without `--vault` = error with usage message. This matches the snapshot pattern where listing doesn't require a target.
+   - RESOLVED: `graphify approve` (no args) = list pending proposals (no vault needed). `graphify approve <id>` without `--vault` = error with usage message. This matches the snapshot pattern where listing doesn't require a target.
 
 ## Environment Availability
 
