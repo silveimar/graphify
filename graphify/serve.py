@@ -82,7 +82,7 @@ def _make_annotate_record(node_id: str, text: str, peer_id: str, session_id: str
         "node_id": sanitize_label(node_id),
         "text": sanitize_label(text),
         "peer_id": sanitize_label(peer_id),
-        "session_id": session_id,
+        "session_id": sanitize_label(session_id),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -97,7 +97,7 @@ def _make_flag_record(node_id: str, importance: str, peer_id: str, session_id: s
         "node_id": sanitize_label(node_id),
         "importance": importance,
         "peer_id": sanitize_label(peer_id),
-        "session_id": session_id,
+        "session_id": sanitize_label(session_id),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -111,7 +111,7 @@ def _make_edge_record(source: str, target: str, relation: str, peer_id: str, ses
         "relation": sanitize_label(relation),
         "confidence": "INFERRED",
         "peer_id": sanitize_label(peer_id),
-        "session_id": session_id,
+        "session_id": sanitize_label(session_id),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -136,7 +136,7 @@ def _make_proposal_record(arguments: dict, session_id: str) -> dict:
         "tags": tags,
         "rationale": rationale,
         "peer_id": peer_id,
-        "session_id": session_id,
+        "session_id": sanitize_label(session_id),
         "timestamp": timestamp,
         "status": "pending",
     }
