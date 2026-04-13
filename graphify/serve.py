@@ -1,11 +1,139 @@
 # MCP stdio server - exposes graph query tools to Claude and other agents
 from __future__ import annotations
 import json
+import os
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 import networkx as nx
 from networkx.readwrite import json_graph
 from graphify.security import sanitize_label
+
+
+def _append_annotation(out_dir: Path, record: dict) -> None:
+    """Append a single annotation record as a JSON line to annotations.jsonl."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / "annotations.jsonl"
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _compact_annotations(path: Path) -> list[dict]:
+    """Read annotations.jsonl, deduplicate by (node_id, annotation_type, peer_id), rewrite atomically.
+
+    Deduplication keeps the LAST record per key. Corrupt lines are skipped.
+    Returns the deduplicated list, or [] if the file does not exist.
+    """
+    if not path.exists():
+        return []
+    records: dict[tuple, dict] = {}
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+                key = (record.get("node_id"), record.get("annotation_type"), record.get("peer_id"))
+                records[key] = record
+            except json.JSONDecodeError:
+                # Skip corrupt lines — data loss limited to at most one record (T-07-06)
+                continue
+    deduped = list(records.values())
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in deduped) + ("\n" if deduped else ""), encoding="utf-8")
+        os.replace(tmp, path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+    return deduped
+
+
+def _load_agent_edges(path: Path) -> list[dict]:
+    """Load agent-edges.json as a list of dicts. Returns [] if missing or corrupt."""
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+
+
+def _save_agent_edges(out_dir: Path, edges: list[dict]) -> None:
+    """Atomically write agent-edges.json to out_dir using os.replace."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / "agent-edges.json"
+    tmp = target.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(edges, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, target)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _make_annotate_record(node_id: str, text: str, peer_id: str, session_id: str) -> dict:
+    """Create a validated annotation record. All string inputs are sanitized."""
+    return {
+        "record_id": str(uuid.uuid4()),
+        "annotation_type": "annotation",
+        "node_id": sanitize_label(node_id),
+        "text": sanitize_label(text),
+        "peer_id": sanitize_label(peer_id),
+        "session_id": session_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _make_flag_record(node_id: str, importance: str, peer_id: str, session_id: str) -> dict:
+    """Create a validated flag record. Raises ValueError for invalid importance values."""
+    if importance not in {"high", "medium", "low"}:
+        raise ValueError(f"Invalid importance: must be high, medium, or low. Got: {importance!r}")
+    return {
+        "record_id": str(uuid.uuid4()),
+        "annotation_type": "flag",
+        "node_id": sanitize_label(node_id),
+        "importance": importance,
+        "peer_id": sanitize_label(peer_id),
+        "session_id": session_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _make_edge_record(source: str, target: str, relation: str, peer_id: str, session_id: str) -> dict:
+    """Create a validated agent edge record. Never modifies the in-memory graph (T-07-03)."""
+    return {
+        "record_id": str(uuid.uuid4()),
+        "source": sanitize_label(source),
+        "target": sanitize_label(target),
+        "relation": sanitize_label(relation),
+        "confidence": "INFERRED",
+        "peer_id": sanitize_label(peer_id),
+        "session_id": session_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _filter_annotations(
+    annotations: list[dict],
+    peer_id: str | None,
+    session_id: str | None,
+    time_from: str | None,
+    time_to: str | None,
+) -> list[dict]:
+    """Filter annotation list by optional peer_id, session_id, and ISO-8601 time range."""
+    result = list(annotations)
+    if peer_id is not None:
+        result = [r for r in result if r.get("peer_id") == peer_id]
+    if session_id is not None:
+        result = [r for r in result if r.get("session_id") == session_id]
+    if time_from is not None:
+        result = [r for r in result if r.get("timestamp", "") >= time_from]
+    if time_to is not None:
+        result = [r for r in result if r.get("timestamp", "") <= time_to]
+    return result
 
 
 def _load_graph(graph_path: str) -> nx.Graph:
@@ -150,6 +278,13 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
     G = _load_graph(graph_path)
     communities = _communities_from_graph(G)
 
+    # Sidecar state initialised at server startup (D-03: compaction at startup only)
+    _graph_mtime = Path(graph_path).stat().st_mtime if Path(graph_path).exists() else 0.0
+    _out_dir = Path(graph_path).parent
+    _annotations: list[dict] = _compact_annotations(_out_dir / "annotations.jsonl")
+    _agent_edges: list[dict] = _load_agent_edges(_out_dir / "agent-edges.json")
+    _session_id = str(uuid.uuid4())
+
     server = Server("graphify")
 
     @server.list_tools()
@@ -223,9 +358,92 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
                     "required": ["source", "target"],
                 },
             ),
+            types.Tool(
+                name="annotate_node",
+                description="Add a free-text annotation to a node. Persisted across server restarts.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "node_id": {"type": "string", "description": "ID of the node to annotate"},
+                        "text": {"type": "string", "description": "Annotation text"},
+                        "peer_id": {"type": "string", "description": "Peer identifier (default: anonymous)"},
+                    },
+                    "required": ["node_id", "text"],
+                },
+            ),
+            types.Tool(
+                name="flag_node",
+                description="Flag a node's importance level. Persisted across server restarts.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "node_id": {"type": "string", "description": "ID of the node to flag"},
+                        "importance": {"type": "string", "enum": ["high", "medium", "low"], "description": "Importance level"},
+                        "peer_id": {"type": "string", "description": "Peer identifier (default: anonymous)"},
+                    },
+                    "required": ["node_id", "importance"],
+                },
+            ),
+            types.Tool(
+                name="add_edge",
+                description="Add an agent-inferred edge between two nodes. Stored in agent-edges.json sidecar; never modifies graph.json.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "source": {"type": "string", "description": "Source node ID"},
+                        "target": {"type": "string", "description": "Target node ID"},
+                        "relation": {"type": "string", "description": "Edge relation type"},
+                        "peer_id": {"type": "string", "description": "Peer identifier (default: anonymous)"},
+                    },
+                    "required": ["source", "target", "relation"],
+                },
+            ),
+            types.Tool(
+                name="propose_vault_note",
+                description="Propose a new vault note for human review before writing. Implemented in Plan 02.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Suggested note title"},
+                        "note_type": {"type": "string", "description": "Note type (e.g. Thing, Source, MOC)"},
+                        "body_markdown": {"type": "string", "description": "Note body in markdown"},
+                        "suggested_folder": {"type": "string", "description": "Suggested vault folder path"},
+                        "tags": {"type": "array", "items": {"type": "string"}, "description": "Tags for the note"},
+                        "rationale": {"type": "string", "description": "Why this note is being proposed"},
+                        "peer_id": {"type": "string", "description": "Peer identifier (default: anonymous)"},
+                    },
+                    "required": ["title", "body_markdown"],
+                },
+            ),
+            types.Tool(
+                name="get_annotations",
+                description="Query stored annotations, optionally filtered by peer, session, or time range.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "peer_id": {"type": "string", "description": "Filter by peer identifier"},
+                        "session_id": {"type": "string", "description": "Filter by session ID"},
+                        "time_from": {"type": "string", "description": "ISO-8601 lower bound (inclusive)"},
+                        "time_to": {"type": "string", "description": "ISO-8601 upper bound (inclusive)"},
+                    },
+                },
+            ),
         ]
 
+    def _reload_if_stale() -> None:
+        """Reload G and communities if graph.json mtime has changed (D-13)."""
+        nonlocal G, communities, _graph_mtime
+        try:
+            mtime = os.stat(graph_path).st_mtime
+        except OSError:
+            return
+        if mtime != _graph_mtime:
+            G = _load_graph(graph_path)
+            communities = _communities_from_graph(G)
+            _graph_mtime = mtime
+
     def _tool_query_graph(arguments: dict) -> str:
+        _reload_if_stale()
         question = arguments["question"]
         mode = arguments.get("mode", "bfs")
         depth = min(int(arguments.get("depth", 3)), 6)
@@ -240,6 +458,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         return header + _subgraph_to_text(G, nodes, edges, budget)
 
     def _tool_get_node(arguments: dict) -> str:
+        _reload_if_stale()
         label = arguments["label"].lower()
         matches = [(nid, d) for nid, d in G.nodes(data=True)
                    if label in d.get("label", "").lower() or label == nid.lower()]
@@ -256,6 +475,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         ])
 
     def _tool_get_neighbors(arguments: dict) -> str:
+        _reload_if_stale()
         label = arguments["label"].lower()
         rel_filter = arguments.get("relation_filter", "").lower()
         matches = _find_node(G, label)
@@ -272,6 +492,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         return "\n".join(lines)
 
     def _tool_get_community(arguments: dict) -> str:
+        _reload_if_stale()
         cid = int(arguments["community_id"])
         nodes = communities.get(cid, [])
         if not nodes:
@@ -283,6 +504,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         return "\n".join(lines)
 
     def _tool_god_nodes(arguments: dict) -> str:
+        _reload_if_stale()
         from .analyze import god_nodes as _god_nodes
         nodes = _god_nodes(G, top_n=int(arguments.get("top_n", 10)))
         lines = ["God nodes (most connected):"]
@@ -290,6 +512,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         return "\n".join(lines)
 
     def _tool_graph_stats(_: dict) -> str:
+        _reload_if_stale()
         confs = [d.get("confidence", "EXTRACTED") for _, _, d in G.edges(data=True)]
         total = len(confs) or 1
         return (
@@ -302,6 +525,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         )
 
     def _tool_shortest_path(arguments: dict) -> str:
+        _reload_if_stale()
         src_scored = _score_nodes(G, [t.lower() for t in arguments["source"].split()])
         tgt_scored = _score_nodes(G, [t.lower() for t in arguments["target"].split()])
         if not src_scored:
@@ -329,6 +553,53 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             segments.append(f"--{rel}{conf_str}--> {G.nodes[v].get('label', v)}")
         return f"Shortest path ({hops} hops):\n  " + " ".join(segments)
 
+    def _tool_annotate_node(arguments: dict) -> str:
+        """Add a free-text annotation to a node. Persisted to annotations.jsonl (T-07-01)."""
+        node_id = arguments.get("node_id", "")
+        text = arguments.get("text", "")
+        peer_id = arguments.get("peer_id", "anonymous")
+        record = _make_annotate_record(node_id, text, peer_id, _session_id)
+        _append_annotation(_out_dir, record)
+        _annotations.append(record)
+        return json.dumps(record)
+
+    def _tool_flag_node(arguments: dict) -> str:
+        """Flag a node's importance (high/medium/low). Persisted to annotations.jsonl."""
+        node_id = arguments.get("node_id", "")
+        importance = arguments.get("importance", "")
+        peer_id = arguments.get("peer_id", "anonymous")
+        try:
+            record = _make_flag_record(node_id, importance, peer_id, _session_id)
+        except ValueError as exc:
+            return str(exc)
+        _append_annotation(_out_dir, record)
+        _annotations.append(record)
+        return json.dumps(record)
+
+    def _tool_add_edge(arguments: dict) -> str:
+        """Add an agent-inferred edge. Saved to agent-edges.json; never mutates G (T-07-03)."""
+        source = arguments.get("source", "")
+        target = arguments.get("target", "")
+        relation = arguments.get("relation", "")
+        peer_id = arguments.get("peer_id", "anonymous")
+        record = _make_edge_record(source, target, relation, peer_id, _session_id)
+        _agent_edges.append(record)
+        _save_agent_edges(_out_dir, _agent_edges)
+        return json.dumps(record)
+
+    def _tool_propose_vault_note(arguments: dict) -> str:
+        """Propose a new vault note for human review. Implemented in Plan 02."""
+        return "Not implemented yet"
+
+    def _tool_get_annotations(arguments: dict) -> str:
+        """Return annotations, optionally filtered by peer_id, session_id, or time range."""
+        peer_id = arguments.get("peer_id") or None
+        session_id = arguments.get("session_id") or None
+        time_from = arguments.get("time_from") or None
+        time_to = arguments.get("time_to") or None
+        results = _filter_annotations(_annotations, peer_id, session_id, time_from, time_to)
+        return json.dumps(results)
+
     _handlers = {
         "query_graph": _tool_query_graph,
         "get_node": _tool_get_node,
@@ -337,6 +608,11 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "god_nodes": _tool_god_nodes,
         "graph_stats": _tool_graph_stats,
         "shortest_path": _tool_shortest_path,
+        "annotate_node": _tool_annotate_node,
+        "flag_node": _tool_flag_node,
+        "add_edge": _tool_add_edge,
+        "propose_vault_note": _tool_propose_vault_note,
+        "get_annotations": _tool_get_annotations,
     }
 
     @server.call_tool()

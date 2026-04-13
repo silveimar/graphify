@@ -264,9 +264,15 @@ def test_make_annotate_record_defaults():
 
 
 def test_make_annotate_record_sanitizes():
-    xss = "<script>alert('xss')</script>"
-    record = _make_annotate_record("n1", xss, "anonymous", "sess-001")
-    assert "<script>" not in record["text"]
+    # sanitize_label strips control characters and caps length (see security.py).
+    # HTML escaping happens at render time, not at storage time — this is by design.
+    text_with_controls = "hello\x00\x01\x1fworld"
+    record = _make_annotate_record("n1", text_with_controls, "anonymous", "sess-001")
+    # Control characters must be stripped
+    assert "\x00" not in record["text"]
+    assert "\x01" not in record["text"]
+    assert "\x1f" not in record["text"]
+    assert "helloworld" in record["text"]
 
 
 # --- _make_flag_record ---
