@@ -10,8 +10,8 @@ Requirements for v1.1 Context Persistence & Agent Memory. Each maps to roadmap p
 ### Graph Delta Analysis & Staleness
 
 - [ ] **DELTA-01**: User can compare current graph run against previous run and see added/removed/changed nodes and edges in `GRAPH_DELTA.md`
-- [ ] **DELTA-02**: Graph snapshots persist to `graphify-out/snapshots/` after each pipeline run with automatic retention (default: keep last 10)
-- [ ] **DELTA-03**: Every extracted node carries `extracted_at` (ISO timestamp) and `source_hash` (SHA256 of source file at extraction time) metadata
+- [x] **DELTA-02**: Graph snapshots persist to `graphify-out/snapshots/` after each pipeline run with automatic retention (default: keep last 10)
+- [x] **DELTA-03**: Every extracted node carries `extracted_at` (ISO timestamp) and `source_hash` (SHA256 of source file at extraction time) metadata
 - [ ] **DELTA-04**: Nodes have three-state staleness: FRESH (hash matches source), STALE (hash mismatch), GHOST (source file deleted/renamed)
 - [ ] **DELTA-05**: `GRAPH_DELTA.md` uses summary+archive pattern: concise summary section (loadable into agent context) plus full structural diff section (searchable but not loaded)
 - [ ] **DELTA-06**: Community migration is tracked: which nodes moved between communities across runs
@@ -87,8 +87,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | DELTA-01 | Phase 6 | Pending |
-| DELTA-02 | Phase 6 | Pending |
-| DELTA-03 | Phase 6 | Pending |
+| DELTA-02 | Phase 6 | Complete |
+| DELTA-03 | Phase 6 | Complete |
 | DELTA-04 | Phase 6 | Pending |
 | DELTA-05 | Phase 6 | Pending |
 | DELTA-06 | Phase 6 | Pending |
