@@ -10,54 +10,43 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 ## Requirements
 
-### Validated (v1.0 — Ideaverse Integration milestone)
+### Validated
 
-- [x] `.graphify/` vault-side profile system with `profile.yaml` + `templates/` directory _(v1.0, Phase 1: Foundation)_
-- [x] Default built-in profile producing Ideaverse ACE-compatible output (Atlas/Maps, Atlas/Dots, Atlas/Sources) _(v1.0, Phase 1)_
-- [x] Profile YAML schema: folder_mapping, mapping_rules, merge behavior, naming conventions, Obsidian config — plus topology section _(v1.0, Phase 1)_
-- [x] Vault profile takes precedence over default; graceful fallback when no profile exists _(v1.0, Phase 1)_
-- [x] Path-traversal guard on every profile-derived file path (`validate_vault_path`) _(v1.0, Phase 1)_
-- [x] Safety helpers: `safe_filename` (NFC normalization, 200-char cap), `safe_tag` (slug/digit-prefix/plus-sign handling), `safe_frontmatter_value` (YAML injection neutralization) _(v1.0, Phase 1)_
-- [x] FIX-01..05 pre-existing bug fixes: YAML frontmatter injection, nondeterministic filename dedup, shallow tag sanitization, NFC normalization, filename length cap _(v1.0, Phase 1)_
-- [x] Markdown templates with placeholders for note generation per note type (MOC, Dot/Thing, Dot/Statement, Dot/Person, Source, Community Overview) _(v1.0, Phase 2: Template Engine)_
-- [x] Proper Ideaverse frontmatter generation: `up:`, `related:`, `collections:`, `created:`, `tags:` with wikilink format _(v1.0, Phase 2)_
-- [x] Wikilink generation respecting vault naming conventions _(v1.0, Phase 2)_
-- [x] Wayfinder generation in notes (configurable) _(v1.0, Phase 2)_
-- [x] Dataview query embedding in MOC notes via two-phase `string.Template.safe_substitute` (no Jinja2) _(v1.0, Phase 2)_
-- [x] User template overrides in `.graphify/templates/` with built-in fallback _(v1.0, Phase 2)_
-- [x] Configurable filename conventions (title_case, kebab-case, preserve) _(v1.0, Phase 2)_
-- [x] Mapping rules support both graph topology (god node, community hub, leaf node) and node content/attributes (`file_type`, `type`, custom attributes) _(v1.0, Phase 3: Mapping Engine)_
-- [x] Dual evaluation: attribute rules take precedence, then topology rules, then default _(v1.0, Phase 3)_
-- [x] Community-to-MOC mapping: communities above configurable member threshold become MOCs in the configured Maps folder with Dataview queries _(v1.0, Phase 3)_
-- [x] God-node-to-Dot mapping: high-degree abstraction nodes become Dots (Things) with connections as body content _(v1.0, Phase 3)_
-- [x] Source-file-to-Source mapping: origin files become Source notes in configured Sources folder (with file-type sub-folder routing) _(v1.0, Phase 3)_
-- [x] Community-to-MOC threshold configurable (default 3); below-threshold communities collapse into sub-community callouts in parent MOC _(v1.0, Phase 3)_
-- [x] Merge/update strategy for existing notes — update by default, preserve user-specified frontmatter fields, skip or replace as configured _(v1.0, Phase 4: Merge Engine)_
-- [x] `preserve_fields` list in profile specifies frontmatter fields graphify never overwrites (default: `rank`, `mapState`, `tags`) _(v1.0, Phase 4)_
-- [x] Frontmatter field-ordering preserved on update to minimize git diff noise _(v1.0, Phase 4)_
-- [x] Configurable merge strategy per profile: `update` (default), `skip`, `replace` _(v1.0, Phase 4)_
-- [x] `compute_merge_plan` + `apply_merge_plan` with CREATE/UPDATE/SKIP_PRESERVE/SKIP_CONFLICT/REPLACE/ORPHAN action types; content-hash skip for idempotent re-runs _(v1.0, Phase 4)_
-- [x] Replaces current `to_obsidian()` in `export.py` while maintaining backward compatibility (no profile = Atlas/Dots/Things layout identical to prior output) _(v1.0, Phase 5: Integration & CLI)_
-- [x] `graphify --obsidian --dry-run` previews all changes without writing any files _(v1.0, Phase 5)_
-- [x] `graphify --validate-profile <vault-path>` runs a four-layer preflight (schema → templates → dead-rules → path-safety) and exits with appropriate status _(v1.0, Phase 5)_
+**v1.0 — Ideaverse Integration:**
+- ✓ `.graphify/` vault-side profile system with `profile.yaml` + `templates/` directory — v1.0
+- ✓ Default built-in profile producing Ideaverse ACE-compatible output — v1.0
+- ✓ Profile YAML schema with folder_mapping, mapping_rules, merge behavior, naming, topology — v1.0
+- ✓ Vault profile precedence with graceful fallback — v1.0
+- ✓ Path-traversal guard (`validate_vault_path`) — v1.0
+- ✓ Safety helpers: `safe_filename`, `safe_tag`, `safe_frontmatter_value` — v1.0
+- ✓ FIX-01..05 pre-existing bug fixes — v1.0
+- ✓ 6 built-in Markdown templates (MOC, Thing, Statement, Person, Source, Community Overview) — v1.0
+- ✓ Ideaverse frontmatter generation with wikilinks — v1.0
+- ✓ Wayfinder generation, Dataview query embedding, user template overrides — v1.0
+- ✓ Configurable filename conventions (title_case, kebab-case, preserve) — v1.0
+- ✓ Dual mapping (topology + content attributes) with first-match-wins precedence — v1.0
+- ✓ Community-to-MOC, god-node-to-Dot, source-file-to-Source mapping — v1.0
+- ✓ Merge engine with CREATE/UPDATE/SKIP_PRESERVE/SKIP_CONFLICT/REPLACE/ORPHAN actions — v1.0
+- ✓ `preserve_fields`, field-ordering preservation, configurable merge strategy — v1.0
+- ✓ Refactored `to_obsidian()` with backward compatibility — v1.0
+- ✓ `graphify --obsidian --dry-run` and `graphify --validate-profile` CLI flags — v1.0
 
-### Active (v1.1 — Context Persistence & Agent Memory)
+**v1.1 — Context Persistence & Agent Memory:**
+- ✓ Graph snapshot persistence in `graphify-out/snapshots/` with FIFO retention — v1.1
+- ✓ `GRAPH_DELTA.md` with summary+archive pattern (added/removed nodes, community migration, connectivity changes) — v1.1
+- ✓ Per-node staleness metadata (FRESH/STALE/GHOST) with `extracted_at`, `source_hash`, `source_mtime` — v1.1
+- ✓ MCP mutation tools: `annotate_node`, `flag_node`, `add_edge` with JSONL sidecar persistence — v1.1
+- ✓ Peer identity tracking (`peer_id`, `session_id`, `timestamp`) on all annotations — v1.1
+- ✓ Session-scoped graph views via MCP — v1.1
+- ✓ `propose_vault_note` MCP tool with `graphify approve` CLI for human-in-the-loop — v1.1
+- ✓ Obsidian round-trip: content-hash manifest detects user-modified notes on re-run — v1.1
+- ✓ User sentinel blocks (`GRAPHIFY_USER_START/END`) — inviolable preservation zones — v1.1
+- ✓ `--force` flag, dry-run source annotations, merge plan audit trail — v1.1
+- ✓ MCP `get_node` provenance (staleness classification) and `get_agent_edges` query tool — v1.1
 
-- [x] Graph snapshot persistence in `graphify-out/snapshots/` for run-over-run comparison _(v1.1, Phase 6: Graph Delta Analysis & Staleness)_
-- [x] `GRAPH_DELTA.md` output showing new/removed nodes, community migration, connectivity changes _(v1.1, Phase 6)_
-- [x] Per-node staleness metadata (`extracted_at`, `source_hash`, `source_mtime`) with three-state classification (FRESH/STALE/GHOST) _(v1.1, Phase 6)_
-- [x] Summary+archive delta pattern (summary for agent context, full diff for search) _(v1.1, Phase 6)_
-- [x] MCP mutation tools: annotate nodes, add edges, flag importance, tag with context _(v1.1, Phase 7: MCP Write-Back & Peer Modeling)_
-- [x] Peer identity tracking on annotations (agent name, session ID, timestamp) _(v1.1, Phase 7)_
-- [x] Session-scoped graph views via MCP _(v1.1, Phase 7)_
-- [x] `propose_vault_note` MCP tool with human approval before write _(v1.1, Phase 7)_
-- [x] Annotations persist in `graphify-out/annotations.jsonl` across re-runs _(v1.1, Phase 7)_
-- [x] Obsidian round-trip: detect user-modified notes via content-hash manifest on `--obsidian` re-run _(v1.1, Phase 8: Obsidian Round-Trip Awareness)_
-- [x] Preserve user-authored content blocks during merge with GRAPHIFY_USER_START/END sentinel markers _(v1.1, Phase 8)_
-- [x] `--force` flag to override user-modified detection while preserving sentinel blocks _(v1.1, Phase 8)_
-- [x] Dry-run output shows user-modification status per note with source annotations _(v1.1, Phase 8)_
-- [x] MCP `get_node` surfaces provenance metadata (extracted_at, source_hash) and live staleness classification (FRESH/STALE/GHOST) _(v1.1, Phase 8.2: MCP Query Enhancements)_
-- [x] MCP `get_agent_edges` query tool with peer_id, session_id, and node_id filtering _(v1.1, Phase 8.2)_
+### Active (next milestone — not yet defined)
+
+_(No active requirements — run `/gsd-new-milestone` to define v1.2 requirements)_
 
 ### Deferred (v1.2+ — template engine extensions from v1.0)
 
@@ -148,26 +137,15 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
-## Current Milestone: v1.1 Context Persistence & Agent Memory
-
-**Goal:** Make graphify a persistent, evolving context layer — not just a one-shot graph builder. Enables agents to read AND write to the knowledge graph across sessions, and gives users visibility into how their codebase/corpus changes over time.
-
-**Target features:**
-- Graph delta analysis with per-node staleness metadata and snapshot persistence
-- MCP write-back with peer modeling, session-scoped views, and `propose_vault_note` tool
-- Obsidian round-trip awareness preserving user-authored content on re-run
-
-**Informed by:** Gap analysis against 12 articles + 7 repositories. See `.planning/notes/april-research-gap-analysis.md` and `.planning/notes/repo-gap-analysis.md`.
-
 ## Current State
 
-**Milestone v1.0 — Ideaverse Integration — Configurable Vault Adapter: ✅ SHIPPED 2026-04-11**
+**Shipped v1.0** (2026-04-11) — Configurable Obsidian vault adapter. 5 phases, 22 plans, 31/31 requirements, 872 tests. See `.planning/milestones/v1.0-*`.
 
-All five v1.0 phases delivered and verified. The configurable vault adapter is the production `to_obsidian()` code path; there is no separate opt-in flag. 5 phases, 22 plans, 31/31 requirements, 872 tests passing. See `.planning/milestones/` for full archives.
+**Shipped v1.1** (2026-04-13) — Context persistence and agent memory. 5 phases, 12 plans, 25/25 requirements, 1,000 tests. See `.planning/milestones/v1.1-*`.
 
-**Milestone v1.1 — Context Persistence & Agent Memory: ✅ COMPLETE (Phases 6–8.2)**
+**Codebase:** 13,520 LOC across 26 Python modules (`graphify/`), 1,000 tests passing on Python 3.10 and 3.12.
 
-All v1.1 phases delivered and verified. Phase 6: graph delta analysis + staleness. Phase 7: MCP write-back + peer modeling. Phase 8: Obsidian round-trip awareness with manifest-based user-modified detection and sentinel block preservation. Phase 8.1: pipeline wiring fixes. Phase 8.2: MCP query enhancements — node provenance in get_node + get_agent_edges query tool. 1000 tests passing.
+**Next milestone:** Not yet defined. Run `/gsd-new-milestone` to start v1.2 planning. Candidate themes: multi-perspective analysis (v1.2), agent discoverability (v1.3). See ROADMAP.md for planned phases.
 
 ---
-*Last updated: 2026-04-13 — Phase 8.2 (MCP Query Enhancements) complete — v1.1 milestone complete*
+*Last updated: 2026-04-13 after v1.1 milestone*

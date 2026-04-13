@@ -1,5 +1,51 @@
 # Milestones
 
+## v1.1 Context Persistence & Agent Memory (Shipped: 2026-04-13)
+
+**Delivered:** Persistent, evolving context layer — graphify is no longer a one-shot graph builder. Agents can read AND write to the knowledge graph across sessions, users see how their corpus changes over time, and Obsidian vault notes survive round-trip re-runs with user content preservation.
+
+**Phases completed:** 5 phases (6–8.2), 12 plans, ~117 commits
+**Timeline:** 2026-04-12 → 2026-04-13 (2 days)
+**Codebase delta:** 13,520 LOC across 26 Python modules (`graphify/`) — 3,663 insertions across 13 files
+**Test suite:** 1,000 passing (up from 872 at v1.0)
+**Requirements:** 25/25 satisfied
+**Audit:** Passed (25/25 requirements, 5/5 phases, 25/25 integration, 3/3 flows)
+
+### Key Accomplishments
+
+1. **Graph Delta Analysis & Staleness** (Phase 6) — `snapshot.py` and `delta.py` modules deliver run-over-run comparison with `GRAPH_DELTA.md` output, snapshot persistence with FIFO retention, per-node provenance metadata (`extracted_at`, `source_hash`, `source_mtime`), three-state staleness classification (FRESH/STALE/GHOST), and community migration tracking. `graphify snapshot` CLI subcommand with `--name/--cap/--from/--to/--delta` flags.
+
+2. **MCP Write-Back with Peer Modeling** (Phase 7) — 5 new MCP tools (`annotate_node`, `flag_node`, `add_edge`, `propose_vault_note`, `get_annotations`) with JSONL/JSON sidecar persistence, peer identity tracking (`peer_id`, `session_id`, `timestamp`), mtime-based graph reload, and startup compaction. `graph.json` is never mutated by agent tools.
+
+3. **Human-in-the-Loop Proposals** (Phase 7, Plan 3) — `graphify approve` CLI subcommand for listing, approving, rejecting, and batch-processing agent-proposed vault notes. Proposals stage to `graphify-out/proposals/` with UUID4 filenames; vault is untouched until explicit approval.
+
+4. **Obsidian Round-Trip Awareness** (Phase 8) — Content-hash manifest (`vault-manifest.json`) tracks what graphify wrote per note. On re-run, user-modified notes receive `SKIP_PRESERVE`. User sentinel blocks (`<!-- GRAPHIFY_USER_START -->` / `<!-- GRAPHIFY_USER_END -->`) provide inviolable preservation zones that survive even REPLACE strategy and `--force` mode. Dry-run enhanced with source annotations and summary preamble.
+
+5. **Pipeline Integration & MCP Enhancements** (Phases 8.1–8.2) — Auto-snapshot and auto-delta on every `/graphify` run (skill.md wiring). Approve path threaded through vault manifest for user-modified detection. MCP `get_node` surfaces provenance fields and staleness classification. New `get_agent_edges` query tool with peer/session/node filtering.
+
+### Architectural Decisions Locked
+
+- peer_id defaults to `"anonymous"` — never derived from environment variables (security: prevents machine identity leaking into committed annotation files)
+- `graph.json` is read-only pipeline ground truth — all agent state lives in JSONL/JSON sidecars
+- Proposal filenames are server-generated UUID4 — never derived from agent-supplied input
+- Content-hash manifest uses content-only SHA256 (no path) to avoid macOS symlink mismatch
+- User sentinel blocks are inviolable even for REPLACE strategy — user content always wins
+- Multiple USER_START/END pairs per note supported
+
+### Known Gaps / Deferred
+
+- **WIRING-01** (low): `_approve_and_write_proposal` hardcodes manifest path to `Path('graphify-out')` — doesn't respect `--out-dir` override
+- 6 human verification items pending (real vault E2E tests for Phases 8 and 8.1)
+- Template engine extensions (TMPL-01/02/03, CFG-02/03) deferred to v1.2+
+
+### Archives
+
+- `.planning/milestones/v1.1-ROADMAP.md` — full phase detail with success criteria and plan descriptions
+- `.planning/milestones/v1.1-REQUIREMENTS.md` — 25 v1.1 requirements with traceability table
+- `.planning/milestones/v1.1-MILESTONE-AUDIT.md` — audit report with integration verification
+
+---
+
 ## v1.0 Ideaverse Integration — Configurable Vault Adapter (Shipped: 2026-04-11)
 
 **Delivered:** Configurable output adapter that injects graphify knowledge graphs into any Obsidian vault framework via a declarative `.graphify/profile.yaml`. Replaces the monolithic `to_obsidian()` with a four-component pipeline (profile → mapping → templates → merge) and wires it behind two new CLI entry points. Backward-compatible when no vault profile exists (default profile emits Ideaverse ACE Atlas/ layout).

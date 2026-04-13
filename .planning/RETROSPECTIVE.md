@@ -58,6 +58,58 @@
 
 ---
 
+## Milestone: v1.1 — Context Persistence & Agent Memory
+
+**Shipped:** 2026-04-13
+**Phases:** 5 (6–8.2) | **Plans:** 12 | **Timeline:** 2 days (2026-04-12 → 2026-04-13)
+
+### What Was Built
+
+- **`graphify/snapshot.py`** — Atomic save/load/prune/list for graph snapshots in `graphify-out/snapshots/`. FIFO retention pruning on every save. `node_link_data`/`node_link_graph` for NetworkX serialization.
+- **`graphify/delta.py`** — Set-arithmetic graph diff (`compute_delta`), three-state staleness classification (`classify_staleness`: FRESH/STALE/GHOST), and `GRAPH_DELTA.md` rendering with summary+archive pattern. Mtime fast-gate skips SHA256 when mtime unchanged.
+- **Provenance metadata in `extract.py`** — `extracted_at`, `source_hash`, `source_mtime` injected per-file in `_extract_generic` (computed once per file, not per node).
+- **MCP mutation tools in `serve.py`** — `annotate_node`, `flag_node`, `add_edge`, `propose_vault_note`, `get_annotations` with JSONL append persistence, peer identity tracking, mtime-based graph reload, and startup compaction. Module-level helper functions for testability without MCP server.
+- **`graphify approve` CLI** — Human-in-the-loop proposal review: list/approve/reject/batch. Indirection helpers for monkeypatching in tests. Proposal lifecycle: approve writes to vault via merge engine, then deletes proposal file.
+- **Vault manifest round-trip in `merge.py`** — `vault-manifest.json` with content-only SHA256 hashes. User-modified detection on re-run. `SKIP_PRESERVE` action for modified notes. User sentinel blocks (`GRAPHIFY_USER_START/END`) — inviolable even for REPLACE strategy. `--force` flag bypasses whole-note detection while respecting sentinels.
+- **MCP query enhancements** — `get_node` surfaces provenance + staleness classification. `get_agent_edges` with peer/session/node filtering.
+- **Skill pipeline wiring** — `auto_snapshot_and_delta()` called at both full-pipeline and cluster-only paths in `skill.md`.
+
+### What Worked
+
+- **Module-level helper pattern for MCP testability**: Extracting record builders (`_make_annotate_record`, `_make_flag_record`, etc.) and filters (`_filter_annotations`, `_filter_agent_edges`) as module-level functions made it possible to write unit tests without spinning up an MCP server. Same pattern applied to approve helpers via indirection wrappers. This yielded 57 new tests for serve.py alone.
+- **TDD red-green throughout**: Every phase used strict test-first development. Phase 8's merge engine extensions (33 new tests) caught 3 edge cases in sentinel block parsing that would have been integration-time surprises.
+- **Decimal phase numbering for gap closure**: Phases 8.1 and 8.2 were inserted after the milestone audit identified integration gaps (INT-01 through INT-04). The decimal numbering kept the roadmap coherent without renumbering existing phases.
+- **Milestone audit before completion**: Running `/gsd-audit-milestone` before `/gsd-complete-milestone` caught 4 integration gaps (2 high, 2 low severity) and resulted in 2 gap-closure phases that strengthened the milestone. The audit-then-fix-then-re-audit pattern from v1.0 continued to pay off.
+- **Sidecar-only mutation invariant**: The hard rule that `graph.json` is never mutated by MCP tools eliminated an entire class of data-loss bugs. Agent state in `annotations.jsonl` and `agent-edges.json` can be freely rewritten without risking pipeline ground truth.
+
+### What Was Inefficient
+
+- **SUMMARY.md one-liner extraction still fragile**: The `gsd-tools summary-extract` command pulled incomplete one-liners for several plans (showed "One-liner:" or "Sidecar persistence:" without the actual content). The MILESTONES.md entry had to be manually rewritten. Same issue as v1.0's SUMMARY frontmatter schema drift — the field names are present but the extraction logic doesn't reliably find the value.
+- **STATE.md accumulated context grew large**: By Phase 8.2, the Accumulated Context section had 50+ lines of phase-specific decisions that were useful during execution but became noise after completion. Could have been pruned at each phase transition.
+- **WIRING-01 (approve manifest hardcoded path) survived to audit**: The `_approve_and_write_proposal` function hardcodes `Path('graphify-out')` for the manifest path. This was flagged as low severity in the audit but not fixed — it silently degrades when `--out-dir` is overridden. Should have been caught during Phase 7 Plan 3 code review.
+
+### Patterns Established
+
+- **Sidecar persistence pattern**: Agent state in append-only JSONL (annotations) or atomic-write JSON (agent-edges, proposals). Pipeline ground truth (`graph.json`) is read-only. This is the canonical pattern for any future MCP mutation tools.
+- **Content-hash manifest for round-trip awareness**: Write a manifest after each merge recording content hashes by relative path. On re-run, compare to detect user modifications. Atomic write via `tmp + os.replace`. This pattern is reusable for any tool that generates files users might edit.
+- **Sentinel block preservation**: `<!-- TOOL_USER_START -->` / `<!-- TOOL_USER_END -->` markers define inviolable zones in generated files. Extract before rewrite, restore after. The regex pattern and extract/restore logic in `merge.py` is generalizable.
+- **Gap-closure via decimal phases**: When an audit finds integration gaps, insert decimal phases (8.1, 8.2) rather than reopening completed phases or deferring to the next milestone. Keeps the shipped milestone complete while addressing real issues.
+
+### Key Lessons
+
+1. **Fix SUMMARY.md extraction tooling.** Two milestones in a row, the `summary-extract` command has produced incomplete accomplishments for MILESTONES.md. Either standardize the SUMMARY frontmatter schema (with validation) or switch to a different extraction approach.
+2. **Prune STATE.md accumulated context at phase transitions.** Archive phase-specific decisions to SUMMARY.md and keep only carry-forward decisions in STATE.md. The file should stay under 50 lines of decisions at any time.
+3. **Code review should catch hardcoded paths.** WIRING-01 (`Path('graphify-out')` in approve) is the kind of bug that code review agents are designed to catch. Ensure `--out-dir` threading is in the review checklist for any new CLI path.
+4. **Module-level helpers are the MCP testing pattern.** Never put business logic inside MCP tool handler closures. Extract to module-level functions, test directly, then wire into the handler. This pattern should be documented in CLAUDE.md for future contributors.
+
+### Cost Observations
+
+- **Model mix:** ~15% opus (milestone audit, gap-closure planning, completion workflow), ~80% sonnet (plan execution, code review), ~5% haiku (state updates, trivial commits).
+- **Sessions:** ~3-4 distinct working sessions across 2 days. Phases 6-8 each landed in roughly one session; gap-closure phases (8.1, 8.2) were a single session.
+- **Notable:** The milestone audit + 2 gap-closure phases added ~4 hours but caught real integration issues. The per-plan execution time averaged 5 minutes across 12 plans — significantly faster than v1.0's average, likely due to smaller plan scopes and established patterns.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -65,17 +117,23 @@
 | Milestone | Phases | Plans | Key Change |
 |-----------|--------|-------|------------|
 | v1.0 | 5 | 22 | First milestone using GSD end-to-end; retroactive VERIFICATION pattern pioneered; 3-source audit cross-reference established |
+| v1.1 | 5 | 12 | Decimal phase numbering for gap closure; module-level MCP testing pattern; sidecar persistence as canonical mutation approach |
 
 ### Cumulative Quality
 
 | Milestone | Tests | Python LOC (graphify/) | Test LOC (tests/) | Zero-Dep Additions |
 |-----------|-------|------------------------|-------------------|-------------------|
 | v1.0 | 872 passing | 11,620 | 10,500 | 0 (PyYAML is optional `obsidian` extra only) |
+| v1.1 | 1,000 passing | 13,520 | ~12,400 | 0 (all stdlib additions) |
 
 ### Top Lessons (Verified Across Milestones)
 
-_Only one milestone so far — these lessons will be cross-validated as v1.1+ ships. The v1.0 key lessons above are the seed set._
+1. **Run phase verification at phase completion time, not later.** (v1.0) — Confirmed in v1.1 where all phases had timely verification; no retroactive gap-filling needed.
+2. **Always audit twice (audit → fix → re-audit).** (v1.0, v1.1) — Both milestones found real issues on first audit that were closed before completion. The pattern is now proven across 2 milestones.
+3. **SUMMARY.md extraction tooling needs fixing.** (v1.0, v1.1) — Two milestones of incomplete `summary-extract` output. This is a tooling debt, not a process debt.
+4. **Sidecar-only mutation for agent-writable state.** (v1.1) — New pattern. Ground truth files are read-only; agent state lives in append-only sidecars. No data loss possible from agent bugs.
+5. **Module-level helpers for MCP testability.** (v1.1) — New pattern. Business logic outside handler closures enables direct unit testing without server infrastructure.
 
 ---
 
-_Retrospective last updated: 2026-04-11 after v1.0 milestone completion._
+_Retrospective last updated: 2026-04-13 after v1.1 milestone completion._
