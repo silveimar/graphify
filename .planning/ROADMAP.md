@@ -116,10 +116,10 @@ Plans:
   3. Agent can call `propose_vault_note` to stage a proposed note; the note lands in `graphify-out/proposals/` and the vault is untouched until the user runs `graphify approve` to review and accept/reject
   4. Agent can query annotations filtered by peer, session, or time range, and retrieve only annotations relevant to a specific session context
   5. `graph.json` (pipeline ground truth) is never modified by any MCP mutation tool; all agent state lives in `annotations.jsonl` and `agent-edges.json` sidecars
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 07-01-PLAN.md — Sidecar persistence + mutation tools (annotate_node, flag_node, add_edge) + query tool (get_annotations) + mtime reload
+- [x] 07-01-PLAN.md — Sidecar persistence + mutation tools (annotate_node, flag_node, add_edge) + query tool (get_annotations) + mtime reload
 - [ ] 07-02-PLAN.md — propose_vault_note tool with proposal staging to graphify-out/proposals/
 - [ ] 07-03-PLAN.md — graphify approve CLI subcommand (list/approve/reject/batch)
 
@@ -145,7 +145,7 @@ Plans:
 | 4. Merge Engine | v1.0 | 6/6 | Complete | 2026-04-11 |
 | 5. Integration & CLI | v1.0 | 6/6 | Complete | 2026-04-11 |
 | 6. Graph Delta Analysis & Staleness | v1.1 | 0/3 | Planned | — |
-| 7. MCP Write-Back with Peer Modeling | v1.1 | 0/3 | Planned | — |
+| 7. MCP Write-Back with Peer Modeling | v1.1 | 1/3 | In Progress|  |
 | 8. Obsidian Round-Trip Awareness | v1.1 | 0/? | Not started | — |
 | 9. Multi-Perspective Analysis (Council Protocol) | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |

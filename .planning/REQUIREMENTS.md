@@ -20,16 +20,16 @@ Requirements for v1.1 Context Persistence & Agent Memory. Each maps to roadmap p
 
 ### MCP Write-Back with Peer Modeling
 
-- [ ] **MCP-01**: MCP server exposes `annotate_node` tool that adds a text annotation to any node by ID, persisted across server restarts
-- [ ] **MCP-02**: MCP server exposes `flag_node` tool that marks a node's importance (high/medium/low), persisted across server restarts
-- [ ] **MCP-03**: MCP server exposes `add_edge` tool for agent-discovered relationships, stored in `agent-edges.json` sidecar (never in pipeline `graph.json`)
-- [ ] **MCP-04**: All annotations persist in `graphify-out/annotations.jsonl` using JSONL append (crash-safe, no read-modify-write race)
-- [ ] **MCP-05**: Every annotation record includes `peer_id`, `session_id`, and `timestamp`; `peer_id` defaults to `"anonymous"` (never derived from environment)
+- [x] **MCP-01**: MCP server exposes `annotate_node` tool that adds a text annotation to any node by ID, persisted across server restarts
+- [x] **MCP-02**: MCP server exposes `flag_node` tool that marks a node's importance (high/medium/low), persisted across server restarts
+- [x] **MCP-03**: MCP server exposes `add_edge` tool for agent-discovered relationships, stored in `agent-edges.json` sidecar (never in pipeline `graph.json`)
+- [x] **MCP-04**: All annotations persist in `graphify-out/annotations.jsonl` using JSONL append (crash-safe, no read-modify-write race)
+- [x] **MCP-05**: Every annotation record includes `peer_id`, `session_id`, and `timestamp`; `peer_id` defaults to `"anonymous"` (never derived from environment)
 - [ ] **MCP-06**: MCP server exposes `propose_vault_note` tool that stages a proposed note to `graphify-out/proposals/` with human approval required before vault write
 - [ ] **MCP-07**: `graphify approve` CLI command lists pending proposals and allows user to approve/reject/edit before writing to vault
-- [ ] **MCP-08**: Annotations and agent-edges are queryable via MCP: filter by peer, session, or time range
-- [ ] **MCP-09**: Session-scoped graph views: MCP tool to retrieve annotations relevant to a specific session context
-- [ ] **MCP-10**: `graph.json` is never mutated by MCP tools — pipeline output is read-only ground truth; all agent state lives in sidecars
+- [x] **MCP-08**: Annotations and agent-edges are queryable via MCP: filter by peer, session, or time range
+- [x] **MCP-09**: Session-scoped graph views: MCP tool to retrieve annotations relevant to a specific session context
+- [x] **MCP-10**: `graph.json` is never mutated by MCP tools — pipeline output is read-only ground truth; all agent state lives in sidecars
 
 ### Obsidian Round-Trip Awareness
 
@@ -94,16 +94,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DELTA-06 | Phase 6 | Complete |
 | DELTA-07 | Phase 6 | Complete |
 | DELTA-08 | Phase 6 | Complete |
-| MCP-01 | Phase 7 | Pending |
-| MCP-02 | Phase 7 | Pending |
-| MCP-03 | Phase 7 | Pending |
-| MCP-04 | Phase 7 | Pending |
-| MCP-05 | Phase 7 | Pending |
+| MCP-01 | Phase 7 | Complete |
+| MCP-02 | Phase 7 | Complete |
+| MCP-03 | Phase 7 | Complete |
+| MCP-04 | Phase 7 | Complete |
+| MCP-05 | Phase 7 | Complete |
 | MCP-06 | Phase 7 | Pending |
 | MCP-07 | Phase 7 | Pending |
-| MCP-08 | Phase 7 | Pending |
-| MCP-09 | Phase 7 | Pending |
-| MCP-10 | Phase 7 | Pending |
+| MCP-08 | Phase 7 | Complete |
+| MCP-09 | Phase 7 | Complete |
+| MCP-10 | Phase 7 | Complete |
 | TRIP-01 | Phase 8 | Pending |
 | TRIP-02 | Phase 8 | Pending |
 | TRIP-03 | Phase 8 | Pending |
