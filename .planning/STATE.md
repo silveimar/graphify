@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Context Persistence & Agent Memory
-status: executing
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-04-13T04:18:35.112Z"
+status: verifying
+stopped_at: Completed 08-03-PLAN.md
+last_updated: "2026-04-13T04:24:49.783Z"
 last_activity: 2026-04-13
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
-  percent: 89
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-12 after v1.1 milestone start)
 Milestone: v1.1 Context Persistence & Agent Memory
 Phase: 08 (obsidian-round-trip-awareness) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-13
 
 Progress: [░░░░░░░░░░] 0% (v1.1)
@@ -61,6 +61,7 @@ Detailed per-plan metrics are preserved in phase SUMMARY.md files and in `.plann
 | Phase 07 P03 | 4min | 2 tasks | 2 files |
 | Phase 08 P01 | 17min | 2 tasks | 2 files |
 | Phase 08 P02 | 3min | 1 tasks | 2 files |
+| Phase 08 P03 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,9 @@ Carry-forward decisions relevant to v1.1:
 - [Phase 08]: D-03 resolved: multiple USER_START/END pairs per note supported — simpler for users and equally simple to implement
 - [Phase 08]: D-08 implemented: user sentinel blocks inviolable even for REPLACE strategy; apply_merge_plan reads existing_text for REPLACE to enable extraction
 - [Phase 08]: has_user_blocks stub resolved: _build_manifest_from_result now calls _has_user_sentinel_blocks on written file content
+- [Phase 08]: manifest_path derived as vault_dir.parent/vault-manifest.json — vault dir is graphify-out/obsidian, manifest lives in graphify-out/ alongside graph.json
+- [Phase 08]: D-11 source annotation omitted for default source='graphify' — keeps v1.0 dry-run output clean with no manifest in play
+- [Phase 08]: D-12 preamble only shown when user_modified > 0 or any non-default source — backward compatible with v1.0 plans
 
 ### v1.1 Phase Architecture Notes
 
@@ -126,7 +130,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-13T04:18:35.109Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-04-13T04:24:43.126Z
+Stopped at: Completed 08-03-PLAN.md
 Resume file: None
 Next action: `/gsd-plan-phase 6`

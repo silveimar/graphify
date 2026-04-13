@@ -41,7 +41,7 @@ Configurable output adapter replacing the monolithic `to_obsidian()` with a four
 
 - [ ] Phase 6: Graph Delta Analysis & Staleness — Compare current run against previous run; surface added/removed/changed nodes, community migration, and connectivity changes. Output `GRAPH_DELTA.md` using CPR summary+archive pattern. Persist graph snapshots in `graphify-out/snapshots/` with automatic FIFO retention. Attach per-node staleness metadata (`extracted_at`, `source_hash`, staleness state) so agents can judge how much to trust each graph claim. _(Informed by: letta-ai/context-constitution staleness-as-first-class principle, EliaAlberti/cpr summary+archive pattern)_
 - [x] Phase 7: MCP Write-Back with Peer Modeling — Extend MCP server with mutation tools: `annotate_node`, `add_edge`, `flag_node` with crash-safe JSONL append persistence. Add peer identity tracking (peer_id, session_id, timestamp) and session-scoped graph views. Add `propose_vault_note` tool that stages proposals for human approval before any vault write. `graph.json` is never mutated by agent tools. _(Informed by: plastic-labs/honcho peer-centric entity model, letta-ai/letta-obsidian `propose_obsidian_note` approval pattern)_ (completed 2026-04-13)
-- [ ] Phase 8: Obsidian Round-Trip Awareness — On `--obsidian` re-run, detect user-modified notes via content-hash manifest and preserve user-authored content blocks during merge. Extend v1.0 merge engine with `PARTIAL_UPDATE` action and user-space sentinel blocks. `--dry-run` reports which notes have user modifications. User content always wins — graphify never overwrites content between user sentinel markers.
+- [x] Phase 8: Obsidian Round-Trip Awareness — On `--obsidian` re-run, detect user-modified notes via content-hash manifest and preserve user-authored content blocks during merge. Extend v1.0 merge engine with `PARTIAL_UPDATE` action and user-space sentinel blocks. `--dry-run` reports which notes have user modifications. User content always wins — graphify never overwrites content between user sentinel markers. (completed 2026-04-13)
 
 **Carried forward from v1.0 v2 scope** (may be folded into phases above or addressed separately):
 
@@ -133,12 +133,12 @@ Plans:
   3. Running `--obsidian --dry-run` shows which notes have user modifications and what merge action would be applied to each, before any file is touched
   4. `vault-manifest.json` is written atomically after each successful merge and records content hashes for all graphify-managed notes, enabling accurate change detection on the next run
   5. Merge plan output includes per-note modification source (graphify-generated, user-modified, or both) so the user has an audit trail of what changed and why
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 08-01-PLAN.md — Vault manifest I/O helpers, MergeAction extension, user-modified detection in compute/apply_merge_plan
 - [x] 08-02-PLAN.md — User sentinel block parsing and preservation in _synthesize_file_text
-- [ ] 08-03-PLAN.md — CLI --force flag, manifest/force threading through to_obsidian, format_merge_plan dry-run enhancements
+- [x] 08-03-PLAN.md — CLI --force flag, manifest/force threading through to_obsidian, format_merge_plan dry-run enhancements
 
 ## Progress
 
@@ -151,7 +151,7 @@ Plans:
 | 5. Integration & CLI | v1.0 | 6/6 | Complete | 2026-04-11 |
 | 6. Graph Delta Analysis & Staleness | v1.1 | 0/3 | Planned | — |
 | 7. MCP Write-Back with Peer Modeling | v1.1 | 3/3 | Complete   | 2026-04-13 |
-| 8. Obsidian Round-Trip Awareness | v1.1 | 2/3 | In Progress|  |
+| 8. Obsidian Round-Trip Awareness | v1.1 | 3/3 | Complete   | 2026-04-13 |
 | 9. Multi-Perspective Analysis (Council Protocol) | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
 | 11. Narrative Mode | v1.2 | 0/? | Planned | — |
