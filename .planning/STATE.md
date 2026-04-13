@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Context Persistence & Agent Memory
 status: executing
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-04-13T02:35:41.907Z"
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-04-13T02:39:40.576Z"
 last_activity: 2026-04-13
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
-  percent: 67
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-12 after v1.1 milestone start)
 
 Milestone: v1.1 Context Persistence & Agent Memory
 Phase: 07 (mcp-write-back-peer-modeling) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-13
 
@@ -57,6 +57,7 @@ Detailed per-plan metrics are preserved in phase SUMMARY.md files and in `.plann
 | Phase 06 P02 | 3min | 2 tasks | 3 files |
 | Phase 06 P03 | 3min | 2 tasks | 5 files |
 | Phase 07 P01 | 10min | 2 tasks | 2 files |
+| Phase 07 P02 | 2 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Carry-forward decisions relevant to v1.1:
 - [Phase 07]: peer_id defaults to 'anonymous' string literal; never read from os.environ (D-04)
 - [Phase 07]: Record helpers extracted as module-level functions (_make_annotate_record etc.) for testability without MCP server
 - [Phase 07]: sanitize_label strips control chars at storage layer; HTML escaping is render-time per security.py design
+- [Phase 07]: Proposal filename is always server-generated uuid4 — never derived from agent-supplied title (T-07-08)
+- [Phase 07]: _list_proposals sorts by timestamp ascending and silently skips corrupt JSON files
 
 ### v1.1 Phase Architecture Notes
 
@@ -111,7 +114,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-13T02:35:41.904Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-04-13T02:39:40.573Z
+Stopped at: Completed 07-02-PLAN.md
 Resume file: None
 Next action: `/gsd-plan-phase 6`

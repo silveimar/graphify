@@ -25,7 +25,7 @@ Requirements for v1.1 Context Persistence & Agent Memory. Each maps to roadmap p
 - [x] **MCP-03**: MCP server exposes `add_edge` tool for agent-discovered relationships, stored in `agent-edges.json` sidecar (never in pipeline `graph.json`)
 - [x] **MCP-04**: All annotations persist in `graphify-out/annotations.jsonl` using JSONL append (crash-safe, no read-modify-write race)
 - [x] **MCP-05**: Every annotation record includes `peer_id`, `session_id`, and `timestamp`; `peer_id` defaults to `"anonymous"` (never derived from environment)
-- [ ] **MCP-06**: MCP server exposes `propose_vault_note` tool that stages a proposed note to `graphify-out/proposals/` with human approval required before vault write
+- [x] **MCP-06**: MCP server exposes `propose_vault_note` tool that stages a proposed note to `graphify-out/proposals/` with human approval required before vault write
 - [ ] **MCP-07**: `graphify approve` CLI command lists pending proposals and allows user to approve/reject/edit before writing to vault
 - [x] **MCP-08**: Annotations and agent-edges are queryable via MCP: filter by peer, session, or time range
 - [x] **MCP-09**: Session-scoped graph views: MCP tool to retrieve annotations relevant to a specific session context
@@ -99,7 +99,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-03 | Phase 7 | Complete |
 | MCP-04 | Phase 7 | Complete |
 | MCP-05 | Phase 7 | Complete |
-| MCP-06 | Phase 7 | Pending |
+| MCP-06 | Phase 7 | Complete |
 | MCP-07 | Phase 7 | Pending |
 | MCP-08 | Phase 7 | Complete |
 | MCP-09 | Phase 7 | Complete |
