@@ -83,7 +83,9 @@ def classify_staleness(node_data: dict) -> str:
     try:
         current_mtime = p.stat().st_mtime
         stored_mtime = node_data.get("source_mtime")
-        if stored_mtime is not None and current_mtime == stored_mtime:
+        # Only trust mtime gate when stored value is a float (same type as
+        # stat().st_mtime) to avoid false FRESH from JSON round-trip precision loss
+        if stored_mtime is not None and isinstance(stored_mtime, float) and current_mtime == stored_mtime:
             return "FRESH"
     except OSError:
         return "GHOST"
