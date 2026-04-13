@@ -52,8 +52,10 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - [x] Session-scoped graph views via MCP _(v1.1, Phase 7)_
 - [x] `propose_vault_note` MCP tool with human approval before write _(v1.1, Phase 7)_
 - [x] Annotations persist in `graphify-out/annotations.jsonl` across re-runs _(v1.1, Phase 7)_
-- [ ] Obsidian round-trip: detect user-modified notes on `--obsidian` re-run
-- [ ] Preserve user-authored content blocks during merge (extend v1.0 merge engine)
+- [x] Obsidian round-trip: detect user-modified notes via content-hash manifest on `--obsidian` re-run _(v1.1, Phase 8: Obsidian Round-Trip Awareness)_
+- [x] Preserve user-authored content blocks during merge with GRAPHIFY_USER_START/END sentinel markers _(v1.1, Phase 8)_
+- [x] `--force` flag to override user-modified detection while preserving sentinel blocks _(v1.1, Phase 8)_
+- [x] Dry-run output shows user-modification status per note with source annotations _(v1.1, Phase 8)_
 
 ### Deferred (v1.2+ — template engine extensions from v1.0)
 
@@ -88,6 +90,12 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - **Delivered:** MCP write-back and peer modeling. Extended `serve.py` with 5 new MCP tools (annotate_node, flag_node, add_edge, propose_vault_note, get_annotations), JSONL/JSON sidecar persistence, peer/session identity tracking, mtime-based graph reload, and startup compaction. Added `graphify approve` CLI subcommand for human-in-the-loop proposal review. graph.json never mutated by any tool.
 - **Test count:** 952 passing (57 new across `test_serve.py` and `test_approve.py`).
 - **Shipped in:** 3 plans across 3 waves, 11 commits.
+
+### v1.1 Phase 8 complete (2026-04-13)
+
+- **Delivered:** Obsidian round-trip awareness. Content-hash manifest (`vault-manifest.json`) tracks what graphify wrote per note. On re-run, user-modified notes receive SKIP_PRESERVE — user content never overwritten. User sentinel blocks (`<!-- GRAPHIFY_USER_START -->` / `<!-- GRAPHIFY_USER_END -->`) provide explicit preservation zones that survive even REPLACE strategy and `--force` mode. `--force` flag bypasses whole-note user-modified detection while respecting sentinel blocks. Dry-run output enhanced with source annotations (`[user]`/`[both]`) and summary preamble.
+- **Test count:** 985 passing (33 new across 5 test classes in `test_merge.py`).
+- **Shipped in:** 3 plans across 3 waves, 9 feature commits.
 
 ### Enduring background (carries across milestones)
 
@@ -155,9 +163,9 @@ This document evolves at phase transitions and milestone boundaries.
 
 All five v1.0 phases delivered and verified. The configurable vault adapter is the production `to_obsidian()` code path; there is no separate opt-in flag. 5 phases, 22 plans, 31/31 requirements, 872 tests passing. See `.planning/milestones/` for full archives.
 
-**Milestone v1.1 — Context Persistence & Agent Memory: ○ DEFINING REQUIREMENTS**
+**Milestone v1.1 — Context Persistence & Agent Memory: ✅ COMPLETE (Phases 6–8)**
 
-Phases 6–8 scoped. Requirements being defined.
+All three v1.1 phases delivered and verified. Phase 6: graph delta analysis + staleness. Phase 7: MCP write-back + peer modeling. Phase 8: Obsidian round-trip awareness with manifest-based user-modified detection and sentinel block preservation. 985 tests passing.
 
 ---
-*Last updated: 2026-04-13 — Phase 6 (Graph Delta Analysis & Staleness) complete*
+*Last updated: 2026-04-13 — Phase 8 (Obsidian Round-Trip Awareness) complete — v1.1 milestone complete*
