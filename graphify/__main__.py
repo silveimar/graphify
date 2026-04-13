@@ -834,13 +834,21 @@ def _approve_and_write_proposal(proposals_dir: Path, record_id: str, vault_path:
     plan = _compute_merge_plan_for_approve(vault_path, rendered, profile)
     _apply_merge_plan_for_approve(plan, vault_path, rendered, profile)
 
-    # Mark approved and rewrite proposal file
+    # Mark approved and rewrite proposal file.
+    # Note: if this status write fails after merge has already written vault files,
+    # the proposal stays "pending" and a re-run may re-apply.  The merge engine
+    # handles re-writes idempotently so this is safe, but we warn to aid debugging.
     proposal["status"] = "approved"
     tmp = path.with_suffix(".tmp")
     try:
         tmp.write_text(json.dumps(proposal, indent=2, ensure_ascii=False), encoding="utf-8")
         _os.replace(tmp, path)
     except Exception:
+        print(
+            f"[graphify] warning: merge succeeded but failed to mark proposal "
+            f"{record_id} as approved — re-run may re-apply (idempotent)",
+            file=sys.stderr,
+        )
         tmp.unlink(missing_ok=True)
         raise
     return proposal
