@@ -47,11 +47,11 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - [x] `GRAPH_DELTA.md` output showing new/removed nodes, community migration, connectivity changes _(v1.1, Phase 6)_
 - [x] Per-node staleness metadata (`extracted_at`, `source_hash`, `source_mtime`) with three-state classification (FRESH/STALE/GHOST) _(v1.1, Phase 6)_
 - [x] Summary+archive delta pattern (summary for agent context, full diff for search) _(v1.1, Phase 6)_
-- [ ] MCP mutation tools: annotate nodes, add edges, flag importance, tag with context
-- [ ] Peer identity tracking on annotations (agent name, session ID, timestamp)
-- [ ] Session-scoped graph views via MCP
-- [ ] `propose_vault_note` MCP tool with human approval before write
-- [ ] Annotations persist in `graphify-out/annotations.json` across re-runs
+- [x] MCP mutation tools: annotate nodes, add edges, flag importance, tag with context _(v1.1, Phase 7: MCP Write-Back & Peer Modeling)_
+- [x] Peer identity tracking on annotations (agent name, session ID, timestamp) _(v1.1, Phase 7)_
+- [x] Session-scoped graph views via MCP _(v1.1, Phase 7)_
+- [x] `propose_vault_note` MCP tool with human approval before write _(v1.1, Phase 7)_
+- [x] Annotations persist in `graphify-out/annotations.jsonl` across re-runs _(v1.1, Phase 7)_
 - [ ] Obsidian round-trip: detect user-modified notes on `--obsidian` re-run
 - [ ] Preserve user-authored content blocks during merge (extend v1.0 merge engine)
 
@@ -82,6 +82,12 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - **Codebase state:** 11,620 LOC across 24 Python modules under `graphify/`; 10,500 LOC across 33 test files under `tests/`; 872 tests passing.
 - **Shipped in:** 5 phases, 22 plans, ~172 commits over 2 days (2026-04-09 → 2026-04-11), fully verified with goal-backward VERIFICATION.md for each phase plus milestone audit (31/31 in-scope requirements satisfied, 2 de-scoped via D-74).
 - **Tech stack additions:** PyYAML as optional `obsidian` extra (guarded regression test in `tests/test_pyproject.py`).
+
+### v1.1 Phase 7 complete (2026-04-13)
+
+- **Delivered:** MCP write-back and peer modeling. Extended `serve.py` with 5 new MCP tools (annotate_node, flag_node, add_edge, propose_vault_note, get_annotations), JSONL/JSON sidecar persistence, peer/session identity tracking, mtime-based graph reload, and startup compaction. Added `graphify approve` CLI subcommand for human-in-the-loop proposal review. graph.json never mutated by any tool.
+- **Test count:** 952 passing (57 new across `test_serve.py` and `test_approve.py`).
+- **Shipped in:** 3 plans across 3 waves, 11 commits.
 
 ### Enduring background (carries across milestones)
 
