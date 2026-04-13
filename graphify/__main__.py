@@ -719,6 +719,136 @@ def claude_uninstall(project_dir: Path | None = None) -> None:
     _uninstall_claude_hook(project_dir or Path("."))
 
 
+# ---------------------------------------------------------------------------
+# Approve CLI helper functions (Phase 07, Plan 03)
+# ---------------------------------------------------------------------------
+
+def _list_pending_proposals(out_dir: Path) -> list[dict]:
+    """Return all proposals with status 'pending', sorted by timestamp ascending.
+
+    Reads every .json file in out_dir/proposals/. Silently skips corrupt files.
+    Returns [] when the proposals directory does not exist.
+    """
+    proposals_dir = out_dir / "proposals"
+    if not proposals_dir.exists():
+        return []
+    records: list[dict] = []
+    for fpath in proposals_dir.glob("*.json"):
+        try:
+            record = json.loads(fpath.read_text(encoding="utf-8"))
+            if record.get("status") == "pending":
+                records.append(record)
+        except (json.JSONDecodeError, OSError):
+            continue
+    records.sort(key=lambda r: r.get("timestamp", ""))
+    return records
+
+
+def _reject_proposal(proposals_dir: Path, record_id: str) -> dict:
+    """Set status to 'rejected' for the given proposal. Rewrites the file atomically.
+
+    Raises FileNotFoundError if the proposal does not exist.
+    """
+    path = proposals_dir / f"{record_id}.json"
+    if not path.exists():
+        raise FileNotFoundError(f"Proposal not found: {record_id}")
+    import os as _os
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["status"] = "rejected"
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+        _os.replace(tmp, path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+    return record
+
+
+# Indirection helpers so tests can monkeypatch individual calls without
+# modifying the internal import machinery of _approve_and_write_proposal.
+
+def _load_profile_for_approve(vault_path: Path) -> dict:
+    from graphify.profile import load_profile
+    return load_profile(vault_path)
+
+
+def _validate_vault_path_for_approve(candidate: str, vault_path: Path):
+    from graphify.profile import validate_vault_path
+    return validate_vault_path(candidate, vault_path)
+
+
+def _compute_merge_plan_for_approve(vault_path, rendered_notes, profile, **kwargs):
+    from graphify.merge import compute_merge_plan
+    return compute_merge_plan(vault_path, rendered_notes, profile, **kwargs)
+
+
+def _apply_merge_plan_for_approve(plan, vault_path, rendered_notes, profile):
+    from graphify.merge import apply_merge_plan
+    return apply_merge_plan(plan, vault_path, rendered_notes, profile)
+
+
+def _approve_and_write_proposal(proposals_dir: Path, record_id: str, vault_path: Path) -> dict:
+    """Approve a proposal and write it to the vault via the merge engine.
+
+    Raises FileNotFoundError if the proposal does not exist.
+    Calls validate_vault_path on the suggested_folder to confine vault writes (T-07-11).
+    """
+    import os as _os
+    path = proposals_dir / f"{record_id}.json"
+    if not path.exists():
+        raise FileNotFoundError(f"Proposal not found: {record_id}")
+
+    proposal = json.loads(path.read_text(encoding="utf-8"))
+
+    # Path confinement gate (T-07-11): validate suggested_folder before any write
+    suggested_folder = proposal.get("suggested_folder", "")
+    _validate_vault_path_for_approve(suggested_folder, vault_path)
+
+    # Load vault profile (falls back to built-in default when no .graphify/profile.yaml)
+    profile = _load_profile_for_approve(vault_path)
+
+    # Build RenderedNote dict from proposal fields
+    from graphify.merge import RenderedNote
+    target_rel = Path(suggested_folder) / (proposal["title"] + ".md") if suggested_folder else Path(proposal["title"] + ".md")
+    rn: RenderedNote = {
+        "node_id": proposal["record_id"],
+        "target_path": str(target_rel),
+        "frontmatter_fields": {
+            "tags": proposal.get("tags", []),
+            "note_type": proposal.get("note_type", "note"),
+        },
+        "body": proposal.get("body_markdown", ""),
+    }
+    rendered = {proposal["record_id"]: rn}
+
+    # Run through the merge engine
+    plan = _compute_merge_plan_for_approve(vault_path, rendered, profile)
+    _apply_merge_plan_for_approve(plan, vault_path, rendered, profile)
+
+    # Mark approved and rewrite proposal file
+    proposal["status"] = "approved"
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(proposal, indent=2, ensure_ascii=False), encoding="utf-8")
+        _os.replace(tmp, path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+    return proposal
+
+
+def _format_proposal_summary(proposal: dict) -> str:
+    """Return a human-readable one-line summary of a proposal for the list view."""
+    return (
+        f"  {proposal['record_id'][:8]}  "
+        f"{proposal.get('title', 'untitled'):40s}  "
+        f"{proposal.get('note_type', 'note'):12s}  "
+        f"{proposal.get('peer_id', 'anonymous'):12s}  "
+        f"{proposal.get('timestamp', ''):25s}"
+    )
+
+
 def main() -> None:
     # Check all known skill install locations for a stale version stamp.
     # Skip during install/uninstall (hook writes trigger a fresh check anyway).
