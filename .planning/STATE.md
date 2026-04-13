@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Context Persistence & Agent Memory
-status: verifying
-stopped_at: Phase 08 context gathered
-last_updated: "2026-04-13T03:38:04.358Z"
+status: executing
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-04-13T04:12:10.710Z"
 last_activity: 2026-04-13
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_plans: 9
+  completed_plans: 7
+  percent: 78
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-12 after v1.1 milestone start)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile
-**Current focus:** Phase 07 — mcp-write-back-peer-modeling
+**Current focus:** Phase 08 — obsidian-round-trip-awareness
 
 ## Current Position
 
 Milestone: v1.1 Context Persistence & Agent Memory
-Phase: 07
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 08 (obsidian-round-trip-awareness) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-13
 
 Progress: [░░░░░░░░░░] 0% (v1.1)
@@ -59,6 +59,7 @@ Detailed per-plan metrics are preserved in phase SUMMARY.md files and in `.plann
 | Phase 07 P01 | 10min | 2 tasks | 2 files |
 | Phase 07 P02 | 2 | 1 tasks | 2 files |
 | Phase 07 P03 | 4min | 2 tasks | 2 files |
+| Phase 08 P01 | 17min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Carry-forward decisions relevant to v1.1:
 - [Phase 07]: validate_vault_path is in graphify.profile (not graphify.security) — plan had wrong module reference
 - [Phase 07]: RenderedNote TypedDict uses frontmatter_fields/body fields (not frontmatter/content) — corrected in approve helper
 - [Phase 07]: Indirection helpers (_load_profile_for_approve etc.) enable monkeypatching approve helpers in tests without MCP server
+- [Phase 08]: _content_hash() uses content-only SHA256 (no path) — avoids macOS symlink mismatch that cache.file_hash() would cause
+- [Phase 08]: force=True bypasses user-modified detection; SKIP_PRESERVE with user_modified=True is the default for hash-mismatch notes (D-07)
+- [Phase 08]: has_user_blocks always False in Plan 01 manifest — sentinel parser deferred to Plan 02
 
 ### v1.1 Phase Architecture Notes
 
@@ -118,7 +122,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-13T03:38:04.350Z
-Stopped at: Phase 08 context gathered
-Resume file: .planning/phases/08-obsidian-round-trip-awareness/08-CONTEXT.md
+Last session: 2026-04-13T04:12:10.706Z
+Stopped at: Completed 08-01-PLAN.md
+Resume file: None
 Next action: `/gsd-plan-phase 6`

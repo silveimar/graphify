@@ -26,16 +26,16 @@ Requirements for v1.1 Context Persistence & Agent Memory. Each maps to roadmap p
 - [x] **MCP-04**: All annotations persist in `graphify-out/annotations.jsonl` using JSONL append (crash-safe, no read-modify-write race)
 - [x] **MCP-05**: Every annotation record includes `peer_id`, `session_id`, and `timestamp`; `peer_id` defaults to `"anonymous"` (never derived from environment)
 - [x] **MCP-06**: MCP server exposes `propose_vault_note` tool that stages a proposed note to `graphify-out/proposals/` with human approval required before vault write
-- [ ] **MCP-07**: `graphify approve` CLI command lists pending proposals and allows user to approve/reject/edit before writing to vault
+- [x] **MCP-07**: `graphify approve` CLI command lists pending proposals and allows user to approve/reject/edit before writing to vault
 - [x] **MCP-08**: Annotations and agent-edges are queryable via MCP: filter by peer, session, or time range
 - [x] **MCP-09**: Session-scoped graph views: MCP tool to retrieve annotations relevant to a specific session context
 - [x] **MCP-10**: `graph.json` is never mutated by MCP tools — pipeline output is read-only ground truth; all agent state lives in sidecars
 
 ### Obsidian Round-Trip Awareness
 
-- [ ] **TRIP-01**: `apply_merge_plan` writes `vault-manifest.json` recording content hash per note at merge time
-- [ ] **TRIP-02**: On `--obsidian` re-run, graphify detects which notes the user has modified since last merge (hash comparison against manifest)
-- [ ] **TRIP-03**: User-modified notes receive `UPDATE_PRESERVE_USER_BLOCKS` merge action: graphify-managed sections refresh, user-authored content blocks preserved
+- [x] **TRIP-01**: `apply_merge_plan` writes `vault-manifest.json` recording content hash per note at merge time
+- [x] **TRIP-02**: On `--obsidian` re-run, graphify detects which notes the user has modified since last merge (hash comparison against manifest)
+- [x] **TRIP-03**: User-modified notes receive `UPDATE_PRESERVE_USER_BLOCKS` merge action: graphify-managed sections refresh, user-authored content blocks preserved
 - [ ] **TRIP-04**: User-space sentinel blocks (`<!-- GRAPHIFY_USER_START -->` / `<!-- GRAPHIFY_USER_END -->`) provide explicit preservation zones users can add to any note
 - [ ] **TRIP-05**: `--dry-run` output shows which notes have user modifications and what the merge plan would do with them
 - [ ] **TRIP-06**: Conflict resolution: user content always wins — graphify never overwrites content between user sentinel blocks
@@ -100,13 +100,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-04 | Phase 7 | Complete |
 | MCP-05 | Phase 7 | Complete |
 | MCP-06 | Phase 7 | Complete |
-| MCP-07 | Phase 7 | Pending |
+| MCP-07 | Phase 7 | Complete |
 | MCP-08 | Phase 7 | Complete |
 | MCP-09 | Phase 7 | Complete |
 | MCP-10 | Phase 7 | Complete |
-| TRIP-01 | Phase 8 | Pending |
-| TRIP-02 | Phase 8 | Pending |
-| TRIP-03 | Phase 8 | Pending |
+| TRIP-01 | Phase 8 | Complete |
+| TRIP-02 | Phase 8 | Complete |
+| TRIP-03 | Phase 8 | Complete |
 | TRIP-04 | Phase 8 | Pending |
 | TRIP-05 | Phase 8 | Pending |
 | TRIP-06 | Phase 8 | Pending |
