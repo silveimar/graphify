@@ -104,7 +104,7 @@ Configurable output adapter replacing the monolithic `to_obsidian()` with a four
 Plans:
 - [x] 06-01-PLAN.md — Snapshot module (save/load/prune/list) + provenance metadata injection in extract.py
 - [x] 06-02-PLAN.md — Delta computation (set-arithmetic diff, staleness classification, GRAPH_DELTA.md rendering)
-- [ ] 06-03-PLAN.md — CLI wiring (graphify snapshot command, auto-snapshot+auto-delta pipeline helper)
+- [x] 06-03-PLAN.md — CLI wiring (graphify snapshot command, auto-snapshot+auto-delta pipeline helper)
 
 ### Phase 7: MCP Write-Back with Peer Modeling
 **Goal**: Agents can annotate, flag, and propose notes on the knowledge graph across sessions, with full provenance and a human-in-the-loop for vault writes
