@@ -453,6 +453,49 @@ def suggest_questions(
     return questions[:top_n]
 
 
+def render_analysis_context(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    community_labels: dict[int, str],
+    god_node_list: list[dict],
+    surprise_list: list[dict],
+    top_n_nodes: int = 20,
+) -> str:
+    """Serialize graph structure to a compact prompt-safe text block for tournament lens agents."""
+    lines = [
+        f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, {len(communities)} communities",
+        "",
+        "Most-connected entities (god nodes):",
+    ]
+
+    for n in god_node_list[:top_n_nodes]:
+        label = n.get("label", n.get("id", ""))
+        edges = n.get("edges", 0)
+        lines.append(f"  - {label} ({edges} connections)")
+
+    lines += ["", "Surprising cross-file connections:"]
+    if surprise_list:
+        for s in surprise_list:
+            src = s.get("source", "")
+            tgt = s.get("target", "")
+            rel = s.get("relation", "")
+            conf = s.get("confidence", "")
+            why = s.get("why", "")
+            lines.append(f"  - {src} --{rel}--> {tgt} [{conf}]: {why}")
+    else:
+        lines.append("  - None detected")
+
+    lines += ["", "Communities:"]
+    for cid, nodes in communities.items():
+        label = community_labels.get(cid, f"Community {cid}")
+        sample = nodes[:5]
+        node_labels = [G.nodes[n].get("label", n) for n in sample if n in G.nodes]
+        suffix = f", ... (+{len(nodes) - 5} more)" if len(nodes) > 5 else ""
+        lines.append(f"  - {label}: {', '.join(node_labels)}{suffix}")
+
+    return "\n".join(lines)
+
+
 def graph_diff(G_old: nx.Graph, G_new: nx.Graph) -> dict:
     """Compare two graph snapshots and return what changed.
 
