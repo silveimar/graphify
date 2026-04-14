@@ -1283,6 +1283,237 @@ Supported URL types (auto-detected):
 
 ---
 
+## For /graphify analyze
+
+<!-- ANTI-PATTERN: Never pass conversation history between tournament rounds. Each round gets only the TEXT output of prior rounds, not system prompts or reasoning traces. -->
+<!-- ANTI-PATTERN: Never label candidates as incumbent/adversary/synthesis in judge prompts. Use Analysis-1/2/3 with shuffled assignment. -->
+<!-- ANTI-PATTERN: Do NOT call render_analysis() from analyze.py — it lives in report.py. analyze.py stays pure metrics (D-75). -->
+
+When the user says `/graphify analyze` (with optional lens selection like "analyze for security and architecture"):
+
+**Prerequisites:** The graph must already be built. Check that `graphify-out/.graphify_analysis.json` exists. If not, tell the user: "Run `/graphify` first to build the graph, then `/graphify analyze` to run multi-perspective analysis."
+
+**Lens selection:** Parse the user's prompt for lens names. The 4 built-in lenses are: `security`, `architecture`, `complexity`, `onboarding`. If the user specifies a subset (e.g., "analyze for security"), run only those. If no specific lenses mentioned, run all 4.
+
+**Token cost note:** The tournament runs up to 6 LLM calls per lens (1 incumbent + 1 adversary + 1 synthesis + 3 judges). With 4 lenses that is up to 24 calls. Report this estimate to the user before starting.
+
+**Step A1 — Load graph context:**
+
+```bash
+$(cat graphify-out/.graphify_python) -c "
+import json
+import networkx as nx
+from pathlib import Path
+from graphify.analyze import render_analysis_context
+
+analysis_path = Path('graphify-out/.graphify_analysis.json')
+if not analysis_path.exists():
+    print('ERROR: .graphify_analysis.json not found. Run /graphify first to build the graph.')
+    raise SystemExit(1)
+
+analysis = json.loads(analysis_path.read_text())
+graph_data = json.loads(Path('graphify-out/graph.json').read_text())
+G = nx.node_link_graph(graph_data)
+
+communities = {int(k): v for k, v in analysis['communities'].items()}
+labels = {int(k): f'Community {k}' for k in analysis['communities']}
+# Use real labels if available from .graphify_analysis.json
+if 'community_labels' in analysis:
+    labels = {int(k): v for k, v in analysis['community_labels'].items()}
+gods = analysis['gods']
+surprises = analysis['surprises']
+
+context = render_analysis_context(G, communities, labels, gods, surprises)
+Path('graphify-out/.graphify_lens_context.txt').write_text(context)
+print(f'Graph context serialized: {len(context)} chars')
+"
+```
+
+**Step A2 — Lens focus definitions:**
+
+The following focus bullets are substituted into tournament prompts as `{LENS_FOCUS_BULLETS}` for each lens:
+
+**Lens focus definitions:**
+
+- **security**: Authentication/authorization patterns, input validation coverage, secrets exposure, dependency vulnerability signals, trust boundary violations, STRIDE categories visible in graph structure
+- **architecture**: God node coupling risk, community cohesion gaps, circular dependencies, layering violations, single points of failure, separation of concerns
+- **complexity**: High fan-in/fan-out nodes, deep call chains, communities with low cohesion scores, files touching many communities, cognitive load hotspots
+- **onboarding**: Entry point clarity, documentation coverage, community labeling quality, path from entry to core abstractions, isolated nodes newcomers would miss
+
+**Step A3 — Run tournament for each selected lens:**
+
+For EACH selected lens, run 4 rounds of LLM calls. Read `graphify-out/.graphify_lens_context.txt` and substitute it as `{GRAPH_CONTEXT}` in each prompt. Each round is a SEPARATE LLM call with fresh context — only the TEXT output of each prior round flows to the next round.
+
+**Round 1 — Incumbent Analysis (A):**
+
+```
+System: You are a {LENS} expert analyzing a software knowledge graph.
+Respond ONLY with your findings in markdown format. Do not ask for more information.
+If you find no issues, say so explicitly — "no issues found" is a valid and important verdict.
+Format: list findings under headers. Include a confidence level (high/medium/low) per finding.
+End with a single-line "Top finding: [your most important insight or 'None']".
+
+User: Here is the graph context:
+
+{GRAPH_CONTEXT}
+
+Analyze this graph from a {LENS} perspective. Focus on:
+{LENS_FOCUS_BULLETS}
+```
+
+Save the full response as `incumbent_text`.
+
+**Round 2 — Adversarial Revision (B):**
+
+```
+System: You are a rigorous devil's advocate reviewing an analysis of a software knowledge graph.
+Your job: find what the analyst missed, overstated, or got wrong.
+You may also argue "the analysis is correct and complete" — do nothing is a valid position.
+Do not reference the original analyst by name or role.
+Respond in markdown format. End with "Top finding: [your most important insight or 'None']".
+
+User: Here is the graph context:
+
+{GRAPH_CONTEXT}
+
+Here is an analysis from a {LENS} perspective:
+
+{INCUMBENT_TEXT}
+
+Challenge this analysis. What did it miss? What did it overstate? Produce your own revised analysis.
+```
+
+Save the full response as `adversary_text`.
+
+**Round 3 — Synthesis (AB):**
+
+```
+System: You are a neutral synthesizer. Merge two analyses of a software knowledge graph into the best possible combined view.
+Preserve strong findings from both. Discard overclaims. Resolve contradictions explicitly.
+Respond in markdown format. End with "Top finding: [your most important insight or 'None']".
+
+User: Here is the graph context:
+
+{GRAPH_CONTEXT}
+
+Analysis 1:
+{INCUMBENT_TEXT}
+
+Analysis 2:
+{ADVERSARY_TEXT}
+
+Produce a merged analysis that combines the strongest insights from both while discarding overclaims.
+```
+
+Save the full response as `synthesis_text`.
+
+**Round 4 — Blind Borda Judges (3 separate calls):**
+
+Before calling judges, create a shuffled mapping. Assign A/B/AB to Analysis-1/Analysis-2/Analysis-3 using a different rotation per judge:
+- Judge 1: Analysis-1=A, Analysis-2=B, Analysis-3=AB
+- Judge 2: Analysis-1=B, Analysis-2=AB, Analysis-3=A
+- Judge 3: Analysis-1=AB, Analysis-2=A, Analysis-3=B
+
+Each judge call (substitute the shuffled texts accordingly):
+
+```
+System: You are an impartial evaluator. Rank the three analyses below from best (1st) to worst (3rd).
+Criteria: accuracy relative to the graph data, completeness, absence of overclaims, actionability.
+Output ONLY this format, nothing else:
+1st: [label]
+2nd: [label]
+3rd: [label]
+
+Where [label] is one of Analysis-1, Analysis-2, Analysis-3.
+
+User: Here is the graph context:
+
+{GRAPH_CONTEXT}
+
+Analysis-1:
+{SHUFFLED_TEXT_1}
+
+Analysis-2:
+{SHUFFLED_TEXT_2}
+
+Analysis-3:
+{SHUFFLED_TEXT_3}
+
+Rank them.
+```
+
+Parse each judge's response. Validate it matches the format "1st: Analysis-N / 2nd: Analysis-N / 3rd: Analysis-N". If malformed, skip that judge and degrade gracefully to 2 judges. Unshuffle to map labels back to A/B/AB.
+
+**Step A4 — Compute Borda scores and assemble lens result:**
+
+After collecting valid judge rankings for a lens:
+
+```bash
+$(cat graphify-out/.graphify_python) -c "
+import json
+
+# Input: judge_rankings is a list of lists, e.g. [['A','B','AB'], ['A','AB','B'], ['AB','A','B']]
+# (parsed and unshuffled by the skill orchestrator above)
+judge_rankings = JUDGE_RANKINGS_PLACEHOLDER
+
+# Standard Borda count: n=3 candidates, 1st=2pts, 2nd=1pt, 3rd=0pts
+scores = {'A': 0, 'B': 0, 'AB': 0}
+for ranking in judge_rankings:
+    for rank, candidate in enumerate(ranking):
+        scores[candidate] += (2 - rank)
+
+winner = max(scores, key=scores.get)
+total_points = sum(scores.values())
+confidence = scores[winner] / total_points if total_points > 0 else 0.0
+
+# Confidence label
+if confidence >= 0.8:
+    conf_label = 'high'
+elif confidence >= 0.5:
+    conf_label = 'medium'
+else:
+    conf_label = 'low'
+
+print(json.dumps({'winner': winner, 'scores': scores, 'confidence': confidence, 'confidence_label': conf_label}))
+"
+```
+
+After computing Borda scores, assemble the lens result dict:
+- `verdict`: If winner is "A" AND `incumbent_text` contains "no issues found" (case-insensitive) → "Clean". Otherwise → "Finding"
+- `findings_text`: The winner's text — `incumbent_text` if A, `adversary_text` if B, `synthesis_text` if AB
+- `top_finding`: Extract the "Top finding: ..." line from `findings_text` (strip the "Top finding: " prefix). Empty string if "None"
+- `voting_rationale`: Format scores as e.g. "3-0 unanimous for incumbent" or "2-1 for synthesis"
+- `incumbent_summary`, `adversary_summary`, `synthesis_summary`: First 100 chars of each text
+- `confidence`, `confidence_label`, `scores`: from Borda output
+
+**Step A5 — Cross-lens synthesis and render (after ALL lenses complete):**
+
+```bash
+$(cat graphify-out/.graphify_python) -c "
+import json
+from pathlib import Path
+from graphify.report import render_analysis
+
+# lens_results is assembled by the skill orchestrator from all lens tournaments
+lens_results = LENS_RESULTS_PLACEHOLDER
+lenses_run = LENSES_RUN_PLACEHOLDER
+
+analysis_md = render_analysis(lens_results, 'INPUT_PATH', lenses_run)
+Path('graphify-out/GRAPH_ANALYSIS.md').write_text(analysis_md)
+print(f'GRAPH_ANALYSIS.md written ({len(analysis_md)} chars, {len(lens_results)} lenses)')
+"
+```
+
+**Step A6 — Report to user:**
+
+After writing GRAPH_ANALYSIS.md, report to the user:
+- Which lenses were run
+- Per-lens verdict (Clean or Finding) with confidence level
+- Top finding per lens (if any)
+- Location: `graphify-out/GRAPH_ANALYSIS.md`
+
+---
+
 ## For --watch
 
 Start a background watcher that monitors a folder and auto-updates the graph when files change.
