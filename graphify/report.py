@@ -173,3 +173,119 @@ def generate(
                     lines.append(f"  _{q['why']}_")
 
     return "\n".join(lines)
+
+
+def _sanitize_md(text: str) -> str:
+    """Strip characters that could inject markdown structure from untrusted LLM output."""
+    # Remove backtick sequences and angle brackets that could break markdown embedding
+    text = text.replace("`", "'").replace("<", "&lt;").replace(">", "&gt;")
+    return text
+
+
+def render_analysis(
+    lens_results: list[dict],
+    root: str,
+    lenses_run: list[str],
+) -> str:
+    """Render GRAPH_ANALYSIS.md from per-lens tournament result dicts."""
+    today = date.today().isoformat()
+
+    lines = [
+        f"# Graph Analysis - {root}  ({today})",
+        "",
+        "> Multi-perspective analysis using autoreason tournament protocol.",
+        f"> Lenses run: {', '.join(lenses_run)}",
+    ]
+
+    # Overall Verdict section
+    findings = [r for r in lens_results if r.get("verdict") == "Finding"]
+    clean = [r for r in lens_results if r.get("verdict") == "Clean"]
+    total = len(lens_results)
+
+    lines += ["", "## Overall Verdict", ""]
+    if not findings:
+        lines.append("All lenses report clean — no actionable findings.")
+    else:
+        top_findings = [r.get("top_finding", "") for r in findings if r.get("top_finding", "")]
+        key_str = "; ".join(top_findings) if top_findings else "see per-lens sections below"
+        lines.append(
+            f"{len(findings)} of {total} lenses found issues. Key findings: {_sanitize_md(key_str)}"
+        )
+
+    # Per-lens sections — every lens always appears (D-83)
+    for r in lens_results:
+        lens = r.get("lens", "unknown")
+        verdict = r.get("verdict", "")
+        confidence = r.get("confidence", 0.0)
+        confidence_label = r.get("confidence_label", "")
+        findings_text = _sanitize_md(r.get("findings_text", ""))
+        voting_rationale = _sanitize_md(r.get("voting_rationale", ""))
+        top_finding = _sanitize_md(r.get("top_finding", ""))
+        incumbent_summary = _sanitize_md(r.get("incumbent_summary", ""))
+        adversary_summary = _sanitize_md(r.get("adversary_summary", ""))
+        synthesis_summary = _sanitize_md(r.get("synthesis_summary", ""))
+        scores = r.get("scores", {"A": 0, "B": 0, "AB": 0})
+
+        # Determine winner label for Tournament Rationale
+        score_a = scores.get("A", 0)
+        score_b = scores.get("B", 0)
+        score_ab = scores.get("AB", 0)
+        if score_a >= score_b and score_a >= score_ab:
+            verdict_source = "Incumbent (A)"
+        elif score_b >= score_a and score_b >= score_ab:
+            verdict_source = "Adversary (B)"
+        else:
+            verdict_source = "Synthesis (AB)"
+
+        lines += [
+            "",
+            "---",
+            "",
+            f"## {lens.title()}",
+            "",
+            f"**Verdict:** {verdict}",
+            f"**Confidence:** {confidence_label} (score: {confidence:.2f})",
+            "",
+            "### Top Finding",
+            top_finding if top_finding else "No issues found.",
+            "",
+            "### Full Analysis",
+            findings_text,
+            "",
+            "### Tournament Rationale",
+            f"- Incumbent (A): {incumbent_summary}",
+            f"- Adversary (B): {adversary_summary}",
+            f"- Synthesis (AB): {synthesis_summary}",
+            f"- Judges voted: A={score_a}, B={score_b}, AB={score_ab}",
+            f"- Winner: {verdict_source} — {voting_rationale}",
+        ]
+
+    # Cross-Lens Synthesis section
+    lines += ["", "## Cross-Lens Synthesis", ""]
+
+    # Convergences: multiple lenses agree
+    lines.append("### Convergences")
+    if len(clean) >= 3:
+        lens_names = ", ".join(r.get("lens", "") for r in clean)
+        lines.append(f"- {len(clean)} lenses agree: no issues ({lens_names})")
+    elif len(clean) == len(lens_results):
+        lines.append("- All lenses agree: no issues detected.")
+    else:
+        lines.append("- No strong convergence detected across lenses.")
+
+    # Tensions: opposing verdicts between lens pairs
+    lines += ["", "### Tensions"]
+    tension_pairs = []
+    for i, r1 in enumerate(lens_results):
+        for r2 in lens_results[i + 1:]:
+            if r1.get("verdict") != r2.get("verdict"):
+                tension_pairs.append((r1.get("lens", ""), r2.get("verdict", ""), r2.get("lens", ""), r1.get("verdict", "")))
+    if tension_pairs:
+        for lens_a, verdict_b, lens_b, verdict_a in tension_pairs:
+            lines.append(
+                f"- {lens_a.title()} ({verdict_a}) vs {lens_b.title()} ({verdict_b}): opposing verdicts"
+            )
+    else:
+        lines.append("- No tensions detected — all lenses agree.")
+
+    return "\n".join(lines)
