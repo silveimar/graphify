@@ -209,3 +209,124 @@ def test_render_analysis_tensions_section():
     results = make_lens_results()
     out = render_analysis(results, "myproject", ["security", "architecture", "complexity", "onboarding"])
     assert "### Tensions" in out
+
+
+# --- _sanitize_md coverage via render_analysis (T-09-01) ---
+
+def _make_malicious_lens_result(field: str, payload: str) -> dict:
+    """Return a Finding lens result with `payload` injected into the named field."""
+    base = {
+        "lens": "security",
+        "verdict": "Finding",
+        "confidence": 0.67,
+        "confidence_label": "medium",
+        "findings_text": "clean",
+        "voting_rationale": "clean",
+        "top_finding": "clean",
+        "incumbent_summary": "clean",
+        "adversary_summary": "clean",
+        "synthesis_summary": "clean",
+        "scores": {"A": 2, "B": 3, "AB": 1},
+    }
+    base[field] = payload
+    return base
+
+
+def test_sanitize_md_backtick_stripped_from_findings_text():
+    """Backticks in findings_text must not appear in rendered output (T-09-01)."""
+    result = _make_malicious_lens_result("findings_text", "run `rm -rf /` now")
+    out = render_analysis([result], "proj", ["security"])
+    assert "`" not in out
+
+
+def test_sanitize_md_angle_brackets_escaped_in_findings_text():
+    """Angle brackets in findings_text must be HTML-escaped in rendered output (T-09-01)."""
+    result = _make_malicious_lens_result("findings_text", "<script>alert(1)</script>")
+    out = render_analysis([result], "proj", ["security"])
+    assert "<script>" not in out
+    assert "&lt;script&gt;" in out
+
+
+def test_sanitize_md_backtick_stripped_from_voting_rationale():
+    """Backticks in voting_rationale must not appear in rendered output (T-09-01)."""
+    result = _make_malicious_lens_result("voting_rationale", "verdict: `override`")
+    out = render_analysis([result], "proj", ["security"])
+    assert "`" not in out
+
+
+def test_sanitize_md_angle_brackets_escaped_in_voting_rationale():
+    """Angle brackets in voting_rationale must be HTML-escaped (T-09-01)."""
+    result = _make_malicious_lens_result("voting_rationale", "<b>bold injection</b>")
+    out = render_analysis([result], "proj", ["security"])
+    assert "<b>" not in out
+    assert "&lt;b&gt;" in out
+
+
+def test_sanitize_md_backtick_stripped_from_top_finding():
+    """Backticks in top_finding must not appear in the Overall Verdict section (T-09-01)."""
+    result = _make_malicious_lens_result("top_finding", "`code block injection`")
+    out = render_analysis([result], "proj", ["security"])
+    assert "`" not in out
+
+
+def test_sanitize_md_angle_brackets_escaped_in_top_finding():
+    """Angle brackets in top_finding must be HTML-escaped in the Overall Verdict section (T-09-01)."""
+    result = _make_malicious_lens_result("top_finding", "<h1>heading injection</h1>")
+    out = render_analysis([result], "proj", ["security"])
+    assert "<h1>" not in out
+    assert "&lt;h1&gt;" in out
+
+
+def test_sanitize_md_backtick_stripped_from_incumbent_summary():
+    """Backticks in incumbent_summary must not appear in rendered output (T-09-01)."""
+    result = _make_malicious_lens_result("incumbent_summary", "says `eval(x)` is safe")
+    out = render_analysis([result], "proj", ["security"])
+    assert "`" not in out
+
+
+def test_sanitize_md_angle_brackets_escaped_in_adversary_summary():
+    """Angle brackets in adversary_summary must be HTML-escaped (T-09-01)."""
+    result = _make_malicious_lens_result("adversary_summary", "<img src=x onerror=alert()>")
+    out = render_analysis([result], "proj", ["security"])
+    assert "<img" not in out
+    assert "&lt;img" in out
+
+
+def test_sanitize_md_backtick_stripped_from_synthesis_summary():
+    """Backticks in synthesis_summary must not appear in rendered output (T-09-01)."""
+    result = _make_malicious_lens_result("synthesis_summary", "use `sudo` carefully")
+    out = render_analysis([result], "proj", ["security"])
+    assert "`" not in out
+
+
+def test_sanitize_md_angle_brackets_escaped_in_synthesis_summary():
+    """Angle brackets in synthesis_summary must be HTML-escaped (T-09-01)."""
+    result = _make_malicious_lens_result("synthesis_summary", "<a href='x'>link</a>")
+    out = render_analysis([result], "proj", ["security"])
+    assert "<a href" not in out
+    assert "&lt;a href" in out
+
+
+def test_sanitize_md_all_fields_clean_when_injected_simultaneously():
+    """All 6 LLM-sourced fields sanitized when all contain injection payloads simultaneously (T-09-01)."""
+    result = {
+        "lens": "security",
+        "verdict": "Finding",
+        "confidence": 0.5,
+        "confidence_label": "low",
+        "findings_text": "`backtick` and <b>bold</b>",
+        "voting_rationale": "`tick` <i>italic</i>",
+        "top_finding": "`top` <em>em</em>",
+        "incumbent_summary": "`inc` <span>span</span>",
+        "adversary_summary": "`adv` <div>div</div>",
+        "synthesis_summary": "`syn` <p>para</p>",
+        "scores": {"A": 2, "B": 3, "AB": 1},
+    }
+    out = render_analysis([result], "proj", ["security"])
+    assert "`" not in out
+    assert "<b>" not in out
+    assert "<i>" not in out
+    assert "<em>" not in out
+    assert "<span>" not in out
+    assert "<div>" not in out
+    assert "<p>" not in out
