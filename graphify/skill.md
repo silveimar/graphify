@@ -1458,6 +1458,12 @@ judge_rankings = JUDGE_RANKINGS_PLACEHOLDER
 
 # Standard Borda count: n=3 candidates, 1st=2pts, 2nd=1pt, 3rd=0pts
 scores = {'A': 0, 'B': 0, 'AB': 0}
+
+# Guard: if all judges failed, force Finding with zero confidence
+if not judge_rankings:
+    print(json.dumps({'winner': 'NONE', 'scores': scores, 'confidence': 0.0, 'confidence_label': 'none', 'tournament_failed': True}))
+    import sys; sys.exit(0)
+
 for ranking in judge_rankings:
     for rank, candidate in enumerate(ranking):
         scores[candidate] += (2 - rank)
@@ -1479,7 +1485,7 @@ print(json.dumps({'winner': winner, 'scores': scores, 'confidence': confidence, 
 ```
 
 After computing Borda scores, assemble the lens result dict:
-- `verdict`: If winner is "A" AND `incumbent_text` contains "no issues found" (case-insensitive) → "Clean". Otherwise → "Finding"
+- `verdict`: If Borda output contains `"tournament_failed": true`, force verdict to "Finding" with confidence 0.0 and `voting_rationale` = "Tournament failed: all judges returned malformed responses". Otherwise, if winner is "A" AND `incumbent_text` contains "no issues found" (case-insensitive) → "Clean". Otherwise → "Finding"
 - `findings_text`: The winner's text — `incumbent_text` if A, `adversary_text` if B, `synthesis_text` if AB
 - `top_finding`: Extract the "Top finding: ..." line from `findings_text` (strip the "Top finding: " prefix). Empty string if "None"
 - `voting_rationale`: Format scores as e.g. "3-0 unanimous for incumbent" or "2-1 for synthesis"
