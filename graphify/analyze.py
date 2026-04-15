@@ -276,7 +276,7 @@ def _cross_community_surprises(
                 ],
                 "confidence": data.get("confidence", "EXTRACTED"),
                 "relation": data.get("relation", ""),
-                "note": f"Bridges graph structure (betweenness={score:.3f})",
+                "why": f"Bridges graph structure (betweenness={score:.3f})",
             })
         return result
 
@@ -312,7 +312,7 @@ def _cross_community_surprises(
             ],
             "confidence": confidence,
             "relation": relation,
-            "note": f"Bridges community {cid_u} → community {cid_v}",
+            "why": f"Bridges community {cid_u} → community {cid_v}",
             "_pair": tuple(sorted([cid_u, cid_v])),
         })
 
