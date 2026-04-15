@@ -265,11 +265,11 @@ def render_analysis(
 
     # Convergences: multiple lenses agree
     lines.append("### Convergences")
-    if len(clean) >= 3:
+    if lens_results and len(clean) == len(lens_results):
+        lines.append("- All lenses agree: no issues detected.")
+    elif len(clean) >= 3:
         lens_names = ", ".join(r.get("lens", "") for r in clean)
         lines.append(f"- {len(clean)} lenses agree: no issues ({lens_names})")
-    elif len(clean) == len(lens_results):
-        lines.append("- All lenses agree: no issues detected.")
     else:
         lines.append("- No strong convergence detected across lenses.")
 
