@@ -405,6 +405,7 @@ from graphify.cluster import cluster, score_all
 from graphify.analyze import god_nodes, surprising_connections, suggest_questions
 from graphify.report import generate
 from graphify.export import to_json
+from graphify.serve import _load_telemetry, _save_telemetry, _decay_telemetry
 from pathlib import Path
 
 extraction = json.loads(Path('graphify-out/.graphify_extract.json').read_text())
@@ -420,9 +421,23 @@ labels = {cid: 'Community ' + str(cid) for cid in communities}
 # Placeholder questions - regenerated with real labels in Step 5
 questions = suggest_questions(G, communities, labels)
 
-report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, 'INPUT_PATH', suggested_questions=questions)
+_tel_path = Path('graphify-out/telemetry.json')
+_usage_data = None
+if _tel_path.exists():
+    import json as _json_tel
+    try:
+        _usage_data = _json_tel.loads(_tel_path.read_text())
+    except (ValueError, OSError):
+        pass
+
+report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, 'INPUT_PATH', suggested_questions=questions, usage_data=_usage_data)
 Path('graphify-out/GRAPH_REPORT.md').write_text(report)
 to_json(G, communities, 'graphify-out/graph.json')
+# Decay telemetry counters on rebuild per D-04
+if _tel_path.exists():
+    _tel_data = _load_telemetry(_tel_path)
+    _decay_telemetry(_tel_data)
+    _save_telemetry(Path('graphify-out'), _tel_data)
 from graphify.snapshot import auto_snapshot_and_delta
 _pre_snap_count = len(list(Path('graphify-out/snapshots').glob('*.json'))) if Path('graphify-out/snapshots').exists() else 0
 _snap_path, _delta_path = auto_snapshot_and_delta(G, communities, root=Path('.'))
@@ -481,7 +496,16 @@ labels = LABELS_DICT
 # Regenerate questions with real community labels (labels affect question phrasing)
 questions = suggest_questions(G, communities, labels)
 
-report = generate(G, communities, cohesion, labels, analysis['gods'], analysis['surprises'], detection, tokens, 'INPUT_PATH', suggested_questions=questions)
+_tel_path = Path('graphify-out/telemetry.json')
+_usage_data = None
+if _tel_path.exists():
+    import json as _json_tel
+    try:
+        _usage_data = _json_tel.loads(_tel_path.read_text())
+    except (ValueError, OSError):
+        pass
+
+report = generate(G, communities, cohesion, labels, analysis['gods'], analysis['surprises'], detection, tokens, 'INPUT_PATH', suggested_questions=questions, usage_data=_usage_data)
 Path('graphify-out/GRAPH_REPORT.md').write_text(report)
 Path('graphify-out/.graphify_labels.json').write_text(json.dumps({str(k): v for k, v in labels.items()}))
 print('Report updated with community labels')
@@ -957,9 +981,23 @@ gods = god_nodes(G)
 surprises = surprising_connections(G, communities)
 labels = {cid: 'Community ' + str(cid) for cid in communities}
 
-report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, '.')
+_tel_path = Path('graphify-out/telemetry.json')
+_usage_data = None
+if _tel_path.exists():
+    import json as _json_tel
+    try:
+        _usage_data = _json_tel.loads(_tel_path.read_text())
+    except (ValueError, OSError):
+        pass
+
+report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, '.', usage_data=_usage_data)
 Path('graphify-out/GRAPH_REPORT.md').write_text(report)
 to_json(G, communities, 'graphify-out/graph.json')
+# Decay telemetry counters on rebuild per D-04
+if _tel_path.exists():
+    _tel_data = _load_telemetry(_tel_path)
+    _decay_telemetry(_tel_data)
+    _save_telemetry(Path('graphify-out'), _tel_data)
 from graphify.snapshot import auto_snapshot_and_delta
 _pre_snap_count = len(list(Path('graphify-out/snapshots').glob('*.json'))) if Path('graphify-out/snapshots').exists() else 0
 _snap_path, _delta_path = auto_snapshot_and_delta(G, communities, root=Path('.'))
