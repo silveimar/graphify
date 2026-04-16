@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import math
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,6 +74,56 @@ def _save_agent_edges(out_dir: Path, edges: list[dict]) -> None:
     except Exception:
         tmp.unlink(missing_ok=True)
         raise
+
+
+def _load_telemetry(path: Path) -> dict:
+    """Load telemetry.json as a dict. Returns default on missing or corrupt."""
+    if not path.exists():
+        return {"counters": {}, "threshold": 5}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"counters": {}, "threshold": 5}
+
+
+def _save_telemetry(out_dir: Path, data: dict) -> None:
+    """Atomically write telemetry.json to out_dir using os.replace."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / "telemetry.json"
+    tmp = target.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, target)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _record_traversal(telemetry: dict, edges: list[tuple]) -> None:
+    """Increment traversal counters for each edge. Keys normalized as min:max. Per D-02."""
+    counters = telemetry.setdefault("counters", {})
+    for u, v in edges:
+        key = f"{min(u, v)}:{max(u, v)}"
+        counters[key] = counters.get(key, 0) + 1
+
+
+def _edge_weight(traversals: int) -> float:
+    """Logarithmic weight: 1.0 + log(t), clamped [1.0, 10.0]. Per D-03/D-05."""
+    return max(1.0, min(10.0, 1.0 + math.log(max(1, traversals))))
+
+
+def _decay_telemetry(telemetry: dict, multiplier: float = 0.8) -> None:
+    """Multiply all counters by multiplier, remove zero entries. Per D-04/D-05."""
+    counters = telemetry.get("counters", {})
+    to_remove = []
+    for key, count in counters.items():
+        new_val = int(count * multiplier)
+        if new_val <= 0:
+            to_remove.append(key)
+        else:
+            counters[key] = new_val
+    for key in to_remove:
+        del counters[key]
 
 
 def _make_annotate_record(node_id: str, text: str, peer_id: str, session_id: str) -> dict:
@@ -354,6 +405,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
     _out_dir = Path(graph_path).parent
     _annotations: list[dict] = _compact_annotations(_out_dir / "annotations.jsonl")
     _agent_edges: list[dict] = _load_agent_edges(_out_dir / "agent-edges.json")
+    _telemetry: dict = _load_telemetry(_out_dir / "telemetry.json")
     _session_id = str(uuid.uuid4())
 
     server = Server("graphify")
@@ -540,6 +592,8 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         if not start_nodes:
             return "No matching nodes found."
         nodes, edges = _dfs(G, start_nodes, depth) if mode == "dfs" else _bfs(G, start_nodes, depth)
+        _record_traversal(_telemetry, edges)
+        _save_telemetry(_out_dir, _telemetry)
         header = f"Traversal: {mode.upper()} depth={depth} | Start: {[G.nodes[n].get('label', n) for n in start_nodes]} | {len(nodes)} nodes found\n\n"
         return header + _subgraph_to_text(G, nodes, edges, budget)
 

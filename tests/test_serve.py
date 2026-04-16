@@ -583,3 +583,70 @@ def test_filter_agent_edges_no_match():
         {"source": "n1", "target": "n2", "peer_id": "alice", "session_id": "s1"},
     ]
     assert _filter_agent_edges(edges, "nobody", None, None) == []
+
+
+# --- Telemetry sidecar helpers (Plan 09.1-01, Task 1) ---
+
+from graphify.serve import (
+    _load_telemetry,
+    _save_telemetry,
+    _record_traversal,
+    _edge_weight,
+    _decay_telemetry,
+)
+
+
+def test_load_telemetry_missing(tmp_path):
+    result = _load_telemetry(tmp_path / "telemetry.json")
+    assert result == {"counters": {}, "threshold": 5}
+
+
+def test_load_telemetry_valid(tmp_path):
+    path = tmp_path / "telemetry.json"
+    data = {"counters": {"a:b": 3}, "threshold": 5}
+    path.write_text(json.dumps(data))
+    result = _load_telemetry(path)
+    assert result == data
+
+
+def test_load_telemetry_corrupt(tmp_path):
+    path = tmp_path / "telemetry.json"
+    path.write_text("not json{{{")
+    result = _load_telemetry(path)
+    assert result == {"counters": {}, "threshold": 5}
+
+
+def test_save_telemetry_atomic(tmp_path):
+    data = {"counters": {"x:y": 7}, "threshold": 5}
+    _save_telemetry(tmp_path, data)
+    path = tmp_path / "telemetry.json"
+    assert path.exists()
+    assert json.loads(path.read_text()) == data
+    # No leftover .tmp file
+    assert not (tmp_path / "telemetry.json.tmp").exists()
+
+
+def test_record_traversal():
+    telemetry = {"counters": {}, "threshold": 5}
+    _record_traversal(telemetry, [("n1", "n2"), ("n2", "n3")])
+    assert telemetry["counters"] == {"n1:n2": 1, "n2:n3": 1}
+
+
+def test_edge_key_normalization():
+    telemetry = {"counters": {}, "threshold": 5}
+    _record_traversal(telemetry, [("n2", "n1")])
+    _record_traversal(telemetry, [("n1", "n2")])
+    assert telemetry["counters"] == {"n1:n2": 2}
+
+
+def test_weight_formula():
+    assert _edge_weight(1) == 1.0
+    assert _edge_weight(2) == pytest.approx(1.693, abs=0.01)
+    assert _edge_weight(22027) == 10.0
+    assert _edge_weight(0) == 1.0
+
+
+def test_decay_counters():
+    telemetry = {"counters": {"a:b": 10, "c:d": 1}, "threshold": 5}
+    _decay_telemetry(telemetry, multiplier=0.8)
+    assert telemetry["counters"] == {"a:b": 8}
