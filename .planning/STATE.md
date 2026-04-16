@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Intelligent Analysis Continuation
-status: Ready to execute
-stopped_at: Completed 09.2-02-PLAN.md (bidirectional BFS + target synthesizer + telemetry extension)
-last_updated: "2026-04-16T22:55:41.546Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 09.2-03-PLAN.md (layer renderer + schema extension + _run_query_graph dispatch with D-02 hybrid response). Phase 9.2 complete. 1099 tests passing.
+last_updated: "2026-04-16T23:09:36.507Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -98,6 +98,10 @@ Key carry-forward decisions:
 - [Phase 09.2]: Hand-rolled _bidirectional_bfs with 3-state status return (ok/frontiers_disjoint/budget_exhausted); no silent fallback on disjoint components per D-07
 - [Phase 09.2]: _synthesize_targets K heuristic locked at max(3, min(20, int(log2(N)))); returns empty list as sentinel for fallback to unidirectional (Pitfall 5)
 - [Phase 09.2]: _record_traversal extended with search_strategy='bfs' default kwarg; per-call record in telemetry['strategies'] list parallel to unchanged counters dict (D-08)
+- [Phase 09.2]: Plan 03 D-02 hybrid response: text_body + SENTINEL('\n---GRAPHIFY-META---\n') + json(meta) with status codes ok/frontiers_disjoint/budget_exhausted/estimate_exceeded/graph_changed/malformed_token/no_seed_nodes
+- [Phase 09.2]: Plan 03 dispatch refactor: _run_query_graph pure helper extracted from _tool_query_graph closure so tests exercise the full Phase 9.2 pipeline without MCP runtime
+- [Phase 09.2]: Plan 03 TOKEN-04 DEFERRED per D-09; test_token_04_deferred_no_bloom_filter_code source-greps serve.py for absence of bloom/materialized_closure/transitive_closure_cache as guard against accidental introduction
+- [Phase 09.2]: Plan 03 backward compat: token_budget retained as DEPRECATED alias for budget; dispatch prefers explicit budget kwarg but falls back to token_budget (D-01)
 
 ### Blockers/Concerns
 
@@ -105,6 +109,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-16T22:55:41.543Z
-Stopped at: Completed 09.2-02-PLAN.md (bidirectional BFS + target synthesizer + telemetry extension)
+Last session: 2026-04-16T23:09:36.504Z
+Stopped at: Completed 09.2-03-PLAN.md (layer renderer + schema extension + _run_query_graph dispatch with D-02 hybrid response). Phase 9.2 complete. 1099 tests passing.
 Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
