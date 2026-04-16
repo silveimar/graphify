@@ -110,6 +110,61 @@
 
 ---
 
+## Milestone: v1.2 — Intelligent Analysis & Cross-File Extraction
+
+**Shipped:** 2026-04-15
+**Phases:** 3 | **Plans:** 9 | **Timeline:** 2 days of code (2026-04-14 → 2026-04-15) + 1 day of retroactive lifecycle cleanup (2026-04-15/16)
+
+### What Was Built
+
+- **`graphify/analyze.py::render_analysis_context`** — Serializes the graph (nodes, edges, communities, god nodes, surprising connections) into a compact text block for tournament LLM prompts. 9 tests in `test_analyze.py`.
+- **`graphify/report.py::render_analysis`** — Produces `GRAPH_ANALYSIS.md` markdown with per-lens sections, overall verdict, cross-lens synthesis (Convergences + Tensions), and tournament rationale (A/B/AB Borda scores). 14 tests in `test_report.py`.
+- **`graphify/skill.md` tournament section (~260 lines)** — 6-step orchestration (A1–A6) for 4 lenses × 4 rounds (incumbent A, adversary B, synthesis AB, blind Borda). Shuffled neutral judge labels (Analysis-1/2/3), "no finding" as first-class Borda option. Writes to `GRAPH_ANALYSIS.md`; `GRAPH_REPORT.md` untouched (D-80).
+- **`graphify/serve.py` telemetry** — `_record_traversal`, `_save_telemetry` (atomic `os.replace`), `_edge_weight`, `_decay_telemetry`, `_check_derived_edges`. Per-edge MCP traversal counters, decay of unused edges, 2-hop A→C derived edges with `confidence=INFERRED`, `confidence_score=0.7`, and a `via` field naming the intermediate node.
+- **`graphify/report.py::_compute_hot_cold` + "Usage Patterns" section** — Percentile-based hot/cold classification surfaced in `GRAPH_REPORT.md`. `generate()` accepts `usage_data=` kwarg at all 3 call sites.
+- **Retroactive lifecycle artifacts (Phase 9.1.1, zero code)** — Generated `09.1-VERIFICATION.md` from existing UAT/VALIDATION/SECURITY evidence, created project-level `.planning/REQUIREMENTS.md` with 10 v1.2 REQ-IDs + file:line traceability, reconciled ROADMAP/STATE/PROJECT into a consistent narrow-scope narrative.
+
+### What Worked
+
+- **Narrow-scope milestone discipline**: v1.2 originally listed 6 phases (9, 9.1, 9.2, 10, 11, 12). The `/gsd-audit-milestone` run on 2026-04-16 surfaced that phases 9 + 9.1 already delivered coherent, shippable value — autoreason tournament + usage-weighted edges form a complete feature. Rather than leave v1.2 open while queueing 4 more phases of retrieval/extraction work, the operator locked scope at 9 + 9.1 and moved the rest to a new v1.3. The re-audit confirmed v1.2 as complete on its own. This is the v1.1 "always audit twice" pattern applied to scope, not just bookkeeping.
+- **Planning-only lifecycle-cleanup phase (Phase 9.1.1)**: A pure gap-closure phase that touched zero code. All 3 audit gaps (missing verification, missing REQUIREMENTS.md, scope contradictions) were closable by writing/reconciling planning artifacts. Because there was no code, no REVIEW.md, VALIDATION.md, or SECURITY.md was needed — just planning delta + verification + summary. The phase completed in under an hour and raised audit score from `gaps_found` to `passed` without touching `graphify/`.
+- **Atomic sidecar writes across all agent state**: `telemetry.json`, `agent-edges.json`, `annotations.jsonl` all use `os.replace()` — no partial-write corruption possible mid-query, even under concurrent MCP traversals. v1.1 established the sidecar pattern; v1.2 locked in atomicity as the default.
+- **Blind Borda prevents "agree with the first agent" failure mode**: Shuffling neutral labels (Analysis-1/2/3) and rotating the label→role mapping across 3 judges (judge 1: [A,B,AB], judge 2: [B,AB,A], judge 3: [AB,A,B]) breaks the natural bias toward accepting whichever perspective was presented first. The tournament is cheap enough (24 LLM calls total across all 4 lenses) that the blind-judging overhead is worth the decision quality.
+- **Separating `GRAPH_ANALYSIS.md` from `GRAPH_REPORT.md` (D-80)**: Mechanical metrics (deterministic, regeneratable) stay in GRAPH_REPORT.md; LLM-produced interpretation (non-deterministic, expensive) lives in GRAPH_ANALYSIS.md. Users can re-run `/graphify` any time and only pay the tournament cost on explicit `/graphify analyze`.
+
+### What Was Inefficient
+
+- **v1.2 was never instantiated via `/gsd-new-milestone`**: REQUIREMENTS.md didn't exist at phase-execution time, so SUMMARY.md files for 09 and 09.1 have no `requirements_completed` frontmatter. The milestone audit had to cross-reference REQ-IDs from a retroactively-created REQUIREMENTS.md (Phase 9.1.1 Plan 02). The 3-source audit pattern works retroactively, but it loses the early-warning signal that catches scope drift before a phase ships.
+- **VERIFICATION.md `human_needed` status never propagated to `passed` after HUMAN-UAT.md closed**: Phase 09 had 3 human checkpoints documented in VERIFICATION.md frontmatter, all resolved 3/3 in HUMAN-UAT.md on 2026-04-15. The VERIFICATION.md frontmatter still read `status: human_needed` until the milestone-close session reconciled it. `/gsd-audit-uat` counted the original 6 frontmatter expectations as "unresolved" even though HUMAN-UAT.md covered them. This is a cross-file integrity issue: HUMAN-UAT.md resolution should auto-bump VERIFICATION.md status.
+- **`gsd-tools audit-open` has a bug**: `ReferenceError: output is not defined` — the comprehensive pre-close audit step couldn't run, so manual grep scans substituted. Non-blocking for this milestone but should be fixed before v1.3 close.
+- **`gsd-tools summary-extract --pick one_liner` returned garbage**: The auto-generated MILESTONES.md entry had 6 accomplishment bullets, 5 of which were literal "One-liner:" strings. The entry had to be hand-rewritten from memory + VERIFICATION.md evidence. Tooling debt called out in v1.0 and v1.1 retrospectives — still unresolved.
+- **09.1-SECURITY.md lacks structured YAML frontmatter**: 7 threats all CLOSED in the table body, but no `threats_total`/`threats_open` frontmatter fields — so grep-based audit extraction returns empty. The milestone audit accepted this as non-blocking, but it means subsequent tooling checks will keep re-flagging phase 09.1 until the frontmatter is added.
+
+### Patterns Established
+
+- **Narrow-scope milestone close**: When an audit surfaces that N of M planned phases already deliver coherent value, ship N and move M−N into a new milestone. Requires: (a) explicit ROADMAP reconciliation recording the split decision, (b) new milestone heading with "continuation" framing, (c) renaming downstream milestones if numbering collides (old v1.3 → v1.4). Documented here as the canonical pattern.
+- **Planning-only lifecycle-cleanup phases**: A phase type that touches zero code, produces no VALIDATION/SECURITY/REVIEW artifacts, and exists solely to reconcile planning-artifact drift. Decimal phase numbering (9.1.1) and a "no code changes" invariant enforced by the verifier. Phase 9.1.1 is the canonical example.
+- **VERIFICATION.md resolution record field**: When HUMAN-UAT.md later resolves a `human_needed` verification, add `resolution_record: <filename>` + `human_checkpoints_resolved: <ISO-date>` fields to VERIFICATION.md frontmatter and update `status` + `score`. Closes the cross-file drift documented in "What Was Inefficient" above.
+- **3-source cross-reference works retroactively**: REQUIREMENTS × VERIFICATION × SUMMARY cross-reference survives a retroactively-created REQUIREMENTS.md, as long as VERIFICATION.md has sufficient evidence detail. The "registered post-hoc" pattern is legitimate tech debt, not a blocker.
+- **Atomic sidecar writes are the contract**: Any agent-writable sidecar must use `os.replace()` — not direct write. This is now the enforced pattern for telemetry, annotations, and agent edges.
+
+### Key Lessons
+
+1. **Instantiate milestones via `/gsd-new-milestone` before phase execution.** This creates REQUIREMENTS.md at the start, so phase SUMMARYs carry `requirements_completed` frontmatter natively. Retroactive creation works but loses the early-warning signal.
+2. **Don't let milestones stay open to accommodate optional scope.** If 2/6 phases already deliver the intent, close the milestone and queue the rest into the next one. Narrow-scope close + continuation milestone is cleaner than indefinite in-progress.
+3. **HUMAN-UAT.md resolution must propagate to VERIFICATION.md frontmatter.** Either as an automated tooling update or as a mandatory step in the HUMAN-UAT close flow. Otherwise audit tooling surfaces stale "human_needed" for items already resolved.
+4. **Fix the `summary-extract` one-liner bug before v1.3 closes.** Three milestones in a row have auto-generated garbage accomplishments. The tooling debt is now blocking efficient milestone closure.
+5. **Enforce SECURITY.md frontmatter schema at phase close.** 09.1 shipped with 7 closed threats but no `threats_total`/`threats_open` fields — which invisibly breaks grep-based audit tooling. Phase verifier should check frontmatter completeness.
+6. **Blind Borda + "no finding" as first-class is worth the complexity.** The architectural investment in shuffled neutral labels and 4-option Borda (A/B/AB/none) prevents the most common LLM-council failure modes. Reusable pattern for any future multi-perspective feature.
+
+### Cost Observations
+
+- **Model mix:** Similar to v1.1 — ~10% opus (orchestration, audits, milestone close), ~85% sonnet (plan execution, test writing), ~5% haiku. The tournament feature itself incurs LLM cost on the *user's* graph, not on GSD operations.
+- **Sessions:** ~3 distinct working sessions across 3 days. Two code-phases sessions + one retroactive cleanup + audit close session.
+- **Notable:** The 24-LLM-call tournament runs in ~2–3 minutes on a real corpus. Tournament cost is amortized across analysis runs (only paid on explicit `/graphify analyze`, not on `/graphify` rebuilds). Phase 9.1.1 (planning-only) added ~1 hour of orchestrator time and fully closed the audit — excellent cost/value ratio for cleanup work.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -118,6 +173,7 @@
 |-----------|--------|-------|------------|
 | v1.0 | 5 | 22 | First milestone using GSD end-to-end; retroactive VERIFICATION pattern pioneered; 3-source audit cross-reference established |
 | v1.1 | 5 | 12 | Decimal phase numbering for gap closure; module-level MCP testing pattern; sidecar persistence as canonical mutation approach |
+| v1.2 | 3 | 9 | Narrow-scope milestone close pattern; planning-only lifecycle-cleanup phase (9.1.1); atomic sidecar writes enforced across all agent state; blind Borda tournament with "no finding" as first-class option |
 
 ### Cumulative Quality
 
@@ -125,15 +181,18 @@
 |-----------|-------|------------------------|-------------------|-------------------|
 | v1.0 | 872 passing | 11,620 | 10,500 | 0 (PyYAML is optional `obsidian` extra only) |
 | v1.1 | 1,000 passing | 13,520 | ~12,400 | 0 (all stdlib additions) |
+| v1.2 | 1,023 passing | ~14,100 | ~13,000 | 0 (all stdlib — telemetry uses `json` + `os.replace`) |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. **Run phase verification at phase completion time, not later.** (v1.0) — Confirmed in v1.1 where all phases had timely verification; no retroactive gap-filling needed.
-2. **Always audit twice (audit → fix → re-audit).** (v1.0, v1.1) — Both milestones found real issues on first audit that were closed before completion. The pattern is now proven across 2 milestones.
-3. **SUMMARY.md extraction tooling needs fixing.** (v1.0, v1.1) — Two milestones of incomplete `summary-extract` output. This is a tooling debt, not a process debt.
-4. **Sidecar-only mutation for agent-writable state.** (v1.1) — New pattern. Ground truth files are read-only; agent state lives in append-only sidecars. No data loss possible from agent bugs.
-5. **Module-level helpers for MCP testability.** (v1.1) — New pattern. Business logic outside handler closures enables direct unit testing without server infrastructure.
+1. **Run phase verification at phase completion time, not later.** (v1.0) — Confirmed in v1.1 where all phases had timely verification; no retroactive gap-filling needed. v1.2 re-surfaced a variant: VERIFICATION.md `status: human_needed` must be flipped to `passed` when HUMAN-UAT.md later resolves the human checkpoints, or audit tooling keeps re-flagging closed items.
+2. **Always audit twice (audit → fix → re-audit).** (v1.0, v1.1, v1.2) — Three milestones, three audit-driven gap closures before close. The pattern is now proven. v1.2 extended it: the second audit can also trigger a *scope* decision, not just a bookkeeping fix (narrow-scope close of 9+9.1, deferred 9.2/10/11/12 to v1.3).
+3. **SUMMARY.md extraction tooling needs fixing.** (v1.0, v1.1, v1.2) — Three milestones of incomplete `summary-extract --pick one_liner` output. The auto-generated MILESTONES.md entry had 5/6 literal "One-liner:" bullets. Blocking efficient close — must be fixed before v1.3.
+4. **Sidecar-only mutation for agent-writable state.** (v1.1) — Reinforced in v1.2: atomic `os.replace()` writes now the default across telemetry, annotations, agent edges. No torn reads under concurrent MCP traversals.
+5. **Module-level helpers for MCP testability.** (v1.1) — Continues in v1.2: `_record_traversal`, `_edge_weight`, `_decay_telemetry`, `_check_derived_edges` are all module-level and directly unit-testable.
+6. **Instantiate milestones before executing phases.** (v1.2) — Without `/gsd-new-milestone` run up-front, phase SUMMARYs lack `requirements_completed` frontmatter and the 3-source audit has to reconstruct REQ coverage from VERIFICATION.md evidence. Works retroactively, but loses the early-warning signal.
+7. **Narrow-scope close > indefinite milestone.** (v1.2) — When N of M planned phases already deliver coherent value, close N and queue M−N into the next milestone with explicit origin anchoring. Keeps milestones shippable and traceable.
 
 ---
 
-_Retrospective last updated: 2026-04-13 after v1.1 milestone completion._
+_Retrospective last updated: 2026-04-16 after v1.2 milestone completion._
