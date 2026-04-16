@@ -30,7 +30,7 @@ Plan: Not started
 Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
 Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
 Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
-Last activity: 2026-04-16
+Last activity: 2026-04-16 - Completed quick task 260416-okg: Add /graphify analyze entries to Usage cheat-sheet in all skill variants
 
 Progress: [░░░░░░░░░░] 0% (0/3 phases complete)
 
@@ -106,6 +106,12 @@ Key carry-forward decisions:
 ### Blockers/Concerns
 
 None.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260416-okg | Add /graphify analyze entries to Usage cheat-sheet in all skill variants | 2026-04-16 | 058152b | [260416-okg-add-graphify-analyze-entries-to-usage-ch](./quick/260416-okg-add-graphify-analyze-entries-to-usage-ch/) |
 
 ## Session Continuity
 
