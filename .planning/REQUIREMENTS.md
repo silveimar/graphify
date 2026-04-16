@@ -13,7 +13,7 @@ Requirements grouped by priority category. Each maps to exactly one roadmap phas
 
 - [ ] **TOKEN-01**: Agent can call MCP `graph_query` with a `budget=N` token parameter that returns a 3-layer progressive response (Layer 1: compact summaries ~50 tokens/node; Layer 2: edge details + neighbors on drill-down ~200 tokens/node; Layer 3: full subgraph with all attributes only on explicit request)
 - [x] **TOKEN-02**: Agent sees an estimated result cardinality (node count, edge count, approximate token size) before a multi-hop graph query executes, with the option to abort when the estimate exceeds the supplied budget
-- [ ] **TOKEN-03**: Multi-hop graph queries (depth ≥ 3) use bidirectional search from both endpoints and meet in the middle, avoiding exponential path explosion on densely connected graphs
+- [x] **TOKEN-03**: Multi-hop graph queries (depth ≥ 3) use bidirectional search from both endpoints and meet in the middle, avoiding exponential path explosion on densely connected graphs
 - [ ] **TOKEN-04** *[stretch]*: Sparse-predicate joins are skipped via Bloom filter probes, and 2–3-hop transitive closures are served from a materialized cache computed during idle rebuild windows
 
 ### Graph Quality on Multi-Source Inputs (Priority b → Phase 10)
@@ -75,7 +75,7 @@ Which phases cover which requirements. Filled by roadmap.
 |-------------|-------|--------|
 | TOKEN-01 | Phase 9.2 | Pending |
 | TOKEN-02 | Phase 9.2 | Complete |
-| TOKEN-03 | Phase 9.2 | Pending |
+| TOKEN-03 | Phase 9.2 | Complete |
 | TOKEN-04 | Phase 9.2 | Pending |
 | GRAPH-01 | Phase 10 | Pending |
 | GRAPH-02 | Phase 10 | Pending |

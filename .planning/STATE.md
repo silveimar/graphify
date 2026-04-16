@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Intelligent Analysis Continuation
 status: Ready to execute
-stopped_at: Completed 09.2-01-PLAN.md
-last_updated: "2026-04-16T22:42:09.266Z"
+stopped_at: Completed 09.2-02-PLAN.md (bidirectional BFS + target synthesizer + telemetry extension)
+last_updated: "2026-04-16T22:55:41.546Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-16 after v1.3 milestone open)
 ## Current Position
 
 Phase: 09.2 (Progressive Graph Retrieval) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
 Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
 Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
@@ -95,6 +95,9 @@ Key carry-forward decisions:
 - [Phase 09.2]: 64 KB DoS cap enforced BEFORE base64 decode (T-09.2-02 mitigation)
 - [Phase 09.2]: SHA-256 hash truncated to 16 hex chars (64 bits integrity, not cryptographic auth)
 - [Phase 09.2]: Layer 3 coefficients (100 tok/node + 95 tok/edge) calibrated from live graphify-out/graph.json
+- [Phase 09.2]: Hand-rolled _bidirectional_bfs with 3-state status return (ok/frontiers_disjoint/budget_exhausted); no silent fallback on disjoint components per D-07
+- [Phase 09.2]: _synthesize_targets K heuristic locked at max(3, min(20, int(log2(N)))); returns empty list as sentinel for fallback to unidirectional (Pitfall 5)
+- [Phase 09.2]: _record_traversal extended with search_strategy='bfs' default kwarg; per-call record in telemetry['strategies'] list parallel to unchanged counters dict (D-08)
 
 ### Blockers/Concerns
 
@@ -102,6 +105,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-16T22:42:09.263Z
-Stopped at: Completed 09.2-01-PLAN.md
+Last session: 2026-04-16T22:55:41.543Z
+Stopped at: Completed 09.2-02-PLAN.md (bidirectional BFS + target synthesizer + telemetry extension)
 Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
