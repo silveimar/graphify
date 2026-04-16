@@ -44,11 +44,20 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - ✓ `--force` flag, dry-run source annotations, merge plan audit trail — v1.1
 - ✓ MCP `get_node` provenance (staleness classification) and `get_agent_edges` query tool — v1.1
 
-### Active (next milestone — not yet defined)
+**v1.2 — Intelligent Analysis & Cross-File Extraction:** *(Shipped 2026-04-15, narrow scope: phases 9 + 9.1)*
+- ✓ Configurable analysis lenses (security, architecture, complexity, onboarding) with autoreason tournament A/B/AB/Borda — v1.2-REQ-09-A
+- ✓ "No finding" competes as first-class Borda option (Clean verdict) — v1.2-REQ-09-B
+- ✓ Tournament output in `GRAPH_ANALYSIS.md` separate from `GRAPH_REPORT.md` (D-80) — v1.2-REQ-09-C
+- ✓ Per-edge traversal counters via MCP query telemetry (`serve.py`) — v1.2-REQ-09.1-A
+- ✓ Hot-path strengthening and unused-path decay (`_edge_weight` + `_decay_telemetry`) — v1.2-REQ-09.1-B
+- ✓ 2-hop A→C derived edges with INFERRED confidence via `_check_derived_edges` — v1.2-REQ-09.1-C
+- ✓ Hot/cold paths surfaced in `GRAPH_REPORT.md` "## Usage Patterns" section — v1.2-REQ-09.1-D
 
-_(No active requirements — run `/gsd-new-milestone` to define v1.2 requirements)_
+### Active
 
-### Deferred (v1.2+ — template engine extensions from v1.0)
+v1.2 is shipped. No active requirements until `/gsd-new-milestone v1.3` instantiates the next milestone (v1.3 Intelligent Analysis Continuation — phases 9.2, 10, 11, 12 are queued in ROADMAP.md). Run `/gsd-complete-milestone v1.2` to archive the current requirements block into `.planning/milestones/v1.2-REQUIREMENTS.md`.
+
+### Deferred (v1.3+ — template engine extensions from v1.0)
 
 - [ ] Conditional template sections (`{{#if_god_node}}...{{/if}}` guards) — TMPL-01
 - [ ] Loop blocks for connections in templates (`{{#connections}}...{{/connections}}`) — TMPL-02
@@ -87,6 +96,13 @@ _(No active requirements — run `/gsd-new-milestone` to define v1.2 requirement
 - **Delivered:** Obsidian round-trip awareness. Content-hash manifest (`vault-manifest.json`) tracks what graphify wrote per note. On re-run, user-modified notes receive SKIP_PRESERVE — user content never overwritten. User sentinel blocks (`<!-- GRAPHIFY_USER_START -->` / `<!-- GRAPHIFY_USER_END -->`) provide explicit preservation zones that survive even REPLACE strategy and `--force` mode. `--force` flag bypasses whole-note user-modified detection while respecting sentinel blocks. Dry-run output enhanced with source annotations (`[user]`/`[both]`) and summary preamble.
 - **Test count:** 985 passing (33 new across 5 test classes in `test_merge.py`).
 - **Shipped in:** 3 plans across 3 waves, 9 feature commits.
+
+### v1.2 shipped (2026-04-15)
+
+- **Delivered:** Intelligent analysis and usage-weighted graph self-improvement. Phase 09 added the autoreason tournament (`render_analysis_context` in `analyze.py:456`, `render_analysis` in `report.py:185`, full A/B/AB/Borda tournament orchestration in `skill.md:1324-1546` writing to `GRAPH_ANALYSIS.md` — separate from `GRAPH_REPORT.md` per D-80). Phase 09.1 added query telemetry (`_record_traversal`, `_save_telemetry`, `_edge_weight`, `_decay_telemetry` in `serve.py`), 2-hop derived shortcut edges with INFERRED confidence (`_check_derived_edges` writes to `agent-edges.json`), and hot/cold path surfacing (`_compute_hot_cold` in `report.py:16`, "## Usage Patterns" section at `report.py:219`). Skill pipeline wired to pass `usage_data=` to all 3 `generate()` call sites and run `_decay_telemetry` at both full-rebuild points.
+- **Test count:** ~1,108 passing (108 new across `test_serve.py` + `test_report.py`).
+- **Shipped in:** 2 phases, 6 plans, ~20 feature commits over 2 days (2026-04-14 → 2026-04-15). Formal goal-backward verification recorded in `09-VERIFICATION.md` (11/12, 1 human_needed resolved via `09-HUMAN-UAT.md` 3/3) and `09.1-VERIFICATION.md` (13/13, generated via Phase 9.1.1 Plan 01 from existing UAT/VALIDATION/SECURITY evidence). 14/14 security threats closed (ASVS L1).
+- **Narrow-scope reconciliation:** Milestone v1.2 originally listed 6 phases (9, 9.1, 9.2, 10, 11, 12) in the ROADMAP. During the `/gsd-audit-milestone` review on 2026-04-16 the operator locked v1.2 at phases 9 + 9.1. Phases 9.2, 10, 11, 12 moved to a new milestone v1.3 "Intelligent Analysis Continuation"; the original v1.3 (Agent Discoverability) renamed to v1.4. Reconciliation executed by Phase 9.1.1 lifecycle cleanup.
 
 ### Enduring background (carries across milestones)
 
@@ -143,9 +159,11 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Shipped v1.1** (2026-04-13) — Context persistence and agent memory. 5 phases, 12 plans, 25/25 requirements, 1,000 tests. See `.planning/milestones/v1.1-*`.
 
-**Codebase:** 13,520 LOC across 26 Python modules (`graphify/`), 1,000 tests passing on Python 3.10 and 3.12.
+**Shipped v1.2** (2026-04-15) — Intelligent analysis & cross-file extraction (narrow scope). 2 phases, 6 plans, 7/7 derived requirements satisfied (registered post-hoc in `.planning/REQUIREMENTS.md` during Phase 9.1.1), ~1,108 tests. See `.planning/phases/09-*` and `.planning/phases/09.1-*`.
 
-**Next milestone:** Not yet defined. Run `/gsd-new-milestone` to start v1.2 planning. Candidate themes: multi-perspective analysis (v1.2), agent discoverability (v1.3). See ROADMAP.md for planned phases.
+**Codebase:** Python 3.10/3.12; `graphify/` + `tests/` with 108 new test additions during v1.2 scope.
+
+**Next milestone:** v1.3 Intelligent Analysis Continuation (queued — phases 9.2, 10, 11, 12). Run `/gsd-complete-milestone v1.2` to archive the current requirements catalog, then `/gsd-new-milestone v1.3` when ready to plan the next block.
 
 ---
-*Last updated: 2026-04-13 after v1.1 milestone*
+*Last updated: 2026-04-15 after v1.2 milestone + Phase 9.1.1 lifecycle cleanup reconciliation*
