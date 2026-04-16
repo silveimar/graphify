@@ -112,12 +112,27 @@ def _compute_branching_factor(G: nx.Graph) -> float:
     return (2.0 * G.number_of_edges()) / G.number_of_nodes()
 
 
-def _record_traversal(telemetry: dict, edges: list[tuple]) -> None:
-    """Increment traversal counters for each edge. Keys normalized as min:max. Per D-02."""
+def _record_traversal(
+    telemetry: dict,
+    edges: list[tuple],
+    search_strategy: str = "bfs",
+) -> None:
+    """Increment traversal counters for each edge. Keys normalized as min:max. Per D-02.
+
+    Phase 9.2 D-08: records `search_strategy` per call in `telemetry["strategies"]`.
+    Valid values: "bfs", "dfs", "bidirectional". Legacy callers without the kwarg
+    default to "bfs", matching the pre-9.2 implicit behavior.
+    """
     counters = telemetry.setdefault("counters", {})
     for u, v in edges:
         key = f"{min(u, v)}:{max(u, v)}"
         counters[key] = counters.get(key, 0) + 1
+    # Phase 9.2 D-08: per-call strategy record. Phase 9.1's _compute_hot_cold() reads
+    # `counters` not this list — backward compatible extension.
+    telemetry.setdefault("strategies", []).append({
+        "strategy": search_strategy,
+        "edges": len(edges),
+    })
 
 
 # Continuation-token codec — stateless drill-down for Phase 9.2 progressive retrieval.

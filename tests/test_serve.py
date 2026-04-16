@@ -839,3 +839,36 @@ def test_continuation_token_oversized_rejected():
     payload, status = _decode_continuation(huge, graph_mtime=1000.0)
     assert status == "malformed"
     assert payload == {}
+
+
+# --- Phase 9.2 Plan 02 Task 1: _record_traversal search_strategy extension (D-08) ---
+
+def test_record_traversal_stores_search_strategy():
+    from graphify.serve import _record_traversal
+    telemetry: dict = {}
+    _record_traversal(telemetry, [("a", "b")], search_strategy="bidirectional")
+    assert telemetry["counters"]["a:b"] == 1
+    assert "strategies" in telemetry
+    assert len(telemetry["strategies"]) == 1
+    assert telemetry["strategies"][0]["strategy"] == "bidirectional"
+    assert telemetry["strategies"][0]["edges"] == 1
+
+
+def test_record_traversal_backward_compat():
+    # Legacy call signature: no search_strategy kwarg — must still increment counters.
+    from graphify.serve import _record_traversal
+    telemetry: dict = {}
+    _record_traversal(telemetry, [("a", "b"), ("b", "c")])
+    assert telemetry["counters"]["a:b"] == 1
+    assert telemetry["counters"]["b:c"] == 1
+    # Default strategy recorded as "bfs"
+    assert telemetry["strategies"][0]["strategy"] == "bfs"
+
+
+def test_record_traversal_multiple_strategies():
+    from graphify.serve import _record_traversal
+    telemetry: dict = {}
+    _record_traversal(telemetry, [("a", "b")], search_strategy="bfs")
+    _record_traversal(telemetry, [("a", "c")], search_strategy="dfs")
+    _record_traversal(telemetry, [("a", "d")], search_strategy="bidirectional")
+    assert [r["strategy"] for r in telemetry["strategies"]] == ["bfs", "dfs", "bidirectional"]
