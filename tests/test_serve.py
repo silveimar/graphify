@@ -22,6 +22,7 @@ from graphify.serve import (
     _make_proposal_record,
     _save_proposal,
     _list_proposals,
+    _estimate_tokens_for_layer,
 )
 
 
@@ -715,3 +716,25 @@ def test_derived_edge_existing_graph_edge(tmp_path):
     agent_edges: list[dict] = []
     _check_derived_edges(G, telemetry, tmp_path, agent_edges)
     assert len(agent_edges) == 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 9.2 — Progressive Graph Retrieval: Plan 01 foundation helpers
+# ---------------------------------------------------------------------------
+
+
+def test_estimate_tokens_for_layer():
+    # Layer 1: 50 tok/node (no edge cost) — CONTEXT D-04
+    assert _estimate_tokens_for_layer(10, 5, 1) == 500
+    # Layer 2: 200 tok/node + 30 tok/edge
+    assert _estimate_tokens_for_layer(10, 5, 2) == 2150
+    # Layer 3: calibrated from graphify-out/graph.json (391 B avg node / 4 chars/tok)
+    assert _estimate_tokens_for_layer(10, 5, 3) == 1475
+    # Monotonic ordering L1 <= L2 for the same non-trivial input
+    assert _estimate_tokens_for_layer(10, 5, 1) <= _estimate_tokens_for_layer(10, 5, 2)
+
+
+def test_estimate_tokens_for_layer_zero_input():
+    assert _estimate_tokens_for_layer(0, 0, 1) == 0
+    assert _estimate_tokens_for_layer(0, 0, 2) == 0
+    assert _estimate_tokens_for_layer(0, 0, 3) == 0

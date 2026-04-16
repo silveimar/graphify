@@ -379,6 +379,22 @@ def _dfs(G: nx.Graph, start_nodes: list[str], depth: int) -> tuple[set[str], lis
     return visited, edges_seen
 
 
+def _estimate_tokens_for_layer(n_nodes: int, n_edges: int, layer: int) -> int:
+    """Deterministic token estimate for a layered subgraph — no tokenizer dep.
+
+    Layer 1: id + label + community only                -> ~50 tok/node       (CONTEXT D-04)
+    Layer 2: L1 + edges + 1-hop neighbor labels         -> ~200 tok/node + ~30 tok/edge
+    Layer 3: full attribute serialization               -> ~100 tok/node + ~95 tok/edge
+             (calibrated from graphify-out/graph.json: avg 391 B/node / 4 chars/tok)
+    """
+    if layer == 1:
+        return 50 * n_nodes
+    if layer == 2:
+        return 200 * n_nodes + 30 * n_edges
+    # layer == 3 (or any other value) — full attribute dump
+    return 100 * n_nodes + 95 * n_edges
+
+
 def _subgraph_to_text(G: nx.Graph, nodes: set[str], edges: list[tuple], token_budget: int = 2000) -> str:
     """Render subgraph as text, cutting at token_budget (approx 3 chars/token)."""
     char_budget = token_budget * 3
