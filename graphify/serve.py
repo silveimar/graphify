@@ -714,6 +714,64 @@ def _find_node(G: nx.Graph, label: str) -> list[str]:
             if term in d.get("label", "").lower() or term == nid.lower()]
 
 
+def _query_graph_input_schema() -> dict:
+    """Return the JSON Schema dict for the `query_graph` MCP tool input.
+
+    Extracted as a module-level function so tests can assert the schema shape without
+    spinning up the `mcp` runtime. `serve()`'s `list_tools` handler uses this.
+
+    Phase 9.2 D-01 extension: adds `budget`, `layer`, `continuation_token` properties;
+    keeps `token_budget` as deprecated alias for backward compatibility.
+    """
+    return {
+        "type": "object",
+        "properties": {
+            "question": {
+                "type": "string",
+                "description": "Natural language question or keyword search",
+            },
+            "mode": {
+                "type": "string",
+                "enum": ["bfs", "dfs"],
+                "default": "bfs",
+                "description": "bfs=broad context, dfs=trace a specific path (depth < 3 only)",
+            },
+            "depth": {
+                "type": "integer",
+                "default": 3,
+                "minimum": 1,
+                "maximum": 6,
+                "description": "Traversal depth (1-6). At depth >= 3 bidirectional BFS auto-activates.",
+            },
+            # Phase 9.2 D-01 — three new optional properties, backward compatible:
+            "budget": {
+                "type": "integer",
+                "default": 2000,
+                "minimum": 50,
+                "maximum": 100000,
+                "description": "Total token ceiling for the response",
+            },
+            "layer": {
+                "type": "integer",
+                "default": 1,
+                "enum": [1, 2, 3],
+                "description": "1=compact summary, 2=edges+neighbors, 3=full",
+            },
+            "continuation_token": {
+                "type": "string",
+                "description": "Opaque drill-down token from a prior Layer 1 or 2 response",
+            },
+            # DEPRECATED alias — retained indefinitely per D-01 for backward compatibility:
+            "token_budget": {
+                "type": "integer",
+                "default": 2000,
+                "description": "DEPRECATED - alias for `budget`. Kept for backward compatibility.",
+            },
+        },
+        "required": ["question"],
+    }
+
+
 def _filter_blank_stdin() -> None:
     """Filter blank lines from stdin before MCP reads it.
 
@@ -774,17 +832,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             types.Tool(
                 name="query_graph",
                 description="Search the knowledge graph using BFS or DFS. Returns relevant nodes and edges as text context.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "question": {"type": "string", "description": "Natural language question or keyword search"},
-                        "mode": {"type": "string", "enum": ["bfs", "dfs"], "default": "bfs",
-                                 "description": "bfs=broad context, dfs=trace a specific path"},
-                        "depth": {"type": "integer", "default": 3, "description": "Traversal depth (1-6)"},
-                        "token_budget": {"type": "integer", "default": 2000, "description": "Max output tokens"},
-                    },
-                    "required": ["question"],
-                },
+                inputSchema=_query_graph_input_schema(),
             ),
             types.Tool(
                 name="get_node",

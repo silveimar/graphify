@@ -30,6 +30,7 @@ from graphify.serve import (
     _encode_continuation,
     _decode_continuation,
     _synthesize_targets,
+    _query_graph_input_schema,
 )
 
 
@@ -1076,3 +1077,34 @@ def test_subgraph_to_text_all_layers_sanitize_labels():
         out = _subgraph_to_text(G, nodes, edges, 2000, layer=layer)
         # Raw \x00 MUST NOT appear — sanitize_label strips control chars on every layer
         assert "\x00" not in out
+
+
+# --- Phase 9.2 Plan 03 Task 2: query_graph input schema extension ---
+
+def test_list_tools_query_graph_schema_has_budget():
+    schema = _query_graph_input_schema()
+    props = schema["properties"]
+    assert "budget" in props
+    assert "layer" in props
+    assert "continuation_token" in props
+    assert schema["required"] == ["question"]
+
+
+def test_list_tools_query_graph_schema_layer_enum():
+    schema = _query_graph_input_schema()
+    assert schema["properties"]["layer"]["enum"] == [1, 2, 3]
+
+
+def test_list_tools_query_graph_schema_backward_compat():
+    schema = _query_graph_input_schema()
+    # Legacy param must remain for backward compat per D-01
+    assert "token_budget" in schema["properties"]
+    assert "DEPRECATED" in schema["properties"]["token_budget"]["description"]
+
+
+def test_list_tools_query_graph_schema_budget_clamped():
+    schema = _query_graph_input_schema()
+    # DoS mitigation per RESEARCH Security Domain
+    assert schema["properties"]["budget"]["minimum"] == 50
+    assert schema["properties"]["budget"]["maximum"] == 100000
+    assert schema["properties"]["depth"]["maximum"] == 6
