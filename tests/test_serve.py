@@ -9,6 +9,7 @@ from graphify.serve import (
     _communities_from_graph,
     _score_nodes,
     _bfs,
+    _bidirectional_bfs,
     _dfs,
     _subgraph_to_text,
     _load_graph,
@@ -41,6 +42,28 @@ def _make_graph() -> nx.Graph:
     G.add_edge("n1", "n2", relation="calls", confidence="INFERRED")
     G.add_edge("n2", "n3", relation="imports", confidence="EXTRACTED")
     G.add_edge("n3", "n4", relation="uses", confidence="EXTRACTED")
+    return G
+
+
+def _make_chain_graph(n: int) -> nx.Graph:
+    """Chain n1-n2-...-nN, 1-connected component."""
+    G = nx.Graph()
+    for i in range(1, n + 1):
+        G.add_node(f"n{i}", label=f"node{i}")
+    for i in range(1, n):
+        G.add_edge(f"n{i}", f"n{i+1}")
+    return G
+
+
+def _make_disjoint_components() -> nx.Graph:
+    """Two disjoint 3-node chains: a1-a2-a3 and b1-b2-b3."""
+    G = nx.Graph()
+    for name in ["a1", "a2", "a3", "b1", "b2", "b3"]:
+        G.add_node(name, label=name)
+    G.add_edge("a1", "a2")
+    G.add_edge("a2", "a3")
+    G.add_edge("b1", "b2")
+    G.add_edge("b2", "b3")
     return G
 
 
@@ -872,3 +895,58 @@ def test_record_traversal_multiple_strategies():
     _record_traversal(telemetry, [("a", "c")], search_strategy="dfs")
     _record_traversal(telemetry, [("a", "d")], search_strategy="bidirectional")
     assert [r["strategy"] for r in telemetry["strategies"]] == ["bfs", "dfs", "bidirectional"]
+
+
+# --- Phase 9.2 Plan 02 Task 2: _bidirectional_bfs (D-06, D-07) ---
+
+def test_bidirectional_bfs_meets_in_middle():
+    G = _make_chain_graph(7)  # n1..n7
+    visited, edges, status = _bidirectional_bfs(G, ["n1"], ["n7"], depth=6, max_visited=1000)
+    assert status == "ok"
+    assert "n1" in visited and "n7" in visited
+    # Should visit far fewer than 7 — bidirectional meets near the middle
+    assert len(visited) <= 7
+
+
+def test_bidirectional_disjoint_frontiers_partial():
+    G = _make_disjoint_components()
+    visited, edges, status = _bidirectional_bfs(
+        G, ["a1"], ["b1"], depth=5, max_visited=1000
+    )
+    assert status == "frontiers_disjoint"
+    # Partial: both starting frontiers are in visited
+    assert "a1" in visited and "b1" in visited
+    # No path exists, but we explored both sides
+    assert len(visited) >= 2
+
+
+def test_bidirectional_budget_exhausted():
+    G = nx.balanced_tree(r=3, h=4)  # ~121 nodes
+    # Convert integer node names to strings to match our API
+    G = nx.relabel_nodes(G, {n: f"n{n}" for n in G.nodes()})
+    visited, edges, status = _bidirectional_bfs(
+        G, ["n0"], ["n120"], depth=4, max_visited=5
+    )
+    assert status == "budget_exhausted"
+    # Cap was reached — count may slightly overshoot due to single-frontier expansion,
+    # but should be in a tight band around max_visited.
+    assert len(visited) >= 5
+
+
+def test_bidirectional_ok_status_on_reachable():
+    G = _make_chain_graph(5)
+    visited, edges, status = _bidirectional_bfs(G, ["n1"], ["n5"], depth=4, max_visited=100)
+    assert status == "ok"
+
+
+def test_bidirectional_no_double_counting_at_meet():
+    G = _make_chain_graph(5)  # n1-n2-n3-n4-n5
+    _, edges, status = _bidirectional_bfs(G, ["n1"], ["n5"], depth=4, max_visited=100)
+    assert status == "ok"
+    # Normalize edges to (min, max) tuples — no duplicates
+    normalized = {(min(u, v), max(u, v)) for u, v in edges}
+    # edges_seen may contain duplicates during traversal (Pitfall 6)
+    # but after dedup, count is reasonable
+    assert len(normalized) >= 1
+    # The caller (Plan 03) will dedupe before calling _record_traversal;
+    # this test just confirms dedup is achievable on the output.

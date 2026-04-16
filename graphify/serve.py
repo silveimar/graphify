@@ -447,6 +447,100 @@ def _bfs(G: nx.Graph, start_nodes: list[str], depth: int) -> tuple[set[str], lis
     return visited, edges_seen
 
 
+def _bidirectional_bfs(
+    G: nx.Graph,
+    start_nodes: list[str],
+    target_nodes: list[str],
+    depth: int,
+    max_visited: int,
+) -> tuple[set[str], list[tuple], str]:
+    """Meet-in-the-middle BFS. `depth` is the combined hop budget (forward + reverse).
+
+    Returns (visited, edges_seen, status) where status is one of:
+      "ok"                 — frontiers met, traversal complete (reachable endpoints)
+      "frontiers_disjoint" — exhausted depth budget without meeting (disjoint components)
+      "budget_exhausted"   — hit max_visited cap before meet
+
+    Per CONTEXT D-06/D-07. Implementation is hand-rolled rather than wrapping
+    networkx._bidirectional_pred_succ because:
+      (a) NetworkX's helper is a private API (leading underscore)
+      (b) it returns pred/succ dicts for path reconstruction, not a visited set
+      (c) it cannot produce partial results on disjoint frontiers
+    Mirrors the (visited, edges_seen) contract of _bfs() above so _subgraph_to_text
+    and _record_traversal consume it uniformly.
+    """
+    forward_visited: set[str] = set(start_nodes)
+    reverse_visited: set[str] = set(target_nodes)
+    forward_frontier: set[str] = set(start_nodes)
+    reverse_frontier: set[str] = set(target_nodes)
+    edges_seen: list[tuple] = []
+
+    # Immediate meet check (start and target overlap)
+    if forward_visited & reverse_visited:
+        return forward_visited | reverse_visited, edges_seen, "ok"
+
+    hops_forward = 0
+    hops_reverse = 0
+    max_forward = (depth + 1) // 2
+    max_reverse = depth // 2
+
+    while forward_frontier or reverse_frontier:
+        # Budget check (D-07 — "budget_exhausted")
+        if len(forward_visited) + len(reverse_visited) >= max_visited:
+            return forward_visited | reverse_visited, edges_seen, "budget_exhausted"
+
+        # Pick smaller frontier to expand (same heuristic NetworkX uses)
+        expand_forward = (
+            forward_frontier
+            and hops_forward < max_forward
+            and (
+                not reverse_frontier
+                or len(forward_frontier) <= len(reverse_frontier)
+                or hops_reverse >= max_reverse
+            )
+        )
+
+        if expand_forward:
+            next_f: set[str] = set()
+            for n in forward_frontier:
+                for neighbor in G.neighbors(n):
+                    if neighbor not in forward_visited:
+                        next_f.add(neighbor)
+                        edges_seen.append((n, neighbor))
+                        if neighbor in reverse_visited:
+                            forward_visited |= next_f
+                            return (
+                                forward_visited | reverse_visited,
+                                edges_seen,
+                                "ok",
+                            )
+            forward_visited |= next_f
+            forward_frontier = next_f
+            hops_forward += 1
+        elif reverse_frontier and hops_reverse < max_reverse:
+            next_r: set[str] = set()
+            for n in reverse_frontier:
+                for neighbor in G.neighbors(n):
+                    if neighbor not in reverse_visited:
+                        next_r.add(neighbor)
+                        edges_seen.append((neighbor, n))  # reversed direction marker
+                        if neighbor in forward_visited:
+                            reverse_visited |= next_r
+                            return (
+                                forward_visited | reverse_visited,
+                                edges_seen,
+                                "ok",
+                            )
+            reverse_visited |= next_r
+            reverse_frontier = next_r
+            hops_reverse += 1
+        else:
+            # Neither frontier can expand further under the depth budget
+            break
+
+    return forward_visited | reverse_visited, edges_seen, "frontiers_disjoint"
+
+
 def _dfs(G: nx.Graph, start_nodes: list[str], depth: int) -> tuple[set[str], list[tuple]]:
     visited: set[str] = set()
     edges_seen: list[tuple] = []
