@@ -86,7 +86,7 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
   **Plans:** 3 plans
   - [x] 09.1.1-01-PLAN.md — Write 09.1-VERIFICATION.md from existing UAT/VALIDATION/SECURITY evidence (closes audit gap 1)
   - [x] 09.1.1-02-PLAN.md — Create .planning/REQUIREMENTS.md with 7 derived v1.2 REQ-IDs + 3 phase-9.1.1 REQ-IDs and traceability (closes audit gap 2)
-  - [ ] 09.1.1-03-PLAN.md — Reconcile ROADMAP.md + STATE.md + PROJECT.md to narrow v1.2 scope; move phases 9.2/10/11/12 to new v1.3; rename old v1.3 to v1.4 (closes audit gap 3)
+  - [x] 09.1.1-03-PLAN.md — Reconcile ROADMAP.md + STATE.md + PROJECT.md to narrow v1.2 scope; move phases 9.2/10/11/12 to new v1.3; rename old v1.3 to v1.4 (closes audit gap 3)
 
 ---
 
