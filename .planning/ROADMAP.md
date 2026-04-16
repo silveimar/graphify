@@ -76,7 +76,10 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
   - [x] 09-01-PLAN.md — Python utility functions (render_analysis_context + render_analysis) with TDD
   - [x] 09-02-PLAN.md — Tournament orchestration in skill.md
   - [x] 09-03-PLAN.md — Human verification of tournament output quality
-- [ ] Phase 9.1: Query Telemetry & Usage-Weighted Edges — Track which MCP queries traverse which edges (query telemetry), maintain traversal counters per edge, and run a post-query pass that strengthens high-traffic paths and decays unused ones. After N traversals of A→B→C, propose a direct A→C derived edge with INFERRED confidence. Surface "hot paths" and "cold zones" in analysis reports. Prerequisite for making multi-perspective analysis usage-aware. _(Informed by: topoteretes/cognee memify() RL-inspired graph self-improvement, rohitg00/agentmemory tiered consolidation)_
+- [ ] Phase 9.1: Query Telemetry & Usage-Weighted Edges — Track which MCP queries traverse which edges (query telemetry), maintain traversal counters per edge, and run a post-query pass that strengthens high-traffic paths and decays unused ones. After N traversals of A->B->C, propose a direct A->C derived edge with INFERRED confidence. Surface "hot paths" and "cold zones" in GRAPH_REPORT.md. Prerequisite for making multi-perspective analysis usage-aware. _(Informed by: topoteretes/cognee memify() RL-inspired graph self-improvement, rohitg00/agentmemory tiered consolidation)_
+  **Plans:** 2 plans
+  - [ ] 09.1-01-PLAN.md — Telemetry sidecar, traversal recording, weight formula, decay, derived edges (serve.py)
+  - [ ] 09.1-02-PLAN.md — Usage Patterns report section with hot/cold paths (report.py)
 - [ ] Phase 9.2: Progressive Graph Retrieval — Token-aware 3-layer MCP responses: Layer 1 returns compact summaries (node IDs + labels + community, ~50 tokens), Layer 2 returns edge details and neighbors on drill-down (~200 tokens per node), Layer 3 returns full subgraph with all attributes only on explicit request. Add `budget` parameter to `graph_query` for context-window-aware retrieval. Prevents context blowout at 500+ node graphs. _(Informed by: thedotmack/claude-mem progressive disclosure, rohitg00/agentmemory triple-stream retrieval)_
 - [ ] Phase 10: Cross-File Semantic Extraction — When context window allows, send clusters of related files (same directory, import-connected) as a batch for extraction. Captures cross-file relationships the current file-by-file approach misses. Requires cluster detection before extraction.
 - [ ] Phase 11: Narrative Mode — Generate a "codebase walkthrough" document that reads like a guided tour for someone new to the codebase. Builds on `wiki.py` module but structured for onboarding, not reference.
@@ -118,7 +121,7 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
 | 8.1 Approve & Pipeline Wiring | v1.1 | 2/2 | Complete | 2026-04-13 |
 | 8.2 MCP Query Enhancements | v1.1 | 1/1 | Complete | 2026-04-13 |
 | 9. Multi-Perspective Analysis (Autoreason Tournament) | v1.2 | 3/3 | Complete   | 2026-04-14 |
-| 9.1 Query Telemetry & Usage-Weighted Edges | v1.2 | 0/? | Planned | — |
+| 9.1 Query Telemetry & Usage-Weighted Edges | v1.2 | 0/2 | Planned | — |
 | 9.2 Progressive Graph Retrieval | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
 | 11. Narrative Mode | v1.2 | 0/? | Planned | — |
