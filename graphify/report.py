@@ -62,6 +62,7 @@ def generate(
     token_cost: dict,
     root: str,
     suggested_questions: list[dict] | None = None,
+    usage_data: dict | None = None,
 ) -> str:
     today = date.today().isoformat()
 
@@ -210,6 +211,37 @@ def generate(
                 if q.get("question"):
                     lines.append(f"- **{q['question']}**")
                     lines.append(f"  _{q['why']}_")
+
+    if usage_data:
+        counters = usage_data.get("counters", {})
+        if counters:
+            hc = _compute_hot_cold(G, counters)
+            lines += ["", "## Usage Patterns", ""]
+            lines.append(f"Total edge traversals recorded: **{hc['total_queries']}**")
+            lines.append(f"Never-traversed edges: **{hc['never_traversed']}**")
+            lines.append("")
+            if hc["hot"]:
+                lines.append("### Hot Paths (top 10%)")
+                lines.append("")
+                lines.append("| Edge | Traversals |")
+                lines.append("|------|------------|")
+                for edge_key, count in hc["hot"]:
+                    parts = edge_key.split(":", 1)
+                    a_label = G.nodes[parts[0]].get("label", parts[0]) if parts[0] in G else parts[0]
+                    b_label = G.nodes[parts[1]].get("label", parts[1]) if parts[1] in G else parts[1]
+                    lines.append(f"| {_sanitize_md(a_label)} -> {_sanitize_md(b_label)} | {count} |")
+                lines.append("")
+            if hc["cold"]:
+                lines.append("### Cold Zones (bottom 10%)")
+                lines.append("")
+                lines.append("| Edge | Traversals |")
+                lines.append("|------|------------|")
+                for edge_key, count in hc["cold"]:
+                    parts = edge_key.split(":", 1)
+                    a_label = G.nodes[parts[0]].get("label", parts[0]) if parts[0] in G else parts[0]
+                    b_label = G.nodes[parts[1]].get("label", parts[1]) if parts[1] in G else parts[1]
+                    lines.append(f"| {_sanitize_md(a_label)} -> {_sanitize_md(b_label)} | {count} |")
+                lines.append("")
 
     return "\n".join(lines)
 

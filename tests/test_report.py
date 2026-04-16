@@ -387,3 +387,58 @@ def test_compute_hot_cold_small_data():
     assert "never_traversed" in result
     assert "total_queries" in result
     assert result["total_queries"] == 16
+
+
+# --- Usage Patterns section tests (T-09.1-10 through T-09.1-12) ---
+
+def test_report_usage_patterns():
+    """Usage Patterns section appears when usage_data with counters is provided."""
+    G, communities, cohesion, labels, gods, surprises, detection, tokens = make_inputs()
+    # Build counters from actual graph edges to get 12+ entries
+    edge_keys = []
+    for u, v in G.edges():
+        key = f"{min(u, v)}:{max(u, v)}"
+        edge_keys.append(key)
+    counters = {}
+    for i, key in enumerate(edge_keys):
+        counters[key] = 50 - i * 3  # descending counts
+    usage_data = {"counters": counters, "threshold": 5}
+    report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, "./project", usage_data=usage_data)
+    assert "## Usage Patterns" in report
+    assert "### Hot Paths" in report
+    assert "Total edge traversals" in report
+
+
+def test_report_no_usage_data():
+    """generate() without usage_data kwarg produces no Usage Patterns section."""
+    G, communities, cohesion, labels, gods, surprises, detection, tokens = make_inputs()
+    report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, "./project")
+    assert "## Usage Patterns" not in report
+
+
+def test_report_usage_empty_counters():
+    """Empty counters dict does not produce a Usage Patterns section."""
+    G, communities, cohesion, labels, gods, surprises, detection, tokens = make_inputs()
+    usage_data = {"counters": {}, "threshold": 5}
+    report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, "./project", usage_data=usage_data)
+    assert "## Usage Patterns" not in report
+
+
+def test_hot_paths_labels():
+    """Hot Paths table uses node labels, not raw IDs."""
+    G, communities, cohesion, labels, gods, surprises, detection, tokens = make_inputs()
+    # Pick two connected nodes and set their labels
+    edges = list(G.edges())
+    u, v = edges[0]
+    G.nodes[u]["label"] = "MyClassA"
+    G.nodes[v]["label"] = "MyClassB"
+    key = f"{min(u, v)}:{max(u, v)}"
+    # Make this edge the hottest with 12+ entries
+    counters = {key: 100}
+    for uu, vv in edges[1:]:
+        k = f"{min(uu, vv)}:{max(uu, vv)}"
+        counters[k] = 1
+    usage_data = {"counters": counters, "threshold": 5}
+    report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, "./project", usage_data=usage_data)
+    assert "MyClassA" in report
+    assert "MyClassB" in report
