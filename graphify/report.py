@@ -1,6 +1,7 @@
 # generate GRAPH_REPORT.md - the human-readable audit trail
 from __future__ import annotations
 import re
+import statistics
 from datetime import date
 import networkx as nx
 
@@ -10,6 +11,44 @@ def _safe_community_name(label: str) -> str:
     cleaned = re.sub(r'[\\/*?:"<>|#^[\]]', "", label.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")).strip()
     cleaned = re.sub(r"\.(md|mdx|markdown)$", "", cleaned, flags=re.IGNORECASE)
     return cleaned or "unnamed"
+
+
+def _compute_hot_cold(
+    G: nx.Graph,
+    counters: dict[str, int],
+    hot_percentile: float = 0.90,
+    cold_percentile: float = 0.10,
+) -> dict:
+    """Return hot paths and cold edges for Usage Patterns section. Per D-10."""
+    if not counters:
+        never = list(G.edges())
+        return {"hot": [], "cold": [], "never_traversed": len(never), "total_queries": 0}
+
+    all_counts = list(counters.values())
+    total = sum(all_counts)
+
+    if len(all_counts) >= 10:
+        thresholds = statistics.quantiles(all_counts, n=10)
+        hot_floor = thresholds[8]   # 90th percentile
+        cold_ceil = thresholds[0]   # 10th percentile
+    else:
+        hot_floor = max(all_counts)
+        cold_ceil = min(all_counts)
+
+    hot = [(k, v) for k, v in counters.items() if v >= hot_floor]
+    cold = [(k, v) for k, v in counters.items() if v <= cold_ceil and v > 0]
+    never = [
+        (u, v) for u, v, _ in G.edges(data=True)
+        if f"{min(u, v)}:{max(u, v)}" not in counters
+    ]
+    hot.sort(key=lambda x: -x[1])
+    cold.sort(key=lambda x: x[1])
+    return {
+        "hot": hot[:10],
+        "cold": cold[:10],
+        "never_traversed": len(never),
+        "total_queries": total,
+    }
 
 
 def generate(

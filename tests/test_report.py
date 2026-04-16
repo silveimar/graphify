@@ -1,10 +1,11 @@
 import json
 from datetime import date
 from pathlib import Path
+import networkx as nx
 from graphify.build import build_from_json
 from graphify.cluster import cluster, score_all
 from graphify.analyze import god_nodes, surprising_connections
-from graphify.report import generate, render_analysis
+from graphify.report import generate, render_analysis, _compute_hot_cold
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -330,3 +331,59 @@ def test_sanitize_md_all_fields_clean_when_injected_simultaneously():
     assert "<span>" not in out
     assert "<div>" not in out
     assert "<p>" not in out
+
+
+# --- _compute_hot_cold tests (T-09.1-09) ---
+
+def test_compute_hot_cold():
+    """Hot/cold classification with 12+ edges uses percentile thresholds."""
+    G = nx.Graph()
+    edges = [
+        ("a", "b"), ("c", "d"), ("e", "f"), ("g", "h"),
+        ("i", "j"), ("k", "l"), ("m", "n"), ("o", "p"),
+        ("q", "r"), ("s", "t"), ("u", "v"), ("w", "x"),
+    ]
+    for u, v in edges:
+        G.add_edge(u, v)
+    counters = {
+        "a:b": 50, "c:d": 40, "e:f": 30, "g:h": 20,
+        "i:j": 15, "k:l": 10, "m:n": 8, "o:p": 5,
+        "q:r": 3, "s:t": 2, "u:v": 1, "w:x": 1,
+    }
+    result = _compute_hot_cold(G, counters)
+    assert result["hot"], "hot list should not be empty"
+    assert result["cold"], "cold list should not be empty"
+    # Highest-count edge should be in hot
+    hot_keys = [k for k, _ in result["hot"]]
+    assert "a:b" in hot_keys
+    # Lowest-count edges should be in cold
+    cold_keys = [k for k, _ in result["cold"]]
+    assert any(k in cold_keys for k in ("u:v", "w:x"))
+    assert result["total_queries"] == sum(counters.values())
+
+
+def test_compute_hot_cold_empty():
+    """Empty counters return zeroed result with never_traversed count."""
+    G = nx.Graph()
+    G.add_edge("a", "b")
+    G.add_edge("c", "d")
+    result = _compute_hot_cold(G, {})
+    assert result["total_queries"] == 0
+    assert result["hot"] == []
+    assert result["cold"] == []
+    assert result["never_traversed"] >= 0
+
+
+def test_compute_hot_cold_small_data():
+    """Fewer than 10 entries uses max/min fallback without raising StatisticsError."""
+    G = nx.Graph()
+    G.add_edge("a", "b")
+    G.add_edge("c", "d")
+    G.add_edge("e", "f")
+    counters = {"a:b": 10, "c:d": 5, "e:f": 1}
+    result = _compute_hot_cold(G, counters)
+    assert "hot" in result
+    assert "cold" in result
+    assert "never_traversed" in result
+    assert "total_queries" in result
+    assert result["total_queries"] == 16
