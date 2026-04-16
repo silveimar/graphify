@@ -650,3 +650,68 @@ def test_decay_counters():
     telemetry = {"counters": {"a:b": 10, "c:d": 1}, "threshold": 5}
     _decay_telemetry(telemetry, multiplier=0.8)
     assert telemetry["counters"] == {"a:b": 8}
+
+
+# --- Derived edge detection (Plan 09.1-01, Task 2) ---
+
+from graphify.serve import _check_derived_edges
+
+
+def test_derived_edge_proposal(tmp_path):
+    G = nx.Graph()
+    G.add_node("n1", label="n1")
+    G.add_node("n2", label="n2")
+    G.add_node("n3", label="n3")
+    G.add_edge("n1", "n2")
+    G.add_edge("n2", "n3")
+    telemetry = {"counters": {"n1:n2": 5, "n2:n3": 5}, "threshold": 5}
+    agent_edges: list[dict] = []
+    _check_derived_edges(G, telemetry, tmp_path, agent_edges)
+    assert len(agent_edges) == 1
+    e = agent_edges[0]
+    assert e["source"] == "n1"
+    assert e["target"] == "n3"
+    assert e["relation"] == "derived_shortcut"
+    assert e["confidence"] == "INFERRED"
+    assert e["confidence_score"] == 0.7
+
+
+def test_derived_edge_no_duplicate(tmp_path):
+    G = nx.Graph()
+    G.add_node("n1", label="n1")
+    G.add_node("n2", label="n2")
+    G.add_node("n3", label="n3")
+    G.add_edge("n1", "n2")
+    G.add_edge("n2", "n3")
+    telemetry = {"counters": {"n1:n2": 5, "n2:n3": 5}, "threshold": 5}
+    agent_edges: list[dict] = []
+    _check_derived_edges(G, telemetry, tmp_path, agent_edges)
+    _check_derived_edges(G, telemetry, tmp_path, agent_edges)
+    assert len(agent_edges) == 1
+
+
+def test_derived_edge_below_threshold(tmp_path):
+    G = nx.Graph()
+    G.add_node("n1", label="n1")
+    G.add_node("n2", label="n2")
+    G.add_node("n3", label="n3")
+    G.add_edge("n1", "n2")
+    G.add_edge("n2", "n3")
+    telemetry = {"counters": {"n1:n2": 4, "n2:n3": 5}, "threshold": 5}
+    agent_edges: list[dict] = []
+    _check_derived_edges(G, telemetry, tmp_path, agent_edges)
+    assert len(agent_edges) == 0
+
+
+def test_derived_edge_existing_graph_edge(tmp_path):
+    G = nx.Graph()
+    G.add_node("n1", label="n1")
+    G.add_node("n2", label="n2")
+    G.add_node("n3", label="n3")
+    G.add_edge("n1", "n2")
+    G.add_edge("n2", "n3")
+    G.add_edge("n1", "n3")  # Direct edge already exists
+    telemetry = {"counters": {"n1:n2": 10, "n2:n3": 10}, "threshold": 5}
+    agent_edges: list[dict] = []
+    _check_derived_edges(G, telemetry, tmp_path, agent_edges)
+    assert len(agent_edges) == 0

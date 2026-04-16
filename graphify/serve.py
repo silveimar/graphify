@@ -126,6 +126,53 @@ def _decay_telemetry(telemetry: dict, multiplier: float = 0.8) -> None:
         del counters[key]
 
 
+def _check_derived_edges(
+    G: nx.Graph,
+    telemetry: dict,
+    out_dir: Path,
+    agent_edges: list[dict],
+) -> None:
+    """Propose 2-hop shortcut edges when traversal threshold met. Per D-06/D-07/D-08."""
+    threshold = telemetry.get("threshold", 5)
+    counters = telemetry.get("counters", {})
+    existing = {(e["source"], e["target"]) for e in agent_edges}
+    existing |= {(e["target"], e["source"]) for e in agent_edges}
+    added = False
+    for key_ab, count_ab in list(counters.items()):
+        if count_ab < threshold:
+            continue
+        a, b = key_ab.split(":", 1)
+        if b not in G:
+            continue
+        for neighbor in G.neighbors(b):
+            if neighbor == a:
+                continue
+            key_bc = f"{min(b, neighbor)}:{max(b, neighbor)}"
+            if counters.get(key_bc, 0) < threshold:
+                continue
+            pair = (a, neighbor)
+            rpair = (neighbor, a)
+            if pair in existing or rpair in existing:
+                continue
+            if G.has_edge(a, neighbor):
+                continue
+            record = {
+                "source": a,
+                "target": neighbor,
+                "relation": "derived_shortcut",
+                "confidence": "INFERRED",
+                "confidence_score": 0.7,
+                "source_file": "",
+                "via": b,
+                "traversal_count": min(count_ab, counters[key_bc]),
+            }
+            agent_edges.append(record)
+            existing.add(pair)
+            added = True
+    if added:
+        _save_agent_edges(out_dir, agent_edges)
+
+
 def _make_annotate_record(node_id: str, text: str, peer_id: str, session_id: str) -> dict:
     """Create a validated annotation record. All string inputs are sanitized."""
     return {
@@ -594,6 +641,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         nodes, edges = _dfs(G, start_nodes, depth) if mode == "dfs" else _bfs(G, start_nodes, depth)
         _record_traversal(_telemetry, edges)
         _save_telemetry(_out_dir, _telemetry)
+        _check_derived_edges(G, _telemetry, _out_dir, _agent_edges)
         header = f"Traversal: {mode.upper()} depth={depth} | Start: {[G.nodes[n].get('label', n) for n in start_nodes]} | {len(nodes)} nodes found\n\n"
         return header + _subgraph_to_text(G, nodes, edges, budget)
 
