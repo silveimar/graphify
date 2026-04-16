@@ -1,5 +1,48 @@
 # Milestones
 
+## v1.2 Intelligent Analysis & Cross-File Extraction (Shipped: 2026-04-15)
+
+**Delivered:** LLM-assisted multi-perspective graph analysis via autoreason tournament (A/B/AB/blind-Borda rounds across 4 lenses), per-edge MCP query telemetry with hot-path strengthening and decay of unused edges, 2-hop A→C derived edges with INFERRED confidence, and hot/cold paths surfaced in `GRAPH_REPORT.md`. Analysis output is scoped to a dedicated `GRAPH_ANALYSIS.md` file — `GRAPH_REPORT.md` remains the mechanical metrics artifact (D-80 separation).
+
+**Phases completed:** 3 phases (09, 09.1, 09.1.1), 9 plans
+**Timeline:** 2026-04-14 → 2026-04-15 (2 days of code + 1 day of retroactive lifecycle cleanup 2026-04-15/16)
+**Codebase delta:** 6 code files changed, +1083 / −6 lines (9.1.1 was planning-only, zero code delta)
+**Test suite:** 1023 passing (up from 1000 at v1.1), no regressions
+**Requirements:** 10/10 satisfied
+**Audit:** Passed (10/10 REQ-IDs, 5/5 integration links WIRED, 3/3 E2E flows COMPLETE) — see `.planning/milestones/v1.2-MILESTONE-AUDIT.md`
+
+### Key Accomplishments
+
+1. **Autoreason Tournament Analysis** (Phase 9) — `render_analysis_context()` in `analyze.py` serializes the graph (nodes, edges, communities, god nodes, surprising connections) for tournament LLM prompts. `render_analysis()` in `report.py` produces the final `GRAPH_ANALYSIS.md` with per-lens sections, cross-lens synthesis (convergences + tensions), overall verdict, and tournament rationale (A/B/AB Borda scores). Tournament orchestration lives in `skill.md` (~260 lines, 6-step protocol A1–A6) with 4 independent lenses × 4 rounds × blind judges. "No finding" competes as a first-class Borda option — prevents hallucinated problems on clean graphs. 23 new tests (9 for context, 14 for report).
+
+2. **Query Telemetry & Usage-Weighted Edges** (Phase 9.1) — `serve.py` records every MCP traversal to a `telemetry.json` sidecar with atomic `os.replace()` writes. Per-edge traversal counters feed a weight formula with exponential decay of unused edges. After N traversals of A→B→C, a direct A→C derived edge is proposed with `confidence=INFERRED`, `confidence_score=0.7`, and a `via` field naming the intermediate node. Neighbor-identity skip in `_check_derived_edges` prevents self-loops when `neighbor == a`. `report.py` emits a new "Usage Patterns" section with hot/cold paths classified via percentile thresholds.
+
+3. **Pipeline Integration** (Phase 9.1, Plan 3) — Telemetry decay fires on every rebuild; usage data flows into all three `generate()` call sites and both rebuild points in `skill.md`. The graph's `agent-edges.json` and `annotations.jsonl` sidecars use the same atomic-write pattern as telemetry — no partial-write corruption possible mid-query.
+
+4. **Retroactive Milestone Lifecycle Cleanup** (Phase 9.1.1) — Planning-only phase that closed three structural gaps found by `/gsd-audit-milestone`: (a) generated retroactive `09.1-VERIFICATION.md` from existing UAT/VALIDATION/SECURITY evidence, (b) created project-level `.planning/REQUIREMENTS.md` with 10 v1.2 REQ-IDs and a full traceability matrix back to file:line anchors, (c) reconciled scope contradictions across `ROADMAP.md` / `STATE.md` / `PROJECT.md` into a consistent narrow-v1.2 narrative, moving phases 9.2/10/11/12 into a new v1.3 milestone and renaming the old v1.3 → v1.4. Zero code changes; audit status upgraded `gaps_found → passed`.
+
+### Architectural Decisions Locked
+
+- **D-80: GRAPH_ANALYSIS.md is separate from GRAPH_REPORT.md** — tournament output never mutates the mechanical metrics artifact. Verified behaviorally in 09-HUMAN-UAT.md.
+- **D-83: Every lens always appears as a section** — `report.py` iterates all lens_results with no filtering, so Clean verdicts (e.g., "3-0 unanimous for incumbent") are visible rather than silently omitted.
+- **Blind Borda judges** — judge prompts use shuffled neutral labels (Analysis-1/2/3) with no role identity disclosed; shuffle rotation enforced across 3 judges.
+- **Telemetry atomicity** — `telemetry.json`, `agent-edges.json`, and `annotations.jsonl` use `os.replace()` for all writes; no torn reads during concurrent MCP queries.
+- **Narrow-scope milestone policy** — v1.2 closed when 2/6 originally-planned phases completed the intent. Remaining scope queued into v1.3 with clear origin anchoring rather than leaving v1.2 open indefinitely.
+
+### Known Gaps / Deferred
+
+- 09.1-SECURITY.md lacks structured YAML frontmatter (no `threats_total`/`threats_open` fields) — all 7 threats marked CLOSED in the table body but grep-based frontmatter extraction returns empty. Non-blocking tech debt.
+- v1.2 was never formally instantiated via `/gsd-new-milestone`; REQUIREMENTS.md was created post-hoc by Phase 9.1.1, so SUMMARY.md files for 09 and 09.1 predate it and have no `requirements_completed` frontmatter. Non-blocking; audit accepted as documented.
+- Remaining v1.2-origin scope (Progressive Graph Retrieval, Cross-File Semantic Extraction, Narrative Mode, Heterogeneous Extraction Routing) carried forward to v1.3.
+
+### Archives
+
+- `.planning/milestones/v1.2-ROADMAP.md` — full phase detail with plan breakdowns
+- `.planning/milestones/v1.2-REQUIREMENTS.md` — 10 v1.2 REQ-IDs with traceability table (file:line evidence)
+- `.planning/milestones/v1.2-MILESTONE-AUDIT.md` — final audit report (passed)
+
+---
+
 ## v1.1 Context Persistence & Agent Memory (Shipped: 2026-04-13)
 
 **Delivered:** Persistent, evolving context layer — graphify is no longer a one-shot graph builder. Agents can read AND write to the knowledge graph across sessions, users see how their corpus changes over time, and Obsidian vault notes survive round-trip re-runs with user content preservation.

@@ -159,11 +159,20 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Shipped v1.1** (2026-04-13) — Context persistence and agent memory. 5 phases, 12 plans, 25/25 requirements, 1,000 tests. See `.planning/milestones/v1.1-*`.
 
-**Shipped v1.2** (2026-04-15) — Intelligent analysis & cross-file extraction (narrow scope). 2 phases, 6 plans, 7/7 derived requirements satisfied (registered post-hoc in `.planning/REQUIREMENTS.md` during Phase 9.1.1), ~1,108 tests. See `.planning/phases/09-*` and `.planning/phases/09.1-*`.
+**Shipped v1.2** (2026-04-15) — Intelligent analysis & cross-file extraction (narrow scope, + Phase 9.1.1 retroactive lifecycle cleanup). 3 phases, 9 plans, 10/10 requirements satisfied, milestone audit passed (5/5 integration links WIRED, 3/3 E2E flows COMPLETE). See `.planning/milestones/v1.2-*`.
 
-**Codebase:** Python 3.10/3.12; `graphify/` + `tests/` with 108 new test additions during v1.2 scope.
+**Codebase:** Python 3.10/3.12; `graphify/` + `tests/` with 23 new tests added for autoreason tournament (Phase 9) and telemetry coverage expanded in Phase 9.1. 1023 tests passing.
 
-**Next milestone:** v1.3 Intelligent Analysis Continuation (queued — phases 9.2, 10, 11, 12). Run `/gsd-complete-milestone v1.2` to archive the current requirements catalog, then `/gsd-new-milestone v1.3` when ready to plan the next block.
+## Next Milestone Goals
+
+**v1.3 Intelligent Analysis Continuation** (queued — 4 phases already staged in `ROADMAP.md`):
+
+- Phase 9.2: Progressive Graph Retrieval — send relevant graph slices instead of full graph to LLM lenses; scales tournament to larger corpora
+- Phase 10: Cross-File Semantic Extraction — batch import-connected or co-located files as extraction units to capture cross-file relationships
+- Phase 11: Narrative Mode — `GRAPH_TOUR.md` for codebase onboarding; reuses `wiki.py` machinery with new prompts
+- Phase 12: Heterogeneous Extraction Routing — file-complexity-aware model routing (AST metrics → model choice); enables parallel multi-endpoint extraction
+
+Run `/gsd-new-milestone v1.3` when ready to instantiate scoped requirements and begin planning.
 
 ---
-*Last updated: 2026-04-15 after v1.2 milestone + Phase 9.1.1 lifecycle cleanup reconciliation*
+*Last updated: 2026-04-16 — v1.2 milestone archived, ready for v1.3*
