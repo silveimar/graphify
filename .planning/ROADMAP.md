@@ -81,6 +81,8 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
   - [x] 09.1-01-PLAN.md — Telemetry sidecar, traversal recording, weight formula, decay, derived edges (serve.py)
   - [x] 09.1-02-PLAN.md — Usage Patterns report section with hot/cold paths (report.py)
   - [x] 09.1-03-PLAN.md — Integration wiring: decay on rebuild + telemetry passed to generate() (skill.md)
+- [ ] Phase 9.1.1: Milestone v1.2 Lifecycle Cleanup — Close structural gaps identified by `/gsd-audit-milestone` on 2026-04-16: (1) generate missing `09.1-VERIFICATION.md` via `/gsd-verify-work 09.1`, (2) create `.planning/REQUIREMENTS.md` with the 7 derived v1.2 REQ-IDs and a traceability table back to phases 9 and 9.1, (3) reconcile scope contradictions across `ROADMAP.md` (6 phases), `STATE.md` (2 phases / 100%), and `PROJECT.md` (Active: "not yet defined"). Gap-closure phase — pure planning-artifact work, no graphify code changes. See `.planning/v1.2-MILESTONE-AUDIT.md`.
+  **Plans:** TBD — created via `/gsd-plan-phase 9.1.1`
 - [ ] Phase 9.2: Progressive Graph Retrieval — Token-aware 3-layer MCP responses: Layer 1 returns compact summaries (node IDs + labels + community, ~50 tokens), Layer 2 returns edge details and neighbors on drill-down (~200 tokens per node), Layer 3 returns full subgraph with all attributes only on explicit request. Add `budget` parameter to `graph_query` for context-window-aware retrieval. Prevents context blowout at 500+ node graphs. _(Informed by: thedotmack/claude-mem progressive disclosure, rohitg00/agentmemory triple-stream retrieval)_
 - [ ] Phase 10: Cross-File Semantic Extraction — When context window allows, send clusters of related files (same directory, import-connected) as a batch for extraction. Captures cross-file relationships the current file-by-file approach misses. Requires cluster detection before extraction.
 - [ ] Phase 11: Narrative Mode — Generate a "codebase walkthrough" document that reads like a guided tour for someone new to the codebase. Builds on `wiki.py` module but structured for onboarding, not reference.
@@ -122,7 +124,8 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
 | 8.1 Approve & Pipeline Wiring | v1.1 | 2/2 | Complete | 2026-04-13 |
 | 8.2 MCP Query Enhancements | v1.1 | 1/1 | Complete | 2026-04-13 |
 | 9. Multi-Perspective Analysis (Autoreason Tournament) | v1.2 | 3/3 | Complete   | 2026-04-14 |
-| 9.1 Query Telemetry & Usage-Weighted Edges | v1.2 | 0/3 | Planned | — |
+| 9.1 Query Telemetry & Usage-Weighted Edges | v1.2 | 3/3 | Complete | 2026-04-15 |
+| 9.1.1 Milestone v1.2 Lifecycle Cleanup | v1.2 | 0/? | Planned | — |
 | 9.2 Progressive Graph Retrieval | v1.2 | 0/? | Planned | — |
 | 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
 | 11. Narrative Mode | v1.2 | 0/? | Planned | — |
@@ -135,4 +138,4 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
 | 18. Focus-Aware Graph Context | v1.3 | 0/? | Planned | — |
 
 ---
-*Last updated: 2026-04-13 — v1.1 milestone archived. v1.2-v1.3 milestones preserved from prior exploration sessions.*
+*Last updated: 2026-04-16 — Phase 9.1.1 gap-closure inserted after `/gsd-audit-milestone` run. Phase 9.1 progress marked complete (3/3 plans).*
