@@ -32,6 +32,9 @@ Turn any folder of files into a navigable knowledge graph with community detecti
 /graphify query "<question>" --budget 1500            # cap answer at N tokens
 /graphify path "AuthModule" "Database"                # shortest path between two concepts
 /graphify explain "SwinTransformer"                   # plain-language explanation of a node
+/graphify analyze                                      # autoreason tournament: 4 lenses (security, architecture, complexity, onboarding) -> GRAPH_ANALYSIS.md
+/graphify analyze for security and architecture        # subset-lens tournament (any of: security, architecture, complexity, onboarding)
+/graphify analyze for <lens>                           # single-lens tournament (~6 LLM calls vs ~24 for all 4)
 ```
 
 ## What graphify is for
