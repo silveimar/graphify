@@ -1005,3 +1005,74 @@ def test_synthesize_targets_k_capped_at_n_minus_start():
     out = _synthesize_targets(G, ["n1"], k=10)
     # Only 3 candidates remain (n2, n3, n4)
     assert len(out) == 3
+
+
+# --- Phase 9.2 Plan 03 Task 1: _subgraph_to_text layered rendering ---
+
+def test_subgraph_to_text_layer1_only_label_and_community():
+    G = _make_graph()
+    nodes = {"n1", "n2"}
+    edges = [("n1", "n2")]
+    out = _subgraph_to_text(G, nodes, edges, token_budget=2000, layer=1)
+    assert "label=" in out
+    assert "community=" in out
+    # L1 MUST NOT include src= or loc= (those are L3-only)
+    assert "src=" not in out
+    assert "loc=" not in out
+    # L1 MUST NOT include EDGE lines
+    assert "EDGE " not in out
+
+
+def test_subgraph_to_text_layer2_includes_edges():
+    G = _make_graph()
+    nodes = {"n1", "n2"}
+    edges = [("n1", "n2")]
+    out = _subgraph_to_text(G, nodes, edges, token_budget=2000, layer=2)
+    assert "NODE " in out
+    assert "EDGE " in out
+    assert "label=" in out
+
+
+def test_subgraph_to_text_layer3_full_attributes():
+    G = _make_graph()
+    nodes = {"n1", "n2"}
+    edges = [("n1", "n2")]
+    out = _subgraph_to_text(G, nodes, edges, token_budget=2000, layer=3)
+    # Legacy output includes src= and loc= in brackets
+    assert "src=" in out
+    assert "loc=" in out
+    assert "EDGE " in out
+
+
+def test_subgraph_to_text_backward_compat_no_layer():
+    G = _make_graph()
+    nodes = {"n1", "n2"}
+    edges = [("n1", "n2")]
+    legacy = _subgraph_to_text(G, nodes, edges, 2000)
+    explicit_l3 = _subgraph_to_text(G, nodes, edges, 2000, layer=3)
+    assert legacy == explicit_l3
+
+
+def test_subgraph_to_text_layer1_budget_respected():
+    G = _make_graph()
+    nodes = set(G.nodes())
+    edges = list(G.edges())
+    out = _subgraph_to_text(G, nodes, edges, token_budget=500, layer=1)
+    # chars/token heuristic = 3; output may include truncation marker
+    assert len(out) <= 500 * 3 + 100  # 100-char slack for truncation marker
+
+
+def test_subgraph_to_text_all_layers_sanitize_labels():
+    # Plan 03 Task 1 Rule 3 deviation: sanitize_label strips control chars (not HTML),
+    # so we use \x00 in the label rather than <script>. If a control char survives in
+    # output, sanitize_label failed to apply on that layer's path.
+    G = nx.Graph()
+    G.add_node("n1", label="bad\x00label", source_file="x.py", community=0)
+    G.add_node("n2", label="normal", source_file="y.py", community=0)
+    G.add_edge("n1", "n2", relation="calls", confidence="EXTRACTED")
+    nodes = {"n1", "n2"}
+    edges = [("n1", "n2")]
+    for layer in (1, 2, 3):
+        out = _subgraph_to_text(G, nodes, edges, 2000, layer=layer)
+        # Raw \x00 MUST NOT appear — sanitize_label strips control chars on every layer
+        assert "\x00" not in out

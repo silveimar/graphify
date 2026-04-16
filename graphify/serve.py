@@ -637,19 +637,70 @@ def _estimate_cardinality(
     }
 
 
-def _subgraph_to_text(G: nx.Graph, nodes: set[str], edges: list[tuple], token_budget: int = 2000) -> str:
-    """Render subgraph as text, cutting at token_budget (approx 3 chars/token)."""
+def _subgraph_to_text(
+    G: nx.Graph,
+    nodes: set[str],
+    edges: list[tuple],
+    token_budget: int = 2000,
+    layer: int = 3,
+) -> str:
+    """Render subgraph as text, cutting at token_budget (approx 3 chars/token).
+
+    Phase 9.2 D-02/D-04 — `layer` controls output density:
+      layer=1 : id + sanitized label + community only         (~50 tok/node, no edges)
+      layer=2 : L1 fields + edges + neighbor labels           (~200 tok/node + ~30 tok/edge)
+      layer=3 : full attribute serialization (legacy default) (~100 tok/node + ~95 tok/edge)
+
+    Every emitted label goes through sanitize_label(). Degree-descending sort preserved.
+    """
     char_budget = token_budget * 3
-    lines = []
-    for nid in sorted(nodes, key=lambda n: G.degree(n), reverse=True):
-        d = G.nodes[nid]
-        line = f"NODE {sanitize_label(d.get('label', nid))} [src={d.get('source_file', '')} loc={d.get('source_location', '')} community={d.get('community', '')}]"
-        lines.append(line)
-    for u, v in edges:
-        if u in nodes and v in nodes:
-            d = G.edges[u, v]
-            line = f"EDGE {sanitize_label(G.nodes[u].get('label', u))} --{d.get('relation', '')} [{d.get('confidence', '')}]--> {sanitize_label(G.nodes[v].get('label', v))}"
+    lines: list[str] = []
+    sorted_nodes = sorted(nodes, key=lambda n: G.degree(n), reverse=True)
+
+    if layer == 1:
+        # Compact summary: id, sanitized label, community membership
+        for nid in sorted_nodes:
+            d = G.nodes[nid]
+            label = sanitize_label(d.get("label", nid))
+            community = d.get("community", "")
+            lines.append(f"NODE {nid} label={label} community={community}")
+        # L1: no edges emitted
+    elif layer == 2:
+        # L1 fields + edges with relation + confidence + neighbor labels
+        for nid in sorted_nodes:
+            d = G.nodes[nid]
+            label = sanitize_label(d.get("label", nid))
+            community = d.get("community", "")
+            lines.append(f"NODE {nid} label={label} community={community}")
+        for u, v in edges:
+            if u in nodes and v in nodes:
+                ed = G.edges[u, v]
+                u_label = sanitize_label(G.nodes[u].get("label", u))
+                v_label = sanitize_label(G.nodes[v].get("label", v))
+                lines.append(
+                    f"EDGE {u_label} --{ed.get('relation', '')} "
+                    f"[{ed.get('confidence', '')}]--> {v_label}"
+                )
+    else:
+        # layer == 3 — full attribute dump (LEGACY — exact current behavior preserved)
+        for nid in sorted_nodes:
+            d = G.nodes[nid]
+            line = (
+                f"NODE {sanitize_label(d.get('label', nid))} "
+                f"[src={d.get('source_file', '')} loc={d.get('source_location', '')} "
+                f"community={d.get('community', '')}]"
+            )
             lines.append(line)
+        for u, v in edges:
+            if u in nodes and v in nodes:
+                ed = G.edges[u, v]
+                line = (
+                    f"EDGE {sanitize_label(G.nodes[u].get('label', u))} "
+                    f"--{ed.get('relation', '')} [{ed.get('confidence', '')}]--> "
+                    f"{sanitize_label(G.nodes[v].get('label', v))}"
+                )
+                lines.append(line)
+
     output = "\n".join(lines)
     if len(output) > char_budget:
         output = output[:char_budget] + f"\n... (truncated to ~{token_budget} token budget)"
