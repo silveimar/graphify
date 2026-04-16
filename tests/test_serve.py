@@ -1,4 +1,5 @@
 """Tests for serve.py - MCP graph query helpers (no mcp package required)."""
+import base64
 import json
 import pytest
 import networkx as nx
@@ -25,6 +26,8 @@ from graphify.serve import (
     _estimate_tokens_for_layer,
     _compute_branching_factor,
     _estimate_cardinality,
+    _encode_continuation,
+    _decode_continuation,
 )
 
 
@@ -789,3 +792,50 @@ def test_compute_branching_factor_returns_average_degree_over_two():
     assert abs(_compute_branching_factor(G) - 1.5) < 0.001
     # Empty graph returns 1.0 sentinel (no crash)
     assert _compute_branching_factor(nx.Graph()) == 1.0
+
+
+def test_encode_decode_continuation_roundtrip():
+    query_params = {"question": "auth", "depth": 3, "mode": "bfs"}
+    visited = {"n3", "n1", "n2"}  # unordered
+    token = _encode_continuation(query_params, visited, current_layer=1, graph_mtime=1234.5)
+    payload, status = _decode_continuation(token, graph_mtime=1234.5)
+    assert status == "ok"
+    assert payload["q"] == query_params
+    assert payload["v"] == sorted(visited)  # deterministic sort
+    assert payload["l"] == 1
+    assert isinstance(payload["h"], str) and len(payload["h"]) == 16
+    assert all(c in "0123456789abcdef" for c in payload["h"])
+
+
+def test_continuation_token_graph_changed():
+    token = _encode_continuation({"question": "x"}, {"n1"}, 1, graph_mtime=1000.0)
+    payload, status = _decode_continuation(token, graph_mtime=2000.0)
+    assert status == "graph_changed"
+    # Payload is still returned — agent can inspect for debugging.
+    assert payload["q"] == {"question": "x"}
+    assert payload["l"] == 1
+
+
+def test_continuation_token_malformed():
+    payload, status = _decode_continuation("not-a-valid-token!!!", graph_mtime=1000.0)
+    assert status == "malformed"
+    assert payload == {}
+
+
+def test_continuation_token_tampered_hash():
+    token = _encode_continuation({"q": "x"}, {"n1"}, 1, graph_mtime=1000.0)
+    # Decode, mutate the hash, re-encode
+    raw = base64.urlsafe_b64decode(token.encode())
+    p = json.loads(raw.decode())
+    p["h"] = "0" * 16  # tamper
+    tampered = base64.urlsafe_b64encode(json.dumps(p, sort_keys=True).encode()).decode()
+    payload, status = _decode_continuation(tampered, graph_mtime=1000.0)
+    assert status == "graph_changed"
+
+
+def test_continuation_token_oversized_rejected():
+    # Build a token clearly over the 64 KB cap.
+    huge = "x" * 70000
+    payload, status = _decode_continuation(huge, graph_mtime=1000.0)
+    assert status == "malformed"
+    assert payload == {}

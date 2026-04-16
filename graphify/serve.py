@@ -1,5 +1,7 @@
 # MCP stdio server - exposes graph query tools to Claude and other agents
 from __future__ import annotations
+import base64
+import hashlib
 import json
 import os
 import sys
@@ -116,6 +118,62 @@ def _record_traversal(telemetry: dict, edges: list[tuple]) -> None:
     for u, v in edges:
         key = f"{min(u, v)}:{max(u, v)}"
         counters[key] = counters.get(key, 0) + 1
+
+
+# Continuation-token codec — stateless drill-down for Phase 9.2 progressive retrieval.
+# Payload shape: {"q": dict, "v": list[str], "l": int, "h": str}. Per CONTEXT D-03.
+
+_CONTINUATION_TOKEN_MAX_BYTES = 65536  # 64 KB hard cap (DoS mitigation, RESEARCH §Security)
+
+
+def _encode_continuation(
+    query_params: dict,
+    visited: set[str],
+    current_layer: int,
+    graph_mtime: float,
+) -> str:
+    """Encode an opaque drill-down token. Base64(JSON) with SHA-256 mtime-integrity hash.
+
+    Opaque to agents; debug-transparent to server-side logs. Per CONTEXT D-03.
+    Deterministic: `visited` is sorted so two encodes with identical input produce identical output.
+    """
+    mtime_hash = hashlib.sha256(
+        f"{graph_mtime}:{json.dumps(query_params, sort_keys=True)}".encode()
+    ).hexdigest()[:16]
+    payload = {
+        "q": query_params,
+        "v": sorted(visited),
+        "l": current_layer,
+        "h": mtime_hash,
+    }
+    return base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True).encode()
+    ).decode()
+
+
+def _decode_continuation(token: str, graph_mtime: float) -> tuple[dict, str]:
+    """Decode + validate a continuation token.
+
+    Returns (payload_dict, status) where status is one of:
+      "ok"             — payload intact, mtime hash matches current graph
+      "graph_changed"  — hash mismatch (graph was rebuilt or touched since encode)
+      "malformed"      — base64 decode failed, JSON parse failed, or token exceeded size cap
+    """
+    if not token or len(token.encode()) > _CONTINUATION_TOKEN_MAX_BYTES:
+        return {}, "malformed"
+    try:
+        raw = base64.urlsafe_b64decode(token.encode())
+        payload = json.loads(raw.decode())
+        if not isinstance(payload, dict):
+            return {}, "malformed"
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return {}, "malformed"
+    expected = hashlib.sha256(
+        f"{graph_mtime}:{json.dumps(payload.get('q', {}), sort_keys=True)}".encode()
+    ).hexdigest()[:16]
+    if payload.get("h") != expected:
+        return payload, "graph_changed"
+    return payload, "ok"
 
 
 def _edge_weight(traversals: int) -> float:
