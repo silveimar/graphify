@@ -714,6 +714,154 @@ def _find_node(G: nx.Graph, label: str) -> list[str]:
             if term in d.get("label", "").lower() or term == nid.lower()]
 
 
+# Sentinel for Phase 9.2 D-02 hybrid response format.
+# Appears on its own line (preceded + followed by \n) so naive clients see it
+# as visually-separated text rather than a parse error (Pitfall 4).
+QUERY_GRAPH_META_SENTINEL = "\n---GRAPHIFY-META---\n"
+
+
+def _run_query_graph(
+    G: nx.Graph,
+    communities: dict,
+    graph_mtime: float,
+    branching_factor: float,
+    telemetry: dict,
+    arguments: dict,
+) -> str:
+    """Pure dispatch core for query_graph - no MCP runtime. Returns the full D-02 response string.
+
+    Separated from `_tool_query_graph` so unit tests can exercise the full pipeline
+    (cardinality, bi-BFS, layer rendering, continuation-token encode/decode) without
+    standing up an MCP stdio server.
+
+    Phase 9.2 dispatch pipeline:
+      1. Decode continuation_token if present; short-circuit on graph_changed / malformed.
+      2. Score + select start nodes (existing _score_nodes).
+      3. If depth >= 2: compute cardinality_estimate; short-circuit on estimate_exceeded.
+      4. If depth >= 3: bidirectional BFS (synthesize targets if none); else single-endpoint.
+      5. Normalize edges (Pitfall 6 dedup), record telemetry with search_strategy.
+      6. Render via _subgraph_to_text(..., layer=layer).
+      7. Encode outbound continuation_token for layer < 3.
+      8. Emit text_body + SENTINEL + json.dumps(meta).
+    """
+    question = str(arguments.get("question", ""))
+    mode = str(arguments.get("mode", "bfs"))
+    depth = max(1, min(int(arguments.get("depth", 3)), 6))
+    # D-01: `budget` is preferred; `token_budget` is deprecated alias. Prefer explicit budget.
+    budget = int(arguments.get("budget", arguments.get("token_budget", 2000)))
+    budget = max(50, min(budget, 100000))
+    layer = int(arguments.get("layer", 1))
+    if layer not in (1, 2, 3):
+        layer = 1
+    continuation_token = arguments.get("continuation_token")
+    explicit_targets = arguments.get("target_nodes")  # optional; synthesize at depth >=3 if absent
+
+    # Phase 9.2 D-03: continuation_token validation at dispatch head.
+    prior_visited: set[str] = set()
+    if continuation_token:
+        decoded, status = _decode_continuation(continuation_token, graph_mtime)
+        if status in ("graph_changed", "malformed"):
+            meta = {
+                "layer": layer,
+                "search_strategy": None,
+                "status": status if status != "malformed" else "malformed_token",
+                "cardinality_estimate": None,
+                "continuation_token": None,
+            }
+            return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+        # Restore visited-so-far from prior layer for drill-down; use decoded query.
+        prior_visited = set(decoded.get("v", []))
+        # Reuse original question from token if not explicitly re-supplied.
+        if not question:
+            question = str(decoded.get("q", {}).get("question", ""))
+
+    # Existing start-node scoring. _score_nodes returns (score, nid) tuples.
+    terms = [t.lower() for t in question.split() if len(t) > 2]
+    scored = _score_nodes(G, terms)
+    start_nodes = [nid for _, nid in scored[:3]]
+    if not start_nodes:
+        meta = {
+            "layer": layer,
+            "search_strategy": None,
+            "status": "no_seed_nodes",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+        }
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    # Phase 9.2 D-04/D-05: cardinality pre-flight (only for depth >= 2).
+    cardinality_estimate: dict | None = None
+    if depth >= 2:
+        cardinality_estimate = _estimate_cardinality(
+            G, start_nodes, depth, layer, branching_factor
+        )
+        # D-05: abort when estimate > 10x budget. Return estimate + empty result.
+        if cardinality_estimate["tokens"] > 10 * budget:
+            meta = {
+                "layer": layer,
+                "search_strategy": None,
+                "status": "estimate_exceeded",
+                "cardinality_estimate": cardinality_estimate,
+                "continuation_token": None,
+            }
+            return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    # Phase 9.2 D-06/D-07: bidirectional BFS at depth >= 3 (unconditional).
+    status = "ok"
+    if depth >= 3:
+        if explicit_targets:
+            targets = list(explicit_targets)
+        else:
+            targets = _synthesize_targets(G, start_nodes)
+        if targets:
+            max_visited = max(10, int(budget / 50))  # L1 density ~50 tok/node as budget proxy
+            visited, edges_seen, bi_status = _bidirectional_bfs(
+                G, start_nodes, targets, depth=depth, max_visited=max_visited
+            )
+            search_strategy = "bidirectional"
+            status = bi_status
+        else:
+            # Pitfall 5: no targets -> honest fallback to unidirectional BFS.
+            visited, edges_seen = _bfs(G, start_nodes, depth)
+            search_strategy = "bfs"
+    elif mode == "dfs":
+        visited, edges_seen = _dfs(G, start_nodes, depth)
+        search_strategy = "dfs"
+    else:
+        visited, edges_seen = _bfs(G, start_nodes, depth)
+        search_strategy = "bfs"
+
+    # Merge prior visited from continuation_token (drill-down case).
+    visited = visited | prior_visited
+
+    # Pitfall 6: dedupe edges before recording (normalize to min/max tuples).
+    deduped_edges = list({(min(u, v), max(u, v)) for u, v in edges_seen})
+    _record_traversal(telemetry, deduped_edges, search_strategy=search_strategy)
+
+    # Render
+    text_body = _subgraph_to_text(G, visited, edges_seen, token_budget=budget, layer=layer)
+
+    # Encode outbound continuation_token for layer < 3 (L3 is terminal).
+    if layer < 3:
+        out_token = _encode_continuation(
+            query_params={"question": question, "depth": depth, "mode": mode},
+            visited=visited,
+            current_layer=layer,
+            graph_mtime=graph_mtime,
+        )
+    else:
+        out_token = None
+
+    meta = {
+        "layer": layer,
+        "search_strategy": search_strategy,
+        "status": status,
+        "cardinality_estimate": cardinality_estimate,
+        "continuation_token": out_token,
+    }
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
 def _query_graph_input_schema() -> dict:
     """Return the JSON Schema dict for the `query_graph` MCP tool input.
 
@@ -992,22 +1140,22 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             _graph_mtime = mtime
 
     def _tool_query_graph(arguments: dict) -> str:
-        _reload_if_stale()
-        question = arguments["question"]
-        mode = arguments.get("mode", "bfs")
-        depth = min(int(arguments.get("depth", 3)), 6)
-        budget = int(arguments.get("token_budget", 2000))
-        terms = [t.lower() for t in question.split() if len(t) > 2]
-        scored = _score_nodes(G, terms)
-        start_nodes = [nid for _, nid in scored[:3]]
-        if not start_nodes:
-            return "No matching nodes found."
-        nodes, edges = _dfs(G, start_nodes, depth) if mode == "dfs" else _bfs(G, start_nodes, depth)
-        _record_traversal(_telemetry, edges)
+        # Phase 9.2 D-02: synchronous dispatch returning str. The hybrid response format
+        # (text_body + SENTINEL + json(meta)) is emitted by _run_query_graph. The MCP
+        # stdio dispatch table at serve.py:~1073 wraps sync-str returns in TextContent.
+        _reload_if_stale()  # NO arguments - reads graph_path from serve() closure
+        response = _run_query_graph(
+            G=G,
+            communities=communities,
+            graph_mtime=_graph_mtime,
+            branching_factor=_branching_factor,
+            telemetry=_telemetry,
+            arguments=arguments,
+        )
+        # _save_telemetry(out_dir, data) - out_dir FIRST, data SECOND. Appends 'telemetry.json'.
         _save_telemetry(_out_dir, _telemetry)
-        _check_derived_edges(G, _telemetry, _out_dir, _agent_edges)
-        header = f"Traversal: {mode.upper()} depth={depth} | Start: {[G.nodes[n].get('label', n) for n in start_nodes]} | {len(nodes)} nodes found\n\n"
-        return header + _subgraph_to_text(G, nodes, edges, budget)
+        _check_derived_edges(G, _telemetry, _out_dir, _agent_edges)  # Phase 9.1 scaffolding, unchanged
+        return response
 
     def _tool_get_node(arguments: dict) -> str:
         _reload_if_stale()

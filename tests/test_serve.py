@@ -31,6 +31,8 @@ from graphify.serve import (
     _decode_continuation,
     _synthesize_targets,
     _query_graph_input_schema,
+    _run_query_graph,
+    QUERY_GRAPH_META_SENTINEL,
 )
 
 
@@ -1108,3 +1110,191 @@ def test_list_tools_query_graph_schema_budget_clamped():
     assert schema["properties"]["budget"]["minimum"] == 50
     assert schema["properties"]["budget"]["maximum"] == 100000
     assert schema["properties"]["depth"]["maximum"] == 6
+
+
+# --- Phase 9.2 Plan 03 Task 3: _run_query_graph dispatch end-to-end ---
+
+def _dispatch_fixture_graph():
+    """7-node chain + community attrs for dispatch-level tests."""
+    G = _make_chain_graph(7)
+    for i, n in enumerate(G.nodes()):
+        G.nodes[n]["community"] = i % 3
+        G.nodes[n].setdefault("source_file", "x.py")
+    return G
+
+
+def test_query_graph_layer1_budget_respected():
+    G = _dispatch_fixture_graph()
+    communities = _communities_from_graph(G)
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    response = _run_query_graph(
+        G, communities, graph_mtime=1000.0, branching_factor=bf,
+        telemetry=telemetry,
+        arguments={"question": "node", "depth": 2, "budget": 500, "layer": 1},
+    )
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["layer"] == 1
+    # Budget respect: chars <= budget*3 + slack (truncation marker)
+    assert len(text_body) <= 500 * 3 + 100
+
+
+def test_response_format_sentinel_splits_cleanly():
+    G = _dispatch_fixture_graph()
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    response = _run_query_graph(
+        G, _communities_from_graph(G), 1000.0, bf, telemetry,
+        {"question": "node", "depth": 1, "budget": 1000, "layer": 1},
+    )
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    assert len(parts) == 2  # exactly one sentinel
+    json.loads(parts[1])  # valid JSON
+
+
+def test_query_graph_backward_compat_token_budget_alias():
+    G = _dispatch_fixture_graph()
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    response = _run_query_graph(
+        G, _communities_from_graph(G), 1000.0, bf, telemetry,
+        {"question": "node", "depth": 2, "token_budget": 1500, "layer": 1},
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    # Success signals the aliased value was accepted.
+    assert meta["status"] in ("ok", "frontiers_disjoint", "budget_exhausted")
+
+
+def test_depth_3_triggers_bidirectional():
+    G = _dispatch_fixture_graph()  # 7-node chain
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    response = _run_query_graph(
+        G, _communities_from_graph(G), 1000.0, bf, telemetry,
+        {"question": "node", "depth": 3, "budget": 5000, "layer": 1},
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    # On a 7-node graph with log2(7)=2 -> K=max(3,2)=3 targets, bidirectional is expected.
+    assert meta["search_strategy"] == "bidirectional"
+
+
+def test_depth_2_remains_bfs():
+    G = _dispatch_fixture_graph()
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    response = _run_query_graph(
+        G, _communities_from_graph(G), 1000.0, bf, telemetry,
+        {"question": "node", "depth": 2, "budget": 5000, "layer": 1},
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["search_strategy"] in ("bfs", "dfs")
+
+
+def test_depth_2_query_includes_cardinality_estimate():
+    G = _dispatch_fixture_graph()
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    response = _run_query_graph(
+        G, _communities_from_graph(G), 1000.0, bf, telemetry,
+        {"question": "node", "depth": 2, "budget": 5000, "layer": 1},
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["cardinality_estimate"] is not None
+    assert set(meta["cardinality_estimate"].keys()) == {"nodes", "edges", "tokens"}
+
+
+def test_depth_1_no_cardinality_estimate():
+    G = _dispatch_fixture_graph()
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    response = _run_query_graph(
+        G, _communities_from_graph(G), 1000.0, bf, telemetry,
+        {"question": "node", "depth": 1, "budget": 5000, "layer": 1},
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["cardinality_estimate"] is None
+
+
+def test_estimate_exceeded_status_and_empty_result():
+    G = _dispatch_fixture_graph()
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    # Tiny budget + high depth triggers 10x threshold
+    response = _run_query_graph(
+        G, _communities_from_graph(G), 1000.0, bf, telemetry,
+        {"question": "node", "depth": 6, "budget": 50, "layer": 3},
+    )
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "estimate_exceeded"
+    assert text_body == ""
+    # Cardinality still returned for inspection
+    assert meta["cardinality_estimate"] is not None
+
+
+def test_continuation_token_graph_changed_in_dispatch():
+    G = _dispatch_fixture_graph()
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    stale_token = _encode_continuation(
+        {"question": "node", "depth": 2, "mode": "bfs"},
+        {"n1"}, 1, graph_mtime=1000.0,
+    )
+    # Current mtime differs from encode-time
+    response = _run_query_graph(
+        G, _communities_from_graph(G), 2000.0, bf, telemetry,
+        {"question": "node", "depth": 2, "budget": 1000, "layer": 1,
+         "continuation_token": stale_token},
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "graph_changed"
+
+
+def test_query_graph_emits_continuation_token_for_l1_and_l2():
+    G = _dispatch_fixture_graph()
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    for layer in (1, 2):
+        response = _run_query_graph(
+            G, _communities_from_graph(G), 1000.0, bf, telemetry,
+            {"question": "node", "depth": 2, "budget": 2000, "layer": layer},
+        )
+        _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+        meta = json.loads(meta_json)
+        assert meta["continuation_token"] is not None
+    # Layer 3 is terminal
+    response = _run_query_graph(
+        G, _communities_from_graph(G), 1000.0, bf, telemetry,
+        {"question": "node", "depth": 2, "budget": 2000, "layer": 3},
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["continuation_token"] is None
+
+
+def test_token_04_deferred_no_bloom_filter_code():
+    # Guard: TOKEN-04 is deferred per D-09. No Bloom filter, no materialized closure cache.
+    source = open("graphify/serve.py").read().lower()
+    assert "bloom" not in source
+    assert "materialized_closure" not in source
+    assert "transitive_closure_cache" not in source
+
+
+def test_dispatch_dedupes_edges_before_record_traversal():
+    G = _dispatch_fixture_graph()
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    _ = _run_query_graph(
+        G, _communities_from_graph(G), 1000.0, bf, telemetry,
+        {"question": "node", "depth": 3, "budget": 5000, "layer": 1},
+    )
+    # No counter > len(G.edges) - would indicate the dedup failed.
+    for key, count in telemetry.get("counters", {}).items():
+        assert count <= G.number_of_edges()
