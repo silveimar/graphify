@@ -541,6 +541,35 @@ def _bidirectional_bfs(
     return forward_visited | reverse_visited, edges_seen, "frontiers_disjoint"
 
 
+def _synthesize_targets(
+    G: nx.Graph,
+    start_nodes: list[str],
+    k: int | None = None,
+) -> list[str]:
+    """Top-K high-degree nodes excluding the start set. For bi-BFS when no explicit target.
+
+    K heuristic per CONTEXT D-06 Claude's Discretion + RESEARCH Open Question #1:
+      K = max(3, min(20, int(log2(N)))) when k is None.
+
+    Returns `[]` only if G minus start_nodes is empty — the caller uses this as the
+    sentinel to fall back to unidirectional BFS (Pitfall 5: never silently claim
+    bidirectional when there is no target pair).
+    """
+    import math
+    start_set = set(start_nodes)
+    candidates = [n for n in G.nodes() if n not in start_set]
+    if not candidates:
+        return []
+    if k is None:
+        n = G.number_of_nodes()
+        if n <= 1:
+            return []
+        k = max(3, min(20, int(math.log2(n))))
+    # Sort by degree descending, tie-break by node id for determinism
+    candidates.sort(key=lambda nid: (-G.degree(nid), nid))
+    return candidates[:k]
+
+
 def _dfs(G: nx.Graph, start_nodes: list[str], depth: int) -> tuple[set[str], list[tuple]]:
     visited: set[str] = set()
     edges_seen: list[tuple] = []

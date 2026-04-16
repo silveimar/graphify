@@ -29,6 +29,7 @@ from graphify.serve import (
     _estimate_cardinality,
     _encode_continuation,
     _decode_continuation,
+    _synthesize_targets,
 )
 
 
@@ -950,3 +951,57 @@ def test_bidirectional_no_double_counting_at_meet():
     assert len(normalized) >= 1
     # The caller (Plan 03) will dedupe before calling _record_traversal;
     # this test just confirms dedup is achievable on the output.
+
+
+# --- Phase 9.2 Plan 02 Task 3: _synthesize_targets (D-06 Claude's Discretion, Pitfall 5) ---
+
+def test_synthesize_targets_top_k_high_degree():
+    # Star: n0 is hub (degree 10), n1..n10 are leaves (degree 1 each)
+    G = nx.Graph()
+    G.add_node("n0", label="hub")
+    for i in range(1, 11):
+        G.add_node(f"n{i}", label=f"leaf{i}")
+        G.add_edge("n0", f"n{i}")
+    out = _synthesize_targets(G, ["n1"])
+    # N=11 → K = max(3, min(20, int(log2(11)))) = max(3, 3) = 3
+    assert len(out) == 3
+    # Highest-degree candidate first
+    assert out[0] == "n0"
+
+
+def test_synthesize_targets_excludes_start():
+    G = nx.Graph()
+    G.add_node("n0")
+    for i in range(1, 11):
+        G.add_node(f"n{i}")
+        G.add_edge("n0", f"n{i}")
+    out = _synthesize_targets(G, ["n0"])
+    assert "n0" not in out
+
+
+def test_synthesize_targets_empty_fallback():
+    G = nx.Graph()
+    G.add_node("n0")
+    out = _synthesize_targets(G, ["n0"])
+    assert out == []
+
+
+def test_synthesize_targets_custom_k():
+    G = nx.Graph()
+    G.add_node("n0")
+    for i in range(1, 11):
+        G.add_node(f"n{i}")
+        G.add_edge("n0", f"n{i}")
+    out = _synthesize_targets(G, ["n1"], k=5)
+    assert len(out) == 5
+
+
+def test_synthesize_targets_k_capped_at_n_minus_start():
+    G = nx.Graph()
+    for i in range(1, 5):
+        G.add_node(f"n{i}")
+    G.add_edge("n1", "n2")
+    G.add_edge("n2", "n3")
+    out = _synthesize_targets(G, ["n1"], k=10)
+    # Only 3 candidates remain (n2, n3, n4)
+    assert len(out) == 3
