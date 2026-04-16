@@ -5,8 +5,8 @@
 - ✅ **v1.0 Ideaverse Integration — Configurable Vault Adapter** — Phases 1–5 (shipped 2026-04-11)
 - ✅ **v1.1 Context Persistence & Agent Memory** — Phases 6–8.2 (shipped 2026-04-13)
 - ✅ **v1.2 Intelligent Analysis & Cross-File Extraction** — Phases 9, 9.1 (+ 9.1.1 gap closure) (shipped 2026-04-15)
-- 📋 **v1.3 Intelligent Analysis Continuation** — Phases 9.2, 10, 11, 12 (planned, originally v1.2 scope; split during v1.2 narrow-scope reconciliation 2026-04-15)
-- 📋 **v1.4 Agent Discoverability & Obsidian Workflows** — Phases 13–18 (planned)
+- 🚧 **v1.3 Intelligent Analysis Continuation** — Phases 9.2, 10, 11 (in progress, started 2026-04-16)
+- 📋 **v1.4 Agent Discoverability & Obsidian Workflows** — Phases 12, 13–18 (planned)
 
 ## Phases
 
@@ -86,29 +86,75 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 
 ---
 
-### 📋 v1.3 Intelligent Analysis Continuation
+### 🚧 v1.3 Intelligent Analysis Continuation
 
-**Theme:** Continuation of v1.2's analysis and extraction evolution — progressive retrieval, cross-file semantic capture, narrative onboarding docs, and heterogeneous routing. Split out from the original v1.2 scope during the 2026-04-15 narrow-scope reconciliation after the autoreason tournament (Phase 9) and query telemetry (Phase 9.1) shipped. The four phases below were originally queued under v1.2 in the ROADMAP but moved into a discrete milestone so v1.2's achievement (intelligent analysis + usage-weighted graph self-improvement) could be declared complete.
+**Theme:** Make graphify viable for real production use on multi-source codebases — agents can query without blowing their token budget, extraction produces dramatically better graphs via entity deduplication, and humans get an interactive thinking partner via Obsidian slash commands. Priority order locked a → b → c during 2026-04-16 exploration: Phase 9.2 first (agent viability), Phase 10 second (graph quality), Phase 11 third (human UX).
 
-**Origin:** Same research anchors as v1.2 — LLM Council patterns (Karpathy, Verbalized Sampling), TurboQuant compression implications, AI Engineer London "understanding your codebase" insight, SPAR-Kit structured argumentation, Smolcluster heterogeneous distribution. See `.planning/notes/april-research-gap-analysis.md` and `.planning/notes/repo-gap-analysis.md`.
+**Origin:** Priority lock and scope decisions captured in `.planning/notes/april-2026-v1.3-priorities.md`. Research anchors: Your-GPUs-Just-Got-6x, Make-Knowledge-Graphs-Fast, Pied-Piper-Was-a-Documentary (cardinality estimation + bidirectional search signals for 9.2); Build-Agents-That-Never-Forget, Everything-Is-Connected, Cognee dedup patterns (entity fragmentation signals for 10); Obsidian-Claude-Codebook, Your-Harness-Your-Memory, memory-harness (static-to-interactive slash command pivot for 11). Phase 12 (Heterogeneous Extraction Routing) explicitly deferred to v1.4 — see Out of Scope in REQUIREMENTS.md.
 
 **Phases:**
 
-- [ ] Phase 9.2: Progressive Graph Retrieval — Token-aware 3-layer MCP responses: Layer 1 returns compact summaries (node IDs + labels + community, ~50 tokens), Layer 2 returns edge details and neighbors on drill-down (~200 tokens per node), Layer 3 returns full subgraph with all attributes only on explicit request. Add `budget` parameter to `graph_query` for context-window-aware retrieval. Prevents context blowout at 500+ node graphs. _(Informed by: thedotmack/claude-mem progressive disclosure, rohitg00/agentmemory triple-stream retrieval)_
-- [ ] Phase 10: Cross-File Semantic Extraction — When context window allows, send clusters of related files (same directory, import-connected) as a batch for extraction. Captures cross-file relationships the current file-by-file approach misses. Requires cluster detection before extraction.
-- [ ] Phase 11: Narrative Mode — Generate a "codebase walkthrough" document that reads like a guided tour for someone new to the codebase. Builds on `wiki.py` module but structured for onboarding, not reference.
-- [ ] Phase 12: Heterogeneous Extraction Routing — Route files to different models by complexity and type. Simple/boilerplate files go to fast/cheap models; complex logic files go to powerful models. Detect file complexity via AST metrics (cyclomatic complexity, nesting depth, import count) before extraction. Support parallel extraction across multiple API endpoints. _(Informed by: YuvrajSingh-mist/smolcluster elastic parallelism with capability-aware workload distribution)_
+- [ ] **Phase 9.2: Progressive Graph Retrieval**
+
+  Token-aware graph retrieval that prevents context blowout when agents query 500+ node graphs. Adds a `budget=N` token parameter to MCP `graph_query` that drives a 3-layer progressive response protocol: Layer 1 returns compact summaries (node IDs, labels, community membership, ~50 tokens/node); Layer 2 returns edge details and neighbors on drill-down (~200 tokens/node); Layer 3 returns the full subgraph with all attributes only on explicit request. Cardinality estimation (node count, edge count, approximate token footprint) is returned before multi-hop queries execute, letting the agent abort before the response hits the wire. Multi-hop queries at depth ≥ 3 switch to bidirectional BFS from both endpoints, eliminating the exponential path explosion on densely connected graphs. Stretch: sparse-predicate joins skipped via Bloom filter probes; 2–3-hop transitive closures served from a materialized cache computed during idle rebuild windows.
+
+  **Requirements:** TOKEN-01, TOKEN-02, TOKEN-03, TOKEN-04 _(TOKEN-04 stretch)_
+
+  **Success Criteria** (what must be TRUE):
+  1. Agent calls `graph_query(budget=500)` and receives a response whose total token footprint is ≤ 500, structured in Layer 1 compact-summary format, with Layer 2/3 available on follow-up
+  2. Before a depth ≥ 2 multi-hop query executes, the MCP response includes a cardinality estimate (node count, edge count, estimated tokens) that the agent can inspect to decide whether to abort
+  3. Depth ≥ 3 queries demonstrably use bidirectional BFS (both-endpoint traversal meets in the middle), visible via a new `search_strategy` field in MCP query telemetry or trace logs
+  4. _(stretch)_ A Bloom filter probe skip appears in the query execution trace when a sparse-predicate join would return zero results, with a measurable reduction in nodes traversed
+
+  **Informed by:** Your-GPUs-Just-Got-6x, Make-Knowledge-Graphs-Fast, Pied-Piper-Was-a-Documentary, thedotmack/claude-mem progressive disclosure, rohitg00/agentmemory triple-stream retrieval. Full rationale: `.planning/notes/april-2026-v1.3-priorities.md` § Phase 9.2.
+
+  **Plans:** TBD
+
+- [ ] **Phase 10: Cross-File Semantic Extraction with Entity Deduplication**
+
+  Two-part graph quality upgrade for multi-source corpora. Part A (batch extraction): import-connected or co-located file clusters are sent to the LLM as a single batch unit per cluster rather than one file at a time, capturing cross-file relationships during extraction instead of requiring them to be inferred post-hoc. Part B (entity deduplication): a new `graphify/dedup.py` module runs after extraction, merging fuzzy-matched (string-similarity ≥ configurable threshold) and embedding-similar (cosine ≥ configurable threshold) entity pairs into a single canonical node. When nodes merge, inbound edges are re-routed to the canonical node, edge weights are aggregated (sum for `weight`, max for `confidence_score`), and canonical label selection follows a deterministic tie-breaker (longest / most-connected / most-recent). Stretch: cross-source ontology alignment resolves the same entity referenced as a function in `.py`, a concept in `.md`, and a class in `tests/` to one canonical node.
+
+  **Requirements:** GRAPH-01, GRAPH-02, GRAPH-03, GRAPH-04 _(GRAPH-04 stretch)_
+
+  **Success Criteria** (what must be TRUE):
+  1. Extractor processes a cluster of import-connected files as one LLM call per cluster (not per file); this is observable in `graphify-out/cache/` telemetry and the extraction trace shows cluster boundaries
+  2. `graphify/dedup.py` exists and a post-extraction run on a multi-source corpus merges fuzzy + embedding-similar node pairs, producing a `dedup_report` that lists merged pairs and their chosen canonical label
+  3. After dedup, `graph.json` shows inbound edges re-routed to canonical nodes and edge weight fields aggregated — no dangling edges pointing to eliminated duplicate nodes remain
+  4. _(stretch)_ Running against a mixed corpus (`auth.py` + `docs.md` + `tests/AuthService`) produces one canonical node that aggregates all three source references, verified by inspecting the canonical node's `source_file` list in `graph.json`
+
+  **Informed by:** Build-Agents-That-Never-Forget, Everything-Is-Connected, Cognee entity dedup patterns, april-research-gap-analysis (entity fragmentation finding). Full rationale: `.planning/notes/april-2026-v1.3-priorities.md` § Phase 10.
+
+  **Plans:** TBD
+
+- [ ] **Phase 11: Narrative Mode as Interactive Slash Commands**
+
+  Replaces the original static `GRAPH_TOUR.md` artifact concept with a suite of seven MCP-backed slash commands that turn graphify into a live thinking partner. Each command ships as a `.claude/commands/*.md` skill file — thin wrappers that invoke existing graphify MCP server queries. No new `graphify/` module is required unless an MCP query is missing. Core five commands: `/context` (full graph-backed life-state summary: active god nodes, top communities, recent deltas), `/trace <entity>` (evolution of a named entity across graph snapshots: first-seen, modifications, current community, staleness history), `/connect <topic-a> <topic-b>` (shortest surprising bridge paths between two topics using the existing surprising-connections analysis), `/drift` (emerging patterns across sessions: nodes whose community, centrality, or edge density has trended consistently), `/emerge` (newly-formed clusters not present in the previous snapshot, using v1.1 delta machinery). Stretch commands: `/ghost` (respond in the user's voice/style extracted from their graph contributions) and `/challenge <belief>` (pressure-test a stated belief against graph evidence — supporting vs contradicting edges). Stretch commands may land in a sibling skill if scope exceeds graphify proper.
+
+  **Requirements:** SLASH-01, SLASH-02, SLASH-03, SLASH-04, SLASH-05, SLASH-06, SLASH-07 _(SLASH-06, SLASH-07 stretch)_
+
+  **Success Criteria** (what must be TRUE):
+  1. `/context` returns a summary of active god nodes, top communities, and recent graph deltas via MCP — the response is grounded in live graph data, not a static snapshot
+  2. `/trace <entity>` returns a snapshot history for a named entity: first-seen timestamp, community membership over time, and current staleness score
+  3. `/connect <topic-a> <topic-b>` returns the shortest surprising bridge path(s) between two topics, consistent with the existing surprising-connections analysis in `analyze.py`
+  4. `/drift` returns trending nodes — those whose community membership, centrality, or edge density has moved in a consistent direction across the last N graph runs
+  5. `/emerge` returns newly-formed clusters detected by comparing the current graph snapshot to the previous one, using the v1.1 delta machinery
+  6. _(stretch)_ `/ghost` and `/challenge` ship as `.claude/commands/*.md` files that invoke the graphify MCP server, with documented fallback behavior when invoked against a vault with no prior graph
+
+  **Informed by:** Obsidian-Claude-Codebook (12 commands pattern), Your-Harness-Your-Memory, memory-harness interactive slash command patterns, letta-ai/letta-obsidian. Full rationale: `.planning/notes/april-2026-v1.3-priorities.md` § Phase 11.
+
+  **Plans:** TBD
 
 ---
 
 ### 📋 v1.4 Agent Discoverability & Obsidian Workflows
 
-**Theme:** Make graphify discoverable to agents that don't already know it exists, package graphify-aware thinking commands for Obsidian vault users, and enable continuous background graph improvement.
+**Theme:** Make graphify discoverable to agents that don't already know it exists, package graphify-aware thinking commands for Obsidian vault users, and enable continuous background graph improvement. Phase 12 (Heterogeneous Extraction Routing) pulled forward from v1.3 deferral.
 
 **Origin:** Agent-readiness stress test framework, Obsidian-Claude Codebook (12 commands pattern), Honcho async derivers, Letta sleep-time compute, SPAR-Kit graph-as-cognitive-map. See `.planning/notes/april-research-gap-analysis.md` and `.planning/notes/repo-gap-analysis.md`.
 
 **Phases:**
 
+- [ ] Phase 12: Heterogeneous Extraction Routing — Route files to different models by complexity and type. Simple/boilerplate files go to fast/cheap models; complex logic files go to powerful models. Detect file complexity via AST metrics (cyclomatic complexity, nesting depth, import count) before extraction. Support parallel extraction across multiple API endpoints. _(Informed by: YuvrajSingh-mist/smolcluster elastic parallelism with capability-aware workload distribution)_
 - [ ] Phase 13: Agent Capability Manifest — Machine-readable self-description of graphify's MCP server capabilities. Structured format agents can discover, evaluate, and decide to use. Explore emerging standards (MCP registry, schema.org, capability descriptors).
 - [ ] Phase 14: Obsidian Thinking Commands — Package graphify-aware slash commands (`/trace`, `/connect`, `/drift`, `/emerge`) that work on graphify-enriched vaults. Leverage the wikilinks and frontmatter injected by v1.0 Ideaverse adapter. Distributed as skill files for Claude Code and other harnesses.
 - [ ] Phase 15: Async Background Enrichment — Post-build passes that run without blocking the user: enrich node descriptions from docstrings/comments, detect emerging patterns across runs, update staleness scores, generate per-community natural-language summaries. Modeled on Honcho's async deriver pattern and Letta's sleep-time compute concept. Can be triggered by `graphify watch` or a post-build hook. _(Informed by: plastic-labs/honcho async derivers, letta-ai/context-constitution sleep-time compute)_
@@ -137,10 +183,10 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 9. Multi-Perspective Analysis (Autoreason Tournament) | v1.2 | 3/3 | Complete   | 2026-04-14 |
 | 9.1 Query Telemetry & Usage-Weighted Edges | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.1.1 Milestone v1.2 Lifecycle Cleanup | v1.2 | 3/3 | Complete | 2026-04-15 |
-| 9.2 Progressive Graph Retrieval | v1.3 | 0/? | Planned | — |
-| 10. Cross-File Semantic Extraction | v1.3 | 0/? | Planned | — |
-| 11. Narrative Mode | v1.3 | 0/? | Planned | — |
-| 12. Heterogeneous Extraction Routing | v1.3 | 0/? | Planned | — |
+| 9.2 Progressive Graph Retrieval | v1.3 | 0/? | Pending | — |
+| 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 0/? | Pending | — |
+| 11. Narrative Mode as Interactive Slash Commands | v1.3 | 0/? | Pending | — |
+| 12. Heterogeneous Extraction Routing | v1.4 | 0/? | Planned | — |
 | 13. Agent Capability Manifest | v1.4 | 0/? | Planned | — |
 | 14. Obsidian Thinking Commands | v1.4 | 0/? | Planned | — |
 | 15. Async Background Enrichment | v1.4 | 0/? | Planned | — |
@@ -149,4 +195,4 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 18. Focus-Aware Graph Context | v1.4 | 0/? | Planned | — |
 
 ---
-*Last updated: 2026-04-16 — v1.2 milestone archived. Detail moved to `.planning/milestones/v1.2-ROADMAP.md`. Next milestone: v1.3 Intelligent Analysis Continuation.*
+*Last updated: 2026-04-16 — v1.3 roadmap created. 3 phases (9.2, 10, 11), 15 requirements mapped. Phase 12 moved to v1.4.*
