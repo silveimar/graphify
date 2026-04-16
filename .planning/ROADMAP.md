@@ -108,7 +108,12 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 
   **Informed by:** Your-GPUs-Just-Got-6x, Make-Knowledge-Graphs-Fast, Pied-Piper-Was-a-Documentary, thedotmack/claude-mem progressive disclosure, rohitg00/agentmemory triple-stream retrieval. Full rationale: `.planning/notes/april-2026-v1.3-priorities.md` § Phase 9.2.
 
-  **Plans:** TBD
+  **Plans:** 3 plans
+
+  Plans:
+  - [ ] 09.2-01-PLAN.md — Foundation helpers: _estimate_tokens_for_layer, _estimate_cardinality, branching-factor cache, continuation_token codec (TOKEN-02 + TOKEN-01 codec half)
+  - [ ] 09.2-02-PLAN.md — Bidirectional BFS + search_strategy telemetry: _bidirectional_bfs, _synthesize_targets, _record_traversal extension (TOKEN-03)
+  - [ ] 09.2-03-PLAN.md — Dispatch wiring + query_graph contract: _subgraph_to_text layered renderer, schema extension, D-02 hybrid response (TOKEN-01 + TOKEN-02 + TOKEN-03 end-to-end; TOKEN-04 deferred per D-09)
 
 - [ ] **Phase 10: Cross-File Semantic Extraction with Entity Deduplication**
 
@@ -183,7 +188,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 9. Multi-Perspective Analysis (Autoreason Tournament) | v1.2 | 3/3 | Complete   | 2026-04-14 |
 | 9.1 Query Telemetry & Usage-Weighted Edges | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.1.1 Milestone v1.2 Lifecycle Cleanup | v1.2 | 3/3 | Complete | 2026-04-15 |
-| 9.2 Progressive Graph Retrieval | v1.3 | 0/? | Pending | — |
+| 9.2 Progressive Graph Retrieval | v1.3 | 0/3 | Planned | — |
 | 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 0/? | Pending | — |
 | 11. Narrative Mode as Interactive Slash Commands | v1.3 | 0/? | Pending | — |
 | 12. Heterogeneous Extraction Routing | v1.4 | 0/? | Planned | — |
