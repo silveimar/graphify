@@ -8,6 +8,22 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
+## Current Milestone: v1.3 Intelligent Analysis Continuation
+
+**Goal:** Make graphify viable for real production use on multi-source codebases — agents can query it without blowing their token budget, it produces dramatically better graphs via entity deduplication, and humans get an interactive thinking partner via Obsidian slash commands.
+
+**Target features (priority order):**
+
+- **(a) Phase 9.2 — Progressive Graph Retrieval (expanded)** — Token-aware 3-layer MCP responses (summary → edges → subgraph) with `budget` parameter, cardinality estimation before query execution, bidirectional search for multi-hop queries. Token economy is the dominant agent constraint; without this, agents reject graphify for cost reasons.
+- **(b) Phase 10 — Cross-File Semantic Extraction (with entity dedup)** — Batch import-connected / co-located files as extraction units AND add fuzzy + embedding-based entity deduplication with node consolidation and inbound edge aggregation. Without dedup, multi-source graphs fragment the same concept across 5–50 nodes; this is the jump from "okay" to "production-ready."
+- **(c) Phase 11 — Narrative Mode as Interactive Slash Commands** — Reshape the staged `GRAPH_TOUR.md` into MCP-backed slash commands (`/context`, `/trace`, `/connect`, `/drift`, `/emerge`) shipped as `.claude/commands/*.md`. Turns the graph into a thinking partner instead of a static artifact and puts v1.1's delta/staleness machinery to work.
+
+**Explicitly deferred to v1.4:** Phase 12 Heterogeneous Extraction Routing (file-complexity-aware model routing). Pulled forward only if token costs against simple boilerplate become the dominant v1.3 UAT complaint.
+
+**Seeds planted but not in scope:** SEED-001 (Tacit-to-Explicit Elicitation Engine), SEED-002 (Harness Memory Export) — trigger conditions do not match v1.3.
+
+**Exploration artifacts** (commit `e6e8282`): `.planning/notes/april-2026-v1.3-priorities.md`, `.planning/notes/folder-architecture-graphify-out-vs-vault.md`, `.planning/seeds/SEED-001-*.md`, `.planning/seeds/SEED-002-*.md`.
+
 ## Requirements
 
 ### Validated
@@ -55,7 +71,7 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 ### Active
 
-v1.2 is shipped. No active requirements until `/gsd-new-milestone v1.3` instantiates the next milestone (v1.3 Intelligent Analysis Continuation — phases 9.2, 10, 11, 12 are queued in ROADMAP.md). Run `/gsd-complete-milestone v1.2` to archive the current requirements block into `.planning/milestones/v1.2-REQUIREMENTS.md`.
+Milestone **v1.3 Intelligent Analysis Continuation** opened 2026-04-16. Scoped requirements are being defined via `/gsd-new-milestone v1.3` — see `.planning/REQUIREMENTS.md` for REQ-IDs after requirement gathering completes. Target scope: Phase 9.2 (Progressive Graph Retrieval, expanded), Phase 10 (Cross-File Semantic Extraction with entity dedup), Phase 11 (Narrative Mode as interactive slash commands). Phase 12 deferred to v1.4.
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -165,14 +181,17 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-**v1.3 Intelligent Analysis Continuation** (queued — 4 phases already staged in `ROADMAP.md`):
+**v1.4 Agent Discoverability & Obsidian Workflows** (queued — phases 12, 13–18 staged in `ROADMAP.md`):
 
-- Phase 9.2: Progressive Graph Retrieval — send relevant graph slices instead of full graph to LLM lenses; scales tournament to larger corpora
-- Phase 10: Cross-File Semantic Extraction — batch import-connected or co-located files as extraction units to capture cross-file relationships
-- Phase 11: Narrative Mode — `GRAPH_TOUR.md` for codebase onboarding; reuses `wiki.py` machinery with new prompts
-- Phase 12: Heterogeneous Extraction Routing — file-complexity-aware model routing (AST metrics → model choice); enables parallel multi-endpoint extraction
+- Phase 12 (pulled forward from v1.3): Heterogeneous Extraction Routing — file-complexity-aware model routing (AST metrics → model choice); enables parallel multi-endpoint extraction
+- Phase 13: Agent Capability Manifest — machine-readable self-description of graphify's MCP server capabilities
+- Phase 14: Obsidian Thinking Commands — graphify-aware slash commands for graphify-enriched vaults
+- Phase 15: Async Background Enrichment — post-build passes that enrich descriptions, detect emerging patterns, update staleness scores
+- Phase 16: Graph Argumentation Mode — knowledge graph as a shared cognitive map for structured LLM debates
+- Phase 17: Conversational Graph Chat — natural-language querying of the knowledge graph
+- Phase 18: Focus-Aware Graph Context — scope graph queries to the user's current editing focus
 
-Run `/gsd-new-milestone v1.3` when ready to instantiate scoped requirements and begin planning.
+Run `/gsd-new-milestone v1.4` after v1.3 ships.
 
 ---
-*Last updated: 2026-04-16 — v1.2 milestone archived, ready for v1.3*
+*Last updated: 2026-04-16 — v1.3 Intelligent Analysis Continuation opened*
