@@ -99,6 +99,17 @@ def _save_telemetry(out_dir: Path, data: dict) -> None:
         raise
 
 
+def _compute_branching_factor(G: nx.Graph) -> float:
+    """Graph-average branching factor = 2*E/N. Used for depth-extrapolation in cardinality estimates.
+
+    Returns 1.0 for the empty graph (degenerate case — estimator still produces a finite number).
+    Cached at graph-load in serve() and refreshed by _reload_if_stale(). Per CONTEXT D-04.
+    """
+    if G.number_of_nodes() == 0:
+        return 1.0
+    return (2.0 * G.number_of_edges()) / G.number_of_nodes()
+
+
 def _record_traversal(telemetry: dict, edges: list[tuple]) -> None:
     """Increment traversal counters for each edge. Keys normalized as min:max. Per D-02."""
     counters = telemetry.setdefault("counters", {})
@@ -395,6 +406,41 @@ def _estimate_tokens_for_layer(n_nodes: int, n_edges: int, layer: int) -> int:
     return 100 * n_nodes + 95 * n_edges
 
 
+def _estimate_cardinality(
+    G: nx.Graph,
+    start_nodes: list[str],
+    depth: int,
+    layer: int,
+    branching_factor: float,
+) -> dict:
+    """1-hop BFS probe + geometric extrapolation. Returns {"nodes","edges","tokens"}.
+
+    Accuracy degrades on power-law topologies (hubs vs leaves); D-05 keeps this advisory only.
+    Per CONTEXT D-04.
+    """
+    if depth <= 0:
+        return {
+            "nodes": len(start_nodes),
+            "edges": 0,
+            "tokens": _estimate_tokens_for_layer(len(start_nodes), 0, layer),
+        }
+    one_hop_visited, _one_hop_edges = _bfs(G, start_nodes, 1)
+    one_hop_count = len(one_hop_visited)
+    if depth == 1:
+        est_nodes = one_hop_count
+    else:
+        est_nodes = min(
+            int(len(start_nodes) * (branching_factor ** depth)),
+            G.number_of_nodes(),
+        )
+    est_edges = min(int(est_nodes * branching_factor / 2), G.number_of_edges())
+    return {
+        "nodes": est_nodes,
+        "edges": est_edges,
+        "tokens": _estimate_tokens_for_layer(est_nodes, est_edges, layer),
+    }
+
+
 def _subgraph_to_text(G: nx.Graph, nodes: set[str], edges: list[tuple], token_budget: int = 2000) -> str:
     """Render subgraph as text, cutting at token_budget (approx 3 chars/token)."""
     char_budget = token_budget * 3
@@ -465,6 +511,8 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
 
     # Sidecar state initialised at server startup (D-03: compaction at startup only)
     _graph_mtime = Path(graph_path).stat().st_mtime if Path(graph_path).exists() else 0.0
+    # Phase 9.2 D-04: average branching factor cached at load for cardinality estimation.
+    _branching_factor = _compute_branching_factor(G)
     _out_dir = Path(graph_path).parent
     _annotations: list[dict] = _compact_annotations(_out_dir / "annotations.jsonl")
     _agent_edges: list[dict] = _load_agent_edges(_out_dir / "agent-edges.json")
@@ -632,8 +680,12 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         ]
 
     def _reload_if_stale() -> None:
-        """Reload G and communities if graph.json mtime has changed (D-13)."""
-        nonlocal G, communities, _graph_mtime
+        """Reload G and communities if graph.json mtime has changed (D-13).
+
+        Also refreshes the Phase 9.2 branching-factor cache so the cardinality
+        estimator reflects the post-rebuild graph topology.
+        """
+        nonlocal G, communities, _graph_mtime, _branching_factor
         try:
             mtime = os.stat(graph_path).st_mtime
         except OSError:
@@ -641,6 +693,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         if mtime != _graph_mtime:
             G = _load_graph(graph_path)
             communities = _communities_from_graph(G)
+            _branching_factor = _compute_branching_factor(G)
             _graph_mtime = mtime
 
     def _tool_query_graph(arguments: dict) -> str:

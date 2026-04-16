@@ -23,6 +23,8 @@ from graphify.serve import (
     _save_proposal,
     _list_proposals,
     _estimate_tokens_for_layer,
+    _compute_branching_factor,
+    _estimate_cardinality,
 )
 
 
@@ -738,3 +740,52 @@ def test_estimate_tokens_for_layer_zero_input():
     assert _estimate_tokens_for_layer(0, 0, 1) == 0
     assert _estimate_tokens_for_layer(0, 0, 2) == 0
     assert _estimate_tokens_for_layer(0, 0, 3) == 0
+
+
+def test_estimate_cardinality_basic():
+    # Chain: n1 — n2 — n3 — n4 — n5 (4 edges)
+    G = nx.Graph()
+    for i in range(1, 6):
+        G.add_node(f"n{i}", label=f"node{i}", source_file="x.py", community=0)
+    for i in range(1, 5):
+        G.add_edge(f"n{i}", f"n{i+1}")
+    result = _estimate_cardinality(G, ["n1"], depth=2, layer=1, branching_factor=2.0)
+    assert set(result.keys()) == {"nodes", "edges", "tokens"}
+    assert result["nodes"] > 0 and result["nodes"] <= G.number_of_nodes()
+    assert result["edges"] >= 0 and result["edges"] <= G.number_of_edges()
+    assert result["tokens"] == _estimate_tokens_for_layer(result["nodes"], result["edges"], 1)
+
+
+def test_estimate_cardinality_depth_zero():
+    G = _make_graph()
+    out = _estimate_cardinality(G, ["n1", "n2"], depth=0, layer=2, branching_factor=3.0)
+    assert out["nodes"] == 2
+    assert out["edges"] == 0
+    assert out["tokens"] == _estimate_tokens_for_layer(2, 0, 2)
+
+
+def test_estimate_cardinality_clamped_to_graph_size():
+    G = nx.Graph()
+    for i in range(1, 6):
+        G.add_node(f"n{i}", label=f"n{i}")
+    G.add_edge("n1", "n2")
+    G.add_edge("n2", "n3")
+    # Wildly over-estimating branching factor should still clamp to graph size.
+    out = _estimate_cardinality(G, ["n1"], depth=5, layer=3, branching_factor=100.0)
+    assert out["nodes"] <= G.number_of_nodes()
+    assert out["edges"] <= G.number_of_edges()
+
+
+def test_compute_branching_factor_returns_average_degree_over_two():
+    # Pure unit test of the helper that serve() calls at startup.
+    # Closure-wiring proof is via grep proxy in acceptance criteria, not this test.
+    G = nx.Graph()
+    for i in range(1, 5):
+        G.add_node(f"n{i}", label=f"n{i}")
+    G.add_edge("n1", "n2")
+    G.add_edge("n2", "n3")
+    G.add_edge("n3", "n4")
+    # 2 * 3 / 4 = 1.5
+    assert abs(_compute_branching_factor(G) - 1.5) < 0.001
+    # Empty graph returns 1.0 sentinel (no crash)
+    assert _compute_branching_factor(nx.Graph()) == 1.0
