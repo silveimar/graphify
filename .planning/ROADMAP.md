@@ -4,8 +4,9 @@
 
 - ✅ **v1.0 Ideaverse Integration — Configurable Vault Adapter** — Phases 1–5 (shipped 2026-04-11)
 - ✅ **v1.1 Context Persistence & Agent Memory** — Phases 6–8.2 (shipped 2026-04-13)
-- 📋 **v1.2 Intelligent Analysis & Cross-File Extraction** — Phases 9–12 (incl. 9.1, 9.2) (planned)
-- 📋 **v1.3 Agent Discoverability & Obsidian Workflows** — Phases 13–18 (planned)
+- ✅ **v1.2 Intelligent Analysis & Cross-File Extraction** — Phases 9, 9.1 (+ 9.1.1 gap closure) (shipped 2026-04-15)
+- 📋 **v1.3 Intelligent Analysis Continuation** — Phases 9.2, 10, 11, 12 (planned, originally v1.2 scope; split during v1.2 narrow-scope reconciliation 2026-04-15)
+- 📋 **v1.4 Agent Discoverability & Obsidian Workflows** — Phases 13–18 (planned)
 
 ## Phases
 
@@ -63,7 +64,7 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
 
 ---
 
-### 📋 v1.2 Intelligent Analysis & Cross-File Extraction
+### ✅ v1.2 Intelligent Analysis & Cross-File Extraction — SHIPPED 2026-04-15
 
 **Theme:** Upgrade graphify's analysis from mechanical graph metrics to LLM-assisted multi-perspective interpretation, and prepare the extraction pipeline for the longer-context-window era.
 
@@ -86,6 +87,17 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
   - [x] 09.1.1-01-PLAN.md — Write 09.1-VERIFICATION.md from existing UAT/VALIDATION/SECURITY evidence (closes audit gap 1)
   - [x] 09.1.1-02-PLAN.md — Create .planning/REQUIREMENTS.md with 7 derived v1.2 REQ-IDs + 3 phase-9.1.1 REQ-IDs and traceability (closes audit gap 2)
   - [ ] 09.1.1-03-PLAN.md — Reconcile ROADMAP.md + STATE.md + PROJECT.md to narrow v1.2 scope; move phases 9.2/10/11/12 to new v1.3; rename old v1.3 to v1.4 (closes audit gap 3)
+
+---
+
+### 📋 v1.3 Intelligent Analysis Continuation
+
+**Theme:** Continuation of v1.2's analysis and extraction evolution — progressive retrieval, cross-file semantic capture, narrative onboarding docs, and heterogeneous routing. Split out from the original v1.2 scope during the 2026-04-15 narrow-scope reconciliation after the autoreason tournament (Phase 9) and query telemetry (Phase 9.1) shipped. The four phases below were originally queued under v1.2 in the ROADMAP but moved into a discrete milestone so v1.2's achievement (intelligent analysis + usage-weighted graph self-improvement) could be declared complete.
+
+**Origin:** Same research anchors as v1.2 — LLM Council patterns (Karpathy, Verbalized Sampling), TurboQuant compression implications, AI Engineer London "understanding your codebase" insight, SPAR-Kit structured argumentation, Smolcluster heterogeneous distribution. See `.planning/notes/april-research-gap-analysis.md` and `.planning/notes/repo-gap-analysis.md`.
+
+**Phases:**
+
 - [ ] Phase 9.2: Progressive Graph Retrieval — Token-aware 3-layer MCP responses: Layer 1 returns compact summaries (node IDs + labels + community, ~50 tokens), Layer 2 returns edge details and neighbors on drill-down (~200 tokens per node), Layer 3 returns full subgraph with all attributes only on explicit request. Add `budget` parameter to `graph_query` for context-window-aware retrieval. Prevents context blowout at 500+ node graphs. _(Informed by: thedotmack/claude-mem progressive disclosure, rohitg00/agentmemory triple-stream retrieval)_
 - [ ] Phase 10: Cross-File Semantic Extraction — When context window allows, send clusters of related files (same directory, import-connected) as a batch for extraction. Captures cross-file relationships the current file-by-file approach misses. Requires cluster detection before extraction.
 - [ ] Phase 11: Narrative Mode — Generate a "codebase walkthrough" document that reads like a guided tour for someone new to the codebase. Builds on `wiki.py` module but structured for onboarding, not reference.
@@ -93,7 +105,7 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
 
 ---
 
-### 📋 v1.3 Agent Discoverability & Obsidian Workflows
+### 📋 v1.4 Agent Discoverability & Obsidian Workflows
 
 **Theme:** Make graphify discoverable to agents that don't already know it exists, package graphify-aware thinking commands for Obsidian vault users, and enable continuous background graph improvement.
 
@@ -129,16 +141,16 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
 | 9. Multi-Perspective Analysis (Autoreason Tournament) | v1.2 | 3/3 | Complete   | 2026-04-14 |
 | 9.1 Query Telemetry & Usage-Weighted Edges | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.1.1 Milestone v1.2 Lifecycle Cleanup | v1.2 | 0/? | Planned | — |
-| 9.2 Progressive Graph Retrieval | v1.2 | 0/? | Planned | — |
-| 10. Cross-File Semantic Extraction | v1.2 | 0/? | Planned | — |
-| 11. Narrative Mode | v1.2 | 0/? | Planned | — |
-| 12. Heterogeneous Extraction Routing | v1.2 | 0/? | Planned | — |
-| 13. Agent Capability Manifest | v1.3 | 0/? | Planned | — |
-| 14. Obsidian Thinking Commands | v1.3 | 0/? | Planned | — |
-| 15. Async Background Enrichment | v1.3 | 0/? | Planned | — |
-| 16. Graph Argumentation Mode | v1.3 | 0/? | Planned | — |
-| 17. Conversational Graph Chat | v1.3 | 0/? | Planned | — |
-| 18. Focus-Aware Graph Context | v1.3 | 0/? | Planned | — |
+| 9.2 Progressive Graph Retrieval | v1.3 | 0/? | Planned | — |
+| 10. Cross-File Semantic Extraction | v1.3 | 0/? | Planned | — |
+| 11. Narrative Mode | v1.3 | 0/? | Planned | — |
+| 12. Heterogeneous Extraction Routing | v1.3 | 0/? | Planned | — |
+| 13. Agent Capability Manifest | v1.4 | 0/? | Planned | — |
+| 14. Obsidian Thinking Commands | v1.4 | 0/? | Planned | — |
+| 15. Async Background Enrichment | v1.4 | 0/? | Planned | — |
+| 16. Graph Argumentation Mode | v1.4 | 0/? | Planned | — |
+| 17. Conversational Graph Chat | v1.4 | 0/? | Planned | — |
+| 18. Focus-Aware Graph Context | v1.4 | 0/? | Planned | — |
 
 ---
-*Last updated: 2026-04-16 — Phase 9.1.1 gap-closure inserted after `/gsd-audit-milestone` run. Phase 9.1 progress marked complete (3/3 plans).*
+*Last updated: 2026-04-15 — v1.2 narrow-scope reconciliation via Phase 9.1.1. Phases 9.2, 10, 11, 12 moved to new milestone v1.3 (Intelligent Analysis Continuation). Old v1.3 renamed to v1.4. v1.2 shipped with phases 9 + 9.1.*
