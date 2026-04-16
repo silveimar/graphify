@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Intelligent Analysis & Cross-File Extraction
-status: Ready to execute
-stopped_at: Completed .planning/phases/09.1.1-lifecycle-cleanup/09.1.1-02-PLAN.md
-last_updated: "2026-04-16T04:18:43.959Z"
-last_activity: 2026-04-16
+status: v1.2 milestone SHIPPED; Phase 9.1.1 gap closure in progress
+stopped_at: Phase 9.1.1 lifecycle cleanup running
+last_updated: "2026-04-15T22:00:00Z"
+last_activity: 2026-04-15
 progress:
   total_phases: 3
   completed_phases: 2
@@ -20,18 +20,19 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-04-13 after v1.1 milestone completion)
 
-**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile
-**Current focus:** Phase 09.1.1 — lifecycle-cleanup
+**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.2 with multi-perspective analysis and usage-weighted graph self-improvement
+**Current focus:** Phase 09.1.1 — milestone v1.2 lifecycle cleanup (post-audit gap closure)
 
 ## Current Position
 
 Phase: 09.1.1 (lifecycle-cleanup) — EXECUTING
 Plan: 3 of 3
-Milestone: v1.1 Context Persistence & Agent Memory — ✅ SHIPPED 2026-04-13
-Next milestone: Not yet defined — run `/gsd-new-milestone` to start v1.2
-Last activity: 2026-04-16
+Milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1, with 9.1.1 gap closure in progress)
+Previous milestone: v1.1 Context Persistence & Agent Memory — ✅ SHIPPED 2026-04-13
+Next milestone: v1.3 Intelligent Analysis Continuation (phases 9.2, 10, 11, 12 — planned, see ROADMAP.md v1.3 section)
+Last activity: 2026-04-15
 
-Progress: [██████████] 100% (v1.1)
+Progress: [██████████] 100% (v1.2 — phases 9 + 9.1 shipped)
 
 ## Performance Metrics
 
@@ -48,6 +49,14 @@ Progress: [██████████] 100% (v1.1)
 - Total tests: 1,000 passing
 - Timeline: 2 days (2026-04-12 → 2026-04-13)
 - Commits in milestone: ~117
+
+**Velocity (v1.2):**
+
+- Total plans completed: 6 (3 for Phase 09 autoreason tournament, 3 for Phase 09.1 query telemetry)
+- Total tests after milestone: ~1,108 passing (estimated; Phase 09 added 23, Phase 09.1 added 19 serve + 7 report tests)
+- Timeline: 2 days (2026-04-14 → 2026-04-15)
+- Commits in milestone: ~20 feature commits (Phase 09: 3 plan-level feats + review fixes; Phase 09.1: 5 plan-level feats per SUMMARY commit logs 7cbbf8f, 004dfac, 5bf00f4, b418c07, 5118108)
+- Structural gap closure: Phase 9.1.1 (3 plans, all planning-artifact — no code touched)
 
 Detailed per-plan metrics are preserved in phase SUMMARY.md files and in milestone archives.
 
@@ -85,6 +94,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-16T04:18:43.956Z
-Stopped at: Completed .planning/phases/09.1.1-lifecycle-cleanup/09.1.1-02-PLAN.md
-Next action: `/gsd-new-milestone`
+Last session: 2026-04-15T22:00:00Z
+Stopped at: Phase 9.1.1 (lifecycle cleanup) in progress — v1.2 narrow-scope reconciliation
+Next action: `/gsd-complete-milestone v1.2`
