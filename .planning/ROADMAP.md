@@ -80,7 +80,7 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
   **Plans:** 3 plans
   - [x] 09.1-01-PLAN.md — Telemetry sidecar, traversal recording, weight formula, decay, derived edges (serve.py)
   - [x] 09.1-02-PLAN.md — Usage Patterns report section with hot/cold paths (report.py)
-  - [ ] 09.1-03-PLAN.md — Integration wiring: decay on rebuild + telemetry passed to generate() (skill.md)
+  - [x] 09.1-03-PLAN.md — Integration wiring: decay on rebuild + telemetry passed to generate() (skill.md)
 - [ ] Phase 9.2: Progressive Graph Retrieval — Token-aware 3-layer MCP responses: Layer 1 returns compact summaries (node IDs + labels + community, ~50 tokens), Layer 2 returns edge details and neighbors on drill-down (~200 tokens per node), Layer 3 returns full subgraph with all attributes only on explicit request. Add `budget` parameter to `graph_query` for context-window-aware retrieval. Prevents context blowout at 500+ node graphs. _(Informed by: thedotmack/claude-mem progressive disclosure, rohitg00/agentmemory triple-stream retrieval)_
 - [ ] Phase 10: Cross-File Semantic Extraction — When context window allows, send clusters of related files (same directory, import-connected) as a batch for extraction. Captures cross-file relationships the current file-by-file approach misses. Requires cluster detection before extraction.
 - [ ] Phase 11: Narrative Mode — Generate a "codebase walkthrough" document that reads like a guided tour for someone new to the codebase. Builds on `wiki.py` module but structured for onboarding, not reference.
