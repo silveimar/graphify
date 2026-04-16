@@ -78,7 +78,7 @@ Persistent, evolving context layer — graphify is no longer a one-shot graph bu
   - [x] 09-03-PLAN.md — Human verification of tournament output quality
 - [ ] Phase 9.1: Query Telemetry & Usage-Weighted Edges — Track which MCP queries traverse which edges (query telemetry), maintain traversal counters per edge, and run a post-query pass that strengthens high-traffic paths and decays unused ones. After N traversals of A->B->C, propose a direct A->C derived edge with INFERRED confidence. Surface "hot paths" and "cold zones" in GRAPH_REPORT.md. Prerequisite for making multi-perspective analysis usage-aware. _(Informed by: topoteretes/cognee memify() RL-inspired graph self-improvement, rohitg00/agentmemory tiered consolidation)_
   **Plans:** 3 plans
-  - [ ] 09.1-01-PLAN.md — Telemetry sidecar, traversal recording, weight formula, decay, derived edges (serve.py)
+  - [x] 09.1-01-PLAN.md — Telemetry sidecar, traversal recording, weight formula, decay, derived edges (serve.py)
   - [ ] 09.1-02-PLAN.md — Usage Patterns report section with hot/cold paths (report.py)
   - [ ] 09.1-03-PLAN.md — Integration wiring: decay on rebuild + telemetry passed to generate() (skill.md)
 - [ ] Phase 9.2: Progressive Graph Retrieval — Token-aware 3-layer MCP responses: Layer 1 returns compact summaries (node IDs + labels + community, ~50 tokens), Layer 2 returns edge details and neighbors on drill-down (~200 tokens per node), Layer 3 returns full subgraph with all attributes only on explicit request. Add `budget` parameter to `graph_query` for context-window-aware retrieval. Prevents context blowout at 500+ node graphs. _(Informed by: thedotmack/claude-mem progressive disclosure, rohitg00/agentmemory triple-stream retrieval)_
