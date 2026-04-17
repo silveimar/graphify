@@ -116,8 +116,7 @@ def _split_by_top_dir(component: list[str]) -> list[list[str]]:
 
     # Find the common ancestor directory
     try:
-        common = Path(*[p.parent for p in paths]) if len(paths) == 1 else paths[0].parent
-        # Use os.path.commonpath for multi-path common ancestor
+        # len(paths) > 1 is guaranteed by the early return above (`if len(component) <= 1`)
         import os
         common = Path(os.path.commonpath([str(p) for p in paths]))
         # commonpath may land on a file component; use its parent if it's a file
