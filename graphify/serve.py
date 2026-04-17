@@ -88,6 +88,27 @@ def _load_telemetry(path: Path) -> dict:
         return {"counters": {}, "threshold": 5}
 
 
+def _load_dedup_report(out_dir: Path) -> dict[str, str]:
+    """D-16: load {eliminated_id: canonical_id} alias map from dedup_report.json.
+
+    Returns {} if the report is missing, unreadable, malformed, or has no
+    alias_map key. Never raises — broken dedup report must not crash MCP serve.
+    """
+    path = out_dir / "dedup_report.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        print("[graphify] warning: dedup_report.json could not be parsed; alias map disabled", file=sys.stderr)
+        return {}
+    alias_map = data.get("alias_map", {}) if isinstance(data, dict) else {}
+    # Defensive: ensure all keys/values are strings (reject anything else)
+    if not isinstance(alias_map, dict):
+        return {}
+    return {str(k): str(v) for k, v in alias_map.items() if isinstance(k, str) and isinstance(v, str)}
+
+
 def _save_telemetry(out_dir: Path, data: dict) -> None:
     """Atomically write telemetry.json to out_dir using os.replace."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -727,12 +748,17 @@ def _run_query_graph(
     branching_factor: float,
     telemetry: dict,
     arguments: dict,
+    alias_map: dict[str, str] | None = None,
 ) -> str:
     """Pure dispatch core for query_graph - no MCP runtime. Returns the full D-02 response string.
 
     Separated from `_tool_query_graph` so unit tests can exercise the full pipeline
     (cardinality, bi-BFS, layer rendering, continuation-token encode/decode) without
     standing up an MCP stdio server.
+
+    alias_map (Phase 10 D-16): when provided, resolve merged-away node IDs to their
+    canonical equivalents before scoring / traversal. The response meta JSON includes
+    `resolved_from_alias: {canonical_id: original_alias}` for every node redirected.
 
     Phase 9.2 dispatch pipeline:
       1. Decode continuation_token if present; short-circuit on graph_changed / malformed.
@@ -755,6 +781,31 @@ def _run_query_graph(
         layer = 1
     continuation_token = arguments.get("continuation_token")
     explicit_targets = arguments.get("target_nodes")  # optional; synthesize at depth >=3 if absent
+
+    # Phase 10 D-16: resolve alias-redirects before scoring / traversal.
+    # If alias_map is provided (loaded from dedup_report.json at serve() startup),
+    # any merged-away node ID in the query is transparently redirected to the canonical.
+    _resolved_aliases: dict[str, str] = {}  # {canonical_id: original_alias}
+    _effective_alias_map: dict[str, str] = alias_map or {}
+
+    def _resolve_alias(node_id: str) -> str:
+        """Return canonical ID for node_id; record redirect if it occurred."""
+        canonical = _effective_alias_map.get(node_id)
+        if canonical and canonical != node_id:
+            _resolved_aliases[canonical] = node_id
+            return canonical
+        return node_id
+
+    # Apply alias resolution to explicit seed-node fields passed in arguments.
+    # These fields carry specific node IDs (not free-text questions).
+    for _alias_field in ("node_id", "source", "target", "seed", "start"):
+        if _alias_field in arguments and isinstance(arguments[_alias_field], str):
+            arguments[_alias_field] = _resolve_alias(arguments[_alias_field])
+    if "seed_nodes" in arguments and isinstance(arguments["seed_nodes"], list):
+        arguments["seed_nodes"] = [
+            _resolve_alias(n) if isinstance(n, str) else n
+            for n in arguments["seed_nodes"]
+        ]
 
     # Phase 9.2 D-03: continuation_token validation at dispatch head.
     prior_visited: set[str] = set()
@@ -859,6 +910,9 @@ def _run_query_graph(
         "cardinality_estimate": cardinality_estimate,
         "continuation_token": out_token,
     }
+    # Phase 10 D-16: include alias redirect provenance when any redirect occurred.
+    if _resolved_aliases:
+        meta["resolved_from_alias"] = _resolved_aliases
     return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
 
@@ -970,6 +1024,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
     _annotations: list[dict] = _compact_annotations(_out_dir / "annotations.jsonl")
     _agent_edges: list[dict] = _load_agent_edges(_out_dir / "agent-edges.json")
     _telemetry: dict = _load_telemetry(_out_dir / "telemetry.json")
+    _alias_map: dict[str, str] = _load_dedup_report(_out_dir)  # Phase 10 D-16
     _session_id = str(uuid.uuid4())
 
     server = Server("graphify")
@@ -1151,6 +1206,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             branching_factor=_branching_factor,
             telemetry=_telemetry,
             arguments=arguments,
+            alias_map=_alias_map,  # Phase 10 D-16
         )
         # _save_telemetry(out_dir, data) - out_dir FIRST, data SECOND. Appends 'telemetry.json'.
         _save_telemetry(_out_dir, _telemetry)
