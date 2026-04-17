@@ -1190,7 +1190,13 @@ def main() -> None:
                 sys.exit(1)
 
         try:
-            extraction = json.loads(source_path.read_text(encoding="utf-8"))
+            # UAT gap 2: treat a zero-byte file as empty extraction rather than
+            # surfacing a JSONDecodeError. A zero-byte file is a valid no-op
+            # dedup run (equivalent to {"nodes":[],"edges":[]}).
+            if source_path.exists() and source_path.stat().st_size == 0:
+                extraction = {"nodes": [], "edges": []}
+            else:
+                extraction = json.loads(source_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as e:
             print(f"error: could not read extraction from {source_path!s}: {e}",
                   file=sys.stderr)
@@ -1214,13 +1220,20 @@ def main() -> None:
             f"(fuzzy>={final_fuzzy}, cos>={final_embed}, cross_type={final_cross}) ...",
             file=sys.stderr,
         )
-        new_extraction, report = _dedup(
-            extraction,
-            fuzzy_threshold=final_fuzzy,
-            embed_threshold=final_embed,
-            cross_type=final_cross,
-        )
-        write_dedup_reports(report, out_dir)
+        try:
+            new_extraction, report = _dedup(
+                extraction,
+                fuzzy_threshold=final_fuzzy,
+                embed_threshold=final_embed,
+                cross_type=final_cross,
+            )
+            write_dedup_reports(report, out_dir)
+        except (RuntimeError, ValueError) as e:
+            # UAT gaps 2b/3: missing [dedup] extra (RuntimeError) and
+            # path-confinement violations (ValueError) must surface as a
+            # single clean `error: <msg>` line — no Python traceback.
+            print(f"error: {e}", file=sys.stderr)
+            sys.exit(1)
 
         # Write updated extraction.json alongside the report (preserve old as backup)
         updated_path = out_dir / "extraction.json"

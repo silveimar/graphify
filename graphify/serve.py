@@ -852,6 +852,11 @@ def _run_query_graph(
             "cardinality_estimate": None,
             "continuation_token": None,
         }
+        # UAT gap 8: surface alias resolution metadata even on the short-circuit
+        # path so agents know which canonical the alias was redirected to.
+        # Mirrors the same guard at the happy-path meta construction below.
+        if _resolved_aliases:
+            meta["resolved_from_alias"] = _resolved_aliases
         return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
     # Phase 9.2 D-04/D-05: cardinality pre-flight (only for depth >= 2).
