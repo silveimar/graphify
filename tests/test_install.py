@@ -318,3 +318,79 @@ def test_gemini_uninstall_removes_hook(tmp_path):
 def test_gemini_uninstall_noop_if_not_installed(tmp_path):
     from graphify.__main__ import gemini_uninstall
     gemini_uninstall(tmp_path)  # should not raise
+
+
+# ── Phase 11: command file install/uninstall tests ────────────────────────────
+
+def test_install_command_files_claude(tmp_path):
+    """D-13: install on claude copies all 5 core command files to .claude/commands/."""
+    from unittest.mock import patch
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+    commands_dir = tmp_path / ".claude" / "commands"
+    for name in ("context.md", "trace.md", "connect.md", "drift.md", "emerge.md"):
+        assert (commands_dir / name).exists(), f"Missing {name} after install"
+
+
+def test_install_command_files_windows(tmp_path):
+    """Plan-checker BLOCKER 3: windows uses the same .claude/commands/ convention as claude.
+
+    RESEARCH.md §Install Path Extension confirms windows has native Claude Code
+    commands support. Without this test, a regression that disables commands on
+    windows (commands_enabled=False) would silently ship.
+    """
+    from unittest.mock import patch
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="windows")
+    commands_dir = tmp_path / ".claude" / "commands"
+    for name in ("context.md", "trace.md", "connect.md", "drift.md", "emerge.md"):
+        assert (commands_dir / name).exists(), f"Missing {name} after install on windows"
+
+
+def test_install_no_commands_flag(tmp_path):
+    """D-14: --no-commands skips command-file copy."""
+    from unittest.mock import patch
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude", no_commands=True)
+    commands_dir = tmp_path / ".claude" / "commands"
+    assert not commands_dir.exists() or not any(commands_dir.glob("*.md"))
+
+
+def test_install_idempotent_commands(tmp_path):
+    """D-14: re-running install is idempotent — overwrites in place."""
+    from unittest.mock import patch
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+        install(platform="claude")   # second run must not raise
+    assert (tmp_path / ".claude" / "commands" / "context.md").exists()
+
+
+def test_uninstall_removes_commands(tmp_path):
+    """D-14: uninstall removes previously-installed command files."""
+    from unittest.mock import patch
+    from graphify.__main__ import install, uninstall
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+        uninstall(platform="claude")
+    commands_dir = tmp_path / ".claude" / "commands"
+    for name in ("context.md", "trace.md", "connect.md", "drift.md", "emerge.md"):
+        assert not (commands_dir / name).exists(), f"{name} not removed after uninstall"
+
+
+def test_install_non_claude_platform_skips_commands(tmp_path):
+    """D-13: non-Claude platforms (commands_enabled=False) do not receive command files.
+
+    Note: `windows` IS Claude Code (commands_enabled=True); this test uses `codex`
+    which has no native slash-command support.
+    """
+    from unittest.mock import patch
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="codex")   # commands_enabled=False for codex
+    # .claude/commands/ should not exist (or be empty) for a codex install
+    assert not (tmp_path / ".claude" / "commands").exists() or \
+        not any((tmp_path / ".claude" / "commands").glob("*.md"))

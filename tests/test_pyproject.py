@@ -127,3 +127,13 @@ def test_dedup_optional_extra_present():
     assert "sentence-transformers" in extras["dedup"]
     # All-extras bundle must also include sentence-transformers
     assert "sentence-transformers" in extras["all"]
+
+
+def test_package_data_includes_commands():
+    """D-15: pyproject.toml must include commands/*.md in package-data."""
+    data = _load_pyproject()
+    package_data = data["tool"]["setuptools"]["package-data"]["graphify"]
+    assert "commands/*.md" in package_data, (
+        "pyproject.toml package-data is missing 'commands/*.md'. "
+        "Phase 11 requires command files to be included in wheel installs."
+    )
