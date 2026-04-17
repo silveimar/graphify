@@ -103,15 +103,39 @@ def _build_import_graph(path_strs: list[str], ast_results: list[dict]) -> nx.DiG
 def _split_by_top_dir(component: list[str]) -> list[list[str]]:
     """D-05: split a connected component if it spans >1 top-level directory.
 
-    Top-level directory is the first path component (e.g., `src/foo.py` -> `src`).
-    A bare filename (e.g., `auth.py`) has top-level `""` (project root).
+    Top-level directory is the first path component relative to the common
+    ancestor of all files in the component. Works with both absolute and
+    relative paths. A file sitting directly in the common ancestor (no
+    subdirectory) uses `""` as its top-level key.
     Splits deterministically (alphabetical by top-dir).
     """
+    if len(component) <= 1:
+        return [sorted(component)]
+
+    paths = [Path(f) for f in component]
+
+    # Find the common ancestor directory
+    try:
+        common = Path(*[p.parent for p in paths]) if len(paths) == 1 else paths[0].parent
+        # Use os.path.commonpath for multi-path common ancestor
+        import os
+        common = Path(os.path.commonpath([str(p) for p in paths]))
+        # commonpath may land on a file component; use its parent if it's a file
+        if common.is_file() or (not common.exists() and common.suffix):
+            common = common.parent
+    except ValueError:
+        # Different drives on Windows — treat all as same group
+        return [sorted(component)]
+
     by_dir: dict[str, list[str]] = {}
-    for f in component:
-        parts = Path(f).parts
-        top = parts[0] if len(parts) > 1 else ""
+    for f, p in zip(component, paths):
+        try:
+            rel = p.relative_to(common)
+            top = rel.parts[0] if len(rel.parts) > 1 else ""
+        except ValueError:
+            top = ""
         by_dir.setdefault(top, []).append(f)
+
     if len(by_dir) <= 1:
         return [sorted(component)]
     return [sorted(by_dir[k]) for k in sorted(by_dir.keys())]
