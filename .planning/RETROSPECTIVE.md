@@ -165,6 +165,55 @@
 
 ---
 
+## Milestone: v1.3 — Intelligent Analysis Continuation
+
+**Shipped:** 2026-04-17
+**Phases:** 3 (9.2, 10, 11) | **Plans:** 19
+**Timeline:** 2026-04-16 → 2026-04-17 (2 days)
+
+### What Was Built
+
+- **Phase 9.2 Progressive Graph Retrieval:** Token-aware 3-layer MCP `query_graph` (Layer 1 summary / Layer 2 edges / Layer 3 full subgraph) with `budget` parameter, deterministic cardinality estimator emitted before multi-hop queries, bidirectional BFS at depth ≥ 3 with 3-state status return. Established the hybrid response envelope (`text_body + SENTINEL + json(meta)` with status codes) that Phases 10 and 11 inherited.
+- **Phase 10 Cross-File Semantic Extraction with Entity Deduplication:** Import-cluster batching with token-budget soft cap (50k default) + topological ordering; new `graphify/dedup.py` with fuzzy (`difflib` ≥ 0.90) + embedding (`sentence-transformers` cosine ≥ 0.85) dual-signal matching; canonical merge with weight sum + confidence_score max + EXTRACTED>INFERRED>AMBIGUOUS precedence; transparent alias redirect in MCP `query_graph` (`resolved_from_alias` meta).
+- **Phase 11 Narrative Mode Slash Commands:** 5 new MCP tools (`graph_summary`, `entity_trace`, `connect_topics`, `drift_nodes`, `newly_formed_clusters`) composed from existing `analyze.py` / `delta.py` / `snapshot.py` primitives (no new `graphify/` modules per D-18); 7 `.claude/commands/*.md` prompt files (`/context`, `/trace`, `/connect`, `/drift`, `/emerge`, `/ghost`, `/challenge`) installable via `graphify install` with `commands_enabled: True` on Claude Code + Windows.
+
+### What Worked
+
+- **Plan-checker caught structural bugs before execution.** 5 blockers + 4 warnings on the Phase 11 first pass (wrong `compute_delta` signature, undefined `G_live` in test template, windows platform incorrectly disabled, ROADMAP success criterion mismatch, VALIDATION.md unfilled). Targeted revision fixed all 9 in one pass.
+- **Code review found production bugs that all unit tests missed.** Phase 11's gsd-code-reviewer caught (a) `list_snapshots()` path double-nesting (`graphify-out/graphify-out/snapshots/` — all 4 snapshot-chain tools would have always returned `insufficient_history` in production; tests passed `tmp_path` directly and never tripped it), (b) `TypeError` on `graphify install --platform=cursor` from a missing `project_dir` argument. Both auto-fixed via `gsd-code-review-fix` with regression tests that match production path semantics.
+- **Wave structure collapsed cleanly under sequential execution.** With `workflow.use_worktrees: false`, the planned 6-wave structure executed as a linear 7-plan run without conflict. Each wave's test suite stayed green before advancing.
+- **Cross-phase invariant enforcement.** Phase 10's alias redirect contract and Phase 9.2's hybrid envelope contract explicitly carried forward into Phase 11 via CONTEXT.md D-07 and D-08. The planner read those contracts as hard requirements, not suggestions.
+
+### What Was Inefficient
+
+- **Roadmap-parser gap cost cycles.** `gsd-tools find-phase 11` returned `found: false` even though Phase 11 was fully scoped in ROADMAP.md — the indexer only recognizes phases with on-disk directories. Workaround was `mkdir .planning/phases/11-narrative-mode-slash-commands/` before `/gsd-discuss-phase 11` would accept the phase. Also caused 24 spurious `W002` warnings in `/gsd-health` from STATE.md history references to phase numbers the indexer couldn't see.
+- **Summary one-liner extractor swallowed Phase 10/11 results.** `gsd-tools summary-extract --fields one_liner` returned raw "One-liner:" labels + stray file paths for several SUMMARY.md files whose frontmatter didn't match the expected shape. Cost a curation pass to rewrite the MILESTONES.md accomplishments block by hand.
+- **`audit-open` tool bug blocked the pre-close audit.** `ReferenceError: output is not defined` at `gsd-tools.cjs:786`. Had to do manual readiness check via filesystem + grep.
+- **Tooling gap surfaced mid-phase.** The `/gsd-audit-milestone` step was skipped because `audit-open` can't run, plus no pre-existing audit file for v1.3. Proceeded with manual verification (3 phases × summary files + requirements table grep + post-execution code review + verifier agent). For v1.4 the audit command needs the CLI bug fixed first.
+
+### Patterns Established
+
+- **Hybrid response envelope as cross-phase invariant.** Phase 9.2 introduced it, Phases 10 and 11 inherited it. All new MCP tools emit `text_body + "\n---GRAPHIFY-META---\n" + json(meta)` with a `status` field — the canonical contract for anything agents consume.
+- **Alias redirect as forward-compat primitive.** When dedup merges node X into Y, `query_graph(X)` returns Y with `resolved_from_alias: "X"` meta. Phase 11 inherited this: every identifier-accepting tool in `entity_trace` / `connect_topics` honors the same contract. Old callsites don't break when the graph gets dedup'd.
+- **Memory discipline for snapshot walkers.** Iterate snapshots → extract per-graph scalars (community_id, degree, staleness) → `del G_snap` → move on. Verified via weakref-based tests that assert the graph object is garbage-collected, not just out of scope.
+- **No new modules for plumbing phases (D-18).** Phase 11 shipped 5 MCP tools by composing `analyze.py` + `delta.py` + `snapshot.py` primitives. When a thin wrapper delivers the requirement, resist the urge to open a new module.
+- **Conditional plans with grep-verifiable gate decisions.** Plan 11-07 (stretch) has a Task 0 that writes `^GATE: proceed` or `^GATE: defer` as the first non-frontmatter line of SUMMARY.md. Subsequent tasks short-circuit via `grep -q '^GATE: defer' ... && exit 0`. Clean conditional execution without complex workflow branching.
+
+### Key Lessons
+
+- **Test fixtures must match production path semantics.** The Phase 11 CR-01 bug is the archetype: tests passed `tmp_path` as the `list_snapshots` root (one layout) while production code passed `graphify-out/` (another layout). Both callers were internally consistent; neither caller matched the other. For any module with filesystem layout assumptions, at least one test must construct the *production* path shape.
+- **Plan-checker and code-reviewer see different bug spaces.** The planner's verifier caught *structural* bugs (wrong signatures in plan text, missing acceptance criteria). The code reviewer caught *runtime* bugs that slipped through plans AND tests. Both gates are necessary — neither is sufficient. If only one were run, a critical class of bugs would ship.
+- **Auto mode is one-pass by design.** `/gsd-discuss-phase --auto` completed a full discussion in a single pass with logged recommended-default selections. Decisions were durable and downstream agents treated them as locked — no iteration, no re-asking. Works best when gray areas are well-enumerated and defaults have been thought through.
+- **Phase-registration gaps compound.** Once Phase 11 failed to register, `/gsd-next` routing, `/gsd-health`, STATE.md comparison, and the pre-close audit all behaved oddly. Fix the indexer gap early in v1.4 — it's cheap leverage.
+
+### Cost Observations
+
+- **Model mix:** ~20% opus (planner agent, checker revisions, milestone orchestration), ~75% sonnet (executor agents across 7 plans, research, code review, fix agent), ~5% haiku-class. Opus share rose vs. v1.2 because Phase 11 was structurally more complex and required more planner/revision work.
+- **Sessions:** ~2 distinct working sessions across 2 days. Phase 10 and Phase 11 executed in the same stretch with no context reset.
+- **Notable:** Phase 11's 7 plans executed sequentially in ~70 minutes total wall-clock (no worktrees, so parallel waves collapsed to sequential). Quality gates (plan-checker, code-reviewer, fix agent, verifier) added ~25 minutes but caught 2 Critical + 2 Warning + 9 pre-execution findings. Net time saved vs. debugging runtime failures in production was significant.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
