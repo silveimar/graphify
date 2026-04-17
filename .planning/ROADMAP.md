@@ -156,7 +156,14 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 
   **Informed by:** Obsidian-Claude-Codebook (12 commands pattern), Your-Harness-Your-Memory, memory-harness interactive slash command patterns, letta-ai/letta-obsidian. Full rationale: `.planning/notes/april-2026-v1.3-priorities.md` § Phase 11.
 
-  **Plans:** TBD
+  **Plans:** 7 plans (5 core + 1 discoverability + 1 stretch conditional)
+  - [ ] 11-01-PLAN.md — MCP tools graph_summary + connect_topics in serve.py (SLASH-01, SLASH-03)
+  - [ ] 11-02-PLAN.md — MCP tool entity_trace + shared snapshot-chain fixture (SLASH-02)
+  - [ ] 11-03-PLAN.md — MCP tools drift_nodes + newly_formed_clusters (SLASH-04, SLASH-05)
+  - [ ] 11-04-PLAN.md — Command prompt files graphify/commands/*.md for core 5 (SLASH-01..05)
+  - [ ] 11-05-PLAN.md — skill.md + 8 variants Available-slash-commands discoverability section (D-16)
+  - [ ] 11-06-PLAN.md — __main__.py _PLATFORM_CONFIG + --no-commands + pyproject.toml package-data (D-13, D-14, D-15)
+  - [ ] 11-07-PLAN.md — CONDITIONAL: /ghost + /challenge command files (SLASH-06, SLASH-07 stretch, D-17)
 
 ---
 
