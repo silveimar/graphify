@@ -129,7 +129,16 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 
   **Informed by:** Build-Agents-That-Never-Forget, Everything-Is-Connected, Cognee entity dedup patterns, april-research-gap-analysis (entity fragmentation finding). Full rationale: `.planning/notes/april-2026-v1.3-priorities.md` § Phase 10.
 
-  **Plans:** TBD
+  **Plans:** 7 plans
+
+  Plans:
+  - [ ] 10-01-PLAN.md — Wave 0 scaffolding: [dedup] extra, validate.py schema (D-11/D-12), conftest fixtures, test stubs, multi-file fixture (GRAPH-02/03 foundation)
+  - [ ] 10-02-PLAN.md — graphify/batch.py: cluster_files() with import-component clustering, top-dir cap, token-budget split, topological order (GRAPH-01)
+  - [ ] 10-03-PLAN.md — graphify/dedup.py: fuzzy+cosine gates, D-09 canonical selection, D-10 edge aggregation, write_dedup_reports, GRAPH-04 stretch (GRAPH-02/03/04)
+  - [ ] 10-04-PLAN.md — CLI --dedup command + yaml.safe_load config + skill.md + 8 platform variants (GRAPH-01/02; T-10-04)
+  - [ ] 10-05-PLAN.md — GRAPH_REPORT.md Entity Dedup section with defense-in-depth sanitization (GRAPH-02; T-10-02)
+  - [ ] 10-06-PLAN.md — MCP serve.py alias redirect layer with resolved_from_alias meta (GRAPH-03; D-16)
+  - [ ] 10-07-PLAN.md — Obsidian aliases: frontmatter from merged_from + --obsidian-dedup flag (GRAPH-03; D-15)
 
 - [ ] **Phase 11: Narrative Mode as Interactive Slash Commands**
 
@@ -189,7 +198,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 9.1 Query Telemetry & Usage-Weighted Edges | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.1.1 Milestone v1.2 Lifecycle Cleanup | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.2 Progressive Graph Retrieval | v1.3 | 0/3 | Planned | — |
-| 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 0/? | Pending | — |
+| 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 0/7 | Planned | — |
 | 11. Narrative Mode as Interactive Slash Commands | v1.3 | 0/? | Pending | — |
 | 12. Heterogeneous Extraction Routing | v1.4 | 0/? | Planned | — |
 | 13. Agent Capability Manifest | v1.4 | 0/? | Planned | — |
