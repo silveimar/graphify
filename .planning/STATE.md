@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: Roadmap complete — ready to plan Phase 12
-stopped_at: v1.4 roadmap written; 86 REQ-IDs mapped to 7 phases (100% coverage); Phase 13 bundles SEED-002 via two-wave execution
-last_updated: "2026-04-17T19:45:00.000Z"
+status: Phase 12 context gathered — ready for plan-phase
+stopped_at: Phase 12 discuss-phase complete; 12-CONTEXT.md + 12-DISCUSSION-LOG.md written
+last_updated: "2026-04-17T22:00:00.000Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 7
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis and usage-weighted self-improvement, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, now being extended in v1.4 to agent discoverability (MCP capability manifest + SEED-002 harness export), Obsidian thinking-command depth, and graph-quality-over-time via heterogeneous routing + async enrichment + focus-aware zoom + grounded chat + SPAR-Kit argumentation.
-**Current focus:** v1.4 roadmap locked. Next step is `/gsd-discuss-phase 12` or `/gsd-plan-phase 12` to begin Heterogeneous Extraction Routing (the HARD gate for `cache.py` key format).
+**Current focus:** Phase 12 context is captured. Next step is `/gsd-plan-phase 12 --auto` (after `/clear` if using chain) to plan and execute Heterogeneous Extraction Routing.
 
 ## Current Position
 
-Phase: Not started (roadmap complete; Phase 12 ready to plan)
+Phase: 12 Heterogeneous Extraction Routing — context gathered
 Plan: —
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17)
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Roadmap complete, awaiting Phase 12 planning
-Last activity: 2026-04-17 — v1.4 ROADMAP.md written with 7 phases, 86 REQ-IDs mapped
+Status: Phase 12 CONTEXT.md ready; next is plan-phase (chain: `--auto` after `/clear`)
+Last activity: 2026-04-17 — `/gsd-discuss-phase 12 --chain` captured decisions in `.planning/phases/12-heterogeneous-extraction-routing/`
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases complete)
 
@@ -118,7 +118,7 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 
 ### Blockers/Concerns
 
-None. Phase 12 ready to plan.
+None. Phase 12 planned next (`/gsd-plan-phase 12 --auto`).
 
 ### Quick Tasks Completed
 
@@ -128,6 +128,6 @@ None. Phase 12 ready to plan.
 
 ## Session Continuity
 
-Last session: 2026-04-17T19:45:00.000Z
-Stopped at: v1.4 roadmap written — 7 phases, 86 REQ-IDs mapped (100% coverage), Phase 13 bundles SEED-002 via Wave A (plumbing, 3rd in build order) + Wave B (final regen, 8th in build order); build order locked per SUMMARY.md; cross-phase rules locked (D-02 envelope, D-16 alias, D-18 compose, Phase 16→17 forbidden composition, Phase 18 codifies v1.3 CR-01 snapshot-root rename, Phase 14 Plan 00 whitelist refactor gates new commands).
-Next action: `/gsd-discuss-phase 12 ${GSD_WS}` or `/gsd-plan-phase 12 ${GSD_WS}` to begin Heterogeneous Extraction Routing (the HARD gate for `cache.py` key format).
+Last session: 2026-04-17T22:00:00.000Z
+Stopped at: Phase 12 discuss-phase complete — `12-CONTEXT.md` + `12-DISCUSSION-LOG.md` in `.planning/phases/12-heterogeneous-extraction-routing/`.
+Next action: `/clear` then `/gsd-plan-phase 12 --auto` to continue the chain (plan → execute). `gsd-sdk` not available in this environment for automatic Skill handoff.
