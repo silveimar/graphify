@@ -1278,6 +1278,189 @@ def _run_connect_topics(
     return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
 
+
+def _run_entity_trace(
+    G: "nx.Graph",
+    snaps_dir: "Path",
+    alias_map: "dict[str, str]",
+    arguments: dict,
+) -> str:
+    """Pure helper for entity_trace MCP tool (Phase 11 SLASH-02).
+
+    Testable without MCP runtime. Returns the full hybrid envelope string.
+
+    Walk graphify-out/snapshots/*.json via list_snapshots(snaps_dir) + load_snapshot()
+    with strict memory discipline (only one nx.Graph deserialized at a time — del G_snap
+    after extracting scalars). Honours Phase 10 alias-redirect contract (D-16).
+
+    Node-id scheme in tests: nodes are named n0, n1, ..., n{i} with label=f"n{j}".
+    Any test that constructs a live G_live tip graph must use the same scheme so
+    _find_node can bridge fixture-built snapshots and the live tip.
+    """
+    from .snapshot import list_snapshots, load_snapshot
+
+    budget = int(arguments.get("budget", 500))
+    budget = max(50, min(budget, 100000))
+
+    entity_raw = sanitize_label(str(arguments.get("entity", "")))
+    if not entity_raw:
+        meta: dict = {
+            "status": "no_data",
+            "layer": 1,
+            "search_strategy": "trace",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+        }
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    # Phase 10 D-16: alias resolution — scoped per-call for thread safety.
+    _resolved_aliases: dict[str, list[str]] = {}
+    _effective_alias_map: dict[str, str] = alias_map or {}
+
+    def _resolve_alias(node_id: str) -> str:
+        canonical = _effective_alias_map.get(node_id)
+        if canonical and canonical != node_id:
+            aliases = _resolved_aliases.setdefault(canonical, [])
+            if node_id not in aliases:
+                aliases.append(node_id)
+            return canonical
+        return node_id
+
+    entity_resolved = _resolve_alias(entity_raw)
+
+    # List prior snapshots from snaps_dir.
+    snaps = list_snapshots(snaps_dir)
+
+    # Insufficient-history: need at least 1 prior snapshot for a meaningful trace
+    # (live G counts as second data point, so threshold is len(snaps) < 1).
+    if len(snaps) < 1:
+        meta = {
+            "status": "insufficient_history",
+            "layer": 1,
+            "search_strategy": "trace",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+            "snapshots_available": len(snaps),
+        }
+        if _resolved_aliases:
+            meta["resolved_from_alias"] = _resolved_aliases
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    # Initial resolution on the live graph — check for ambiguity first.
+    live_matches = _find_node(G, entity_resolved)
+    if len(live_matches) > 1:
+        candidates = [
+            {
+                "id": m,
+                "label": G.nodes[m].get("label", m),
+                "source_file": G.nodes[m].get("source_file", ""),
+            }
+            for m in live_matches
+        ]
+        meta = {
+            "status": "ambiguous_entity",
+            "layer": 1,
+            "search_strategy": "trace",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+            "candidates": candidates,
+        }
+        if _resolved_aliases:
+            meta["resolved_from_alias"] = _resolved_aliases
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    # Walk snapshot chain with memory discipline: extract scalars then del G_snap.
+    timeline: list[dict] = []
+    first_seen_ts: "str | None" = None
+
+    for path in snaps:
+        G_snap, _comms_snap, meta_snap = load_snapshot(path)
+        ts = meta_snap.get("timestamp", path.stem)
+        snap_matches = _find_node(G_snap, entity_resolved)
+        if snap_matches:
+            node_id_snap = snap_matches[0]
+            if first_seen_ts is None:
+                first_seen_ts = ts
+            comm_id_snap = G_snap.nodes[node_id_snap].get("community", -1)
+            degree_snap = G_snap.degree(node_id_snap)
+            timeline.append({
+                "timestamp": ts,
+                "community": comm_id_snap,
+                "degree": degree_snap,
+                "present": True,
+            })
+        else:
+            timeline.append({"timestamp": ts, "present": False})
+        del G_snap  # CRITICAL memory discipline: only one graph in memory at a time
+
+    # Check entity existence across all sources (snapshots + live) for entity_not_found.
+    if not live_matches and first_seen_ts is None:
+        # Entity not found anywhere — no matches in any snapshot and not in live graph.
+        meta = {
+            "status": "entity_not_found",
+            "layer": 1,
+            "search_strategy": "trace",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+        }
+        if _resolved_aliases:
+            meta["resolved_from_alias"] = _resolved_aliases
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    # Append live graph as "tip" data point.
+    if live_matches:
+        tip_id = live_matches[0]
+        if first_seen_ts is None:
+            first_seen_ts = "current"
+        timeline.append({
+            "timestamp": "current",
+            "community": G.nodes[tip_id].get("community", -1),
+            "degree": G.degree(tip_id),
+            "present": True,
+        })
+    else:
+        timeline.append({"timestamp": "current", "present": False})
+
+    # Build text_body: Layer-1 compact timeline.
+    entity_label = entity_resolved
+    if live_matches:
+        entity_label = G.nodes[live_matches[0]].get("label", entity_resolved)
+
+    lines = [f"## Entity Trace: {sanitize_label(entity_label)}", ""]
+    lines.append(f"**First seen:** {first_seen_ts}")
+    lines.append(f"**Timeline ({len(timeline)} data points):**")
+    lines.append("")
+    for entry in timeline:
+        ts_str = entry["timestamp"]
+        if entry.get("present"):
+            comm_val = entry["community"]
+            deg_val = entry["degree"]
+            lines.append(f"  {ts_str}: community={comm_val}, degree={deg_val}")
+        else:
+            lines.append(f"  {ts_str}: (not present)")
+
+    text_body = "\n".join(lines)
+    max_chars = budget * 3
+    if len(text_body) > max_chars:
+        text_body = text_body[:max_chars] + f"\n... (truncated to ~{budget} token budget)"
+
+    entity_id_out = live_matches[0] if live_matches else entity_resolved
+    meta = {
+        "status": "ok",
+        "layer": 1,
+        "search_strategy": "trace",
+        "cardinality_estimate": None,
+        "continuation_token": None,
+        "snapshot_count": len(snaps),
+        "first_seen": first_seen_ts,
+        "timeline_length": len(timeline),
+        "entity_id": entity_id_out,
+    }
+    if _resolved_aliases:
+        meta["resolved_from_alias"] = _resolved_aliases
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
 def serve(graph_path: str = "graphify-out/graph.json") -> None:
     """Start the MCP server. Requires pip install mcp."""
     try:
@@ -1465,6 +1648,14 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
                     "topic_b": {"type": "string"},
                     "budget": {"type": "integer", "default": 500},
                 }, "required": ["topic_a", "topic_b"]},
+            ),
+            types.Tool(
+                name="entity_trace",
+                description="Return the evolution of a named entity across graph snapshots: first-seen, per-snapshot community and degree, current status. Used by the /trace slash command.",
+                inputSchema={"type": "object", "properties": {
+                    "entity": {"type": "string"},
+                    "budget": {"type": "integer", "default": 500},
+                }, "required": ["entity"]},
             ),
         ]
 
@@ -1693,6 +1884,21 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
         return _run_connect_topics(G, communities, _alias_map, arguments)
 
+    def _tool_entity_trace(arguments: dict) -> str:
+        """Phase 11 SLASH-02: entity evolution timeline across graph snapshots."""
+        _reload_if_stale()
+        if not Path(graph_path).exists():
+            meta: dict = {
+                "status": "no_graph",
+                "layer": 1,
+                "search_strategy": "trace",
+                "cardinality_estimate": None,
+                "continuation_token": None,
+            }
+            text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
+            return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+        return _run_entity_trace(G, _out_dir, _alias_map, arguments)
+
     _handlers = {
         "query_graph": _tool_query_graph,
         "get_node": _tool_get_node,
@@ -1709,6 +1915,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "get_agent_edges": _tool_get_agent_edges,
         "graph_summary": _tool_graph_summary,
         "connect_topics": _tool_connect_topics,
+        "entity_trace": _tool_entity_trace,
     }
 
     @server.call_tool()
