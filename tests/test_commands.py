@@ -1,0 +1,110 @@
+"""Tests for graphify slash-command prompt files — existence, frontmatter, MCP tool references."""
+from __future__ import annotations
+from pathlib import Path
+import re
+
+import graphify
+
+
+CORE_COMMANDS = {
+    "context": "graph_summary",
+    "trace": "entity_trace",
+    "connect": "connect_topics",
+    "drift": "drift_nodes",
+    "emerge": "newly_formed_clusters",
+}
+
+SNAPSHOT_COMMANDS = {"trace", "drift", "emerge"}
+PARAMETERIZED_COMMANDS = {"trace", "connect"}
+
+
+def _commands_dir() -> Path:
+    return Path(graphify.__file__).parent / "commands"
+
+
+def _read(name: str) -> str:
+    return (_commands_dir() / f"{name}.md").read_text(encoding="utf-8")
+
+
+def _registered_tool_names() -> set[str]:
+    """Regex-extract every types.Tool(name="...") from graphify/serve.py source.
+
+    serve.py builds _handlers inside a closure, so direct introspection would
+    require standing up the MCP runtime. Regex over source is sufficient for a
+    drift detector (plan-checker WARNING 3 fix).
+    """
+    serve_src = (Path(graphify.__file__).parent / "serve.py").read_text(encoding="utf-8")
+    return set(re.findall(r'types\.Tool\s*\(\s*name="([^"]+)"', serve_src))
+
+
+def test_command_files_exist_in_package():
+    for name in CORE_COMMANDS:
+        assert (_commands_dir() / f"{name}.md").exists(), f"Missing commands/{name}.md"
+
+
+def test_command_files_have_required_frontmatter():
+    for name in CORE_COMMANDS:
+        text = _read(name)
+        assert text.startswith("---\n"), f"{name}.md missing YAML frontmatter opener"
+        for field in (f"name: {name}", "description:", "argument-hint:", "disable-model-invocation: true"):
+            assert field in text, f"{name}.md missing {field!r} in frontmatter"
+
+
+def test_command_files_reference_correct_mcp_tool():
+    for name, tool in CORE_COMMANDS.items():
+        text = _read(name)
+        assert tool in text, f"{name}.md does not reference MCP tool {tool!r}"
+
+
+def test_command_files_have_no_graph_guard():
+    for name in CORE_COMMANDS:
+        text = _read(name)
+        assert "no_graph" in text, f"{name}.md missing no_graph guard"
+
+
+def test_snapshot_commands_have_insufficient_history_guard():
+    for name in SNAPSHOT_COMMANDS:
+        text = _read(name)
+        assert "insufficient_history" in text, f"{name}.md missing insufficient_history guard"
+
+
+def test_trace_md_has_ambiguous_and_not_found_guards():
+    text = _read("trace")
+    assert "ambiguous_entity" in text
+    assert "entity_not_found" in text
+
+
+def test_connect_md_has_distinct_sections():
+    text = _read("connect")
+    assert "Shortest path" in text, "connect.md must contain 'Shortest path' section header"
+    assert "Surprising bridges" in text, "connect.md must contain 'Surprising bridges' section header"
+
+
+def test_connect_md_does_not_conflate_sections():
+    text = _read("connect")
+    idx_path = text.find("Shortest path")
+    idx_bridges = text.find("Surprising bridges")
+    assert idx_path != -1 and idx_bridges != -1
+    assert idx_path < idx_bridges, "Shortest path section must come before Surprising bridges — must not be conflated (Pitfall 4)"
+
+
+def test_parameterized_commands_reference_arguments():
+    for name in PARAMETERIZED_COMMANDS:
+        text = _read(name)
+        assert "$ARGUMENTS" in text, f"{name}.md missing $ARGUMENTS placeholder"
+
+
+def test_command_files_reference_registered_tools():
+    """Every tool name used by a command file must be registered in serve.py.
+
+    Plan-checker WARNING 3: detects tool-name drift. If serve.py renames
+    `graph_summary` to `graph_digest` but context.md still says `graph_summary`,
+    the command silently breaks at runtime. This test catches it at test time.
+    """
+    registered = _registered_tool_names()
+    referenced = set(CORE_COMMANDS.values())
+    missing = referenced - registered
+    assert not missing, (
+        f"Command files reference tools not registered in serve.py: {sorted(missing)}. "
+        f"Registered tools: {sorted(registered)}"
+    )
