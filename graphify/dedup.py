@@ -583,7 +583,7 @@ def _render_dedup_md(report: dict) -> str:
             for e in merge.get("eliminated", [])
         )
         lines.append(
-            f"- `{canon_label}` <- {eliminated_labels}  "
+            f"- `{canon_label}` ← {eliminated_labels}  "
             f"[fuzzy={merge.get('fuzzy_score', 0):.3f}, cos={merge.get('cosine_score', 0):.3f}]"
         )
     if not report.get("merges"):
