@@ -70,3 +70,68 @@ def multi_file_extraction():
     designed to exercise GRAPH-01 (clustering) and GRAPH-02/03 (dedup).
     """
     return json.loads((FIXTURES / "multi_file_extraction.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def make_snapshot_chain(tmp_path):
+    """Factory fixture: create a chain of N synthetic snapshots under `root`.
+
+    Usage::
+
+        def test_something(make_snapshot_chain, tmp_path):
+            snaps = make_snapshot_chain(n=3, root=tmp_path)
+            # snaps is a list[Path] sorted oldest-first (matching list_snapshots order)
+
+    Node-id scheme (CRITICAL — downstream tests that construct a live tip graph G_live
+    MUST use the same scheme so _find_node can match across chain and tip):
+
+        - Snapshot i (0-indexed) contains nodes n0 .. n{i+1}
+        - Each node j has: label=f"n{j}", source_file=f"f{j}.py",
+          source_location=f"L{j}", file_type="code", community=j % 2
+        - Each snapshot i>0 also adds edge (n0, n{i}, relation="calls",
+          confidence="EXTRACTED", source_file="f0.py")
+        - Nodes are named n0, n1, ..., n{i+1} with label matching the id string.
+
+    This means a 3-snapshot chain yields:
+        snap_00: nodes {n0, n1}
+        snap_01: nodes {n0, n1, n2}, edge n0->n1
+        snap_02: nodes {n0, n1, n2, n3}, edges n0->n1, n0->n2
+
+    Each snapshot is saved with name=f"snap_{i:02d}" so mtime ordering matches
+    insertion order (list_snapshots sorts by mtime oldest-first).
+    """
+    import networkx as nx
+    from graphify.snapshot import save_snapshot
+
+    def _make(n: int = 3, root: "Path | None" = None) -> "list[Path]":
+        base = Path(root) if root is not None else tmp_path
+        paths = []
+        for i in range(n):
+            G = nx.Graph()
+            # Snapshot i contains nodes n0 .. n{i+1}
+            for j in range(i + 2):
+                G.add_node(
+                    f"n{j}",
+                    label=f"n{j}",
+                    source_file=f"f{j}.py",
+                    source_location=f"L{j}",
+                    file_type="code",
+                    community=j % 2,
+                )
+            # From snapshot 1 onward, add edge n0 -> n{i}
+            if i > 0:
+                G.add_edge(
+                    "n0",
+                    f"n{i}",
+                    relation="calls",
+                    confidence="EXTRACTED",
+                    source_file="f0.py",
+                )
+            communities = {j % 2: [f"n{k}" for k in range(i + 2) if k % 2 == j % 2] for j in range(i + 2)}
+            p = save_snapshot(G, communities, root=base, name=f"snap_{i:02d}")
+            paths.append(p)
+        # Return sorted oldest-first (matching list_snapshots output ordering)
+        paths.sort(key=lambda p: p.stat().st_mtime)
+        return paths
+
+    return _make
