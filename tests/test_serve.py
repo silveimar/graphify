@@ -1507,3 +1507,45 @@ def test_run_query_graph_does_not_mutate_caller_arguments():
     assert arguments["layer"] == snapshot["layer"]
 
 
+
+
+# --- Phase 10 Plan 09: UAT gap test 8 — alias resolution on no_seed_nodes path ---
+
+def test_no_seed_nodes_surfaces_resolved_from_alias():
+    """no_seed_nodes meta must include resolved_from_alias when an alias was resolved (UAT gap test 8).
+
+    When node_id='auth' redirects to 'authentication_service' via alias_map, but
+    authentication_service is not in the graph (so start_nodes is empty), the
+    no_seed_nodes meta must still expose resolved_from_alias so agents know the
+    redirect happened.
+    """
+    # A graph that does NOT contain the canonical 'authentication_service' node
+    # so that after alias resolution, _score_nodes finds no seed nodes.
+    G = nx.Graph()
+    G.add_node("unrelated_service", label="unrelated service", file_type="code",
+               community=0, source_file="other.py", source_location="L1")
+
+    communities = _communities_from_graph(G)
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    alias_map = {"auth": "authentication_service"}
+
+    response = _run_query_graph(
+        G, communities, 1000.0, bf, telemetry,
+        {
+            "node_id": "auth",
+            "question": "",  # empty question ensures no question-based scoring
+            "depth": 1,
+            "budget": 500,
+            "layer": 1,
+        },
+        alias_map=alias_map,
+    )
+    assert QUERY_GRAPH_META_SENTINEL in response
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "no_seed_nodes"
+    assert "resolved_from_alias" in meta, (
+        "resolved_from_alias must be present in no_seed_nodes meta when alias was resolved"
+    )
+    assert meta["resolved_from_alias"] == {"authentication_service": ["auth"]}
