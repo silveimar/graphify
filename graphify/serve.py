@@ -758,7 +758,9 @@ def _run_query_graph(
 
     alias_map (Phase 10 D-16): when provided, resolve merged-away node IDs to their
     canonical equivalents before scoring / traversal. The response meta JSON includes
-    `resolved_from_alias: {canonical_id: original_alias}` for every node redirected.
+    `resolved_from_alias: {canonical_id: [original_alias, ...]}` listing every alias
+    that was redirected to each canonical (multiple aliases may collapse to one
+    canonical, so the value is always a list).
 
     Phase 9.2 dispatch pipeline:
       1. Decode continuation_token if present; short-circuit on graph_changed / malformed.
@@ -785,14 +787,19 @@ def _run_query_graph(
     # Phase 10 D-16: resolve alias-redirects before scoring / traversal.
     # If alias_map is provided (loaded from dedup_report.json at serve() startup),
     # any merged-away node ID in the query is transparently redirected to the canonical.
-    _resolved_aliases: dict[str, str] = {}  # {canonical_id: original_alias}
+    # WR-02: keep a list per canonical so multiple aliases collapsing to the same
+    # canonical (e.g. ``auth`` and ``auth_svc`` both -> ``authentication_service``)
+    # all surface in meta.resolved_from_alias instead of the last-write winning.
+    _resolved_aliases: dict[str, list[str]] = {}  # {canonical_id: [original_alias, ...]}
     _effective_alias_map: dict[str, str] = alias_map or {}
 
     def _resolve_alias(node_id: str) -> str:
         """Return canonical ID for node_id; record redirect if it occurred."""
         canonical = _effective_alias_map.get(node_id)
         if canonical and canonical != node_id:
-            _resolved_aliases[canonical] = node_id
+            aliases = _resolved_aliases.setdefault(canonical, [])
+            if node_id not in aliases:
+                aliases.append(node_id)
             return canonical
         return node_id
 

@@ -1410,3 +1410,49 @@ def test_run_query_graph_no_alias_map_backward_compat():
     assert meta1["status"] == meta2["status"]
     assert "resolved_from_alias" not in meta1
     assert "resolved_from_alias" not in meta2
+
+
+def test_run_query_graph_records_all_aliases_for_same_canonical():
+    """WR-02 regression: multiple aliases resolving to one canonical must all be recorded.
+
+    Pre-fix the recorder was ``_resolved_aliases[canonical] = node_id`` which
+    overwrote on the second hit, so only the last alias survived. Now each
+    canonical maps to a list of every alias that was redirected to it.
+    """
+    G = nx.Graph()
+    G.add_node("authentication_service", label="authentication service",
+               file_type="code", community=0, source_file="auth.py", source_location="L1")
+    G.add_node("other", label="other service", file_type="code", community=0,
+               source_file="other.py", source_location="L1")
+    G.add_edge("authentication_service", "other", relation="calls", confidence="EXTRACTED")
+
+    communities = _communities_from_graph(G)
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    # Two distinct merged-away IDs both collapse to the same canonical.
+    alias_map = {
+        "auth": "authentication_service",
+        "auth_svc": "authentication_service",
+    }
+
+    response = _run_query_graph(
+        G, communities, 1000.0, bf, telemetry,
+        {
+            "question": "auth",
+            "depth": 1,
+            "budget": 500,
+            "layer": 1,
+            # seed_nodes triggers alias resolution for both entries.
+            "seed_nodes": ["auth", "auth_svc"],
+        },
+        alias_map=alias_map,
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    resolved = meta["resolved_from_alias"]
+    # Both aliases must surface under the canonical, not just the last write.
+    assert "authentication_service" in resolved
+    assert isinstance(resolved["authentication_service"], list)
+    assert sorted(resolved["authentication_service"]) == ["auth", "auth_svc"]
+
+
