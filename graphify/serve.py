@@ -1023,6 +1023,261 @@ def _filter_blank_stdin() -> None:
     sys.stdin = open(0, "r", closefd=False)
 
 
+def _run_graph_summary(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    snaps_dir: Path,
+    arguments: dict,
+) -> str:
+    """Pure helper for graph_summary MCP tool (Phase 11 SLASH-01).
+
+    Testable without MCP runtime. Returns the full hybrid envelope string.
+    """
+    budget = int(arguments.get("budget", 500))
+    budget = max(50, min(budget, 100000))
+    top_n = int(arguments.get("top_n", 10))
+    top_n = max(1, min(top_n, 50))
+
+    from .analyze import god_nodes as _god_nodes
+    from .snapshot import list_snapshots, load_snapshot
+    from .delta import compute_delta
+
+    gods = _god_nodes(G, top_n=top_n)
+    snaps = list_snapshots(snaps_dir)
+
+    # Build top communities list (top 5 by size)
+    top_communities = []
+    sorted_comms = sorted(communities.items(), key=lambda x: len(x[1]), reverse=True)
+    for cid, node_ids in sorted_comms[:5]:
+        sample_labels = []
+        for nid in node_ids[:3]:
+            sample_labels.append(G.nodes[nid].get("label", nid) if nid in G.nodes else nid)
+        top_communities.append({"id": cid, "size": len(node_ids), "sample": sample_labels})
+
+    # Compute delta from most recent snapshot
+    delta_block: dict | None = None
+    if len(snaps) >= 1:
+        G_prev, comms_prev, _meta_prev = load_snapshot(snaps[-1])
+        delta = compute_delta(G_prev, comms_prev, G, communities)
+        delta_block = {
+            "added_nodes": len(delta["added_nodes"]),
+            "removed_nodes": len(delta["removed_nodes"]),
+            "added_edges": len(delta["added_edges"]),
+            "removed_edges": len(delta["removed_edges"]),
+        }
+        del G_prev
+    else:
+        delta_block = {"status": "no_prior_snapshot"}
+
+    # Build text_body
+    lines = ["## Graph Summary", ""]
+    lines.append(f"**Nodes:** {G.number_of_nodes()}  |  **Edges:** {G.number_of_edges()}  |  **Communities:** {len(communities)}")
+    lines.append("")
+    lines.append("### God Nodes (most connected)")
+    for i, n in enumerate(gods, 1):
+        lines.append(f"  {i}. {n['label']} — {n['edges']} edges")
+    lines.append("")
+    lines.append("### Top Communities")
+    for c in top_communities:
+        sample_str = ", ".join(c["sample"])
+        lines.append(f"  Community {c['id']}: {c['size']} nodes — e.g. {sample_str}")
+    lines.append("")
+    if delta_block and "status" not in delta_block:
+        lines.append("### Recent Delta (vs. last snapshot)")
+        lines.append(f"  +{delta_block['added_nodes']} nodes  -{delta_block['removed_nodes']} nodes  "
+                     f"+{delta_block['added_edges']} edges  -{delta_block['removed_edges']} edges")
+    elif delta_block and delta_block.get("status") == "no_prior_snapshot":
+        lines.append("### Recent Delta")
+        lines.append("  No prior snapshot — this is the first graph build.")
+
+    text_body = "\n".join(lines)
+    max_chars = budget * 3
+    if len(text_body) > max_chars:
+        text_body = text_body[:max_chars] + f"\n... (truncated to ~{budget} token budget)"
+
+    meta: dict = {
+        "status": "ok",
+        "layer": 1,
+        "search_strategy": None,
+        "cardinality_estimate": None,
+        "continuation_token": None,
+        "snapshot_count": len(snaps),
+        "god_node_count": len(gods),
+        "community_count": len(communities),
+        "delta": delta_block,
+    }
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
+def _run_connect_topics(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    alias_map: dict[str, str],
+    arguments: dict,
+) -> str:
+    """Pure helper for connect_topics MCP tool (Phase 11 SLASH-03).
+
+    Testable without MCP runtime. Returns the full hybrid envelope string.
+    Emits two DISTINCT sections: shortest path AND globally surprising bridges.
+    The surprising-bridges block is NOT filtered to the A-B path — it is global.
+    """
+    budget = int(arguments.get("budget", 500))
+    budget = max(50, min(budget, 100000))
+
+    # Sanitize inputs (T-11-01-01)
+    topic_a_raw = sanitize_label(arguments.get("topic_a", ""))
+    topic_b_raw = sanitize_label(arguments.get("topic_b", ""))
+
+    if not topic_a_raw or not topic_b_raw:
+        meta: dict = {
+            "status": "no_data",
+            "layer": 1,
+            "search_strategy": "connect",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+        }
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    # Alias resolution (Phase 10 D-16)
+    _resolved_aliases: dict[str, list[str]] = {}
+    _effective_alias_map: dict[str, str] = alias_map or {}
+
+    def _resolve_alias(node_id: str) -> str:
+        canonical = _effective_alias_map.get(node_id)
+        if canonical and canonical != node_id:
+            aliases = _resolved_aliases.setdefault(canonical, [])
+            if node_id not in aliases:
+                aliases.append(node_id)
+            return canonical
+        return node_id
+
+    topic_a_id = _resolve_alias(topic_a_raw)
+    topic_b_id = _resolve_alias(topic_b_raw)
+
+    # Label resolution
+    matches_a = _find_node(G, topic_a_id)
+    matches_b = _find_node(G, topic_b_id)
+
+    missing = []
+    if not matches_a:
+        missing.append("topic_a")
+    if not matches_b:
+        missing.append("topic_b")
+    if missing:
+        meta = {
+            "status": "entity_not_found",
+            "layer": 1,
+            "search_strategy": "connect",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+            "missing_endpoints": missing,
+        }
+        if _resolved_aliases:
+            meta["resolved_from_alias"] = _resolved_aliases
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    if len(matches_a) > 1 or len(matches_b) > 1:
+        candidates: dict[str, list[dict]] = {}
+        if len(matches_a) > 1:
+            candidates["topic_a"] = [
+                {"id": m, "label": G.nodes[m].get("label", m), "source_file": G.nodes[m].get("source_file", "")}
+                for m in matches_a
+            ]
+        if len(matches_b) > 1:
+            candidates["topic_b"] = [
+                {"id": m, "label": G.nodes[m].get("label", m), "source_file": G.nodes[m].get("source_file", "")}
+                for m in matches_b
+            ]
+        meta = {
+            "status": "ambiguous_entity",
+            "layer": 1,
+            "search_strategy": "connect",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+            "candidates": candidates,
+        }
+        if _resolved_aliases:
+            meta["resolved_from_alias"] = _resolved_aliases
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    src_id = matches_a[0]
+    dst_id = matches_b[0]
+
+    # Compute shortest path
+    try:
+        path_nodes = nx.shortest_path(G, src_id, dst_id)
+    except (nx.NetworkXNoPath, nx.NodeNotFound):
+        meta = {
+            "status": "no_path",
+            "layer": 1,
+            "search_strategy": "connect",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+            "topic_a_id": src_id,
+            "topic_b_id": dst_id,
+        }
+        if _resolved_aliases:
+            meta["resolved_from_alias"] = _resolved_aliases
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    hops = len(path_nodes) - 1
+
+    # Build path text
+    path_segments = []
+    for i in range(len(path_nodes) - 1):
+        u, v = path_nodes[i], path_nodes[i + 1]
+        edata = G.edges[u, v]
+        rel = edata.get("relation", "")
+        conf = edata.get("confidence", "")
+        conf_str = f" [{conf}]" if conf else ""
+        if i == 0:
+            path_segments.append(G.nodes[u].get("label", u))
+        path_segments.append(f"--{rel}{conf_str}--> {G.nodes[v].get('label', v)}")
+
+    # Compute globally surprising bridges (NOT filtered to A-B path — global to the graph)
+    from .analyze import surprising_connections as _sc
+    bridges = _sc(G, communities, top_n=5)
+
+    # Build text_body with two DISTINCT labelled sections (RESEARCH.md Pitfall 4 — do NOT conflate)
+    lines = [
+        f"## Shortest Path ({hops} hops)",
+        "  " + " ".join(path_segments),
+        "",
+        "## Surprising Bridges (global to the graph, not filtered to the A-B path)",
+    ]
+    if bridges:
+        for b in bridges:
+            src_label = G.nodes[b["source"]].get("label", b["source"]) if b["source"] in G.nodes else b["source"]
+            tgt_label = G.nodes[b["target"]].get("label", b["target"]) if b["target"] in G.nodes else b["target"]
+            rel = b.get("relation", "")
+            conf = b.get("confidence", "")
+            conf_str = f" [{conf}]" if conf else ""
+            lines.append(f"  {src_label} --{rel}{conf_str}--> {tgt_label}")
+    else:
+        lines.append("  (no surprising bridges detected)")
+
+    text_body = "\n".join(lines)
+    max_chars = budget * 3
+    if len(text_body) > max_chars:
+        text_body = text_body[:max_chars] + f"\n... (truncated to ~{budget} token budget)"
+
+    meta = {
+        "status": "ok",
+        "layer": 1,
+        "search_strategy": "connect",
+        "cardinality_estimate": None,
+        "continuation_token": None,
+        "path_length": hops,
+        "surprise_count": len(bridges),
+        "surprise_scope": "global",
+        "topic_a_id": src_id,
+        "topic_b_id": dst_id,
+    }
+    if _resolved_aliases:
+        meta["resolved_from_alias"] = _resolved_aliases
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
 def serve(graph_path: str = "graphify-out/graph.json") -> None:
     """Start the MCP server. Requires pip install mcp."""
     try:
@@ -1193,6 +1448,23 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
                         "node_id": {"type": "string", "description": "Filter edges involving a specific node (source or target)"},
                     },
                 },
+            ),
+            types.Tool(
+                name="graph_summary",
+                description="Return a full graph-backed summary: god nodes, top communities, and delta from the most recent snapshot. Used by the /context slash command.",
+                inputSchema={"type": "object", "properties": {
+                    "top_n": {"type": "integer", "default": 10, "minimum": 1, "maximum": 50},
+                    "budget": {"type": "integer", "default": 500, "minimum": 50, "maximum": 100000},
+                }},
+            ),
+            types.Tool(
+                name="connect_topics",
+                description="Return the shortest path between two topics PLUS a separate block of globally surprising cross-community bridges (NOT filtered to the A-B path). Used by the /connect slash command.",
+                inputSchema={"type": "object", "properties": {
+                    "topic_a": {"type": "string"},
+                    "topic_b": {"type": "string"},
+                    "budget": {"type": "integer", "default": 500},
+                }, "required": ["topic_a", "topic_b"]},
             ),
         ]
 
@@ -1391,6 +1663,36 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         results = _filter_agent_edges(_agent_edges, peer_id, session_id, node_id)
         return json.dumps(results)
 
+    def _tool_graph_summary(arguments: dict) -> str:
+        """Phase 11 SLASH-01: full graph-backed summary (god nodes + communities + delta)."""
+        _reload_if_stale()
+        if not Path(graph_path).exists():
+            meta: dict = {
+                "status": "no_graph",
+                "layer": 1,
+                "search_strategy": None,
+                "cardinality_estimate": None,
+                "continuation_token": None,
+            }
+            text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
+            return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+        return _run_graph_summary(G, communities, _out_dir, arguments)
+
+    def _tool_connect_topics(arguments: dict) -> str:
+        """Phase 11 SLASH-03: shortest path + globally surprising bridges between two topics."""
+        _reload_if_stale()
+        if not Path(graph_path).exists():
+            meta: dict = {
+                "status": "no_graph",
+                "layer": 1,
+                "search_strategy": "connect",
+                "cardinality_estimate": None,
+                "continuation_token": None,
+            }
+            text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
+            return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+        return _run_connect_topics(G, communities, _alias_map, arguments)
+
     _handlers = {
         "query_graph": _tool_query_graph,
         "get_node": _tool_get_node,
@@ -1405,6 +1707,8 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "propose_vault_note": _tool_propose_vault_note,
         "get_annotations": _tool_get_annotations,
         "get_agent_edges": _tool_get_agent_edges,
+        "graph_summary": _tool_graph_summary,
+        "connect_topics": _tool_connect_topics,
     }
 
     @server.call_tool()
