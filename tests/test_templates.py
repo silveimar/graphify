@@ -2215,3 +2215,116 @@ def test_sentinel_pairing_survives_adversarial_connections_label():
     assert starts.count("connections") == 1
     assert ends.count("connections") == 1
     assert starts == ends
+
+
+# ---------------------------------------------------------------------------
+# Phase 10 Plan 07: Obsidian aliases from merged_from (D-15, T-10-05)
+# ---------------------------------------------------------------------------
+
+def test_render_note_emits_aliases_from_merged_from(tmp_path):
+    """D-15: node with merged_from produces `aliases:` frontmatter."""
+    import networkx as nx
+    from tests.fixtures.template_context import make_classification_context
+    from graphify.templates import render_note
+
+    G = nx.Graph()
+    G.add_node(
+        "authentication_service",
+        label="AuthenticationService",
+        file_type="code",
+        source_file="auth.py",
+        merged_from=["auth", "auth_svc"],
+        community=0,
+    )
+    ctx = make_classification_context(
+        community_tag="auth",
+        community_name="Auth",
+        parent_moc_label="Auth",
+        sibling_labels=[],
+    )
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("authentication_service", G, profile, "thing", ctx)
+    assert "aliases:" in text
+    assert "- auth" in text
+    assert "- auth_svc" in text
+
+
+def test_render_note_no_aliases_when_no_merged_from():
+    """Backward compat: node without merged_from produces no aliases: line."""
+    import networkx as nx
+    from tests.fixtures.template_context import make_classification_context
+    from graphify.templates import render_note
+
+    G = nx.Graph()
+    G.add_node(
+        "transformer",
+        label="Transformer",
+        file_type="code",
+        source_file="model.py",
+        community=0,
+    )
+    ctx = make_classification_context(
+        community_tag="ml",
+        community_name="ML",
+        parent_moc_label="ML",
+        sibling_labels=[],
+    )
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("transformer", G, profile, "thing", ctx)
+    assert "aliases:" not in text
+
+
+def test_render_note_aliases_sorted_and_deduped():
+    """Aliases are sorted alphabetically and deduplicated."""
+    import networkx as nx
+    from tests.fixtures.template_context import make_classification_context
+    from graphify.templates import render_note
+
+    G = nx.Graph()
+    G.add_node(
+        "svc",
+        label="Svc",
+        file_type="code",
+        source_file="svc.py",
+        merged_from=["zebra", "alpha", "alpha"],  # duplicate alpha
+        community=0,
+    )
+    ctx = make_classification_context(community_tag="c0", community_name="C0",
+                                      parent_moc_label="C0", sibling_labels=[])
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("svc", G, profile, "thing", ctx)
+    assert "aliases:" in text
+    # After dedup+sort: alpha < zebra
+    aliases_block = text[text.index("aliases:"):]
+    alpha_pos = aliases_block.index("alpha")
+    zebra_pos = aliases_block.index("zebra")
+    assert alpha_pos < zebra_pos, "aliases must be sorted: alpha before zebra"
+    # Only one alpha entry
+    assert aliases_block.count("- alpha") == 1
+
+
+def test_render_note_aliases_sanitized_for_wikilinks():
+    """T-10-05: malicious alias input is neutralized via _sanitize_wikilink_alias."""
+    import networkx as nx
+    from tests.fixtures.template_context import make_classification_context
+    from graphify.templates import render_note
+
+    G = nx.Graph()
+    G.add_node(
+        "target",
+        label="Target",
+        file_type="code",
+        source_file="t.py",
+        merged_from=["<script>alert(1)</script>", "valid_alias", "bad|pipe"],
+        community=0,
+    )
+    ctx = make_classification_context(community_tag="c0", community_name="C0",
+                                      parent_moc_label="C0", sibling_labels=[])
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("target", G, profile, "thing", ctx)
+    assert "aliases:" in text
+    # Pipe char must be stripped
+    assert "bad|pipe" not in text
+    # Script tags pass through (no HTML, these are YAML aliases for filenames)
+    # but the pipe in the script tag content — there is none, so just verify valid_alias
+    assert "valid_alias" in text
