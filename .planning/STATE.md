@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Intelligent Analysis Continuation
 status: Ready to execute
-stopped_at: Completed 10-cross-file-semantic-extraction/10-04-PLAN.md
-last_updated: "2026-04-17T01:45:10.189Z"
+stopped_at: Completed 10-cross-file-semantic-extraction 10-05-PLAN.md
+last_updated: "2026-04-17T01:49:39.388Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 10
-  completed_plans: 7
-  percent: 70
+  completed_plans: 8
+  percent: 80
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-16 after v1.3 milestone open)
 ## Current Position
 
 Phase: 10 (Cross-File Semantic Extraction with Entity Deduplication) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
 Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
 Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
@@ -109,6 +109,7 @@ Key carry-forward decisions:
 - [Phase 10-cross-file-semantic-extraction]: dedup.py operates exclusively on extraction dicts, never nx.relabel_nodes — ensures D-10 edge aggregation correctness (Pitfall 1)
 - [Phase 10-cross-file-semantic-extraction]: yaml.load( regex vs \byaml.load\b: tighter regex targets call sites only, excludes docstring references, same T-10-04 security intent
 - [Phase 10-cross-file-semantic-extraction]: _run_cli_in injects PYTHONPATH to project root so subprocess tests use local package regardless of tmp_path cwd
+- [Phase 10-cross-file-semantic-extraction]: dedup_report param placed last in generate() for backward compat; defense-in-depth: sanitize_label+_sanitize_md on all dedup labels (T-10-02)
 
 ### Blockers/Concerns
 
@@ -123,9 +124,10 @@ None.
 | Phase 10-cross-file-semantic-extraction P02 | 480 | 2 tasks | 2 files |
 | Phase 10-cross-file-semantic-extraction P03 | 6 | 2 tasks | 2 files |
 | Phase 10-cross-file-semantic-extraction P04 | 35 | 2 tasks | 11 files |
+| Phase 10-cross-file-semantic-extraction P05 | 8 | 1 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-04-17T01:45:10.186Z
-Stopped at: Completed 10-cross-file-semantic-extraction/10-04-PLAN.md
+Last session: 2026-04-17T01:49:39.385Z
+Stopped at: Completed 10-cross-file-semantic-extraction 10-05-PLAN.md
 Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
