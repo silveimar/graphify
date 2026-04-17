@@ -1461,6 +1461,203 @@ def _run_entity_trace(
     return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
 
+def _run_drift_nodes(
+    G: "nx.Graph",
+    snaps_dir: "Path",
+    arguments: dict,
+) -> str:
+    """Pure helper for drift_nodes MCP tool (Phase 11 SLASH-04).
+
+    Testable without MCP runtime. Returns the full hybrid envelope string.
+
+    Walks graphify-out/snapshots/*.json via list_snapshots(snaps_dir) + load_snapshot()
+    with strict memory discipline (del G_snap after extracting scalars — Pattern E).
+    Computes a trend score per node from community-change count and degree delta,
+    returns the top-N drifters as a Layer-1 narrative + meta envelope.
+    """
+    from .snapshot import list_snapshots, load_snapshot
+
+    budget = int(arguments.get("budget", 500))
+    budget = max(50, min(budget, 100000))
+    max_snapshots = int(arguments.get("max_snapshots", 10))
+    max_snapshots = max(2, min(max_snapshots, 50))
+    top_n = int(arguments.get("top_n", 10))
+    top_n = max(1, min(top_n, 100))
+
+    snaps = list_snapshots(snaps_dir)
+
+    # Insufficient-history: need at least 1 prior snapshot (live G is the second data point).
+    if len(snaps) < 1:
+        meta: dict = {
+            "status": "insufficient_history",
+            "layer": 1,
+            "search_strategy": "drift",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+            "snapshots_available": len(snaps),
+        }
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    # Walk the last max_snapshots snapshots with memory discipline (Pattern E).
+    # history: {node_id: [(timestamp, community, degree), ...]}
+    history: dict[str, list[tuple]] = {}
+    for path in snaps[-max_snapshots:]:
+        G_snap, _, meta_snap = load_snapshot(path)
+        ts = meta_snap.get("timestamp", path.stem)
+        for nid, d in G_snap.nodes(data=True):
+            history.setdefault(nid, []).append((ts, d.get("community", -1), G_snap.degree(nid)))
+        del G_snap  # CRITICAL memory discipline: only one graph in memory at a time
+
+    # Add current live G as the tip data point.
+    for nid, d in G.nodes(data=True):
+        history.setdefault(nid, []).append(("current", d.get("community", -1), G.degree(nid)))
+
+    # Compute per-node trend score.
+    # Only include nodes present in at least 2 data points (ignore noise/transient nodes).
+    scored: list[tuple[float, str]] = []
+    for nid, entries in history.items():
+        if len(entries) < 2:
+            continue
+        # community_changes: how many distinct communities the node visited (0 = stable, >0 = drifted)
+        community_changes = len({c for _, c, _ in entries}) - 1
+        # degree_delta: signed centrality change from first to last data point
+        degree_delta = entries[-1][2] - entries[0][2]
+        # trend_score: simple weighted composition — no new algorithm (D-18)
+        trend_score = community_changes * 2 + abs(degree_delta)
+        scored.append((trend_score, nid))
+
+    # Sort by trend_score descending; take top_n.
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top_drifters = scored[:top_n]
+
+    # Build text_body: Layer-1 narrative of top drifting nodes.
+    lines = ["## Drifting Nodes", ""]
+    for score, nid in top_drifters:
+        entries = history[nid]
+        label = G.nodes[nid].get("label", nid) if nid in G.nodes else nid
+        community_set = {c for _, c, _ in entries}
+        community_changes = len(community_set) - 1
+        degree_delta = entries[-1][2] - entries[0][2]
+        degree_sign = "+" if degree_delta >= 0 else ""
+        lines.append(
+            f"  {sanitize_label(label)}: community_changes={community_changes}, "
+            f"degree_delta={degree_sign}{degree_delta}, score={score:.1f}"
+        )
+    text_body = "\n".join(lines)
+    max_chars = budget * 3
+    if len(text_body) > max_chars:
+        text_body = text_body[:max_chars] + f"\n... (truncated to ~{budget} token budget)"
+
+    actual_snap_count = min(len(snaps), max_snapshots)
+    meta = {
+        "status": "ok",
+        "layer": 1,
+        "search_strategy": "drift",
+        "cardinality_estimate": None,
+        "continuation_token": None,
+        "snapshot_count": actual_snap_count,
+        "drift_count": len(top_drifters),
+        "nodes_scanned": len(history),
+    }
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
+def _run_newly_formed_clusters(
+    G: "nx.Graph",
+    communities: "dict[int, list[str]]",
+    snaps_dir: "Path",
+    arguments: dict,
+) -> str:
+    """Pure helper for newly_formed_clusters MCP tool (Phase 11 SLASH-05).
+
+    Testable without MCP runtime. Returns the full hybrid envelope string.
+
+    Loads the most recent prior snapshot and applies a set-based novelty rule:
+    a current community is "new" if NONE of its members appeared in ANY prior community.
+    This avoids compute_delta's 4-arg complexity (per D-18 no-new-algorithms constraint).
+    """
+    from .snapshot import list_snapshots, load_snapshot
+
+    budget = int(arguments.get("budget", 500))
+    budget = max(50, min(budget, 100000))
+
+    snaps = list_snapshots(snaps_dir)
+
+    # Insufficient-history: need at least 1 prior snapshot to compute diff against.
+    if len(snaps) < 1:
+        meta: dict = {
+            "status": "insufficient_history",
+            "layer": 1,
+            "search_strategy": "emerge",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+            "snapshots_available": len(snaps),
+        }
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    # Load most recent prior snapshot — extract community dict then release graph.
+    G_prev, comms_prev, _meta_prev = load_snapshot(snaps[-1])
+    del G_prev  # CRITICAL memory discipline: only one graph in memory at a time
+
+    # "New cluster" rule: members have zero overlap with any prior community.
+    # A current community is "new" if none of its members appeared in any prior community.
+    new_clusters: list[tuple[int, list[str]]] = []
+    for c, members in communities.items():
+        M_c = set(members)
+        overlaps_any_prior = any(bool(M_c & set(P_p)) for P_p in comms_prev.values())
+        if not overlaps_any_prior:
+            new_clusters.append((c, sorted(members)))
+
+    if len(new_clusters) == 0:
+        meta = {
+            "status": "no_change",
+            "layer": 1,
+            "search_strategy": "emerge",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+            "snapshot_count": len(snaps),
+            "new_cluster_count": 0,
+            "new_cluster_ids": [],
+        }
+        return (
+            "No new clusters formed since the last run. The graph structure is stable."
+            + QUERY_GRAPH_META_SENTINEL
+            + json.dumps(meta, ensure_ascii=False)
+        )
+
+    # Build text_body: one line per new cluster with id, size, representative labels.
+    lines = ["## Newly Formed Clusters", ""]
+    for c, members in new_clusters:
+        # Pick up to 3 representative nodes by degree (highest degree first).
+        member_degrees = [(G.degree(m) if m in G.nodes else 0, m) for m in members]
+        member_degrees.sort(key=lambda x: x[0], reverse=True)
+        reps = [
+            G.nodes[m].get("label", m) if m in G.nodes else m
+            for _, m in member_degrees[:3]
+        ]
+        rep_str = ", ".join(sanitize_label(r) for r in reps)
+        lines.append(
+            f"  Community {c}: {len(members)} members (e.g. {rep_str})"
+        )
+
+    text_body = "\n".join(lines)
+    max_chars = budget * 3
+    if len(text_body) > max_chars:
+        text_body = text_body[:max_chars] + f"\n... (truncated to ~{budget} token budget)"
+
+    meta = {
+        "status": "ok",
+        "layer": 1,
+        "search_strategy": "emerge",
+        "cardinality_estimate": None,
+        "continuation_token": None,
+        "snapshot_count": len(snaps),
+        "new_cluster_count": len(new_clusters),
+        "new_cluster_ids": [c for c, _ in new_clusters],
+    }
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
 def serve(graph_path: str = "graphify-out/graph.json") -> None:
     """Start the MCP server. Requires pip install mcp."""
     try:
@@ -1656,6 +1853,22 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
                     "entity": {"type": "string"},
                     "budget": {"type": "integer", "default": 500},
                 }, "required": ["entity"]},
+            ),
+            types.Tool(
+                name="drift_nodes",
+                description="Return nodes whose community or centrality has trended consistently across recent snapshots. Used by the /drift slash command.",
+                inputSchema={"type": "object", "properties": {
+                    "top_n": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100},
+                    "max_snapshots": {"type": "integer", "default": 10, "minimum": 2, "maximum": 50},
+                    "budget": {"type": "integer", "default": 500},
+                }},
+            ),
+            types.Tool(
+                name="newly_formed_clusters",
+                description="Return communities that are new in the current graph compared to the most recent prior snapshot. Used by the /emerge slash command.",
+                inputSchema={"type": "object", "properties": {
+                    "budget": {"type": "integer", "default": 500},
+                }},
             ),
         ]
 
@@ -1899,6 +2112,36 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
         return _run_entity_trace(G, _out_dir, _alias_map, arguments)
 
+    def _tool_drift_nodes(arguments: dict) -> str:
+        """Phase 11 SLASH-04: per-node trend vectors across snapshot chain."""
+        _reload_if_stale()
+        if not Path(graph_path).exists():
+            meta: dict = {
+                "status": "no_graph",
+                "layer": 1,
+                "search_strategy": "drift",
+                "cardinality_estimate": None,
+                "continuation_token": None,
+            }
+            text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
+            return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+        return _run_drift_nodes(G, _out_dir, arguments)
+
+    def _tool_newly_formed_clusters(arguments: dict) -> str:
+        """Phase 11 SLASH-05: communities new in current graph vs. most recent snapshot."""
+        _reload_if_stale()
+        if not Path(graph_path).exists():
+            meta: dict = {
+                "status": "no_graph",
+                "layer": 1,
+                "search_strategy": "emerge",
+                "cardinality_estimate": None,
+                "continuation_token": None,
+            }
+            text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
+            return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+        return _run_newly_formed_clusters(G, communities, _out_dir, arguments)
+
     _handlers = {
         "query_graph": _tool_query_graph,
         "get_node": _tool_get_node,
@@ -1916,6 +2159,8 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "graph_summary": _tool_graph_summary,
         "connect_topics": _tool_connect_topics,
         "entity_trace": _tool_entity_trace,
+        "drift_nodes": _tool_drift_nodes,
+        "newly_formed_clusters": _tool_newly_formed_clusters,
     }
 
     @server.call_tool()
