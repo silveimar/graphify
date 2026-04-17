@@ -198,7 +198,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 9.1 Query Telemetry & Usage-Weighted Edges | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.1.1 Milestone v1.2 Lifecycle Cleanup | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.2 Progressive Graph Retrieval | v1.3 | 0/3 | Planned | — |
-| 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 8/9 | In Progress|  |
+| 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 9/9 | Complete   | 2026-04-17 |
 | 11. Narrative Mode as Interactive Slash Commands | v1.3 | 0/? | Pending | — |
 | 12. Heterogeneous Extraction Routing | v1.4 | 0/? | Planned | — |
 | 13. Agent Capability Manifest | v1.4 | 0/? | Planned | — |

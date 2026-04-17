@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Intelligent Analysis Continuation
 status: Ready to execute
-stopped_at: Completed 10-cross-file-semantic-extraction-10-08-PLAN.md
-last_updated: "2026-04-17T14:00:19.030Z"
+stopped_at: Completed 10-cross-file-semantic-extraction-10-09-PLAN.md
+last_updated: "2026-04-17T14:10:16.794Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 12
-  completed_plans: 11
-  percent: 92
+  completed_plans: 12
+  percent: 100
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-16 after v1.3 milestone open)
 ## Current Position
 
 Phase: 10 (cross-file-semantic-extraction) — EXECUTING
-Plan: 2 of 9
+Plan: 3 of 9
 Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
 Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
 Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
@@ -114,6 +114,9 @@ Key carry-forward decisions:
 - [Phase 10-cross-file-semantic-extraction]: 10-07: aliases injected into frontmatter_fields after _build_frontmatter_fields, before _dump_frontmatter — avoids signature change to existing helper
 - [Phase 10-cross-file-semantic-extraction]: _iter_sources/_fmt_source_file placed in analyze.py (not _schema.py) to avoid circular imports; re-exported to export.py via direct import
 - [Phase 10-cross-file-semantic-extraction]: 10-08: source_files emit sites in analyze.py normalized to str via _fmt_source_file so callers always receive str values
+- [Phase 10]: Zero-byte --graph file short-circuits to empty extraction dict before json.loads — no JSONDecodeError surfaced (UAT gap 2)
+- [Phase 10]: RuntimeError + ValueError both caught at --dedup CLI boundary with try/except — clean error: line, exit 1, no traceback (UAT gaps 2b/3)
+- [Phase 10]: resolved_from_alias guard mirrored from happy-path to no_seed_nodes early-return in _run_query_graph (UAT gap 8)
 
 ### Blockers/Concerns
 
@@ -132,9 +135,10 @@ None.
 | Phase 10 P06 | 18 | 1 tasks | 2 files |
 | Phase 10-cross-file-semantic-extraction P07 | 7 | 2 tasks | 5 files |
 | Phase 10-cross-file-semantic-extraction P08 | 18 | 3 tasks | 6 files |
+| Phase 10 P09 | 10 | 2 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-04-17T14:00:19.024Z
-Stopped at: Completed 10-cross-file-semantic-extraction-10-08-PLAN.md
+Last session: 2026-04-17T14:10:16.791Z
+Stopped at: Completed 10-cross-file-semantic-extraction-10-09-PLAN.md
 Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
