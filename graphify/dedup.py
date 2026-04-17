@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import difflib
 import hashlib
-import html
 import json
 import os
 import sys
@@ -33,7 +32,7 @@ try:
 except ImportError:
     _HAS_SENTENCE_TRANSFORMERS = False
 
-from graphify.security import sanitize_label
+from graphify.security import sanitize_label, sanitize_label_md
 
 # ---------- Constants ----------
 
@@ -575,10 +574,12 @@ def _render_dedup_md(report: dict) -> str:
         "",
     ]
     for merge in report.get("merges", []):
-        # T-10-02: strip control chars + cap length, then HTML-escape for MD output
-        canon_label = html.escape(sanitize_label(merge.get("canonical_label", "")))
+        # T-10-02: strip control chars + cap length (sanitize_label), then strip
+        # markdown structural chars incl. backticks (sanitize_label_md). Mirrors
+        # report.py:_sanitize_md so both reports render canonical labels identically.
+        canon_label = sanitize_label_md(sanitize_label(merge.get("canonical_label", "")))
         eliminated_labels = ", ".join(
-            html.escape(sanitize_label(e.get("label", e.get("id", ""))))
+            sanitize_label_md(sanitize_label(e.get("label", e.get("id", ""))))
             for e in merge.get("eliminated", [])
         )
         lines.append(
