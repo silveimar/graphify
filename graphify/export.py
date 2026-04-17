@@ -446,6 +446,64 @@ def to_html(
 generate_html = to_html
 
 
+# ---------------------------------------------------------------------------
+# Phase 10 D-15: hydrate merged_from from dedup_report.json (--obsidian-dedup)
+# ---------------------------------------------------------------------------
+
+def _hydrate_merged_from(G: nx.Graph, output_dir: Path) -> None:
+    """Populate G.nodes[canonical_id]['merged_from'] from dedup_report.json.
+
+    Called by to_obsidian when obsidian_dedup=True. Mutates G in place.
+
+    Looks for dedup_report.json in:
+    1. output_dir.parent (typical graphify-out/obsidian layout)
+    2. output_dir/../.. (one extra level up)
+    3. graphify-out/dedup_report.json relative to cwd (fallback)
+
+    Silently returns when the report is missing. Never raises.
+    """
+    candidates = [
+        output_dir.parent / "dedup_report.json",
+        output_dir / ".." / "dedup_report.json",
+        Path("graphify-out") / "dedup_report.json",
+    ]
+    report_path = None
+    for c in candidates:
+        try:
+            if c.resolve().exists():
+                report_path = c.resolve()
+                break
+        except OSError:
+            continue
+    if report_path is None:
+        print(
+            "[graphify] warning: --obsidian-dedup set but no dedup_report.json found",
+            file=sys.stderr,
+        )
+        return
+    try:
+        data = json.loads(Path(report_path).read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[graphify] warning: could not read {report_path}: {e}",
+              file=sys.stderr)
+        return
+    # Build {canonical_id: [eliminated_ids]} from merges[]
+    merges = data.get("merges", []) if isinstance(data, dict) else []
+    for merge in merges:
+        canonical_id = merge.get("canonical_id")
+        if not canonical_id or canonical_id not in G:
+            continue
+        eliminated_ids = [
+            e.get("id") for e in merge.get("eliminated", [])
+            if isinstance(e, dict) and isinstance(e.get("id"), str)
+        ]
+        # Merge into existing merged_from (if dedup already ran into G.nodes)
+        existing = G.nodes[canonical_id].get("merged_from") or []
+        combined = sorted(set(existing) | set(e for e in eliminated_ids if e))
+        if combined:
+            G.nodes[canonical_id]["merged_from"] = combined
+
+
 def to_obsidian(
     G: nx.Graph,
     communities: dict[int, list[str]],
@@ -456,6 +514,7 @@ def to_obsidian(
     cohesion: dict[int, float] | None = None,
     dry_run: bool = False,
     force: bool = False,
+    obsidian_dedup: bool = False,
 ) -> "MergeResult | MergePlan":
     """Export graph as an Obsidian vault using the profile-driven pipeline.
 
@@ -495,6 +554,11 @@ def to_obsidian(
             f"to_obsidian: output_dir {out} exists but is not a directory"
         )
     out.mkdir(parents=True, exist_ok=True)
+
+    # Phase 10 D-15: hydrate merged_from from dedup_report.json when flag set.
+    # This mutates G.nodes in place before rendering so render_note can emit aliases:.
+    if obsidian_dedup:
+        _hydrate_merged_from(G, out)
 
     # Manifest lives in the parent of the vault dir (typically graphify-out/).
     # vault-manifest.json is a graphify sidecar alongside graph.json.

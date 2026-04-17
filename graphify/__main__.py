@@ -943,6 +943,7 @@ def main() -> None:
         print("    --obsidian-dir <path>   output vault directory (default graphify-out/obsidian)")
         print("    --dry-run               print the merge plan via format_merge_plan without writing files")
         print("    --force                 force update of user-modified notes (preserves sentinel blocks)")
+        print("    --obsidian-dedup        hydrate merged_from from dedup_report.json (Phase 10 D-15)")
         print("  --dedup                 run entity deduplication on graphify-out/extraction.json (Phase 10)")
         print("    --graph <path>          source extraction.json or graph.json (default graphify-out/extraction.json)")
         print("    --out-dir <path>        output directory (default graphify-out/)")
@@ -1029,6 +1030,7 @@ def main() -> None:
         obsidian_dir = "graphify-out/obsidian"
         dry_run = False
         force = False
+        obsidian_dedup = False  # Phase 10: hydrate merged_from from dedup_report.json
         args = sys.argv[2:]
         i = 0
         while i < len(args):
@@ -1044,6 +1046,8 @@ def main() -> None:
                 dry_run = True; i += 1
             elif args[i] == "--force":
                 force = True; i += 1
+            elif args[i] == "--obsidian-dedup":
+                obsidian_dedup = True; i += 1
             else:
                 print(f"error: unknown --obsidian option: {args[i]}", file=sys.stderr)
                 sys.exit(2)
@@ -1095,6 +1099,7 @@ def main() -> None:
                 obsidian_dir,
                 dry_run=dry_run,
                 force=force,
+                obsidian_dedup=obsidian_dedup,  # Phase 10 D-15
             )
         except Exception as exc:
             print(f"error: to_obsidian failed: {exc}", file=sys.stderr)
