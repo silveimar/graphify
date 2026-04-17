@@ -178,9 +178,105 @@ Carried forward from v1.0/v1.1/v1.2/v1.3 (not v1.4's priority):
 
 ## Traceability
 
-This section is populated by `gsd-roadmapper` after roadmap generation. Expected shape:
+Populated by `gsd-roadmapper` on 2026-04-17 after ROADMAP.md generation. 86/86 REQ-IDs mapped to 7 phases (100% coverage). Plan column set to `TBD` until planner refines per-phase plan counts. Status = `planned`, Evidence = `—` until phase execution lands verification.
+
+Priority tags: `[P2]` indicates the requirement is in v1.4 scope per user confirmation 2026-04-17 (P1 + P2 both complete — no stretch deferrals). Untagged REQ-IDs are P1.
 
 | REQ-ID | Phase | Plan | Status | Evidence |
 |--------|-------|------|--------|----------|
-| ROUTE-01 | Phase 12 | 12-01-PLAN.md | planned | — |
-| ... | ... | ... | ... | ... |
+| ROUTE-01 | Phase 12 | TBD | planned | — |
+| ROUTE-02 | Phase 12 | TBD | planned | — |
+| ROUTE-03 | Phase 12 | TBD | planned | — |
+| ROUTE-04 | Phase 12 | TBD | planned | — |
+| ROUTE-05 | Phase 12 | TBD | planned | — |
+| ROUTE-06 | Phase 12 | TBD | planned | — |
+| ROUTE-07 | Phase 12 | TBD | planned | — |
+| ROUTE-08 [P2] | Phase 12 | TBD | planned | — |
+| ROUTE-09 [P2] | Phase 12 | TBD | planned | — |
+| ROUTE-10 [P2] | Phase 12 | TBD | planned | — |
+| MANIFEST-01 | Phase 13 | TBD | planned | — |
+| MANIFEST-02 | Phase 13 | TBD | planned | — |
+| MANIFEST-03 | Phase 13 | TBD | planned | — |
+| MANIFEST-04 | Phase 13 | TBD | planned | — |
+| MANIFEST-05 | Phase 13 | TBD | planned | — |
+| MANIFEST-06 | Phase 13 | TBD | planned | — |
+| MANIFEST-07 | Phase 13 | TBD | planned | — |
+| MANIFEST-08 | Phase 13 | TBD | planned | — |
+| MANIFEST-09 [P2] | Phase 13 | TBD | planned | — |
+| MANIFEST-10 [P2] | Phase 13 | TBD | planned | — |
+| HARNESS-01 | Phase 13 | TBD | planned | — |
+| HARNESS-02 | Phase 13 | TBD | planned | — |
+| HARNESS-03 | Phase 13 | TBD | planned | — |
+| HARNESS-04 | Phase 13 | TBD | planned | — |
+| HARNESS-05 | Phase 13 | TBD | planned | — |
+| HARNESS-06 | Phase 13 | TBD | planned | — |
+| HARNESS-07 [P2] | Phase 13 | TBD | planned | — |
+| HARNESS-08 [P2] | Phase 13 | TBD | planned | — |
+| OBSCMD-01 | Phase 14 | TBD | planned | — |
+| OBSCMD-02 | Phase 14 | TBD | planned | — |
+| OBSCMD-03 | Phase 14 | TBD | planned | — |
+| OBSCMD-04 | Phase 14 | TBD | planned | — |
+| OBSCMD-05 | Phase 14 | TBD | planned | — |
+| OBSCMD-06 | Phase 14 | TBD | planned | — |
+| OBSCMD-07 | Phase 14 | TBD | planned | — |
+| OBSCMD-08 | Phase 14 | TBD | planned | — |
+| OBSCMD-09 [P2] | Phase 14 | TBD | planned | — |
+| OBSCMD-10 [P2] | Phase 14 | TBD | planned | — |
+| OBSCMD-11 [P2] | Phase 14 | TBD | planned | — |
+| OBSCMD-12 [P2] | Phase 14 | TBD | planned | — |
+| ENRICH-01 | Phase 15 | TBD | planned | — |
+| ENRICH-02 | Phase 15 | TBD | planned | — |
+| ENRICH-03 | Phase 15 | TBD | planned | — |
+| ENRICH-04 | Phase 15 | TBD | planned | — |
+| ENRICH-05 | Phase 15 | TBD | planned | — |
+| ENRICH-06 | Phase 15 | TBD | planned | — |
+| ENRICH-07 | Phase 15 | TBD | planned | — |
+| ENRICH-08 | Phase 15 | TBD | planned | — |
+| ENRICH-09 | Phase 15 | TBD | planned | — |
+| ENRICH-10 [P2] | Phase 15 | TBD | planned | — |
+| ENRICH-11 [P2] | Phase 15 | TBD | planned | — |
+| ENRICH-12 [P2] | Phase 15 | TBD | planned | — |
+| ARGUE-01 | Phase 16 | TBD | planned | — |
+| ARGUE-02 | Phase 16 | TBD | planned | — |
+| ARGUE-03 | Phase 16 | TBD | planned | — |
+| ARGUE-04 | Phase 16 | TBD | planned | — |
+| ARGUE-05 | Phase 16 | TBD | planned | — |
+| ARGUE-06 | Phase 16 | TBD | planned | — |
+| ARGUE-07 | Phase 16 | TBD | planned | — |
+| ARGUE-08 | Phase 16 | TBD | planned | — |
+| ARGUE-09 | Phase 16 | TBD | planned | — |
+| ARGUE-10 | Phase 16 | TBD | planned | — |
+| ARGUE-11 [P2] | Phase 16 | TBD | planned | — |
+| ARGUE-12 [P2] | Phase 16 | TBD | planned | — |
+| ARGUE-13 [P2] | Phase 16 | TBD | planned | — |
+| CHAT-01 | Phase 17 | TBD | planned | — |
+| CHAT-02 | Phase 17 | TBD | planned | — |
+| CHAT-03 | Phase 17 | TBD | planned | — |
+| CHAT-04 | Phase 17 | TBD | planned | — |
+| CHAT-05 | Phase 17 | TBD | planned | — |
+| CHAT-06 | Phase 17 | TBD | planned | — |
+| CHAT-07 | Phase 17 | TBD | planned | — |
+| CHAT-08 | Phase 17 | TBD | planned | — |
+| CHAT-09 | Phase 17 | TBD | planned | — |
+| CHAT-10 [P2] | Phase 17 | TBD | planned | — |
+| CHAT-11 [P2] | Phase 17 | TBD | planned | — |
+| CHAT-12 [P2] | Phase 17 | TBD | planned | — |
+| FOCUS-01 | Phase 18 | TBD | planned | — |
+| FOCUS-02 | Phase 18 | TBD | planned | — |
+| FOCUS-03 | Phase 18 | TBD | planned | — |
+| FOCUS-04 | Phase 18 | TBD | planned | — |
+| FOCUS-05 | Phase 18 | TBD | planned | — |
+| FOCUS-06 | Phase 18 | TBD | planned | — |
+| FOCUS-07 | Phase 18 | TBD | planned | — |
+| FOCUS-08 [P2] | Phase 18 | TBD | planned | — |
+| FOCUS-09 [P2] | Phase 18 | TBD | planned | — |
+
+**Coverage summary:**
+- Phase 12 Heterogeneous Extraction Routing: 10 REQ-IDs (ROUTE-01..10)
+- Phase 13 Agent Capability Manifest + SEED-002: 18 REQ-IDs (MANIFEST-01..10 + HARNESS-01..08)
+- Phase 14 Obsidian Thinking Commands: 12 REQ-IDs (OBSCMD-01..12)
+- Phase 15 Async Background Enrichment: 12 REQ-IDs (ENRICH-01..12)
+- Phase 16 Graph Argumentation Mode: 13 REQ-IDs (ARGUE-01..13)
+- Phase 17 Conversational Graph Chat: 12 REQ-IDs (CHAT-01..12)
+- Phase 18 Focus-Aware Graph Context: 9 REQ-IDs (FOCUS-01..09)
+- **Total: 86/86 REQ-IDs mapped (100% coverage, no orphans, no duplicates).**
