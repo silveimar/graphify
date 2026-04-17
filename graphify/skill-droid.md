@@ -37,6 +37,15 @@ Turn any folder of files into a navigable knowledge graph with community detecti
 /graphify analyze for <lens>                           # single-lens tournament (~6 LLM calls vs ~24 for all 4)
 ```
 
+## Available slash commands
+
+After `graphify install`, these commands are available in Claude Code:
+- `/context` — full graph-backed summary (god nodes, top communities, recent deltas)
+- `/trace <entity>` — evolution of a named entity across snapshots
+- `/connect <topic-a> <topic-b>` — shortest path + surprising bridges
+- `/drift` — nodes trending across recent snapshots
+- `/emerge` — new clusters formed since the last snapshot
+
 ## What graphify is for
 
 graphify is built around Andrej Karpathy's /raw folder workflow: drop anything into a folder - papers, tweets, screenshots, code, notes - and get a structured knowledge graph that shows you what you didn't know was connected.
