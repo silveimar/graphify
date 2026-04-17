@@ -1,38 +1,44 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: Intelligent Analysis Continuation
-status: v1.3 milestone complete
-stopped_at: Completed 11-07-PLAN.md
-last_updated: "2026-04-17T18:48:09.203Z"
+milestone: v1.4
+milestone_name: Agent Discoverability & Obsidian Workflows
+status: Defining requirements
+stopped_at: Milestone v1.4 opened — requirements gathering pending
+last_updated: "2026-04-17T19:00:00.000Z"
 last_activity: 2026-04-17
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 19
-  completed_plans: 19
-  percent: 100
+  total_phases: 7
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-16 after v1.3 milestone open)
+See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
-**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.2 with multi-perspective analysis and usage-weighted graph self-improvement; being extended in v1.3 with token-aware retrieval, entity dedup, and interactive slash commands
-**Current focus:** Phase 11 — narrative-mode-slash-commands
+**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis and usage-weighted self-improvement, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, now being extended in v1.4 to agent discoverability and Obsidian thinking workflows.
+**Current focus:** v1.4 requirements definition (parallel research in flight)
 
 ## Current Position
 
-Phase: 11 (narrative-mode-slash-commands) — EXECUTING
-Plan: 7 of 7
-Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
-Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
-Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
-Last activity: 2026-04-17
+Phase: Not started (defining requirements)
+Plan: —
+Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17)
+Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
+Status: Defining requirements (post-research)
+Last activity: 2026-04-17 — Milestone v1.4 opened
 
-Progress: [░░░░░░░░░░] 0% (0/3 phases complete)
+Progress: [░░░░░░░░░░] 0% (0/7 phases complete)
+
+**Seeds activated in v1.4:**
+- SEED-002 Harness Memory Export — paired with Phase 13
+
+**Seeds still planted:**
+- SEED-001 Tacit Elicitation Engine — re-evaluate at v1.5 if onboarding/discovery becomes the milestone theme
 
 ## Performance Metrics
 
@@ -52,13 +58,19 @@ Progress: [░░░░░░░░░░] 0% (0/3 phases complete)
 
 **Velocity (v1.2):**
 
-- Total plans completed: 6 (3 for Phase 09 autoreason tournament, 3 for Phase 09.1 query telemetry)
-- Total tests after milestone: ~1,108 passing (estimated; Phase 09 added 23, Phase 09.1 added 19 serve + 7 report tests)
-- Timeline: 2 days (2026-04-14 → 2026-04-15)
-- Commits in milestone: ~20 feature commits (Phase 09: 3 plan-level feats + review fixes; Phase 09.1: 5 plan-level feats per SUMMARY commit logs 7cbbf8f, 004dfac, 5bf00f4, b418c07, 5118108)
-- Structural gap closure: Phase 9.1.1 (3 plans, all planning-artifact — no code touched)
+- Total plans completed: 9 (3 for Phase 09 autoreason tournament, 3 for Phase 09.1 query telemetry, 3 for Phase 9.1.1 lifecycle cleanup)
+- Total tests after milestone: ~1,108 passing
+- Timeline: 2 days (2026-04-14 → 2026-04-15) + 1 day planning-only cleanup
+- Commits in milestone: ~20 feature commits
 
-Detailed per-plan metrics are preserved in phase SUMMARY.md files and in milestone archives.
+**Velocity (v1.3):**
+
+- Total plans completed: 19 (3 for Phase 9.2, 9 for Phase 10, 7 for Phase 11)
+- Total tests after milestone: 1,234 passing (+211 over v1.2)
+- Timeline: 2 days (2026-04-16 → 2026-04-17)
+- Commits in milestone: ~178 (range e60d757–64e8475); +24,057 / −161 lines across 108 files
+
+Detailed per-plan metrics are preserved in phase SUMMARY.md files and in milestone archives (`.planning/milestones/v1.N-*`).
 
 ## Accumulated Context
 
@@ -69,68 +81,20 @@ All milestone decisions are archived in:
 - **PROJECT.md Key Decisions table** — architectural decisions (D-73, D-74)
 - **`.planning/milestones/v1.0-MILESTONE-AUDIT.md`** — v1.0 decision trail
 - **`.planning/milestones/v1.1-MILESTONE-AUDIT.md`** — v1.1 decision trail
+- **`.planning/milestones/v1.2-MILESTONE-AUDIT.md`** — v1.2 decision trail
+- **`.planning/milestones/v1.3-ROADMAP.md`, v1.3-REQUIREMENTS.md** — v1.3 decision trail
 - **Phase SUMMARY.md files** — tactical decisions locked during plan execution
 
-Key carry-forward decisions:
+Key carry-forward decisions (affect v1.4):
 
 - **D-73**: CLI is utilities-only; skill drives the full pipeline
 - **D-74**: `to_obsidian()` is a notes pipeline, not a vault-config-file manager
-- `graph.json` is read-only pipeline ground truth — agent state lives in JSONL/JSON sidecars
-- `peer_id` defaults to `"anonymous"` — never derived from environment
-- User sentinel blocks are inviolable even for REPLACE strategy
-- [Phase 09]: D-render-01: _sanitize_md() strips backticks and angle brackets from LLM-sourced strings before markdown embedding (T-09-01 mitigation)
-- [Phase 09]: D-render-02: render_analysis_context() uses .get() defensively on all node attributes (T-09-03 mitigation)
-- [Phase 09]: D-75/76/77/78/80/82/83 honored: tournament in skill.md with 4-round autoreason protocol, 4 lenses, subset selection, GRAPH_ANALYSIS.md output, clean verdict with rationale, all lenses always shown
-- [Phase 09]: D-03: Human verification checkpoint auto-approved in auto-mode — tournament implementation accepted as correct based on code review and test coverage from plans 09-01 and 09-02
-- [Phase 09.1]: Edge keys normalized as min:max for undirected graph consistency
-- [Phase 09.1]: Use statistics.quantiles(n=10) for hot/cold percentile thresholds, max/min fallback for <10 entries
-- [Phase 09.1]: D-04/D-09 honored: telemetry decay at rebuild points and usage_data passed to all generate() calls in skill.md
-- [Phase 09.1.1-lifecycle-cleanup]: Option A synthesis used to generate 09.1-VERIFICATION.md from existing UAT/VALIDATION/SECURITY/SUMMARY artifacts — no tests re-run, no graphify code touched; closes Gap 1 of v1.2 milestone audit
-- [Phase 09.1.1]: Registered 7 derived v1.2 REQ-IDs post-hoc in .planning/REQUIREMENTS.md plus 3 phase-9.1.1 gap-closure IDs; moved phases 9.2/10/11/12 to v1.3 placeholders
-- [Phase 09.1.1]: v1.2 narrow scope reconciled across ROADMAP/STATE/PROJECT; phases 9.2/10/11/12 moved to new milestone v1.3 (Intelligent Analysis Continuation); old v1.3 renamed to v1.4 — closes audit Gap 3
-- [v1.3 roadmap]: Priority order locked a→b→c: Phase 9.2 (agent token economy) → Phase 10 (graph quality via entity dedup) → Phase 11 (human thinking partner via slash commands). Phase 12 deferred to v1.4. Rationale in `.planning/notes/april-2026-v1.3-priorities.md`.
-- [v1.3 roadmap]: Phase 11 scope pivoted from static GRAPH_TOUR.md artifact to 7 interactive slash commands (SLASH-01..07) delivered as `.claude/commands/*.md` skill files. SLASH-06 (/ghost) and SLASH-07 (/challenge) are stretch — may land in sibling skill.
-- [Phase 09.2]: Empty-graph branching factor sentinel = 1.0 to keep cardinality estimator finite without crashing
-- [Phase 09.2]: Continuation token returns partial payload on graph_changed so agents can debug post-rebuild replays
-- [Phase 09.2]: 64 KB DoS cap enforced BEFORE base64 decode (T-09.2-02 mitigation)
-- [Phase 09.2]: SHA-256 hash truncated to 16 hex chars (64 bits integrity, not cryptographic auth)
-- [Phase 09.2]: Layer 3 coefficients (100 tok/node + 95 tok/edge) calibrated from live graphify-out/graph.json
-- [Phase 09.2]: Hand-rolled _bidirectional_bfs with 3-state status return (ok/frontiers_disjoint/budget_exhausted); no silent fallback on disjoint components per D-07
-- [Phase 09.2]: _synthesize_targets K heuristic locked at max(3, min(20, int(log2(N)))); returns empty list as sentinel for fallback to unidirectional (Pitfall 5)
-- [Phase 09.2]: _record_traversal extended with search_strategy='bfs' default kwarg; per-call record in telemetry['strategies'] list parallel to unchanged counters dict (D-08)
-- [Phase 09.2]: Plan 03 D-02 hybrid response: text_body + SENTINEL('\n---GRAPHIFY-META---\n') + json(meta) with status codes ok/frontiers_disjoint/budget_exhausted/estimate_exceeded/graph_changed/malformed_token/no_seed_nodes
-- [Phase 09.2]: Plan 03 dispatch refactor: _run_query_graph pure helper extracted from _tool_query_graph closure so tests exercise the full Phase 9.2 pipeline without MCP runtime
-- [Phase 09.2]: Plan 03 TOKEN-04 DEFERRED per D-09; test_token_04_deferred_no_bloom_filter_code source-greps serve.py for absence of bloom/materialized_closure/transitive_closure_cache as guard against accidental introduction
-- [Phase 09.2]: Plan 03 backward compat: token_budget retained as DEPRECATED alias for budget; dispatch prefers explicit budget kwarg but falls back to token_budget (D-01)
-- [Phase 10-cross-file-semantic-extraction]: D-11/D-12: validate.py extended to accept merged_from list[str] and source_file str|list[str]; REQUIRED_NODE_FIELDS unchanged
-- [Phase 10-cross-file-semantic-extraction]: D-01: [dedup] sentence-transformers optional extra added to pyproject.toml following [leiden]/[obsidian] pattern
-- [Phase 10-cross-file-semantic-extraction]: Used weakly_connected_components (DiGraph API) and os.path.commonpath for absolute-path top-dir detection in batch.py
-- [Phase 10-cross-file-semantic-extraction]: html.escape(sanitize_label()) required for MD output — sanitize_label() alone does not HTML-escape (Rule 2 auto-fix)
-- [Phase 10-cross-file-semantic-extraction]: dedup.py operates exclusively on extraction dicts, never nx.relabel_nodes — ensures D-10 edge aggregation correctness (Pitfall 1)
-- [Phase 10-cross-file-semantic-extraction]: yaml.load( regex vs \byaml.load\b: tighter regex targets call sites only, excludes docstring references, same T-10-04 security intent
-- [Phase 10-cross-file-semantic-extraction]: _run_cli_in injects PYTHONPATH to project root so subprocess tests use local package regardless of tmp_path cwd
-- [Phase 10-cross-file-semantic-extraction]: dedup_report param placed last in generate() for backward compat; defense-in-depth: sanitize_label+_sanitize_md on all dedup labels (T-10-02)
-- [Phase 10]: D-16: _resolved_aliases dict scoped inside _run_query_graph per call (not module-level) for thread safety; resolved_from_alias omitted from meta when no redirect occurred for strict backward compat
-- [Phase 10-cross-file-semantic-extraction]: 10-07: aliases injected into frontmatter_fields after _build_frontmatter_fields, before _dump_frontmatter — avoids signature change to existing helper
-- [Phase 10-cross-file-semantic-extraction]: _iter_sources/_fmt_source_file placed in analyze.py (not _schema.py) to avoid circular imports; re-exported to export.py via direct import
-- [Phase 10-cross-file-semantic-extraction]: 10-08: source_files emit sites in analyze.py normalized to str via _fmt_source_file so callers always receive str values
-- [Phase 10]: Zero-byte --graph file short-circuits to empty extraction dict before json.loads — no JSONDecodeError surfaced (UAT gap 2)
-- [Phase 10]: RuntimeError + ValueError both caught at --dedup CLI boundary with try/except — clean error: line, exit 1, no traceback (UAT gaps 2b/3)
-- [Phase 10]: resolved_from_alias guard mirrored from happy-path to no_seed_nodes early-return in _run_query_graph (UAT gap 8)
-- [Phase 11-narrative-mode-slash-commands]: Pure helpers _run_graph_summary and _run_connect_topics extracted at module level for testability without MCP runtime
-- [Phase 11-narrative-mode-slash-commands]: connect_topics surprising bridges are GLOBAL to graph, not A-B filtered — labelled explicitly in text_body and meta.surprise_scope='global' (BLOCKER 4 Option A)
-- [Phase 11]: _run_entity_trace extracted as pure helper at module level; _tool_entity_trace closure in serve(); insufficient_history threshold = len(snaps) < 1 (live G counts as second data point)
-- [Phase 11-narrative-mode-slash-commands]: drift_nodes trend score: community_changes * 2 + abs(degree_delta) — composition of existing data, no new algorithm (D-18)
-- [Phase 11-narrative-mode-slash-commands]: newly_formed_clusters uses pure set-based novelty rule (zero-overlap) instead of compute_delta — avoids 4-arg coupling, aligns with D-18
-- [Phase 11-narrative-mode-slash-commands]: Five command files ship as static prompts in graphify/commands/ — no code changes to serve.py or __main__.py in plan 11-04
-- [Phase 11-narrative-mode-slash-commands]: connect.md Pitfall-4 guard: two distinct sections (Shortest path / Surprising bridges) with explicit Do NOT merge instruction, enforced by test order assertion
-- [Phase 11-narrative-mode-slash-commands]: Drift detector test uses regex over serve.py source to extract types.Tool(name=...) — avoids MCP runtime dependency in unit tests (plan-checker WARNING 3 fix)
-- [Phase 11]: Section injected after Usage block in all 9 skill files; test_skill_files.py is self-contained (WARNING 1 fix)
-- [Phase 11-narrative-mode-slash-commands]: windows platform commands_enabled=True with .claude/commands/ destination — plan-checker BLOCKER 3 fix, both claude and windows use native Claude Code commands convention
-- [Phase 11-narrative-mode-slash-commands]: New top-level uninstall() added alongside install() — removes only known Phase 11 filenames (never glob-delete) per T-11-06-02
-- [Phase 11-narrative-mode-slash-commands]: GATE: proceed — plans 11-01..06 completed in ~74 min with no blockers; stretch commands SLASH-06/07 authorized to ship
-- [Phase 11-narrative-mode-slash-commands]: ghost.md uses peer_id='self' sentinel + anti-impersonation note (T-11-07-02 mitigation)
-- [Phase 11-narrative-mode-slash-commands]: challenge.md 'do NOT fabricate' guard tested by test_challenge_md_has_anti_fabrication_guard (T-11-07-04 mitigation)
+- **`graph.json` is read-only** — agent state lives in JSONL/JSON sidecars
+- **`peer_id` defaults to `"anonymous"`** — never derived from environment (security carry-forward)
+- **User sentinel blocks are inviolable** — even under REPLACE strategy
+- **D-02 (Phase 9.2)**: MCP responses use hybrid `text_body + SENTINEL + json(meta)` envelope with status codes — all future MCP tools inherit (applies to Phase 13 manifest + Phase 17 chat tool)
+- **D-16 (Phase 10)**: MCP `query_graph` transparently redirects merged-away aliases — agent callsites preserved across dedup (applies to Phase 17 chat + Phase 18 focus tools)
+- **D-18 (Phase 11)**: New MCP tools should compose existing `analyze.py` / `delta.py` / `snapshot.py` primitives — no new graphify/ modules for plumbing; new analysis algorithms get their own phase (applies to Phase 15 async derivers, Phase 16 argumentation, Phase 17 chat, Phase 18 focus)
 
 ### Blockers/Concerns
 
@@ -141,25 +105,9 @@ None.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260416-okg | Add /graphify analyze entries to Usage cheat-sheet in all skill variants | 2026-04-16 | 058152b | [260416-okg-add-graphify-analyze-entries-to-usage-ch](./quick/260416-okg-add-graphify-analyze-entries-to-usage-ch/) |
-| Phase 10-cross-file-semantic-extraction P10-01 | 6 | 3 tasks | 8 files |
-| Phase 10-cross-file-semantic-extraction P02 | 480 | 2 tasks | 2 files |
-| Phase 10-cross-file-semantic-extraction P03 | 6 | 2 tasks | 2 files |
-| Phase 10-cross-file-semantic-extraction P04 | 35 | 2 tasks | 11 files |
-| Phase 10-cross-file-semantic-extraction P05 | 8 | 1 tasks | 2 files |
-| Phase 10 P06 | 18 | 1 tasks | 2 files |
-| Phase 10-cross-file-semantic-extraction P07 | 7 | 2 tasks | 5 files |
-| Phase 10-cross-file-semantic-extraction P08 | 18 | 3 tasks | 6 files |
-| Phase 10 P09 | 10 | 2 tasks | 4 files |
-| Phase 11-narrative-mode-slash-commands P01 | 45 | 3 tasks | 2 files |
-| Phase 11-narrative-mode-slash-commands P02 | 7 | 3 tasks | 3 files |
-| Phase 11-narrative-mode-slash-commands P03 | 7 | 3 tasks | 2 files |
-| Phase 11-narrative-mode-slash-commands P04 | 3 | 3 tasks | 6 files |
-| Phase 11 P05 | 5 | 3 tasks | 10 files |
-| Phase 11-narrative-mode-slash-commands P06 | 400 | 3 tasks | 4 files |
-| Phase 11-narrative-mode-slash-commands P07 | 3 | 4 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-04-17T17:29:27.087Z
-Stopped at: Completed 11-07-PLAN.md
-Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
+Last session: 2026-04-17T19:00:00.000Z
+Stopped at: Milestone v1.4 opened — requirements gathering pending
+Next action: Run 4 parallel researchers, then define REQUIREMENTS.md, then spawn gsd-roadmapper for v1.4 phases 12–18

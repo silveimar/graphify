@@ -14,17 +14,19 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 **Prior milestone (v1.3) shipped 2026-04-17:** Phases 9.2 (Progressive Graph Retrieval), 10 (Cross-File Semantic Extraction with Entity Deduplication), 11 (Narrative Mode as Interactive Slash Commands). 19/19 plans, 14/15 requirements (TOKEN-04 Bloom filter stretch deferred per D-09). Full detail archived to `.planning/milestones/v1.3-*`.
 
-**Target features (v1.4 — requirements gathering pending via `/gsd-new-milestone v1.4`):**
+**Target features (v1.4 — scope confirmed 2026-04-17, requirements pending):**
 
 - Phase 12: Heterogeneous Extraction Routing — file-complexity-aware model routing (AST metrics → model choice); enables parallel multi-endpoint extraction
-- Phase 13: Agent Capability Manifest — machine-readable self-description of graphify's MCP server capabilities
+- Phase 13: Agent Capability Manifest — machine-readable self-description of graphify's MCP server capabilities (pairs with SEED-002 Harness Memory Export: manifest declares MCP surface, export declares portability surface)
 - Phase 14: Obsidian Thinking Commands — graphify-aware slash commands for enriched vaults
 - Phase 15: Async Background Enrichment — post-build passes that enrich descriptions, detect emerging patterns, update staleness scores
 - Phase 16: Graph Argumentation Mode — knowledge graph as a shared cognitive map for structured LLM debates
 - Phase 17: Conversational Graph Chat — natural-language querying of the knowledge graph
 - Phase 18: Focus-Aware Graph Context — scope graph queries to the user's current editing focus
 
-**Seeds planted but not in scope:** SEED-001 (Tacit-to-Explicit Elicitation Engine), SEED-002 (Harness Memory Export) — trigger conditions do not match v1.4 yet.
+**Seed activation for v1.4:**
+- **SEED-002 (Harness Memory Export) — ACTIVATED** per its own trigger condition ("v1.4 Phase 13 Agent Capability Manifest is being planned — these are natural companions"). Scope bundled with Phase 13.
+- SEED-001 (Tacit-to-Explicit Elicitation Engine) — remains planted. Trigger is user-side onboarding; v1.4 is agent-side discoverability. Re-evaluate at v1.5.
 
 ## Requirements
 
@@ -88,7 +90,7 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 ### Active
 
-Milestone **v1.4 Agent Discoverability & Obsidian Workflows** opened 2026-04-17. Phase 12 (Heterogeneous Extraction Routing) pulled forward from v1.3 deferral. Additional phases: 13 Agent Capability Manifest, 14 Obsidian Thinking Commands, 15 Async Background Enrichment, 16 Graph Argumentation Mode, 17 Conversational Graph Chat, 18 Focus-Aware Graph Context. Requirements gathering pending via `/gsd-new-milestone v1.4`.
+Milestone **v1.4 Agent Discoverability & Obsidian Workflows** opened 2026-04-17; scope confirmed via `/gsd-new-milestone v1.4` on 2026-04-17. Phase 12 (Heterogeneous Extraction Routing) pulled forward from v1.3 deferral. Additional phases: 13 Agent Capability Manifest (+ SEED-002 Harness Memory Export), 14 Obsidian Thinking Commands, 15 Async Background Enrichment, 16 Graph Argumentation Mode, 17 Conversational Graph Chat, 18 Focus-Aware Graph Context. Requirements being defined after parallel domain research.
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -200,7 +202,7 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-v1.4 milestone opened 2026-04-17 (see Current Milestone section above). v1.5+ is unscoped — revisit after v1.4 ships and user feedback lands.
+v1.4 milestone opened 2026-04-17; scope confirmed and requirements pending (see Current Milestone section above). v1.5+ is unscoped — revisit after v1.4 ships and user feedback lands. SEED-001 (Tacit Elicitation) remains a candidate for v1.5+ if onboarding/discovery becomes the milestone theme.
 
 ---
-*Last updated: 2026-04-17 — v1.3 Intelligent Analysis Continuation shipped; v1.4 Agent Discoverability & Obsidian Workflows opened*
+*Last updated: 2026-04-17 — v1.4 scope confirmed via /gsd-new-milestone; SEED-002 activated alongside Phase 13; requirements gathering + roadmap next*
