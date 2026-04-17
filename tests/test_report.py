@@ -442,3 +442,169 @@ def test_hot_paths_labels():
     report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, "./project", usage_data=usage_data)
     assert "MyClassA" in report
     assert "MyClassB" in report
+
+
+# --- Entity Dedup section tests (Phase 10, D-04 / T-10-02) ---
+
+def _make_minimal_graph():
+    """Minimal graph fixture for dedup section tests."""
+    G = nx.Graph()
+    G.add_node("n1", label="A", file_type="code", source_file="a.py", community=0)
+    return G
+
+
+def test_generate_no_dedup_section_when_none(tmp_path):
+    """Omitting dedup_report (default None) produces no Entity Dedup section."""
+    G = _make_minimal_graph()
+    out = generate(
+        G=G,
+        communities={0: ["n1"]},
+        cohesion_scores={0: 1.0},
+        community_labels={0: "C0"},
+        god_node_list=[],
+        surprise_list=[],
+        detection_result={"files": {"code": ["a.py"]}, "total_files": 1, "total_words": 100, "needs_graph": True, "warning": None},
+        token_cost={"total": 0},
+        root=str(tmp_path),
+        # dedup_report omitted -> defaults to None
+    )
+    assert "## Entity Dedup" not in out
+
+
+def test_generate_no_dedup_section_when_empty(tmp_path):
+    """dedup_report with zero merges does not render the Entity Dedup section."""
+    G = _make_minimal_graph()
+    empty_report = {
+        "version": "1",
+        "summary": {"total_nodes_before": 1, "total_nodes_after": 1, "merges": 0},
+        "alias_map": {},
+        "merges": [],
+    }
+    out = generate(
+        G=G,
+        communities={0: ["n1"]},
+        cohesion_scores={0: 1.0},
+        community_labels={0: "C0"},
+        god_node_list=[],
+        surprise_list=[],
+        detection_result={"files": {"code": ["a.py"]}, "total_files": 1, "total_words": 100, "needs_graph": True, "warning": None},
+        token_cost={"total": 0},
+        root=str(tmp_path),
+        dedup_report=empty_report,
+    )
+    assert "## Entity Dedup" not in out
+
+
+def test_generate_renders_dedup_section_with_merges(tmp_path):
+    """Populated dedup_report appends a sanitized Entity Dedup section."""
+    G = _make_minimal_graph()
+    populated_report = {
+        "version": "1",
+        "summary": {"total_nodes_before": 3, "total_nodes_after": 1, "merges": 1},
+        "alias_map": {"n2": "n1", "n3": "n1"},
+        "merges": [{
+            "canonical_id": "n1",
+            "canonical_label": "AuthService",
+            "eliminated": [
+                {"id": "n2", "label": "auth_service", "source_file": "b.py"},
+                {"id": "n3", "label": "Auth", "source_file": "c.py"},
+            ],
+            "fuzzy_score": 0.957,
+            "cosine_score": 0.912,
+        }],
+    }
+    out = generate(
+        G=G,
+        communities={0: ["n1"]},
+        cohesion_scores={0: 1.0},
+        community_labels={0: "C0"},
+        god_node_list=[],
+        surprise_list=[],
+        detection_result={"files": {"code": ["a.py"]}, "total_files": 1, "total_words": 100, "needs_graph": True, "warning": None},
+        token_cost={"total": 0},
+        root=str(tmp_path),
+        dedup_report=populated_report,
+    )
+    assert "## Entity Dedup" in out
+    assert "AuthService" in out
+    assert "auth_service" in out
+    assert "fuzzy=0.957" in out
+    assert "cos=0.912" in out
+    # Summary line present
+    assert "3 nodes" in out and "1 nodes" in out
+
+
+def test_generate_dedup_section_sanitizes_labels(tmp_path):
+    """T-10-02: HTML/markdown injection attempts in canonical labels are neutralized."""
+    G = _make_minimal_graph()
+    evil_report = {
+        "version": "1",
+        "summary": {"total_nodes_before": 2, "total_nodes_after": 1, "merges": 1},
+        "alias_map": {"n2": "n1"},
+        "merges": [{
+            "canonical_id": "n1",
+            "canonical_label": "<script>alert(1)</script>",
+            "eliminated": [{"id": "n2", "label": "<img src=x>", "source_file": "b.py"}],
+            "fuzzy_score": 0.95,
+            "cosine_score": 0.90,
+        }],
+    }
+    out = generate(
+        G=G,
+        communities={0: ["n1"]},
+        cohesion_scores={0: 1.0},
+        community_labels={0: "C0"},
+        god_node_list=[],
+        surprise_list=[],
+        detection_result={"files": {"code": ["a.py"]}, "total_files": 1, "total_words": 100, "needs_graph": True, "warning": None},
+        token_cost={"total": 0},
+        root=str(tmp_path),
+        dedup_report=evil_report,
+    )
+    # Raw < / > must not appear in dedup section (sanitized to &lt;/&gt;)
+    section_start = out.index("## Entity Dedup")
+    section = out[section_start:]
+    assert "<script>" not in section
+    assert "<img" not in section
+    assert "&lt;script&gt;" in section or "[script]" not in section
+    # Canonical content still present in escaped form
+    assert "alert" in section
+
+
+def test_generate_dedup_section_truncates_above_10():
+    """More than 10 merges: only first 10 rendered, overflow line appears."""
+    G = _make_minimal_graph()
+    merges = [{
+        "canonical_id": f"n{i}",
+        "canonical_label": f"Label{i}",
+        "eliminated": [{"id": f"x{i}", "label": f"elim{i}", "source_file": "x.py"}],
+        "fuzzy_score": 0.95,
+        "cosine_score": 0.90,
+    } for i in range(15)]
+    report = {
+        "version": "1",
+        "summary": {"total_nodes_before": 30, "total_nodes_after": 15, "merges": 15},
+        "alias_map": {},
+        "merges": merges,
+    }
+    out = generate(
+        G=G,
+        communities={0: ["n1"]},
+        cohesion_scores={0: 1.0},
+        community_labels={0: "C0"},
+        god_node_list=[],
+        surprise_list=[],
+        detection_result={"files": {"code": ["a.py"]}, "total_files": 1, "total_words": 100, "needs_graph": True, "warning": None},
+        token_cost={"total": 0},
+        root=".",
+        dedup_report=report,
+    )
+    # First 10 labels present
+    for i in range(10):
+        assert f"Label{i}" in out
+    # Overflow line present
+    assert "+5 more" in out
+    # 11th-15th labels NOT in the rendered section
+    section_start = out.index("## Entity Dedup")
+    section = out[section_start:]
+    assert "Label14" not in section

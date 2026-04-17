@@ -4,6 +4,7 @@ import re
 import statistics
 from datetime import date
 import networkx as nx
+from graphify.security import sanitize_label
 
 
 def _safe_community_name(label: str) -> str:
@@ -63,6 +64,7 @@ def generate(
     root: str,
     suggested_questions: list[dict] | None = None,
     usage_data: dict | None = None,
+    dedup_report: dict | None = None,  # Phase 10, D-04
 ) -> str:
     today = date.today().isoformat()
 
@@ -242,6 +244,36 @@ def generate(
                     b_label = G.nodes[parts[1]].get("label", parts[1]) if parts[1] in G else parts[1]
                     lines.append(f"| {_sanitize_md(a_label)} -> {_sanitize_md(b_label)} | {count} |")
                 lines.append("")
+
+    # Phase 10 / D-04: Entity Dedup section (optional; only rendered when dedup ran)
+    if dedup_report and dedup_report.get("merges"):
+        summary = dedup_report.get("summary", {}) or {}
+        merges = dedup_report["merges"]
+        lines += [
+            "",
+            "## Entity Dedup",
+            (
+                f"- {summary.get('merges', len(merges))} entities merged · "
+                f"{summary.get('total_nodes_before', '?')} nodes → "
+                f"{summary.get('total_nodes_after', '?')} nodes"
+            ),
+            "",
+        ]
+        # Render up to first 10 merges; defense-in-depth sanitization on all labels
+        for merge in merges[:10]:
+            canon_label = _sanitize_md(sanitize_label(str(merge.get("canonical_label", ""))))
+            elim_labels = ", ".join(
+                _sanitize_md(sanitize_label(str(e.get("label", e.get("id", "")))))
+                for e in merge.get("eliminated", [])
+            )
+            fuzzy = float(merge.get("fuzzy_score", 0.0) or 0.0)
+            cos = float(merge.get("cosine_score", 0.0) or 0.0)
+            lines.append(
+                f"- `{canon_label}` ← {elim_labels}  "
+                f"[fuzzy={fuzzy:.3f}, cos={cos:.3f}]"
+            )
+        if len(merges) > 10:
+            lines.append(f"  (+{len(merges) - 10} more — see dedup_report.json)")
 
     return "\n".join(lines)
 
