@@ -805,6 +805,10 @@ def _run_query_graph(
 
     # Apply alias resolution to explicit seed-node fields passed in arguments.
     # These fields carry specific node IDs (not free-text questions).
+    # WR-03: shallow-copy arguments before rewriting so the caller's dict (passed
+    # in by _tool_query_graph) is never mutated. Retry / instrumentation that
+    # re-reads arguments after dispatch must see the original input.
+    arguments = dict(arguments)
     for _alias_field in ("node_id", "source", "target", "seed", "start"):
         if _alias_field in arguments and isinstance(arguments[_alias_field], str):
             arguments[_alias_field] = _resolve_alias(arguments[_alias_field])

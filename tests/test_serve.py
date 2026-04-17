@@ -1456,3 +1456,54 @@ def test_run_query_graph_records_all_aliases_for_same_canonical():
     assert sorted(resolved["authentication_service"]) == ["auth", "auth_svc"]
 
 
+def test_run_query_graph_does_not_mutate_caller_arguments():
+    """WR-03 regression: _run_query_graph must not rewrite caller's arguments dict.
+
+    Pre-fix alias resolution mutated ``arguments[seed_nodes]`` and
+    ``arguments[node_id]`` in place, so the caller's dict held the resolved
+    canonical IDs after dispatch — a latent bug for any retry/instrumentation
+    path that re-reads the original input.
+    """
+    G = nx.Graph()
+    G.add_node("authentication_service", label="authentication service",
+               file_type="code", community=0, source_file="auth.py", source_location="L1")
+    G.add_node("other", label="other", file_type="code", community=0,
+               source_file="other.py", source_location="L1")
+    G.add_edge("authentication_service", "other", relation="calls", confidence="EXTRACTED")
+
+    communities = _communities_from_graph(G)
+    telemetry: dict = {}
+    bf = _compute_branching_factor(G)
+    alias_map = {"auth": "authentication_service", "auth_svc": "authentication_service"}
+
+    arguments = {
+        "question": "auth",
+        "depth": 1,
+        "budget": 500,
+        "layer": 1,
+        "node_id": "auth",
+        "seed_nodes": ["auth", "auth_svc"],
+    }
+    # Snapshot exact pre-call state for comparison.
+    snapshot = {
+        "question": arguments["question"],
+        "depth": arguments["depth"],
+        "budget": arguments["budget"],
+        "layer": arguments["layer"],
+        "node_id": arguments["node_id"],
+        "seed_nodes": list(arguments["seed_nodes"]),
+    }
+
+    _run_query_graph(
+        G, communities, 1000.0, bf, telemetry, arguments, alias_map=alias_map,
+    )
+
+    # Caller's dict must be untouched: aliases must still be the original strings.
+    assert arguments["node_id"] == snapshot["node_id"] == "auth"
+    assert arguments["seed_nodes"] == snapshot["seed_nodes"] == ["auth", "auth_svc"]
+    assert arguments["question"] == snapshot["question"]
+    assert arguments["depth"] == snapshot["depth"]
+    assert arguments["budget"] == snapshot["budget"]
+    assert arguments["layer"] == snapshot["layer"]
+
+
