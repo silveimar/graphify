@@ -7,6 +7,21 @@ import networkx as nx
 from graphify.security import sanitize_label
 
 
+def _fmt_source(value) -> str:
+    """Render a source_file value as a display string.
+
+    Defends against list[str] values reaching the renderer even if
+    analyze.py already flattened them — defense-in-depth per T-10-08-02.
+
+    list[str] -> comma-joined string
+    str       -> unchanged
+    other     -> str(value) or ""
+    """
+    if isinstance(value, list):
+        return ", ".join(v for v in value if v) if value else ""
+    return str(value or "")
+
+
 def _safe_community_name(label: str) -> str:
     """Mirrors export.safe_name so community hub filenames and report wikilinks always agree."""
     cleaned = re.sub(r'[\\/*?:"<>|#^[\]]', "", label.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")).strip()
@@ -131,7 +146,7 @@ def generate(
             sem_tag = " [semantically similar]" if relation == "semantically_similar_to" else ""
             lines += [
                 f"- `{s['source']}` --{relation}--> `{s['target']}`  [{conf_tag}]{sem_tag}",
-                f"  {files[0]} → {files[1]}" + (f"  _{note}_" if note else ""),
+                f"  {_fmt_source(files[0])} → {_fmt_source(files[1])}" + (f"  _{note}_" if note else ""),
             ]
     else:
         lines.append("- None detected - all connections are within the same source files.")
