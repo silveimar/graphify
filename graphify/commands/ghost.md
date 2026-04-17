@@ -13,14 +13,15 @@ Step 1: Call the graphify MCP tool `get_annotations` with:
 Step 2: Call the graphify MCP tool `god_nodes` with:
 - `top_n`: 10
 
-Parse `meta.status` on both responses.
+`get_annotations` returns a JSON array (not a meta envelope).
+`god_nodes` returns plain text (not a meta envelope).
 
-**If either response has `status` == `no_graph`:** render verbatim:
-> No graph found at graphify-out/graph.json. Run `/graphify` to build one, then re-invoke this command.
-
-**If `get_annotations` returns an empty list:** render:
+**If `get_annotations` returns an empty array `[]`:** render:
 > No annotations found — /ghost needs your own notes or rationales in the graph to learn your voice.
 > Annotate nodes via `/graphify` workflow (rationale / peer_id="self"), then re-invoke.
+
+**If `god_nodes` returns an empty list:** render:
+> No god nodes found — run `/graphify` to build the graph first.
 
 **Otherwise:** render in the user's voice:
 1. Extract voice patterns from the returned annotations — vocabulary, sentence structure, tone, idiom.

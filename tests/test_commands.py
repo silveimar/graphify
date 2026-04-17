@@ -134,8 +134,30 @@ def test_stretch_command_files_have_required_frontmatter():
 
 
 def test_stretch_command_files_have_no_graph_guard():
-    for name in STRETCH_COMMANDS:
+    # challenge.md uses query_graph which returns a meta envelope with meta.status,
+    # so its no_graph guard is valid and must be present.
+    # ghost.md uses get_annotations (JSON array) and god_nodes (plain text) — neither
+    # returns a meta envelope, so its guard is based on empty-array/empty-list detection,
+    # not meta.status. ghost is excluded from this check; see test_ghost_md_guard_wording.
+    for name in ("challenge",):
         assert "no_graph" in _read(name), f"{name}.md missing no_graph guard"
+
+
+def test_ghost_md_guard_wording():
+    """WR-02 regression: ghost.md must NOT instruct parsing meta.status (dead guard).
+
+    get_annotations returns a JSON array and god_nodes returns plain text — neither
+    returns a Phase 9.2 meta envelope. The guard must check for empty array/list instead.
+    """
+    text = _read("ghost")
+    assert "JSON array" in text, "ghost.md must describe get_annotations as returning a JSON array"
+    assert "empty array" in text or "empty list" in text, (
+        "ghost.md must guard on empty array/list, not meta.status"
+    )
+    assert "meta.status" not in text, (
+        "ghost.md must NOT reference meta.status — neither get_annotations nor god_nodes "
+        "returns a meta envelope"
+    )
 
 
 def test_ghost_md_references_get_annotations():
