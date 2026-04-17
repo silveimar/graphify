@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Intelligent Analysis Continuation
 status: Ready to execute
-stopped_at: Completed 11-03-PLAN.md
-last_updated: "2026-04-17T17:03:05.389Z"
+stopped_at: Completed 11-04-PLAN.md
+last_updated: "2026-04-17T17:08:47.857Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 19
-  completed_plans: 15
-  percent: 79
+  completed_plans: 16
+  percent: 84
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-16 after v1.3 milestone open)
 ## Current Position
 
 Phase: 11 (narrative-mode-slash-commands) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
 Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
 Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
@@ -122,6 +122,9 @@ Key carry-forward decisions:
 - [Phase 11]: _run_entity_trace extracted as pure helper at module level; _tool_entity_trace closure in serve(); insufficient_history threshold = len(snaps) < 1 (live G counts as second data point)
 - [Phase 11-narrative-mode-slash-commands]: drift_nodes trend score: community_changes * 2 + abs(degree_delta) — composition of existing data, no new algorithm (D-18)
 - [Phase 11-narrative-mode-slash-commands]: newly_formed_clusters uses pure set-based novelty rule (zero-overlap) instead of compute_delta — avoids 4-arg coupling, aligns with D-18
+- [Phase 11-narrative-mode-slash-commands]: Five command files ship as static prompts in graphify/commands/ — no code changes to serve.py or __main__.py in plan 11-04
+- [Phase 11-narrative-mode-slash-commands]: connect.md Pitfall-4 guard: two distinct sections (Shortest path / Surprising bridges) with explicit Do NOT merge instruction, enforced by test order assertion
+- [Phase 11-narrative-mode-slash-commands]: Drift detector test uses regex over serve.py source to extract types.Tool(name=...) — avoids MCP runtime dependency in unit tests (plan-checker WARNING 3 fix)
 
 ### Blockers/Concerns
 
@@ -144,9 +147,10 @@ None.
 | Phase 11-narrative-mode-slash-commands P01 | 45 | 3 tasks | 2 files |
 | Phase 11-narrative-mode-slash-commands P02 | 7 | 3 tasks | 3 files |
 | Phase 11-narrative-mode-slash-commands P03 | 7 | 3 tasks | 2 files |
+| Phase 11-narrative-mode-slash-commands P04 | 3 | 3 tasks | 6 files |
 
 ## Session Continuity
 
-Last session: 2026-04-17T17:03:05.386Z
-Stopped at: Completed 11-03-PLAN.md
+Last session: 2026-04-17T17:08:47.853Z
+Stopped at: Completed 11-04-PLAN.md
 Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
