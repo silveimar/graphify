@@ -1066,6 +1066,7 @@ def _run_graph_summary(
             "removed_edges": len(delta["removed_edges"]),
         }
         del G_prev
+        del comms_prev
     else:
         delta_block = {"status": "no_prior_snapshot"}
 
