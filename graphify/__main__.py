@@ -51,61 +51,129 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "skill_file": "skill.md",
         "skill_dst": Path(".claude") / "skills" / "graphify" / "SKILL.md",
         "claude_md": True,
+        "commands_src_dir": "commands",
+        "commands_dst": Path(".claude") / "commands",
+        "commands_enabled": True,
     },
     "codex": {
         "skill_file": "skill-codex.md",
         "skill_dst": Path(".agents") / "skills" / "graphify" / "SKILL.md",
         "claude_md": False,
+        "commands_src_dir": "commands",
+        "commands_dst": None,
+        "commands_enabled": False,
     },
     "opencode": {
         "skill_file": "skill-opencode.md",
         "skill_dst": Path(".config") / "opencode" / "skills" / "graphify" / "SKILL.md",
         "claude_md": False,
+        "commands_src_dir": "commands",
+        "commands_dst": None,
+        "commands_enabled": False,
     },
     "aider": {
         "skill_file": "skill-aider.md",
         "skill_dst": Path(".aider") / "graphify" / "SKILL.md",
         "claude_md": False,
+        "commands_src_dir": "commands",
+        "commands_dst": None,
+        "commands_enabled": False,
     },
     "copilot": {
         "skill_file": "skill-copilot.md",
         "skill_dst": Path(".copilot") / "skills" / "graphify" / "SKILL.md",
         "claude_md": False,
+        "commands_src_dir": "commands",
+        "commands_dst": None,
+        "commands_enabled": False,
     },
     "claw": {
         "skill_file": "skill-claw.md",
         "skill_dst": Path(".openclaw") / "skills" / "graphify" / "SKILL.md",
         "claude_md": False,
+        "commands_src_dir": "commands",
+        "commands_dst": None,
+        "commands_enabled": False,
     },
     "droid": {
         "skill_file": "skill-droid.md",
         "skill_dst": Path(".factory") / "skills" / "graphify" / "SKILL.md",
         "claude_md": False,
+        "commands_src_dir": "commands",
+        "commands_dst": None,
+        "commands_enabled": False,
     },
     "trae": {
         "skill_file": "skill-trae.md",
         "skill_dst": Path(".trae") / "skills" / "graphify" / "SKILL.md",
         "claude_md": False,
+        "commands_src_dir": "commands",
+        "commands_dst": None,
+        "commands_enabled": False,
     },
     "trae-cn": {
         "skill_file": "skill-trae.md",
         "skill_dst": Path(".trae-cn") / "skills" / "graphify" / "SKILL.md",
         "claude_md": False,
+        "commands_src_dir": "commands",
+        "commands_dst": None,
+        "commands_enabled": False,
     },
     "antigravity": {
         "skill_file": "skill.md",
         "skill_dst": Path(".agent") / "skills" / "graphify" / "SKILL.md",
         "claude_md": False,
+        "commands_src_dir": "commands",
+        "commands_dst": None,
+        "commands_enabled": False,
     },
     "windows": {
         "skill_file": "skill-windows.md",
         "skill_dst": Path(".claude") / "skills" / "graphify" / "SKILL.md",
         "claude_md": True,
+        "commands_src_dir": "commands",
+        "commands_dst": Path(".claude") / "commands",
+        "commands_enabled": True,
     },
 }
 
 
-def install(platform: str = "claude") -> None:
+def _install_commands(cfg: dict, src_dir: Path, *, verbose: bool = True) -> None:
+    """Copy all command .md files from src_dir to cfg['commands_dst'] under Path.home()."""
+    if not cfg.get("commands_enabled"):
+        return
+    dst_rel = cfg.get("commands_dst")
+    if dst_rel is None:
+        return
+    dst_dir = Path.home() / dst_rel
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    for src in sorted(src_dir.glob("*.md")):
+        dst = dst_dir / src.name
+        shutil.copy(src, dst)
+        if verbose:
+            print(f"  command installed  ->  {dst}")
+
+
+def _uninstall_commands(cfg: dict, *, verbose: bool = True) -> None:
+    """Remove command files previously installed by _install_commands."""
+    if not cfg.get("commands_enabled"):
+        return
+    dst_rel = cfg.get("commands_dst")
+    if dst_rel is None:
+        return
+    dst_dir = Path.home() / dst_rel
+    if not dst_dir.exists():
+        return
+    # Remove only the files we know Phase 11 installs (core 5 + stretch placeholders)
+    for name in ("context.md", "trace.md", "connect.md", "drift.md", "emerge.md", "ghost.md", "challenge.md"):
+        target = dst_dir / name
+        if target.exists():
+            target.unlink()
+            if verbose:
+                print(f"  command removed    ->  {target}")
+
+
+def install(platform: str = "claude", no_commands: bool = False) -> None:
     if platform == "gemini":
         gemini_install()
         return
@@ -135,22 +203,48 @@ def install(platform: str = "claude") -> None:
         # Register in ~/.claude/CLAUDE.md (Claude Code only)
         claude_md = Path.home() / ".claude" / "CLAUDE.md"
         if claude_md.exists():
-            content = claude_md.read_text(encoding="utf-8")
-            if "graphify" in content:
+            _content = claude_md.read_text(encoding="utf-8")
+            if "graphify" in _content:
                 print(f"  CLAUDE.md        ->  already registered (no change)")
             else:
-                claude_md.write_text(content.rstrip() + _SKILL_REGISTRATION, encoding="utf-8")
+                claude_md.write_text(_content.rstrip() + _SKILL_REGISTRATION, encoding="utf-8")
                 print(f"  CLAUDE.md        ->  skill registered in {claude_md}")
         else:
             claude_md.parent.mkdir(parents=True, exist_ok=True)
             claude_md.write_text(_SKILL_REGISTRATION.lstrip(), encoding="utf-8")
             print(f"  CLAUDE.md        ->  created at {claude_md}")
 
+    if not no_commands:
+        commands_src = Path(__file__).parent / cfg["commands_src_dir"]
+        _install_commands(cfg, commands_src)
+
     print()
     print("Done. Open your AI coding assistant and type:")
     print()
     print("  /graphify .")
     print()
+
+
+def uninstall(platform: str = "claude", no_commands: bool = False) -> None:
+    """Remove the skill file and command files for the given platform."""
+    if platform not in _PLATFORM_CONFIG:
+        print(
+            f"error: unknown platform '{platform}'. Choose from: {', '.join(_PLATFORM_CONFIG)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    cfg = _PLATFORM_CONFIG[platform]
+    skill_dst = Path.home() / cfg["skill_dst"]
+    if skill_dst.exists():
+        skill_dst.unlink()
+        print(f"  skill removed    ->  {skill_dst}")
+    version_file = skill_dst.parent / ".graphify_version"
+    if version_file.exists():
+        version_file.unlink()
+
+    if not no_commands:
+        _uninstall_commands(cfg)
 
 
 _CLAUDE_MD_SECTION = """\
@@ -1484,6 +1578,10 @@ def main() -> None:
         # Default to windows platform on Windows, claude elsewhere
         default_platform = "windows" if platform.system() == "Windows" else "claude"
         chosen_platform = default_platform
+        # --no-commands flag: skip command file installation
+        no_commands = "--no-commands" in sys.argv
+        if no_commands:
+            sys.argv.remove("--no-commands")
         args = sys.argv[2:]
         i = 0
         while i < len(args):
@@ -1495,7 +1593,7 @@ def main() -> None:
                 i += 2
             else:
                 i += 1
-        install(platform=chosen_platform)
+        install(platform=chosen_platform, no_commands=no_commands)
     elif cmd == "claude":
         subcmd = sys.argv[2] if len(sys.argv) > 2 else ""
         if subcmd == "install":
