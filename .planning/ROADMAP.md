@@ -149,7 +149,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   **Success Criteria** (what must be TRUE):
   1. `/context` returns a summary of active god nodes, top communities, and recent graph deltas via MCP — the response is grounded in live graph data, not a static snapshot
   2. `/trace <entity>` returns a snapshot history for a named entity: first-seen timestamp, community membership over time, and current staleness score
-  3. `/connect <topic-a> <topic-b>` returns the shortest surprising bridge path(s) between two topics, consistent with the existing surprising-connections analysis in `analyze.py`
+  3. `/connect <topic-a> <topic-b>` returns the shortest path between two topics AND a complementary block of globally surprising bridges from `analyze.py`'s surprising-connections analysis — rendered as two distinct sections, with the surprising-bridges block labelled as global to the graph (NOT filtered to the A-B path)
   4. `/drift` returns trending nodes — those whose community membership, centrality, or edge density has moved in a consistent direction across the last N graph runs
   5. `/emerge` returns newly-formed clusters detected by comparing the current graph snapshot to the previous one, using the v1.1 delta machinery
   6. _(stretch)_ `/ghost` and `/challenge` ship as `.claude/commands/*.md` files that invoke the graphify MCP server, with documented fallback behavior when invoked against a vault with no prior graph
