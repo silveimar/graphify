@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Intelligent Analysis Continuation
 status: Ready to execute
-stopped_at: Completed 10-cross-file-semantic-extraction/10-02-PLAN.md
-last_updated: "2026-04-17T01:21:05.988Z"
+stopped_at: Completed 10-cross-file-semantic-extraction/03-PLAN.md
+last_updated: "2026-04-17T01:31:17.092Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 10
-  completed_plans: 5
-  percent: 50
+  completed_plans: 6
+  percent: 60
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-16 after v1.3 milestone open)
 ## Current Position
 
 Phase: 10 (Cross-File Semantic Extraction with Entity Deduplication) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
 Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
 Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
@@ -105,6 +105,8 @@ Key carry-forward decisions:
 - [Phase 10-cross-file-semantic-extraction]: D-11/D-12: validate.py extended to accept merged_from list[str] and source_file str|list[str]; REQUIRED_NODE_FIELDS unchanged
 - [Phase 10-cross-file-semantic-extraction]: D-01: [dedup] sentence-transformers optional extra added to pyproject.toml following [leiden]/[obsidian] pattern
 - [Phase 10-cross-file-semantic-extraction]: Used weakly_connected_components (DiGraph API) and os.path.commonpath for absolute-path top-dir detection in batch.py
+- [Phase 10-cross-file-semantic-extraction]: html.escape(sanitize_label()) required for MD output — sanitize_label() alone does not HTML-escape (Rule 2 auto-fix)
+- [Phase 10-cross-file-semantic-extraction]: dedup.py operates exclusively on extraction dicts, never nx.relabel_nodes — ensures D-10 edge aggregation correctness (Pitfall 1)
 
 ### Blockers/Concerns
 
@@ -117,9 +119,10 @@ None.
 | 260416-okg | Add /graphify analyze entries to Usage cheat-sheet in all skill variants | 2026-04-16 | 058152b | [260416-okg-add-graphify-analyze-entries-to-usage-ch](./quick/260416-okg-add-graphify-analyze-entries-to-usage-ch/) |
 | Phase 10-cross-file-semantic-extraction P10-01 | 6 | 3 tasks | 8 files |
 | Phase 10-cross-file-semantic-extraction P02 | 480 | 2 tasks | 2 files |
+| Phase 10-cross-file-semantic-extraction P03 | 6 | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-04-17T01:21:05.985Z
-Stopped at: Completed 10-cross-file-semantic-extraction/10-02-PLAN.md
+Last session: 2026-04-17T01:31:17.089Z
+Stopped at: Completed 10-cross-file-semantic-extraction/03-PLAN.md
 Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
