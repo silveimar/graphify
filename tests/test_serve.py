@@ -35,6 +35,8 @@ from graphify.serve import (
     _run_graph_summary,
     _run_connect_topics,
     _run_entity_trace,
+    _run_drift_nodes,
+    _run_newly_formed_clusters,
     QUERY_GRAPH_META_SENTINEL,
 )
 
@@ -1974,3 +1976,192 @@ def test_entity_trace_envelope_structure(make_snapshot_chain, tmp_path):
     assert meta["status"] == "ok"
     assert meta["layer"] == 1
     assert meta["search_strategy"] == "trace"
+
+
+# --- Phase 11: drift_nodes + newly_formed_clusters ---
+
+def test_drift_nodes_insufficient_history(tmp_path):
+    """Zero snapshots → status='insufficient_history', snapshots_available==0."""
+    G = nx.Graph()
+    G.add_node("n0", label="n0", source_file="f0.py", source_location="L0",
+               file_type="code", community=0)
+    response = _run_drift_nodes(G, tmp_path, {})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    meta = json.loads(parts[1])
+    assert meta["status"] == "insufficient_history"
+    assert meta["snapshots_available"] == 0
+    assert meta["search_strategy"] == "drift"
+
+
+def test_drift_nodes_trend_vectors(make_snapshot_chain, tmp_path):
+    """With 3 snapshots, drift_nodes returns meta.drift_count >= 1 and nodes_scanned >= 2."""
+    snaps = make_snapshot_chain(n=3, root=tmp_path)
+    # Build G_live using same n{j} scheme; n0 is present across all snapshots → drifts
+    G_live = nx.Graph()
+    for j in range(4):
+        G_live.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                        source_location=f"L{j}", file_type="code", community=j % 2)
+    G_live.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    G_live.add_edge("n0", "n2", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    G_live.add_edge("n0", "n3", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+
+    response = _run_drift_nodes(G_live, tmp_path, {"max_snapshots": 10})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    meta = json.loads(parts[1])
+    assert meta["status"] == "ok"
+    assert meta["drift_count"] >= 1
+    assert meta["nodes_scanned"] >= 2
+    # At least one node label should appear in the text body
+    assert parts[0].strip(), "text_body should not be empty"
+
+
+def test_drift_nodes_top_n_respected(make_snapshot_chain, tmp_path):
+    """With top_n=1, meta.drift_count <= 1."""
+    snaps = make_snapshot_chain(n=3, root=tmp_path)
+    G_live = nx.Graph()
+    for j in range(4):
+        G_live.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                        source_location=f"L{j}", file_type="code", community=j % 2)
+    response = _run_drift_nodes(G_live, tmp_path, {"top_n": 1})
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    meta = json.loads(parts[1])
+    assert meta["status"] == "ok"
+    assert meta["drift_count"] <= 1
+
+
+def test_drift_nodes_memory_discipline(make_snapshot_chain, tmp_path):
+    """All G_snap objects are released (del'd) after _run_drift_nodes completes."""
+    import gc
+    import weakref
+    import graphify.snapshot as _snap
+
+    original = _snap.load_snapshot
+    refs = []
+
+    def _spy(path):
+        G, c, m = original(path)
+        refs.append(weakref.ref(G))
+        return G, c, m
+
+    _snap.load_snapshot = _spy
+    try:
+        snaps = make_snapshot_chain(n=3, root=tmp_path)
+        G_live = nx.Graph()
+        for j in range(4):
+            G_live.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                            source_location=f"L{j}", file_type="code", community=j % 2)
+        _ = _run_drift_nodes(G_live, tmp_path, {})
+        gc.collect()
+        alive = sum(1 for r in refs if r() is not None)
+        assert alive == 0, f"{alive} snapshot graph(s) still alive — memory discipline violated"
+    finally:
+        _snap.load_snapshot = original
+
+
+def test_newly_formed_clusters_insufficient_history(tmp_path):
+    """Zero snapshots → status='insufficient_history'."""
+    G = nx.Graph()
+    G.add_node("n0", label="n0", source_file="f0.py", source_location="L0",
+               file_type="code", community=0)
+    communities = {0: ["n0"]}
+    response = _run_newly_formed_clusters(G, communities, tmp_path, {})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    meta = json.loads(parts[1])
+    assert meta["status"] == "insufficient_history"
+    assert meta["snapshots_available"] == 0
+    assert meta["search_strategy"] == "emerge"
+
+
+def test_newly_formed_clusters_no_change(tmp_path):
+    """When live graph and most recent snapshot have identical community members → no_change."""
+    from graphify.snapshot import save_snapshot
+
+    G = nx.Graph()
+    for j in range(3):
+        G.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                   source_location=f"L{j}", file_type="code", community=j % 2)
+    G.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    # Community structure is identical to what we'll load back.
+    communities = {0: ["n0", "n2"], 1: ["n1"]}
+    save_snapshot(G, communities, root=tmp_path, name="snap_00")
+
+    response = _run_newly_formed_clusters(G, communities, tmp_path, {})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    meta = json.loads(parts[1])
+    assert meta["status"] == "no_change"
+    assert meta["new_cluster_count"] == 0
+    assert meta["new_cluster_ids"] == []
+
+
+def test_newly_formed_clusters_new_cluster_detected(tmp_path):
+    """Snapshot has {n0, n1, n2}; live graph adds {new_a, new_b, new_c} as isolated triangle → 1 new cluster."""
+    from graphify.snapshot import save_snapshot
+
+    # Save snap with original nodes only.
+    G_old = nx.Graph()
+    for j in range(3):
+        G_old.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                       source_location=f"L{j}", file_type="code", community=0)
+    G_old.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    comms_old = {0: ["n0", "n1", "n2"]}
+    save_snapshot(G_old, comms_old, root=tmp_path, name="snap_00")
+
+    # Live graph has original nodes PLUS an isolated new cluster.
+    G_live = nx.Graph()
+    for j in range(3):
+        G_live.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                        source_location=f"L{j}", file_type="code", community=0)
+    G_live.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    for name in ["new_a", "new_b", "new_c"]:
+        G_live.add_node(name, label=name, source_file="new.py",
+                        source_location="L1", file_type="code", community=99)
+    G_live.add_edge("new_a", "new_b", relation="calls", confidence="EXTRACTED", source_file="new.py")
+    G_live.add_edge("new_b", "new_c", relation="calls", confidence="EXTRACTED", source_file="new.py")
+    G_live.add_edge("new_c", "new_a", relation="calls", confidence="EXTRACTED", source_file="new.py")
+    # new_a/b/c form community 99 — no overlap with prior community 0.
+    comms_live = {0: ["n0", "n1", "n2"], 99: ["new_a", "new_b", "new_c"]}
+
+    response = _run_newly_formed_clusters(G_live, comms_live, tmp_path, {})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    meta = json.loads(parts[1])
+    assert meta["status"] == "ok"
+    assert meta["new_cluster_count"] >= 1
+    assert 99 in meta["new_cluster_ids"]
+
+
+def test_newly_formed_clusters_envelope_structure(tmp_path):
+    """On OK path: response splits on SENTINEL; json parses; all required keys present."""
+    from graphify.snapshot import save_snapshot
+
+    # Snap with just {n0} in community 0.
+    G_old = nx.Graph()
+    G_old.add_node("n0", label="n0", source_file="f0.py",
+                   source_location="L0", file_type="code", community=0)
+    save_snapshot(G_old, {0: ["n0"]}, root=tmp_path, name="snap_00")
+
+    # Live graph adds a fully new community.
+    G_live = nx.Graph()
+    G_live.add_node("n0", label="n0", source_file="f0.py",
+                    source_location="L0", file_type="code", community=0)
+    G_live.add_node("fresh", label="fresh", source_file="fresh.py",
+                    source_location="L1", file_type="code", community=1)
+    comms_live = {0: ["n0"], 1: ["fresh"]}
+
+    response = _run_newly_formed_clusters(G_live, comms_live, tmp_path, {})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    assert len(parts) == 2
+    meta = json.loads(parts[1])
+    required_keys = {
+        "status", "layer", "search_strategy", "cardinality_estimate",
+        "continuation_token", "snapshot_count", "new_cluster_count", "new_cluster_ids",
+    }
+    for key in required_keys:
+        assert key in meta, f"Required key missing: {key}"
+    assert meta["layer"] == 1
+    assert meta["search_strategy"] == "emerge"
