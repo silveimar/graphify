@@ -108,3 +108,47 @@ def test_command_files_reference_registered_tools():
         f"Command files reference tools not registered in serve.py: {sorted(missing)}. "
         f"Registered tools: {sorted(registered)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Stretch command tests (plan 11-07 — SLASH-06 /ghost and SLASH-07 /challenge)
+# ---------------------------------------------------------------------------
+
+STRETCH_COMMANDS = {
+    "ghost": "get_annotations",
+    "challenge": "query_graph",
+}
+
+
+def test_stretch_command_files_exist():
+    for name in STRETCH_COMMANDS:
+        assert (_commands_dir() / f"{name}.md").exists(), f"Missing commands/{name}.md"
+
+
+def test_stretch_command_files_have_required_frontmatter():
+    for name in STRETCH_COMMANDS:
+        text = _read(name)
+        assert text.startswith("---\n"), f"{name}.md missing YAML frontmatter opener"
+        for field in (f"name: {name}", "description:", "argument-hint:", "disable-model-invocation: true"):
+            assert field in text, f"{name}.md missing {field!r}"
+
+
+def test_stretch_command_files_have_no_graph_guard():
+    for name in STRETCH_COMMANDS:
+        assert "no_graph" in _read(name), f"{name}.md missing no_graph guard"
+
+
+def test_ghost_md_references_get_annotations():
+    assert "get_annotations" in _read("ghost")
+
+
+def test_challenge_md_has_evidence_sections():
+    text = _read("challenge")
+    idx_support = text.find("Evidence supporting")
+    idx_contra = text.find("Evidence contradicting")
+    assert idx_support != -1 and idx_contra != -1
+    assert idx_support < idx_contra, "Evidence supporting must come before Evidence contradicting"
+
+
+def test_challenge_md_has_anti_fabrication_guard():
+    assert "do NOT fabricate" in _read("challenge"), "challenge.md must include anti-fabrication guard"
