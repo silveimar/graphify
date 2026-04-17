@@ -48,8 +48,9 @@ watch = ["watchdog"]
 leiden = ["graspologic"]
 office = ["python-docx", "openpyxl"]
 obsidian = ["PyYAML"]
+dedup = ["sentence-transformers"]
 video = ["faster-whisper", "yt-dlp"]
-all = ["mcp", "neo4j", "pypdf", "html2text", "watchdog", "graspologic", "python-docx", "openpyxl", "PyYAML", "faster-whisper", "yt-dlp"]
+all = ["mcp", "neo4j", "pypdf", "html2text", "watchdog", "graspologic", "python-docx", "openpyxl", "PyYAML", "faster-whisper", "yt-dlp", "sentence-transformers"]
 
 [project.scripts]
 graphify = "graphify.__main__:main"
