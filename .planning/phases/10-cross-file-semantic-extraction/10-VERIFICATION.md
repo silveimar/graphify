@@ -1,19 +1,34 @@
 ---
 phase: 10-cross-file-semantic-extraction
-verified: 2026-04-17T02:20:00Z
+verified: 2026-04-17T13:15:00Z
 status: passed
 score: 4/4
 overrides_applied: 0
-re_verification: false
+re_verification: true
+previous_status: passed
+previous_score: 4/4
+gaps_closed:
+  - "dedup → build → analyze pipeline crashes with TypeError when source_file is list[str] (UAT test 6)"
+  - "graphify --dedup on zero-byte --graph file surfaces JSONDecodeError instead of empty report (UAT test 2)"
+  - "Missing [dedup] extra and path-escape --out-dir both leak Python tracebacks instead of clean error messages (UAT test 3)"
+  - "MCP no_seed_nodes short-circuit path omits resolved_from_alias even when alias was resolved (UAT test 8)"
+gaps_remaining: []
+regressions: []
 ---
 
-# Phase 10: Cross-File Semantic Extraction with Entity Deduplication — Verification Report
+# Phase 10: Cross-File Semantic Extraction — Re-Verification Report
 
-**Phase Goal:** Deliver production-quality graphs on multi-source corpora via (A) cluster-based batch extraction (one LLM call per import-connected cluster, not per file) AND (B) post-extraction entity deduplication merging fuzzy + embedding-similar nodes into canonical entities with re-routed edges, aggregated weights (sum/max), and deterministic canonical label selection.
+**Phase Goal:** Deliver production-quality graphs on multi-source corpora via (A) cluster-based batch extraction (one LLM call per import-connected cluster, not per file) AND (B) post-extraction entity deduplication merging fuzzy + embedding-similar nodes into canonical entities with re-routed edges, aggregated weights, and deterministic canonical label selection.
 
-**Verified:** 2026-04-17T02:20:00Z
+**Verified:** 2026-04-17T13:15:00Z
 **Status:** passed
-**Re-verification:** No — initial verification
+**Re-verification:** Yes — after gap closure plans 10-08 and 10-09
+
+---
+
+## Re-Verification Context
+
+The initial verification (2026-04-17T02:20:00Z) returned `passed` for the 4 ROADMAP success criteria. However, UAT testing subsequently identified 4 gaps in the pipeline's error handling and composed flow behavior. Gap closure plans 10-08 (UAT test 6 — source_file list crash) and 10-09 (UAT tests 2, 3, 8 — CLI UX + MCP alias visibility) were executed and this re-verification confirms all 4 gaps are now closed.
 
 ---
 
@@ -23,107 +38,146 @@ re_verification: false
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Extractor processes import-connected file clusters as one LLM call per cluster; observable in skill files (per-cluster dispatch) and `graphify/batch.py::cluster_files` | VERIFIED | `batch.py` (213 lines) implements `cluster_files()` using `nx.weakly_connected_components` on an import graph. `skill.md` Step B0.5 calls `from graphify.batch import cluster_files` and dispatches one subagent per cluster. All 9 skill variants have 2+ cluster_files references. |
-| 2 | `graphify/dedup.py` exists and produces a `dedup_report` listing merged pairs with chosen canonical labels (json + md outputs) | VERIFIED | `dedup.py` (590 lines) exists. `dedup()` returns `(extraction_dict, report_dict)` where `report_dict` has keys `version`, `generated_at`, `summary`, `alias_map`, `merges`. `write_dedup_reports()` atomically writes `dedup_report.json` + `dedup_report.md` under `graphify-out/`. Smoke test confirmed report structure with merge records. |
-| 3 | After dedup, extraction dict shows inbound edges re-routed to canonical nodes and edge weights aggregated — no dangling edges to eliminated duplicate IDs | VERIFIED | Smoke test with `AuthService` + `auth_service` nodes: merge happened, edge to eliminated node re-routed to canonical, aggregated weight=1.7 (1.0+0.7 sum), zero dangling edges. `test_no_dangling_edges_after_merge` and `test_edge_weight_summed` both pass. `merged_from` provenance field set on canonical node. |
-| 4 | (Stretch GRAPH-04) Mixed corpus produces one canonical node aggregating cross-source references when `--dedup-cross-type` is enabled | VERIFIED | `test_cross_source_graph04_acceptance` passes: `auth.py` function + `docs.md` heading + `tests/AuthService` class reference collapse to one canonical node via `cross_type=True`. `--dedup-cross-type` CLI flag wired in `__main__.py`. |
+| 1 | Extractor processes import-connected file clusters as one LLM call per cluster | VERIFIED | Unchanged from initial verification — `batch.py::cluster_files()` confirmed substantive (213 lines); all 9 skill variants retain cluster_files dispatch. |
+| 2 | `graphify/dedup.py` produces a structured `dedup_report` listing merged pairs with canonical labels | VERIFIED | Unchanged from initial verification — `dedup.py` (590 lines), all 22 dedup tests pass, `write_dedup_reports()` confirmed. |
+| 3 | After dedup, edges are re-routed to canonical nodes with no dangling edges; composed pipeline dedup → build → analyze runs without crash | VERIFIED | **Newly verified:** `_iter_sources` helper added to `analyze.py` (line 11). All 7 call sites in `analyze.py` that read `source_file` now tolerate `str | list[str] | None`. `_fmt_source_file` normalizes list values to comma-joined strings at emit sites. `export.py` line 372 and 708 also fixed. Integration tests `test_dedup_pipeline.py` (3 tests) pass. |
+| 4 | (Stretch GRAPH-04) Cross-source mixed corpus collapses to one canonical node via `--dedup-cross-type` | VERIFIED | Unchanged from initial verification — `test_cross_source_graph04_acceptance` passes. |
 
 **Score:** 4/4 truths verified
 
 ---
 
-### Required Artifacts
+## UAT Gap Closure Verification
 
-| Artifact | Expected | Status | Details |
-|----------|----------|--------|---------|
-| `graphify/batch.py` | cluster_files() with import-graph connected components, top-dir cap, token-budget split, topological order (GRAPH-01) | VERIFIED | 213 lines. `cluster_files(paths, ast_results, *, token_budget=50000)` — import graph via `_build_import_graph`, weakly-connected components, top-dir cap, budget split via `_split_by_budget`, topological order via `_topological_order`. |
-| `graphify/dedup.py` | fuzzy+cosine gates, D-09 canonical selection, D-10 edge aggregation, `write_dedup_reports`, GRAPH-04 stretch (GRAPH-02/03/04) | VERIFIED | 590 lines. `dedup()` signature: `fuzzy_threshold=0.90, embed_threshold=0.85, cross_type=False, encoder=None`. `write_dedup_reports()` exists. All gates implemented. D-09 tie-break: longest→most-connected→alphabetical. D-10: weight=sum, confidence_score=max, confidence=EXTRACTED>INFERRED>AMBIGUOUS. |
-| `graphify/validate.py` | D-11/D-12: `source_file: str | list[str]` and optional `merged_from: list[str]` schema extensions | VERIFIED | `isinstance(sf, (str, list))` check added. `merged_from` validated as `list[str]` when present. Tests pass (401 total). |
-| `pyproject.toml [dedup]` extra | `sentence-transformers` optional dep following [leiden]/[obsidian] pattern | VERIFIED | `dedup = ["sentence-transformers"]` at line 51 of pyproject.toml. |
-| `graphify/__main__.py` `--dedup` command | CLI dispatch with `--dedup-fuzzy-threshold`, `--dedup-embed-threshold`, `--dedup-cross-type`, `--obsidian-dedup`, yaml.safe_load (T-10-04) | VERIFIED | `cmd == "--dedup"` branch at line 1127. All flags parsed. yaml.safe_load used (comment at line 887 confirms the invariant; grep for bare `yaml.load` returns no executable matches). |
-| `graphify/serve.py` alias redirect layer | D-16: `resolved_from_alias` meta, transparent redirect of merged-away IDs | VERIFIED | `_load_dedup_report()` at line 91, `_alias_map` loaded at startup line 1027, `resolved_from_alias` emitted at line 913. |
-| `graphify/export.py` + `graphify/report.py` | `_hydrate_merged_from()`, `--obsidian-dedup` flag, `aliases` in Obsidian frontmatter, Entity Dedup section in GRAPH_REPORT.md | VERIFIED | `_hydrate_merged_from()` at export.py line 453. `to_obsidian(obsidian_dedup=...)` parameter. Report.py `dedup_report` parameter at line 67, "## Entity Dedup" section rendered at line 249. |
-| All 9 skill file variants | cluster_files dispatch + `graphify --dedup` usage | VERIFIED | skill.md, skill-codex.md, skill-claw.md, skill-aider.md, skill-copilot.md, skill-droid.md, skill-opencode.md, skill-trae.md, skill-windows.md all have 2 cluster_files refs and 15-16 dedup refs. |
-| `tests/test_batch.py` | 9 tests covering cluster_files behaviors | VERIFIED | 9/9 pass: empty inputs, import-connected, top-dir cap, token budget, topological order, cycle fallback, no stdout, positive token estimate, contiguous IDs. |
-| `tests/test_dedup.py` | 22 tests covering GRAPH-02/03/04 | VERIFIED | 22/22 pass: all gate tests, edge aggregation, canonical selection, provenance, GRAPH-04 acceptance, path confinement, sanitization, determinism. |
+### Gap 1 — UAT Test 6: dedup → build → analyze TypeError (CLOSED)
+
+**Root cause:** `_is_file_node` in `analyze.py` called `Path(source_file).name` where `source_file` was `list[str]` after Phase 10 D-12 schema extension.
+
+**Fix verified:**
+- `_iter_sources(source_file)` helper at `graphify/analyze.py:11` — normalizes `str | list[str] | None` → `list[str]`
+- `_fmt_source_file(source_file)` helper at `graphify/analyze.py:32` — flattens to comma-joined string for emit/sort
+- `_fmt_source(value)` helper at `graphify/report.py:10` — defense-in-depth for report renderer
+- 7 call sites in `analyze.py` audited and updated (confirmed via grep)
+- 2 call sites in `export.py` fixed: `sanitize_label(_fmt_source_file(...))` at line 372; sort key at line 708
+- `report.py` surprising-connections renderer updated at line 149
+- **Tests:** 7 new unit tests in `test_analyze.py::test_*list_source*` (all pass), 3 integration tests in `test_dedup_pipeline.py` (all pass)
+- Commits: 45ae309 (RED), 06a66cf (GREEN), a1b7582 (REFACTOR)
+
+### Gap 2 — UAT Test 2: Zero-byte graph file surfaces JSONDecodeError (CLOSED)
+
+**Root cause:** `--dedup` handler passed zero-byte file directly to `json.loads()`, producing confusing error instead of empty-extraction no-op.
+
+**Fix verified:**
+- `graphify/__main__.py` line 1196: `if source_path.exists() and source_path.stat().st_size == 0: extraction = {"nodes": [], "edges": []}` before `json.loads()` call
+- **Test:** `test_dedup_zero_byte_graph_exits_clean` in `test_main_cli.py:326` — PASSES
+
+### Gap 3 — UAT Test 3: Missing extra and path-escape leak Python tracebacks (CLOSED)
+
+**Root cause:** `_dedup()` and `write_dedup_reports()` calls in `--dedup` handler were unguarded — cleanly-worded `RuntimeError` and `ValueError` propagated to `sys.excepthook` instead of being caught and formatted.
+
+**Fix verified:**
+- `graphify/__main__.py` line 1231: `except (RuntimeError, ValueError) as e: print(f"error: {e}", file=sys.stderr); sys.exit(1)` wraps both `_dedup()` and `write_dedup_reports()` calls
+- **Tests:** `test_dedup_missing_extra_clean_error` at line 369 and `test_dedup_path_escape_clean_error` at line 349 — both PASS
+
+### Gap 4 — UAT Test 8: resolved_from_alias missing on no_seed_nodes path (CLOSED)
+
+**Root cause:** `_run_query_graph` no_seed_nodes early-return (serve.py ~line 847) did not include the `if _resolved_aliases: meta["resolved_from_alias"] = _resolved_aliases` guard that the happy-path branch had.
+
+**Fix verified:**
+- `graphify/serve.py` lines 858-859: `if _resolved_aliases: meta["resolved_from_alias"] = _resolved_aliases` added inside the `if not start_nodes:` block
+- Confirmed via grep: `resolved_from_alias` appears at both line 859 (no_seed_nodes) and line 934 (happy-path)
+- **Test:** `test_no_seed_nodes_surfaces_resolved_from_alias` in `test_serve.py:1514` — PASSES
 
 ---
 
-### Key Link Verification
+### Required Artifacts (regression check)
 
-| From | To | Via | Status | Details |
-|------|----|-----|--------|---------|
-| `skill.md` Step B0.5 | `graphify/batch.py::cluster_files` | `from graphify.batch import cluster_files` | WIRED | Direct import in skill; cluster dispatch in Step B1 |
-| `graphify/__main__.py --dedup` | `graphify/dedup.py::dedup` | import + function call in `--dedup` branch | WIRED | Lines 1127+ in `__main__.py`; dedup() called on extraction dict |
-| `graphify/serve.py` query_graph | `dedup_report.json` alias map | `_load_dedup_report()` at startup | WIRED | `_alias_map` loaded at serve() startup (line 1027); alias resolution in query path (line 785) |
-| `graphify/export.py::to_obsidian` | `_hydrate_merged_from()` | `if obsidian_dedup: _hydrate_merged_from(G, out)` | WIRED | Line 558-561 in export.py |
-| `graphify/report.py::render_report` | dedup Entity Dedup section | `dedup_report` parameter → "## Entity Dedup" block | WIRED | Line 248-276 in report.py |
-| `graphify/validate.py` | D-11/D-12 provenance fields | `isinstance` checks for `source_file` and `merged_from` | WIRED | Lines 38-56 in validate.py |
+| Artifact | Status | Regression check |
+|----------|--------|-----------------|
+| `graphify/batch.py` | VERIFIED | Unchanged; 9 batch tests still pass |
+| `graphify/dedup.py` | VERIFIED | Unchanged core logic; docstring added at write site (a1b7582) |
+| `graphify/analyze.py` | VERIFIED | `_iter_sources` + `_fmt_source_file` helpers added; all 35 analyze tests pass |
+| `graphify/report.py` | VERIFIED | `_fmt_source` helper added; renderer updated; report tests pass |
+| `graphify/export.py` | VERIFIED | 2 source_file call sites fixed (a1b7582); export tests pass |
+| `graphify/__main__.py` | VERIFIED | Zero-byte guard + clean error wrapping added; CLI tests pass |
+| `graphify/serve.py` | VERIFIED | resolved_from_alias guard added to no_seed_nodes branch; serve tests pass |
+| `graphify/validate.py` | VERIFIED | Unchanged |
+| All 9 skill file variants | VERIFIED | Unchanged |
+| `tests/test_batch.py` | VERIFIED | 9 tests pass (unchanged) |
+| `tests/test_dedup.py` | VERIFIED | 22 tests pass (unchanged) |
+| `tests/test_dedup_pipeline.py` | VERIFIED | New — 3 integration tests pass |
+| `tests/fixtures/dedup_composed_extraction.json` | VERIFIED | New — multi-source fixture with near-dup pair |
 
 ---
 
-### Data-Flow Trace (Level 4)
+### Key Link Verification (regression check)
 
-Not applicable — `batch.py` and `dedup.py` are pure-function pipeline stages operating on plain dicts, not UI components that render dynamic data.
+| From | To | Via | Status |
+|------|----|-----|--------|
+| `graphify/analyze.py` source_file call sites | `_iter_sources()` / `_fmt_source_file()` | Direct call at all 7 sites | WIRED |
+| `graphify/export.py` source_file call sites | `_fmt_source_file` via import from analyze | `from graphify.analyze import _node_community_map, _fmt_source_file` | WIRED |
+| `graphify/__main__.py --dedup` handler | zero-byte short-circuit | `stat().st_size == 0` check before `json.loads()` | WIRED |
+| `graphify/__main__.py --dedup` handler | clean error boundary | `except (RuntimeError, ValueError)` wraps `_dedup()` + `write_dedup_reports()` | WIRED |
+| `graphify/serve.py _run_query_graph` no_seed_nodes | `resolved_from_alias` metadata | `if _resolved_aliases:` guard inside `if not start_nodes:` block | WIRED |
+
+All other key links from initial verification unchanged and passing.
 
 ---
 
 ### Behavioral Spot-Checks
 
-| Behavior | Command | Result | Status |
-|----------|---------|--------|--------|
-| `cluster_files` is importable and callable | `python -c "from graphify.batch import cluster_files; assert callable(cluster_files)"` | Exits 0 | PASS |
-| `dedup` and `write_dedup_reports` callable | `python -c "from graphify.dedup import dedup, write_dedup_reports; assert callable(dedup)"` | Exits 0 | PASS |
-| `dedup()` threshold defaults match D-02 spec | `fuzzy_threshold.default == 0.90, embed_threshold.default == 0.85` | Both confirmed | PASS |
-| Pitfall 1 (no `relabel_nodes` in dedup.py) | `grep -n 'relabel_nodes' graphify/dedup.py` | 0 matches | PASS |
-| T-10-04: no bare `yaml.load` in executable code | `grep -nE '\byaml\.load\b' __main__.py dedup.py` | Match only in docstring comment (not executable) | PASS |
-| Merge + edge re-routing + no dangling edges | Smoke test: `AuthService` + `auth_service` nodes with `forced_merge_encoder` | Merge happened, weight aggregated to 1.7, 0 dangling edges | PASS |
-| Full test suite (8 specified test files) | `pytest tests/test_validate.py tests/test_batch.py tests/test_dedup.py tests/test_main_cli.py tests/test_report.py tests/test_serve.py tests/test_templates.py tests/test_export.py -q` | 401 passed, 0 failed | PASS |
-| GRAPH-04 stretch acceptance | `test_cross_source_graph04_acceptance` | PASS | PASS |
-
----
-
-### Requirements Coverage
-
-| Requirement | Source Plan | Description | Status | Evidence |
-|-------------|-------------|-------------|--------|----------|
-| GRAPH-01 | 10-02-PLAN.md | Import-connected file clusters extracted as single batch unit | SATISFIED | `batch.py::cluster_files` uses import-graph weakly-connected-components; skill dispatches one subagent per cluster |
-| GRAPH-02 | 10-03-PLAN.md | `graphify/dedup.py` merges fuzzy+embedding-similar entities into canonical node | SATISFIED | `dedup.py` exists, 590 lines, all 22 dedup tests pass, smoke test confirmed |
-| GRAPH-03 | 10-03-PLAN.md + 10-06, 10-07 | Edges re-routed, weights aggregated (sum/max), deterministic canonical label | SATISFIED | Edge re-routing verified in smoke test and `test_no_dangling_edges_after_merge`; weight=sum confirmed; D-09 tie-break implemented and tested |
-| GRAPH-04 (stretch) | 10-03-PLAN.md | Cross-source ontology alignment via `--dedup-cross-type` | SATISFIED | `test_cross_source_graph04_acceptance` passes; `cross_type=True` parameter gates cross-file-type merges via cosine alone |
-
-All 4 requirements (3 core + 1 stretch) SATISFIED.
+| Behavior | Result | Status |
+|----------|--------|--------|
+| Full test suite | 1178 passed, 0 failed, 2 warnings (deprecations in graspologic/numba) | PASS |
+| 7 new analyze list-source tests | All pass in isolation (`-k "list_source"`) | PASS |
+| 3 new dedup_pipeline integration tests | All pass in isolation | PASS |
+| 4 new CLI + serve tests (UAT gaps 2, 3, 8) | All pass in isolation | PASS |
+| Commit SHAs from summaries (45ae309, 06a66cf, a1b7582, 57b5468, be7a391) | All 5 found in git log | PASS |
 
 ---
 
 ### Anti-Patterns Found
 
-No blockers or warnings found. All empty `return []` occurrences in `batch.py` and `dedup.py` are legitimate empty-input guard clauses, not stubs. No TODO/FIXME/PLACEHOLDER comments in new phase 10 files.
+No blockers found. The only "placeholder" match in grep is an HTML `<input placeholder="Search nodes...">` attribute in `export.py`'s vis.js template — this is a UI label, not a code stub.
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| None | — | — | — | — |
+| None in modified gap-closure files | — | — | — | — |
+
+---
+
+### Test Count Delta
+
+| Plan | Before | After | Delta |
+|------|--------|-------|-------|
+| After 10-08 | 1161 | 1174 | +13 (7 test_analyze + 3 test_dedup_pipeline + 3 fixture-driven) |
+| After 10-09 | 1174 | 1178 | +4 (3 test_main_cli + 1 test_serve) |
+| **Total** | **1161** | **1178** | **+17** |
 
 ---
 
 ### Human Verification Required
 
-None. All success criteria are verifiable programmatically and all checks passed.
+None. All 4 UAT gaps are verifiable programmatically and all new tests pass.
 
 ---
 
 ### Gaps Summary
 
-No gaps. All 4 ROADMAP success criteria verified against the actual codebase:
+No gaps remaining. All 4 UAT-identified gaps from the initial test run are closed:
 
-1. **SC-1 (GRAPH-01):** `batch.py::cluster_files` implements import-graph connected-component clustering with topological ordering. `skill.md` (all 9 variants) dispatches per-cluster via Step B0.5/B1.
-2. **SC-2 (GRAPH-02):** `dedup.py` exists, is substantive (590 lines), and produces a structured `dedup_report` with `merges`, `alias_map`, `summary`, and `version` keys. `write_dedup_reports()` emits both json and md atomically.
-3. **SC-3 (GRAPH-03):** Edges are re-routed to canonical nodes (verified in smoke test and dedicated unit test). Weight aggregated via sum (confirmed: 1.0+0.7=1.7). `merged_from` provenance field set. `serve.py` alias redirect layer (D-16) transparently redirects stale IDs with `resolved_from_alias` metadata.
-4. **SC-4 (GRAPH-04 stretch):** Cross-source ontology alignment test passes — `auth.py` function + `docs.md` heading + `tests/AuthService` collapse to one canonical node with `--dedup-cross-type`.
+1. **UAT Test 6 (major):** `dedup → analyze` TypeError on `source_file: list[str]` — fixed via `_iter_sources` helper across all 7 call sites in `analyze.py`, 2 sites in `export.py`, and `_fmt_source` in `report.py`. Integration test proves composed pipeline runs end-to-end.
 
-Pre-existing `test_delta.py` failures (3 tests for removed `snapshot` CLI command) are confirmed pre-phase-10 and excluded per the known pre-existing issue note.
+2. **UAT Test 2 (minor):** Zero-byte `--graph` file now treated as empty extraction (exit 0, empty dedup_report) rather than surfacing `JSONDecodeError`.
+
+3. **UAT Test 3 (minor):** Missing `[dedup]` extra and path-escape `--out-dir` now produce single-line `error: <message>` with exit 1, no Python traceback.
+
+4. **UAT Test 8 (minor):** MCP `no_seed_nodes` short-circuit now includes `resolved_from_alias` metadata when alias resolution occurred, consistent with the happy-path behavior.
+
+All 4 ROADMAP success criteria (GRAPH-01 through GRAPH-04 stretch) remain satisfied. No regressions introduced.
 
 ---
 
-_Verified: 2026-04-17T02:20:00Z_
+_Verified: 2026-04-17T13:15:00Z_
 _Verifier: Claude (gsd-verifier)_
+_Re-verification after gap closure plans 10-08 and 10-09_
