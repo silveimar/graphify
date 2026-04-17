@@ -265,6 +265,37 @@ def test_cursor_uninstall_noop_if_not_installed(tmp_path):
     _cursor_uninstall(tmp_path)  # should not raise
 
 
+def test_install_cursor_via_install_helper(tmp_path, monkeypatch):
+    """Regression CR-02: install(platform='cursor') must not raise TypeError.
+
+    Before the fix, _cursor_install() was called with zero arguments inside
+    install(), but the function signature requires project_dir: Path.
+    This test calls the public install() helper with platform='cursor' and
+    verifies it succeeds without TypeError.
+    """
+    import graphify.__main__ as m
+    # Patch _cursor_install to write into tmp_path instead of cwd
+    called_with = []
+
+    def _fake_cursor_install(project_dir):
+        called_with.append(project_dir)
+        # Simulate the real function writing to project_dir
+        rule = project_dir / ".cursor" / "rules" / "graphify.mdc"
+        rule.parent.mkdir(parents=True, exist_ok=True)
+        rule.write_text("# graphify cursor rule\nalwaysApply: true\n")
+
+    monkeypatch.setattr(m, "_cursor_install", _fake_cursor_install)
+
+    # Must not raise TypeError
+    m.install(platform="cursor")
+
+    assert called_with, "_cursor_install was never called"
+    # Argument must be a Path (not missing)
+    assert isinstance(called_with[0], m.Path), (
+        f"_cursor_install was called with {called_with[0]!r}, expected a Path"
+    )
+
+
 # ── Gemini CLI ────────────────────────────────────────────────────────────────
 
 def test_gemini_install_writes_gemini_md(tmp_path):

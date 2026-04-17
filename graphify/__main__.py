@@ -178,7 +178,7 @@ def install(platform: str = "claude", no_commands: bool = False) -> None:
         gemini_install()
         return
     if platform == "cursor":
-        _cursor_install()
+        _cursor_install(Path("."))
         return
     if platform not in _PLATFORM_CONFIG:
         print(
