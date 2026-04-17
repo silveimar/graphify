@@ -227,9 +227,31 @@ print(f'Cache: {len(all_files)-len(uncached)} files hit, {len(uncached)} files n
 
 Only dispatch subagents for files listed in `.graphify_uncached.txt`. If all files are cached, skip to Part C directly.
 
-**Step B1 - Split into chunks**
+**Step B0.5 - Cluster files for batched extraction (Phase 10, GRAPH-01)**
 
-Load files from `.graphify_uncached.txt`. Split into chunks of 20-25 files each. Each image gets its own chunk (vision needs separate context). When splitting, group files from the same directory together so related artifacts land in the same chunk and cross-file relationships are more likely to be extracted.
+Before dispatching semantic subagents, group the uncached files into import-connected clusters so each LLM call sees cross-file context:
+
+```bash
+python -c "
+from graphify.batch import cluster_files
+from pathlib import Path
+import json
+
+uncached_paths = [Path(p) for p in Path('.graphify_uncached.txt').read_text().splitlines() if p.strip()]
+ast_results = []
+ast_path = Path('.graphify_ast.json')
+if ast_path.exists():
+    ast_results = [json.loads(ast_path.read_text())]
+token_budget = 50_000
+clusters = cluster_files(uncached_paths, ast_results, token_budget=token_budget)
+print(f'[graphify] Clustered {len(uncached_paths)} files into {len(clusters)} batches')
+Path('.graphify_clusters.json').write_text(json.dumps(clusters, indent=2), encoding='utf-8')
+"
+```
+
+**Step B1 - Dispatch one subagent per cluster**
+
+Load clusters from `.graphify_clusters.json`. Dispatch one subagent per cluster (instead of fixed 20-25-file chunks). Each subagent receives the files in the cluster's `files` list in topological order. Clusters under 500 tokens may be grouped into a residual chunk for efficiency. Each image still gets its own chunk (vision needs separate context).
 
 **Step B2 - Dispatch ALL subagents using the Agent tool (Trae)**
 
@@ -385,6 +407,27 @@ edges = len(merged_edges)
 print(f'Merged: {total} nodes, {edges} edges ({len(ast[\"nodes\"])} AST + {len(sem[\"nodes\"])} semantic)')
 "
 ```
+
+**Step C.5 - Entity deduplication (Phase 10, GRAPH-02/03, optional)**
+
+If the user invoked `/graphify` with `--dedup` (or the parent command otherwise indicates dedup), run:
+
+```bash
+graphify --dedup \
+  --dedup-fuzzy-threshold 0.90 \
+  --dedup-embed-threshold 0.85
+```
+
+This reads `graphify-out/extraction.json`, merges fuzzy + embedding-similar nodes, and writes:
+- `graphify-out/extraction.json` (updated with canonical nodes + `merged_from` fields)
+- `graphify-out/extraction.pre-dedup.json` (backup)
+- `graphify-out/dedup_report.json` (machine-readable merge list)
+- `graphify-out/dedup_report.md` (human-readable diff)
+
+Add `--dedup-cross-type` to allow code<->document merges (D-13, GRAPH-04 stretch).
+Requires the `[dedup]` optional extra: `pip install 'graphifyy[dedup]'`.
+
+Note: when `graphify --dedup` is not run, the pipeline proceeds unchanged (dedup is opt-in per D-14).
 
 ### Step 4 - Build graph, cluster, analyze, generate outputs
 
