@@ -1,5 +1,46 @@
 # Milestones
 
+## v1.3 Intelligent Analysis Continuation (Shipped: 2026-04-17)
+
+**Delivered:** Graphify is production-viable on multi-source codebases — agents query it without blowing their token budget (Phase 9.2), extraction produces dramatically better graphs via cross-file semantic clustering + entity deduplication (Phase 10), and humans get a live thinking partner via seven MCP-backed slash commands (Phase 11). The static `GRAPH_TOUR.md` artifact concept was replaced with interactive `/context`, `/trace`, `/connect`, `/drift`, `/emerge`, `/ghost`, `/challenge` command files that ship via `graphify install`.
+
+**Phases completed:** 3 phases (9.2, 10, 11), 19 plans
+**Timeline:** 2026-04-16 → 2026-04-17 (2 days)
+**Codebase delta:** 108 files changed, +24,057 / −161 lines (~16,481 LOC in `graphify/`, 16,529 LOC in `tests/`)
+**Test suite:** 1,234 passing (up from 1,023 at v1.2), no regressions
+**Requirements:** 14/15 satisfied (TOKEN-04 Bloom filter stretch — explicitly deferred per Phase 9.2 D-09)
+
+### Key Accomplishments
+
+1. **Progressive Graph Retrieval** (Phase 9.2) — Token-aware 3-layer MCP `query_graph` response (Layer 1 compact summaries, Layer 2 edge details, Layer 3 full subgraph) with `budget: int` parameter that clamps response size. Deterministic cardinality estimator emits a pre-execution estimate so agents can abort before paying for exploding multi-hop queries. Bidirectional BFS for depth ≥ 3 with 3-state status return (`ok` / `frontiers_disjoint` / `budget_exhausted`) replaces the old exponential-path implementation. New D-02 hybrid response envelope — `text_body + "\n---GRAPHIFY-META---\n" + json(meta)` with status codes — becomes the canonical MCP contract that Phases 10 and 11 inherit.
+
+2. **Cross-File Semantic Extraction with Entity Deduplication** (Phase 10) — File clustering via import-graph connected components capped by top-level directory, with a token-budgeted soft cap (default 50,000 tokens per cluster) and import-topological ordering for cluster emission. New `graphify/dedup.py` merges fuzzy-matched (`difflib.SequenceMatcher ≥ 0.90`) and embedding-similar (`sentence-transformers all-MiniLM-L6-v2` cosine ≥ 0.85) entities with both signals required to agree. Edge re-routing with weight sum + confidence_score max + EXTRACTED > INFERRED > AMBIGUOUS enum precedence. MCP `query_graph` transparently redirects merged-away IDs with `resolved_from_alias` meta. Opt-in via `--dedup` flag; vault runs use separate `--obsidian-dedup` to control wikilink forward-mapping.
+
+3. **Narrative Mode as Interactive Slash Commands** (Phase 11) — Five new MCP tools (`graph_summary`, `entity_trace`, `connect_topics`, `drift_nodes`, `newly_formed_clusters`) compose existing `analyze.py` / `delta.py` / `snapshot.py` primitives (D-18: no new graphify/ modules). Seven `.claude/commands/*.md` files (`/context`, `/trace`, `/connect`, `/drift`, `/emerge`, `/ghost`, `/challenge`) ship via extended `_PLATFORM_CONFIG` in `__main__.py` with `commands_enabled: True` on Claude Code + Windows and a `--no-commands` opt-out. Snapshot-chain walkers use explicit `del G_snap` memory discipline verified via weakref tests. All new tools inherit the Phase 9.2 envelope contract and Phase 10 alias-redirect contract.
+
+4. **Quality gates caught production bugs early** — Phase 11's gsd-code-reviewer found 2 critical runtime bugs that all unit tests had missed: (a) `list_snapshots()` called with `graphify-out/` where it internally re-prepends `graphify-out/snapshots/` — all 4 snapshot-chain tools would have always returned `insufficient_history` in production (tests passed `tmp_path` directly and never tripped the double-nesting), and (b) `_cursor_install()` called without its required `project_dir` argument — `TypeError` on `graphify install --platform=cursor`. Both auto-fixed by `gsd-code-review-fix` with regression tests that match production path semantics.
+
+### Architectural Decisions Locked
+
+- **D-02 (Phase 9.2):** MCP responses use hybrid `text_body + SENTINEL + json(meta)` envelope with status codes — all future MCP tools inherit
+- **D-09 (Phase 9.2):** TOKEN-04 Bloom filter + 2-3 hop materialized cache deferred beyond v1.3 — orthogonal to token economy, belongs in a performance milestone
+- **D-16 (Phase 10):** MCP `query_graph` transparently redirects merged-away aliases — preserves agent callsites across dedup without breaking
+- **D-18 (Phase 11):** No new `graphify/*.py` modules — Phase 11 is plumbing over existing primitives; new analysis algorithms belong in separate phases
+- **BLOCKER 3 fix (Phase 11):** Windows platform has native `.claude/commands/` support; `_PLATFORM_CONFIG` treats it identically to Claude Code (not grouped with non-Claude platforms)
+
+### Known Deferred Items
+
+- **TOKEN-04** (stretch, Phase 9.2) — Bloom filter probe skip + 2-3-hop materialized cache. Deferred per D-09 to a future performance milestone where it's the focused scope rather than an add-on.
+- **Sibling thinking-skill project** (conditional, Phase 11) — `/ghost` and `/challenge` shipped in graphify this cycle, but the door is preserved for migrating them to a companion skill if scope/voice diverges post-v1.3.
+
+### Archives
+
+- Full phase detail: `.planning/milestones/v1.3-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.3-REQUIREMENTS.md`
+- Per-phase artifacts: `.planning/phases/09.2-*`, `.planning/phases/10-*`, `.planning/phases/11-*`
+
+---
+
 ## v1.2 Intelligent Analysis & Cross-File Extraction (Shipped: 2026-04-15)
 
 **Delivered:** LLM-assisted multi-perspective graph analysis via autoreason tournament (A/B/AB/blind-Borda rounds across 4 lenses), per-edge MCP query telemetry with hot-path strengthening and decay of unused edges, 2-hop A→C derived edges with INFERRED confidence, and hot/cold paths surfaced in `GRAPH_REPORT.md`. Analysis output is scoped to a dedicated `GRAPH_ANALYSIS.md` file — `GRAPH_REPORT.md` remains the mechanical metrics artifact (D-80 separation).
