@@ -161,7 +161,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   - [x] 11-02-PLAN.md — MCP tool entity_trace + shared snapshot-chain fixture (SLASH-02)
   - [x] 11-03-PLAN.md — MCP tools drift_nodes + newly_formed_clusters (SLASH-04, SLASH-05)
   - [x] 11-04-PLAN.md — Command prompt files graphify/commands/*.md for core 5 (SLASH-01..05)
-  - [ ] 11-05-PLAN.md — skill.md + 8 variants Available-slash-commands discoverability section (D-16)
+  - [x] 11-05-PLAN.md — skill.md + 8 variants Available-slash-commands discoverability section (D-16)
   - [ ] 11-06-PLAN.md — __main__.py _PLATFORM_CONFIG + --no-commands + pyproject.toml package-data (D-13, D-14, D-15)
   - [ ] 11-07-PLAN.md — CONDITIONAL: /ghost + /challenge command files (SLASH-06, SLASH-07 stretch, D-17)
 
@@ -206,7 +206,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 9.1.1 Milestone v1.2 Lifecycle Cleanup | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.2 Progressive Graph Retrieval | v1.3 | 0/3 | Planned | — |
 | 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 9/9 | Complete   | 2026-04-17 |
-| 11. Narrative Mode as Interactive Slash Commands | v1.3 | 4/7 | In Progress|  |
+| 11. Narrative Mode as Interactive Slash Commands | v1.3 | 5/7 | In Progress|  |
 | 12. Heterogeneous Extraction Routing | v1.4 | 0/? | Planned | — |
 | 13. Agent Capability Manifest | v1.4 | 0/? | Planned | — |
 | 14. Obsidian Thinking Commands | v1.4 | 0/? | Planned | — |
