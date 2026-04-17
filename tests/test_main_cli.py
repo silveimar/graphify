@@ -277,6 +277,26 @@ def test_dedup_yaml_config_respected(tmp_path):
     assert "cross_type=True" in result.stderr
 
 
+def test_dedup_accepts_node_link_graph_json(tmp_path):
+    """WR-01 regression: `--dedup --graph graph.json` must accept node-link format.
+
+    NetworkX writes graph.json with `links` instead of `edges`. The --dedup help
+    text advertises both extraction.json and graph.json as valid sources, so the
+    CLI must normalize `links` -> `edges` (mirroring graphify/validate.py)
+    before the shape check.
+    """
+    (tmp_path / "graphify-out").mkdir()
+    # NetworkX node-link format uses "links" instead of "edges".
+    graph_path = tmp_path / "graphify-out" / "graph.json"
+    graph_path.write_text(
+        json.dumps({"nodes": [], "links": []}), encoding="utf-8",
+    )
+    result = _run_cli_in("--dedup", "--graph", str(graph_path), cwd=tmp_path)
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    report = json.loads((tmp_path / "graphify-out" / "dedup_report.json").read_text())
+    assert report["summary"]["merges"] == 0
+
+
 def test_dedup_yaml_safe_load_only():
     """T-10-04: verify yaml.load (unsafe) is NOT called anywhere in __main__.py.
 

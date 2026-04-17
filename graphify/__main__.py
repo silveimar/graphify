@@ -1196,7 +1196,12 @@ def main() -> None:
                   file=sys.stderr)
             sys.exit(1)
 
-        # Normalize graph.json -> extraction dict shape (graph.json has nodes+edges already)
+        # Normalize graph.json -> extraction dict shape.
+        # NetworkX node-link format uses "links" instead of "edges"; mirror the
+        # fallback in graphify/validate.py so `--graph graph.json` works as the
+        # `--dedup` help text advertises.
+        if isinstance(extraction, dict) and "links" in extraction and "edges" not in extraction:
+            extraction = {**extraction, "edges": extraction.pop("links")}
         if "nodes" not in extraction or "edges" not in extraction:
             print(
                 f"error: {source_path!s} does not contain 'nodes' and 'edges' keys",
