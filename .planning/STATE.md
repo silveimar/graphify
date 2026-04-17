@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Intelligent Analysis Continuation
 status: Ready to execute
-stopped_at: Completed 11-05-PLAN.md
-last_updated: "2026-04-17T17:14:48.598Z"
+stopped_at: Completed 11-06-PLAN.md
+last_updated: "2026-04-17T17:23:49.466Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 19
-  completed_plans: 17
-  percent: 89
+  completed_plans: 18
+  percent: 95
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-16 after v1.3 milestone open)
 ## Current Position
 
 Phase: 11 (narrative-mode-slash-commands) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
 Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
 Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
@@ -126,6 +126,8 @@ Key carry-forward decisions:
 - [Phase 11-narrative-mode-slash-commands]: connect.md Pitfall-4 guard: two distinct sections (Shortest path / Surprising bridges) with explicit Do NOT merge instruction, enforced by test order assertion
 - [Phase 11-narrative-mode-slash-commands]: Drift detector test uses regex over serve.py source to extract types.Tool(name=...) — avoids MCP runtime dependency in unit tests (plan-checker WARNING 3 fix)
 - [Phase 11]: Section injected after Usage block in all 9 skill files; test_skill_files.py is self-contained (WARNING 1 fix)
+- [Phase 11-narrative-mode-slash-commands]: windows platform commands_enabled=True with .claude/commands/ destination — plan-checker BLOCKER 3 fix, both claude and windows use native Claude Code commands convention
+- [Phase 11-narrative-mode-slash-commands]: New top-level uninstall() added alongside install() — removes only known Phase 11 filenames (never glob-delete) per T-11-06-02
 
 ### Blockers/Concerns
 
@@ -150,9 +152,10 @@ None.
 | Phase 11-narrative-mode-slash-commands P03 | 7 | 3 tasks | 2 files |
 | Phase 11-narrative-mode-slash-commands P04 | 3 | 3 tasks | 6 files |
 | Phase 11 P05 | 5 | 3 tasks | 10 files |
+| Phase 11-narrative-mode-slash-commands P06 | 400 | 3 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-04-17T17:14:48.595Z
-Stopped at: Completed 11-05-PLAN.md
+Last session: 2026-04-17T17:23:49.463Z
+Stopped at: Completed 11-06-PLAN.md
 Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
