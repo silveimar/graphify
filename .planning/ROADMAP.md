@@ -115,7 +115,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   - [x] 09.2-02-PLAN.md — Bidirectional BFS + search_strategy telemetry: _bidirectional_bfs, _synthesize_targets, _record_traversal extension (TOKEN-03)
   - [x] 09.2-03-PLAN.md — Dispatch wiring + query_graph contract: _subgraph_to_text layered renderer, schema extension, D-02 hybrid response (TOKEN-01 + TOKEN-02 + TOKEN-03 end-to-end; TOKEN-04 deferred per D-09)
 
-- [ ] **Phase 10: Cross-File Semantic Extraction with Entity Deduplication**
+- [x] **Phase 10: Cross-File Semantic Extraction with Entity Deduplication** (completed 2026-04-17)
 
   Two-part graph quality upgrade for multi-source corpora. Part A (batch extraction): import-connected or co-located file clusters are sent to the LLM as a single batch unit per cluster rather than one file at a time, capturing cross-file relationships during extraction instead of requiring them to be inferred post-hoc. Part B (entity deduplication): a new `graphify/dedup.py` module runs after extraction, merging fuzzy-matched (string-similarity ≥ configurable threshold) and embedding-similar (cosine ≥ configurable threshold) entity pairs into a single canonical node. When nodes merge, inbound edges are re-routed to the canonical node, edge weights are aggregated (sum for `weight`, max for `confidence_score`), and canonical label selection follows a deterministic tie-breaker (longest / most-connected / most-recent). Stretch: cross-source ontology alignment resolves the same entity referenced as a function in `.py`, a concept in `.md`, and a class in `tests/` to one canonical node.
 
@@ -138,7 +138,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   - [x] 10-04-PLAN.md — CLI --dedup command + yaml.safe_load config + skill.md + 8 platform variants (GRAPH-01/02; T-10-04)
   - [x] 10-05-PLAN.md — GRAPH_REPORT.md Entity Dedup section with defense-in-depth sanitization (GRAPH-02; T-10-02)
   - [x] 10-06-PLAN.md — MCP serve.py alias redirect layer with resolved_from_alias meta (GRAPH-03; D-16)
-  - [ ] 10-07-PLAN.md — Obsidian aliases: frontmatter from merged_from + --obsidian-dedup flag (GRAPH-03; D-15)
+  - [x] 10-07-PLAN.md — Obsidian aliases: frontmatter from merged_from + --obsidian-dedup flag (GRAPH-03; D-15)
 
 - [ ] **Phase 11: Narrative Mode as Interactive Slash Commands**
 
@@ -198,7 +198,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 9.1 Query Telemetry & Usage-Weighted Edges | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.1.1 Milestone v1.2 Lifecycle Cleanup | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.2 Progressive Graph Retrieval | v1.3 | 0/3 | Planned | — |
-| 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 6/7 | In Progress|  |
+| 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 7/7 | Complete   | 2026-04-17 |
 | 11. Narrative Mode as Interactive Slash Commands | v1.3 | 0/? | Pending | — |
 | 12. Heterogeneous Extraction Routing | v1.4 | 0/? | Planned | — |
 | 13. Agent Capability Manifest | v1.4 | 0/? | Planned | — |
