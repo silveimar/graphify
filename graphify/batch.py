@@ -6,6 +6,7 @@ extraction ast_results, returns list of FileCluster dicts.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -117,7 +118,6 @@ def _split_by_top_dir(component: list[str]) -> list[list[str]]:
     # Find the common ancestor directory
     try:
         # len(paths) > 1 is guaranteed by the early return above (`if len(component) <= 1`)
-        import os
         common = Path(os.path.commonpath([str(p) for p in paths]))
         # commonpath may land on a file component; use its parent if it's a file
         if common.is_file() or (not common.exists() and common.suffix):
