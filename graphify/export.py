@@ -455,16 +455,17 @@ def _hydrate_merged_from(G: nx.Graph, output_dir: Path) -> None:
 
     Called by to_obsidian when obsidian_dedup=True. Mutates G in place.
 
-    Looks for dedup_report.json in:
-    1. output_dir.parent (typical graphify-out/obsidian layout)
-    2. output_dir/../.. (one extra level up)
-    3. graphify-out/dedup_report.json relative to cwd (fallback)
+    Search order for dedup_report.json:
+    1. output_dir.parent (typical graphify-out/obsidian layout — preferred)
+    2. graphify-out/ relative to cwd (fallback for unusual layouts)
 
     Silently returns when the report is missing. Never raises.
     """
+    # Note: an earlier implementation also searched `output_dir / ".." /` but
+    # that resolves to the same path as candidate 1 after `.resolve()` and was
+    # removed as redundant.
     candidates = [
         output_dir.parent / "dedup_report.json",
-        output_dir / ".." / "dedup_report.json",
         Path("graphify-out") / "dedup_report.json",
     ]
     report_path = None
