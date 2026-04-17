@@ -99,8 +99,11 @@ def _load_dedup_report(out_dir: Path) -> dict[str, str]:
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError:
         print("[graphify] warning: dedup_report.json could not be parsed; alias map disabled", file=sys.stderr)
+        return {}
+    except OSError as e:
+        print(f"[graphify] warning: could not read dedup_report.json ({e}); alias map disabled", file=sys.stderr)
         return {}
     alias_map = data.get("alias_map", {}) if isinstance(data, dict) else {}
     # Defensive: ensure all keys/values are strings (reject anything else)
