@@ -27,9 +27,9 @@ Requirements grouped by priority category. Each maps to exactly one roadmap phas
 
 All commands ship as `.claude/commands/*.md` skill files that invoke the graphify MCP server. They are thin wrappers — no new `graphify/` module required unless an MCP query is missing.
 
-- [ ] **SLASH-01**: User can run `/context` to load a full graph-backed life-state summary (active god nodes, top communities, recent deltas) from the currently-loaded graph
+- [x] **SLASH-01**: User can run `/context` to load a full graph-backed life-state summary (active god nodes, top communities, recent deltas) from the currently-loaded graph
 - [ ] **SLASH-02**: User can run `/trace <entity>` to see how a specific entity / concept has evolved across graph snapshots (first-seen, modifications, current community, staleness history)
-- [ ] **SLASH-03**: User can run `/connect <topic-a> <topic-b>` to find the shortest surprising bridge paths between two topics in the graph (uses surprising-connections analysis)
+- [x] **SLASH-03**: User can run `/connect <topic-a> <topic-b>` to find the shortest surprising bridge paths between two topics in the graph (uses surprising-connections analysis)
 - [ ] **SLASH-04**: User can run `/drift` to surface emerging patterns across sessions / runs — nodes whose community membership, centrality, or edge density has trended in a consistent direction
 - [ ] **SLASH-05**: User can run `/emerge` to surface newly-formed clusters that weren't present in the previous snapshot (uses v1.1 delta machinery)
 - [ ] **SLASH-06** *[stretch]*: User can run `/ghost` to answer as they would, grounded in voice / style extracted from the user's own graph contributions (may land in a sibling skill if scope exceeds graphify proper)
@@ -81,9 +81,9 @@ Which phases cover which requirements. Filled by roadmap.
 | GRAPH-02 | Phase 10 | Complete |
 | GRAPH-03 | Phase 10 | Complete |
 | GRAPH-04 | Phase 10 | Complete |
-| SLASH-01 | Phase 11 | Pending |
+| SLASH-01 | Phase 11 | Complete |
 | SLASH-02 | Phase 11 | Pending |
-| SLASH-03 | Phase 11 | Pending |
+| SLASH-03 | Phase 11 | Complete |
 | SLASH-04 | Phase 11 | Pending |
 | SLASH-05 | Phase 11 | Pending |
 | SLASH-06 | Phase 11 | Pending |

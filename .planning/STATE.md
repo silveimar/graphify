@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Intelligent Analysis Continuation
 status: Ready to execute
-stopped_at: Phase 11 context gathered
-last_updated: "2026-04-17T16:40:52.512Z"
-last_activity: 2026-04-17 -- Phase 11 planning complete
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-04-17T16:48:46.672Z"
+last_activity: 2026-04-17
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 19
-  completed_plans: 12
-  percent: 63
+  completed_plans: 13
+  percent: 68
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-16 after v1.3 milestone open)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.2 with multi-perspective analysis and usage-weighted graph self-improvement; being extended in v1.3 with token-aware retrieval, entity dedup, and interactive slash commands
-**Current focus:** Phase 10 — cross-file-semantic-extraction
+**Current focus:** Phase 11 — narrative-mode-slash-commands
 
 ## Current Position
 
-Phase: 10 (cross-file-semantic-extraction) — EXECUTING
-Plan: 3 of 9
+Phase: 11 (narrative-mode-slash-commands) — EXECUTING
+Plan: 2 of 7
 Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
 Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
 Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
-Last activity: 2026-04-17 -- Phase 11 planning complete
+Last activity: 2026-04-17
 
 Progress: [░░░░░░░░░░] 0% (0/3 phases complete)
 
@@ -117,6 +117,8 @@ Key carry-forward decisions:
 - [Phase 10]: Zero-byte --graph file short-circuits to empty extraction dict before json.loads — no JSONDecodeError surfaced (UAT gap 2)
 - [Phase 10]: RuntimeError + ValueError both caught at --dedup CLI boundary with try/except — clean error: line, exit 1, no traceback (UAT gaps 2b/3)
 - [Phase 10]: resolved_from_alias guard mirrored from happy-path to no_seed_nodes early-return in _run_query_graph (UAT gap 8)
+- [Phase 11-narrative-mode-slash-commands]: Pure helpers _run_graph_summary and _run_connect_topics extracted at module level for testability without MCP runtime
+- [Phase 11-narrative-mode-slash-commands]: connect_topics surprising bridges are GLOBAL to graph, not A-B filtered — labelled explicitly in text_body and meta.surprise_scope='global' (BLOCKER 4 Option A)
 
 ### Blockers/Concerns
 
@@ -136,9 +138,10 @@ None.
 | Phase 10-cross-file-semantic-extraction P07 | 7 | 2 tasks | 5 files |
 | Phase 10-cross-file-semantic-extraction P08 | 18 | 3 tasks | 6 files |
 | Phase 10 P09 | 10 | 2 tasks | 4 files |
+| Phase 11-narrative-mode-slash-commands P01 | 45 | 3 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-04-17T15:38:52.734Z
-Stopped at: Phase 11 context gathered
+Last session: 2026-04-17T16:48:46.669Z
+Stopped at: Completed 11-01-PLAN.md
 Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
