@@ -85,3 +85,52 @@ def test_assert_valid_raises_on_errors():
 
 def test_assert_valid_passes_silently():
     assert_valid(VALID)  # should not raise
+
+
+def test_source_file_as_list():
+    """D-12: source_file list[str] is valid after dedup."""
+    data = {
+        "nodes": [{"id": "n1", "label": "A", "file_type": "code",
+                   "source_file": ["a.py", "b.py"], "merged_from": ["n2"]}],
+        "edges": [],
+    }
+    assert validate_extraction(data) == []
+
+def test_merged_from_accepted():
+    """D-11: merged_from list[str] is optional; when present must be list[str]."""
+    data = {
+        "nodes": [{"id": "n1", "label": "A", "file_type": "code",
+                   "source_file": "a.py", "merged_from": ["n2", "n3"]}],
+        "edges": [],
+    }
+    assert validate_extraction(data) == []
+
+def test_source_file_invalid_type():
+    """D-12: source_file that is neither str nor list[str] must fail validation."""
+    data = {
+        "nodes": [{"id": "n1", "label": "A", "file_type": "code",
+                   "source_file": 42}],
+        "edges": [],
+    }
+    errors = validate_extraction(data)
+    assert any("source_file" in e for e in errors)
+
+def test_source_file_list_with_non_string():
+    """D-12: source_file list with a non-string element must fail."""
+    data = {
+        "nodes": [{"id": "n1", "label": "A", "file_type": "code",
+                   "source_file": ["a.py", 7]}],
+        "edges": [],
+    }
+    errors = validate_extraction(data)
+    assert any("source_file list must contain only strings" in e for e in errors)
+
+def test_merged_from_not_list():
+    """D-11: merged_from must be list[str], not a string."""
+    data = {
+        "nodes": [{"id": "n1", "label": "A", "file_type": "code",
+                   "source_file": "a.py", "merged_from": "n2"}],
+        "edges": [],
+    }
+    errors = validate_extraction(data)
+    assert any("merged_from" in e for e in errors)
