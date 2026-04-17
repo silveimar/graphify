@@ -140,7 +140,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   - [x] 10-06-PLAN.md — MCP serve.py alias redirect layer with resolved_from_alias meta (GRAPH-03; D-16)
   - [x] 10-07-PLAN.md — Obsidian aliases: frontmatter from merged_from + --obsidian-dedup flag (GRAPH-03; D-15)
 
-- [ ] **Phase 11: Narrative Mode as Interactive Slash Commands**
+- [x] **Phase 11: Narrative Mode as Interactive Slash Commands** (completed 2026-04-17)
 
   Replaces the original static `GRAPH_TOUR.md` artifact concept with a suite of seven MCP-backed slash commands that turn graphify into a live thinking partner. Each command ships as a `.claude/commands/*.md` skill file — thin wrappers that invoke existing graphify MCP server queries. No new `graphify/` module is required unless an MCP query is missing. Core five commands: `/context` (full graph-backed life-state summary: active god nodes, top communities, recent deltas), `/trace <entity>` (evolution of a named entity across graph snapshots: first-seen, modifications, current community, staleness history), `/connect <topic-a> <topic-b>` (shortest surprising bridge paths between two topics using the existing surprising-connections analysis), `/drift` (emerging patterns across sessions: nodes whose community, centrality, or edge density has trended consistently), `/emerge` (newly-formed clusters not present in the previous snapshot, using v1.1 delta machinery). Stretch commands: `/ghost` (respond in the user's voice/style extracted from their graph contributions) and `/challenge <belief>` (pressure-test a stated belief against graph evidence — supporting vs contradicting edges). Stretch commands may land in a sibling skill if scope exceeds graphify proper.
 
@@ -163,7 +163,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   - [x] 11-04-PLAN.md — Command prompt files graphify/commands/*.md for core 5 (SLASH-01..05)
   - [x] 11-05-PLAN.md — skill.md + 8 variants Available-slash-commands discoverability section (D-16)
   - [x] 11-06-PLAN.md — __main__.py _PLATFORM_CONFIG + --no-commands + pyproject.toml package-data (D-13, D-14, D-15)
-  - [ ] 11-07-PLAN.md — CONDITIONAL: /ghost + /challenge command files (SLASH-06, SLASH-07 stretch, D-17)
+  - [x] 11-07-PLAN.md — CONDITIONAL: /ghost + /challenge command files (SLASH-06, SLASH-07 stretch, D-17)
 
 ---
 
@@ -206,7 +206,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 9.1.1 Milestone v1.2 Lifecycle Cleanup | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 9.2 Progressive Graph Retrieval | v1.3 | 0/3 | Planned | — |
 | 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 9/9 | Complete   | 2026-04-17 |
-| 11. Narrative Mode as Interactive Slash Commands | v1.3 | 6/7 | In Progress|  |
+| 11. Narrative Mode as Interactive Slash Commands | v1.3 | 7/7 | Complete   | 2026-04-17 |
 | 12. Heterogeneous Extraction Routing | v1.4 | 0/? | Planned | — |
 | 13. Agent Capability Manifest | v1.4 | 0/? | Planned | — |
 | 14. Obsidian Thinking Commands | v1.4 | 0/? | Planned | — |

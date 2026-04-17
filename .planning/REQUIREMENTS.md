@@ -32,8 +32,8 @@ All commands ship as `.claude/commands/*.md` skill files that invoke the graphif
 - [x] **SLASH-03**: User can run `/connect <topic-a> <topic-b>` to find the shortest surprising bridge paths between two topics in the graph (uses surprising-connections analysis)
 - [x] **SLASH-04**: User can run `/drift` to surface emerging patterns across sessions / runs — nodes whose community membership, centrality, or edge density has trended in a consistent direction
 - [x] **SLASH-05**: User can run `/emerge` to surface newly-formed clusters that weren't present in the previous snapshot (uses v1.1 delta machinery)
-- [ ] **SLASH-06** *[stretch]*: User can run `/ghost` to answer as they would, grounded in voice / style extracted from the user's own graph contributions (may land in a sibling skill if scope exceeds graphify proper)
-- [ ] **SLASH-07** *[stretch]*: User can run `/challenge <belief>` to pressure-test a stated belief against graph evidence — surface supporting vs contradicting edges (may land in a sibling skill)
+- [x] **SLASH-06** *[stretch]*: User can run `/ghost` to answer as they would, grounded in voice / style extracted from the user's own graph contributions (may land in a sibling skill if scope exceeds graphify proper)
+- [x] **SLASH-07** *[stretch]*: User can run `/challenge <belief>` to pressure-test a stated belief against graph evidence — surface supporting vs contradicting edges (may land in a sibling skill)
 
 ## Deferred (v1.4+)
 
@@ -86,8 +86,8 @@ Which phases cover which requirements. Filled by roadmap.
 | SLASH-03 | Phase 11 | Complete |
 | SLASH-04 | Phase 11 | Complete |
 | SLASH-05 | Phase 11 | Complete |
-| SLASH-06 | Phase 11 | Pending |
-| SLASH-07 | Phase 11 | Pending |
+| SLASH-06 | Phase 11 | Complete |
+| SLASH-07 | Phase 11 | Complete |
 
 **Coverage:**
 - v1.3 requirements: 15 total (11 core, 4 stretch)

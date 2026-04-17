@@ -116,6 +116,17 @@ No new network endpoints, auth paths, file access patterns, or schema changes in
 - T-11-07-03: Accepted — annotations authored by user, echoed back to user only
 - T-11-07-04: `do NOT fabricate` guard in challenge.md, tested by `test_challenge_md_has_anti_fabrication_guard`
 
-## Self-Check
+## Self-Check: PASSED
 
-(Populated after tasks complete)
+| Check | Result |
+|-------|--------|
+| `graphify/commands/ghost.md` exists | FOUND |
+| `graphify/commands/challenge.md` exists | FOUND |
+| `11-07-SUMMARY.md` exists | FOUND |
+| Commit `dbefc3e` (Task 0 gate) | FOUND |
+| Commit `e7c925d` (Task 1 ghost.md) | FOUND |
+| Commit `60f6994` (Task 2 challenge.md) | FOUND |
+| Commit `bd5a6af` (Task 3 tests) | FOUND |
+| `ls graphify/commands/*.md \| wc -l` == 7 | 7 (5 core + 2 stretch) |
+| `pytest tests/test_commands.py -q` exits 0 | 16/16 passed |
+| `GATE: proceed` on first line of SUMMARY | VERIFIED |
