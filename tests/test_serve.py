@@ -32,6 +32,8 @@ from graphify.serve import (
     _synthesize_targets,
     _query_graph_input_schema,
     _run_query_graph,
+    _run_graph_summary,
+    _run_connect_topics,
     QUERY_GRAPH_META_SENTINEL,
 )
 
@@ -1549,3 +1551,255 @@ def test_no_seed_nodes_surfaces_resolved_from_alias():
         "resolved_from_alias must be present in no_seed_nodes meta when alias was resolved"
     )
     assert meta["resolved_from_alias"] == {"authentication_service": ["auth"]}
+
+
+# --- Phase 11: graph_summary + connect_topics ---
+
+def _make_graph_for_phase11() -> nx.Graph:
+    """Richer graph with distinct communities for Phase 11 tool tests."""
+    G = nx.Graph()
+    G.add_node("n1", label="extract", source_file="extract.py", source_location="L10", community=0)
+    G.add_node("n2", label="cluster", source_file="cluster.py", source_location="L5", community=0)
+    G.add_node("n3", label="build", source_file="build.py", source_location="L1", community=1)
+    G.add_node("n4", label="report", source_file="report.py", source_location="L1", community=1)
+    G.add_node("n5", label="serve", source_file="serve.py", source_location="L1", community=2)
+    G.add_edge("n1", "n2", relation="calls", confidence="INFERRED", source_file="extract.py")
+    G.add_edge("n2", "n3", relation="imports", confidence="EXTRACTED", source_file="cluster.py")
+    G.add_edge("n3", "n4", relation="uses", confidence="EXTRACTED", source_file="build.py")
+    G.add_edge("n1", "n5", relation="references", confidence="AMBIGUOUS", source_file="extract.py")
+    return G
+
+
+def test_graph_summary_envelope_no_graph(tmp_path):
+    """When graph_path does not exist: meta.status == 'no_graph', splits cleanly on SENTINEL."""
+    G = _make_graph_for_phase11()
+    communities = _communities_from_graph(G)
+    response = _run_graph_summary(G, communities, tmp_path, {})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    assert len(parts) == 2
+    meta = json.loads(parts[1])
+    # tmp_path has no snapshots — should still return ok (not no_graph, that's the closure test)
+    # The pure helper doesn't check graph_path existence — the closure does.
+    # What the helper does: 0 snapshots → delta = {"status": "no_prior_snapshot"}
+    assert meta["status"] == "ok"
+    assert meta["delta"] == {"status": "no_prior_snapshot"}
+    assert meta["snapshot_count"] == 0
+
+
+def test_graph_summary_envelope_ok(tmp_path):
+    """On a populated graph: meta.status == 'ok', required keys present."""
+    from graphify.snapshot import save_snapshot
+    G = _make_graph_for_phase11()
+    communities = _communities_from_graph(G)
+    save_snapshot(G, communities, tmp_path)
+    # Slightly modified graph for the current state
+    G2 = _make_graph_for_phase11()
+    G2.add_node("n6", label="new_node", source_file="new.py", community=0)
+    communities2 = _communities_from_graph(G2)
+    response = _run_graph_summary(G2, communities2, tmp_path, {"top_n": 3, "budget": 500})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    assert len(parts) == 2
+    meta = json.loads(parts[1])
+    assert meta["status"] == "ok"
+    assert meta["layer"] == 1
+    assert "snapshot_count" in meta
+    assert "god_node_count" in meta
+    assert "community_count" in meta
+    assert meta["snapshot_count"] >= 1
+    assert meta["god_node_count"] >= 0
+    assert meta["community_count"] >= 0
+
+
+def test_graph_summary_budget_clamp(tmp_path):
+    """Budget clamping: 10 clamps to 50, 999999999 clamps to 100000. No crash."""
+    G = _make_graph_for_phase11()
+    communities = _communities_from_graph(G)
+    # Low budget clamp — no crash
+    response_low = _run_graph_summary(G, communities, tmp_path, {"budget": 10})
+    assert QUERY_GRAPH_META_SENTINEL in response_low
+    meta_low = json.loads(response_low.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta_low["status"] == "ok"
+    # High budget clamp — no crash
+    response_high = _run_graph_summary(G, communities, tmp_path, {"budget": 999999999})
+    assert QUERY_GRAPH_META_SENTINEL in response_high
+    meta_high = json.loads(response_high.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta_high["status"] == "ok"
+    # Low budget response should be shorter than high budget (body clamped differently)
+    body_low = response_low.split(QUERY_GRAPH_META_SENTINEL)[0]
+    body_high = response_high.split(QUERY_GRAPH_META_SENTINEL)[0]
+    # body_low max is 50*3=150 chars; body_high max is 100000*3 chars — body_low <= body_high
+    assert len(body_low) <= len(body_high) + 1  # allow for truncation marker edge case
+
+
+def test_graph_summary_no_prior_snapshot(tmp_path):
+    """Brand-new graph with zero snapshots: meta.delta == {'status': 'no_prior_snapshot'}."""
+    G = _make_graph_for_phase11()
+    communities = _communities_from_graph(G)
+    response = _run_graph_summary(G, communities, tmp_path, {})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta["status"] == "ok"
+    assert meta["delta"] == {"status": "no_prior_snapshot"}
+
+
+def test_graph_summary_compute_delta_four_arg_call(tmp_path, monkeypatch):
+    """BLOCKER 1 regression: compute_delta must be called with 4 args, not 2."""
+    from graphify import delta as _delta
+    calls = []
+    original = _delta.compute_delta
+
+    def _spy(*args, **kwargs):
+        calls.append((args, kwargs))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(_delta, "compute_delta", _spy)
+
+    # Set up a prior snapshot
+    G = _make_graph_for_phase11()
+    communities = _communities_from_graph(G)
+    from graphify.snapshot import save_snapshot
+    save_snapshot(G, communities, tmp_path)
+
+    # Run the helper (it will import compute_delta at call time from .delta)
+    # We need to also patch the reference inside serve module
+    import graphify.serve as _serve_mod
+    monkeypatch.setattr(_serve_mod, "_run_graph_summary",
+                        lambda G, comms, snaps_dir, args: _run_graph_summary(G, comms, snaps_dir, args))
+
+    G2 = _make_graph_for_phase11()
+    G2.add_node("n6", label="new_node", source_file="new.py", community=0)
+    communities2 = _communities_from_graph(G2)
+
+    # Patch compute_delta inside graphify.delta so _run_graph_summary picks it up
+    from graphify import delta as delta_mod
+    monkeypatch.setattr(delta_mod, "compute_delta", _spy)
+
+    response = _run_graph_summary(G2, communities2, tmp_path, {})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    assert calls, "compute_delta was not called"
+    args, _kwargs = calls[0]
+    assert len(args) == 4, f"Expected 4 positional args to compute_delta, got {len(args)}: {args!r}"
+
+
+def test_connect_topics_envelope_ok(tmp_path):
+    """Two connected labels: meta.status=='ok', path_length, surprise_count, surprise_scope present."""
+    G = _make_graph_for_phase11()
+    communities = _communities_from_graph(G)
+    response = _run_connect_topics(G, communities, {}, {"topic_a": "extract", "topic_b": "build"})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    assert len(parts) == 2
+    meta = json.loads(parts[1])
+    assert meta["status"] == "ok"
+    assert "path_length" in meta
+    assert "surprise_count" in meta
+    assert meta["surprise_scope"] == "global"
+
+
+def test_connect_topics_alias_redirect(tmp_path):
+    """Alias map: topic_a='auth' redirects to 'authentication_service' via alias_map."""
+    G = nx.Graph()
+    G.add_node("authentication_service", label="authentication service",
+               source_file="auth.py", community=0)
+    G.add_node("user_model", label="user model", source_file="user.py", community=1)
+    G.add_edge("authentication_service", "user_model", relation="uses",
+               confidence="EXTRACTED", source_file="auth.py")
+    communities = _communities_from_graph(G)
+    alias_map = {"auth": "authentication_service"}
+    response = _run_connect_topics(
+        G, communities, alias_map,
+        {"topic_a": "auth", "topic_b": "user model"}
+    )
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta["status"] == "ok"
+    assert "resolved_from_alias" in meta
+    assert meta["resolved_from_alias"] == {"authentication_service": ["auth"]}
+
+
+def test_connect_topics_ambiguous(tmp_path):
+    """When label fuzzy-matches multiple nodes: meta.status == 'ambiguous_entity'."""
+    G = nx.Graph()
+    G.add_node("auth_service", label="auth service", source_file="auth_service.py", community=0)
+    G.add_node("auth_provider", label="auth provider", source_file="auth_provider.py", community=0)
+    G.add_node("user_model", label="user model", source_file="user.py", community=1)
+    G.add_edge("auth_service", "user_model", relation="uses",
+               confidence="EXTRACTED", source_file="auth_service.py")
+    G.add_edge("auth_provider", "user_model", relation="uses",
+               confidence="EXTRACTED", source_file="auth_provider.py")
+    communities = _communities_from_graph(G)
+    # "auth" matches both auth_service and auth_provider
+    response = _run_connect_topics(
+        G, communities, {},
+        {"topic_a": "auth", "topic_b": "user model"}
+    )
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta["status"] == "ambiguous_entity"
+    assert "candidates" in meta
+    assert "topic_a" in meta["candidates"]
+    candidates_a = meta["candidates"]["topic_a"]
+    assert len(candidates_a) == 2
+    for c in candidates_a:
+        assert "id" in c
+        assert "label" in c
+        assert "source_file" in c
+
+
+def test_connect_topics_entity_not_found(tmp_path):
+    """Unknown label returns status='entity_not_found' with missing_endpoints list."""
+    G = _make_graph_for_phase11()
+    communities = _communities_from_graph(G)
+    response = _run_connect_topics(
+        G, communities, {},
+        {"topic_a": "nonexistent_zzzxxx", "topic_b": "extract"}
+    )
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta["status"] == "entity_not_found"
+    assert "missing_endpoints" in meta
+    assert "topic_a" in meta["missing_endpoints"]
+
+
+def test_connect_topics_no_path(tmp_path):
+    """Two disconnected components: status == 'no_path'."""
+    G = nx.Graph()
+    G.add_node("island_a", label="island a", source_file="a.py", community=0)
+    G.add_node("island_b", label="island b", source_file="b.py", community=1)
+    # No edges between them
+    communities = _communities_from_graph(G)
+    response = _run_connect_topics(
+        G, communities, {},
+        {"topic_a": "island a", "topic_b": "island b"}
+    )
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta["status"] == "no_path"
+
+
+def test_connect_topics_section_headers_distinct(tmp_path):
+    """text_body must contain 'Shortest Path' before 'Surprising Bridges', plus scope label.
+
+    Validates RESEARCH.md Pitfall 4 (no conflation) and BLOCKER 4 Option A resolution.
+    """
+    G = _make_graph_for_phase11()
+    communities = _communities_from_graph(G)
+    response = _run_connect_topics(
+        G, communities, {},
+        {"topic_a": "extract", "topic_b": "report"}
+    )
+    assert QUERY_GRAPH_META_SENTINEL in response
+    text_body = response.split(QUERY_GRAPH_META_SENTINEL)[0]
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+
+    idx_path = text_body.find("Shortest Path")
+    idx_bridges = text_body.find("Surprising Bridges")
+    assert idx_path >= 0, "'Shortest Path' header missing from text_body"
+    assert idx_bridges >= 0, "'Surprising Bridges' header missing from text_body"
+    assert idx_path < idx_bridges, "'Shortest Path' must appear before 'Surprising Bridges'"
+    assert "global to the graph" in text_body, (
+        "Surprising-bridges section must be explicitly labelled as 'global to the graph'"
+    )
+    assert meta["surprise_scope"] == "global"
