@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: Phase 12 context gathered — ready for plan-phase
-stopped_at: Phase 12 discuss-phase complete; 12-CONTEXT.md + 12-DISCUSSION-LOG.md written
-last_updated: "2026-04-17T22:00:00.000Z"
+status: Phase 13 discuss complete — CONTEXT + RESEARCH + Plan 01 drafted; execution not started
+stopped_at: /gsd-discuss-phase 13 --chain — 13-CONTEXT.md, 13-DISCUSSION-LOG.md, 13-RESEARCH.md, 13-01-PLAN.md (Wave A)
+last_updated: "2026-04-17T23:35:00.000Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 7
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 6
+  completed_plans: 6
+  percent: 14
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis and usage-weighted self-improvement, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, now being extended in v1.4 to agent discoverability (MCP capability manifest + SEED-002 harness export), Obsidian thinking-command depth, and graph-quality-over-time via heterogeneous routing + async enrichment + focus-aware zoom + grounded chat + SPAR-Kit argumentation.
-**Current focus:** Phase 12 context is captured. Next step is `/gsd-plan-phase 12 --auto` (after `/clear` if using chain) to plan and execute Heterogeneous Extraction Routing.
+**Current focus:** Phase 12 done. v1.4 build order next candidates: **Phase 18** (parallel, no code overlap with 12) or **Phase 13 Wave A** — pick per capacity; see Build order list below.
 
 ## Current Position
 
-Phase: 12 Heterogeneous Extraction Routing — context gathered
-Plan: —
+Phase: 13 Agent Capability Manifest — planning artifacts present; implementation pending
+Plan: 13-01 (Wave A) ready for `/gsd-execute-phase 13` or manual execution
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17)
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Phase 12 CONTEXT.md ready; next is plan-phase (chain: `--auto` after `/clear`)
-Last activity: 2026-04-17 — `/gsd-discuss-phase 12 --chain` captured decisions in `.planning/phases/12-heterogeneous-extraction-routing/`
+Status: Phase 12 complete. Phase 13: `13-CONTEXT.md`, `13-RESEARCH.md`, `13-01-PLAN.md` (Wave A) exist under `.planning/phases/13-agent-capability-manifest/`. Next: run `/gsd-execute-phase 13` (or implement Plan 01) when ready; additional plans needed for MANIFEST-09/10 P2 and Wave B harness.
+Last activity: 2026-04-17 — `/gsd-discuss-phase 13 --chain` (context + planner follow-up for research + Plan 01)
 
-Progress: [░░░░░░░░░░] 0% (0/7 phases complete)
+Progress: [█░░░░░░░░░] 14% (1/7 phases complete)
 
 **Build order (locked in SUMMARY.md):**
 1. Phase 12 Routing — HARD gates `cache.py` key format
@@ -118,7 +118,7 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 
 ### Blockers/Concerns
 
-None. Phase 12 planned next (`/gsd-plan-phase 12 --auto`).
+None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE updated manually.
 
 ### Quick Tasks Completed
 
@@ -128,6 +128,6 @@ None. Phase 12 planned next (`/gsd-plan-phase 12 --auto`).
 
 ## Session Continuity
 
-Last session: 2026-04-17T22:00:00.000Z
-Stopped at: Phase 12 discuss-phase complete — `12-CONTEXT.md` + `12-DISCUSSION-LOG.md` in `.planning/phases/12-heterogeneous-extraction-routing/`.
-Next action: `/clear` then `/gsd-plan-phase 12 --auto` to continue the chain (plan → execute). `gsd-sdk` not available in this environment for automatic Skill handoff.
+Last session: 2026-04-17T23:35:00.000Z
+Stopped at: Phase 12 execution verified (`pytest`: 1257 passed); chain advance to Phase 13.
+Next action (auto-chain): choose next phase from build order — e.g. `/gsd-discuss-phase 18` or `/gsd-discuss-phase 13` (no `13-CONTEXT.md` / `18-CONTEXT.md` yet unless created). Install `gsd-sdk` locally for full GSD `phase.complete` and automated commits.
