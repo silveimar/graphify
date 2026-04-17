@@ -34,6 +34,7 @@ from graphify.serve import (
     _run_query_graph,
     _run_graph_summary,
     _run_connect_topics,
+    _run_entity_trace,
     QUERY_GRAPH_META_SENTINEL,
 )
 
@@ -1803,3 +1804,173 @@ def test_connect_topics_section_headers_distinct(tmp_path):
         "Surprising-bridges section must be explicitly labelled as 'global to the graph'"
     )
     assert meta["surprise_scope"] == "global"
+
+
+# --- Phase 11: entity_trace ---
+
+def test_entity_trace_insufficient_history(tmp_path):
+    """With 0 prior snapshots (only live graph): meta.status == 'insufficient_history'."""
+    G_live = nx.Graph()
+    for j in range(3):
+        G_live.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                        source_location=f"L{j}", file_type="code", community=j % 2)
+    G_live.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    # tmp_path has no snapshots directory — list_snapshots returns []
+    response = _run_entity_trace(G_live, tmp_path, {}, {"entity": "n0"})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    assert len(parts) == 2
+    meta = json.loads(parts[1])
+    assert meta["status"] == "insufficient_history"
+    assert meta["snapshots_available"] == 0
+
+
+def test_entity_trace_ok_timeline(make_snapshot_chain, tmp_path):
+    """With >=2 snapshots where entity n0 exists throughout: status ok, timeline_length>=3."""
+    snaps = make_snapshot_chain(n=3, root=tmp_path)
+    # Build G_live with same id scheme as fixture (BLOCKER 2 fix)
+    G_live = nx.Graph()
+    for j in range(4):
+        G_live.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                        source_location=f"L{j}", file_type="code", community=j % 2)
+    G_live.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    G_live.add_edge("n0", "n2", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    G_live.add_edge("n0", "n3", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    response = _run_entity_trace(G_live, tmp_path, {}, {"entity": "n0"})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    assert len(parts) == 2
+    meta = json.loads(parts[1])
+    assert meta["status"] == "ok"
+    assert meta["timeline_length"] >= 3
+    assert meta["first_seen"] is not None
+    text_body = parts[0]
+    # text_body should reference "first_seen" or "First seen"
+    assert "First seen" in text_body or "first_seen" in text_body
+
+
+def test_entity_trace_alias_redirect(make_snapshot_chain, tmp_path):
+    """Alias map: passing entity='auth' redirects to 'authentication_service'. meta has resolved_from_alias."""
+    snaps = make_snapshot_chain(n=2, root=tmp_path)
+    # Build a live graph where 'authentication_service' exists (not 'auth')
+    # Use n0 as alias target for compatibility with fixture snapshots
+    G_live = nx.Graph()
+    for j in range(3):
+        G_live.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                        source_location=f"L{j}", file_type="code", community=j % 2)
+    G_live.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    alias_map = {"auth": "n0"}
+    response = _run_entity_trace(G_live, tmp_path, alias_map, {"entity": "auth"})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta["status"] == "ok"
+    assert "resolved_from_alias" in meta
+    assert meta["resolved_from_alias"] == {"n0": ["auth"]}
+
+
+def test_entity_trace_ambiguous_entity(make_snapshot_chain, tmp_path):
+    """Label 'auth' matches multiple nodes: status == 'ambiguous_entity' with candidates list."""
+    snaps = make_snapshot_chain(n=2, root=tmp_path)
+    G_live = nx.Graph()
+    G_live.add_node("auth_service", label="auth service", source_file="auth_service.py",
+                    community=0, file_type="code")
+    G_live.add_node("auth_provider", label="auth provider", source_file="auth_provider.py",
+                    community=0, file_type="code")
+    G_live.add_node("user_model", label="user model", source_file="user.py",
+                    community=1, file_type="code")
+    G_live.add_edge("auth_service", "user_model", relation="uses",
+                    confidence="EXTRACTED", source_file="auth_service.py")
+    G_live.add_edge("auth_provider", "user_model", relation="uses",
+                    confidence="EXTRACTED", source_file="auth_provider.py")
+    response = _run_entity_trace(G_live, tmp_path, {}, {"entity": "auth"})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta["status"] == "ambiguous_entity"
+    assert "candidates" in meta
+    assert len(meta["candidates"]) == 2
+    for c in meta["candidates"]:
+        assert "id" in c
+        assert "label" in c
+        assert "source_file" in c
+
+
+def test_entity_trace_entity_not_found(make_snapshot_chain, tmp_path):
+    """Entity 'nonexistent_label_xyz' against populated graph returns status == 'entity_not_found'."""
+    snaps = make_snapshot_chain(n=2, root=tmp_path)
+    G_live = nx.Graph()
+    for j in range(3):
+        G_live.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                        source_location=f"L{j}", file_type="code", community=j % 2)
+    G_live.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    response = _run_entity_trace(G_live, tmp_path, {}, {"entity": "nonexistent_label_xyz"})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta["status"] == "entity_not_found"
+
+
+def test_entity_trace_no_graph(tmp_path):
+    """When graph_path does not exist: meta.status == 'no_data' (no entity given)."""
+    # _run_entity_trace takes G directly — we test the no_data edge case by passing empty entity.
+    G_live = nx.Graph()
+    response = _run_entity_trace(G_live, tmp_path, {}, {"entity": ""})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    assert meta["status"] == "no_data"
+
+
+def test_entity_trace_memory_discipline(make_snapshot_chain, tmp_path):
+    """Weakref test: all snapshot graphs are released after _run_entity_trace returns."""
+    import weakref
+    import gc
+    from graphify import snapshot as _snap
+    original = _snap.load_snapshot
+    refs = []
+
+    def _spy(path):
+        G, c, m = original(path)
+        refs.append(weakref.ref(G))
+        return G, c, m
+
+    _snap.load_snapshot = _spy
+    try:
+        snaps = make_snapshot_chain(n=3, root=tmp_path)
+        # Build G_live with the SAME id scheme as the fixture so _find_node matches.
+        G_live = nx.Graph()
+        for j in range(4):
+            G_live.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                            source_location=f"L{j}", file_type="code", community=j % 2)
+        G_live.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+        G_live.add_edge("n0", "n2", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+        G_live.add_edge("n0", "n3", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+        _ = _run_entity_trace(G_live, tmp_path, {}, {"entity": "n0"})
+        gc.collect()
+        alive = sum(1 for r in refs if r() is not None)
+        assert alive == 0, f"{alive} snapshot graph(s) still alive — memory discipline violated"
+    finally:
+        _snap.load_snapshot = original
+
+
+def test_entity_trace_envelope_structure(make_snapshot_chain, tmp_path):
+    """On OK path: response splits on SENTINEL, json parses, all required keys present."""
+    snaps = make_snapshot_chain(n=3, root=tmp_path)
+    G_live = nx.Graph()
+    for j in range(4):
+        G_live.add_node(f"n{j}", label=f"n{j}", source_file=f"f{j}.py",
+                        source_location=f"L{j}", file_type="code", community=j % 2)
+    G_live.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    G_live.add_edge("n0", "n2", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    G_live.add_edge("n0", "n3", relation="calls", confidence="EXTRACTED", source_file="f0.py")
+    response = _run_entity_trace(G_live, tmp_path, {}, {"entity": "n0"})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    assert len(parts) == 2
+    meta = json.loads(parts[1])
+    required_keys = {
+        "status", "layer", "search_strategy", "cardinality_estimate",
+        "continuation_token", "snapshot_count", "first_seen", "timeline_length", "entity_id"
+    }
+    for key in required_keys:
+        assert key in meta, f"Required key missing from meta: {key}"
+    assert meta["status"] == "ok"
+    assert meta["layer"] == 1
+    assert meta["search_strategy"] == "trace"
