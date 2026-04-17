@@ -442,18 +442,17 @@ def _merge_extraction(
         if canon is None:
             # Safety guard: canonical not found (should not happen)
             continue
-        # Merge source_file (str -> list[str])
+        # Merge source_file (str -> list[str]) using a set for O(1) dedup
         existing = canon.get("source_file", "")
-        sf_list = list(existing) if isinstance(existing, list) else ([existing] if existing else [])
+        sf_set: set[str] = set(existing) if isinstance(existing, list) else ({existing} if existing else set())
         incoming = node.get("source_file", "")
         if isinstance(incoming, list):
-            for s in incoming:
-                if s and s not in sf_list:
-                    sf_list.append(s)
-        elif incoming and incoming not in sf_list:
-            sf_list.append(incoming)
-        # Normalize: single string if only one entry, else sorted list
-        canon["source_file"] = sorted(sf_list) if len(sf_list) > 1 else (sf_list[0] if sf_list else "")
+            sf_set.update(s for s in incoming if s)
+        elif incoming:
+            sf_set.add(incoming)
+        # Normalize: single string if only one entry, else sorted list (output is
+        # sorted regardless of insertion order, so set-based folding is safe)
+        canon["source_file"] = sorted(sf_set) if len(sf_set) > 1 else (next(iter(sf_set)) if sf_set else "")
 
     # merged_from: attach to each canonical
     for canonical_id, eliminated_list in provenance.items():
