@@ -881,6 +881,37 @@ def _format_proposal_summary(proposal: dict) -> str:
     )
 
 
+def _load_dedup_yaml_config(path: Path) -> dict:
+    """D-17: load .graphify/dedup.yaml via yaml.safe_load. Returns {} on any error.
+
+    T-10-04: ALWAYS uses yaml.safe_load (never yaml.load) to prevent arbitrary
+    code execution via PyYAML's default loader.
+    Pitfall 7: when PyYAML is not installed, prints a stderr warning and returns {}.
+    """
+    if not path.exists():
+        return {}
+    try:
+        import yaml  # PyYAML; optional via [obsidian] extra
+    except ImportError:
+        print(
+            "[graphify] warning: PyYAML not installed, skipping .graphify/dedup.yaml "
+            "(install with: pip install 'graphifyy[obsidian]')",
+            file=sys.stderr,
+        )
+        return {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        print(
+            f"[graphify] warning: could not parse .graphify/dedup.yaml: {e}",
+            file=sys.stderr,
+        )
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return data
+
+
 def main() -> None:
     # Check all known skill install locations for a stale version stamp.
     # Skip during install/uninstall (hook writes trigger a fresh check anyway).
@@ -912,6 +943,14 @@ def main() -> None:
         print("    --obsidian-dir <path>   output vault directory (default graphify-out/obsidian)")
         print("    --dry-run               print the merge plan via format_merge_plan without writing files")
         print("    --force                 force update of user-modified notes (preserves sentinel blocks)")
+        print("  --dedup                 run entity deduplication on graphify-out/extraction.json (Phase 10)")
+        print("    --graph <path>          source extraction.json or graph.json (default graphify-out/extraction.json)")
+        print("    --out-dir <path>        output directory (default graphify-out/)")
+        print("    --dedup-fuzzy-threshold F  fuzzy ratio gate (default 0.90; D-02)")
+        print("    --dedup-embed-threshold F  cosine similarity gate (default 0.85; D-02)")
+        print("    --dedup-cross-type      allow code<->document merges (D-13, GRAPH-04 stretch)")
+        print("    --batch-token-budget N  token cap per cluster batch (default 50000; D-07)")
+        print("                            NOTE: .graphify/dedup.yaml at corpus root is layered under CLI flags (D-17)")
         print("  snapshot               save current graph.json as a snapshot (DELTA-07)")
         print("    --name <label>         optional label suffix for snapshot filename")
         print("    --cap <N>              max snapshots to retain (default: 10)")
@@ -1074,6 +1113,122 @@ def main() -> None:
                 f"wrote obsidian vault at {Path(obsidian_dir).resolve()} "
                 f"\u2014 {total} actions ({created} CREATE, {updated} UPDATE)"
             )
+        sys.exit(0)
+
+    # --dedup [options] (Phase 10, GRAPH-02, GRAPH-03)
+    # Reads graphify-out/extraction.json or graph.json, runs dedup(),
+    # writes dedup_report.{json,md}, updates extraction.json.
+    # Flags override .graphify/dedup.yaml if present (D-17).
+    if cmd == "--dedup":
+        from graphify.dedup import dedup as _dedup, write_dedup_reports
+
+        graph_path_arg = None
+        out_dir_arg = None
+        fuzzy_threshold = None
+        embed_threshold = None
+        cross_type = None
+        batch_token_budget = None  # accepted but only consumed by the skill batch loop
+        args = sys.argv[2:]
+        i = 0
+        while i < len(args):
+            if args[i] == "--graph" and i + 1 < len(args):
+                graph_path_arg = args[i + 1]; i += 2
+            elif args[i].startswith("--graph="):
+                graph_path_arg = args[i].split("=", 1)[1]; i += 1
+            elif args[i] == "--out-dir" and i + 1 < len(args):
+                out_dir_arg = args[i + 1]; i += 2
+            elif args[i].startswith("--out-dir="):
+                out_dir_arg = args[i].split("=", 1)[1]; i += 1
+            elif args[i] == "--dedup-fuzzy-threshold" and i + 1 < len(args):
+                fuzzy_threshold = float(args[i + 1]); i += 2
+            elif args[i].startswith("--dedup-fuzzy-threshold="):
+                fuzzy_threshold = float(args[i].split("=", 1)[1]); i += 1
+            elif args[i] == "--dedup-embed-threshold" and i + 1 < len(args):
+                embed_threshold = float(args[i + 1]); i += 2
+            elif args[i].startswith("--dedup-embed-threshold="):
+                embed_threshold = float(args[i].split("=", 1)[1]); i += 1
+            elif args[i] == "--dedup-cross-type":
+                cross_type = True; i += 1
+            elif args[i] == "--batch-token-budget" and i + 1 < len(args):
+                batch_token_budget = int(args[i + 1]); i += 2
+            elif args[i].startswith("--batch-token-budget="):
+                batch_token_budget = int(args[i].split("=", 1)[1]); i += 1
+            else:
+                print(f"error: unknown --dedup option: {args[i]}", file=sys.stderr)
+                sys.exit(2)
+
+        # Layer .graphify/dedup.yaml if present (T-10-04: safe_load only)
+        yaml_config = _load_dedup_yaml_config(Path(".graphify/dedup.yaml"))
+        # CLI overrides YAML
+        final_fuzzy = fuzzy_threshold if fuzzy_threshold is not None else float(yaml_config.get("fuzzy_threshold", 0.90))
+        final_embed = embed_threshold if embed_threshold is not None else float(yaml_config.get("embed_threshold", 0.85))
+        final_cross = cross_type if cross_type is not None else bool(yaml_config.get("cross_type", False))
+        # batch_token_budget surfaced to stdout so the skill can pick it up
+        final_budget = batch_token_budget if batch_token_budget is not None else int(yaml_config.get("batch_token_budget", 50_000))
+
+        # Locate extraction source: extraction.json preferred; fall back to graph.json
+        out_dir = Path(out_dir_arg) if out_dir_arg else Path("graphify-out")
+        if graph_path_arg:
+            source_path = Path(graph_path_arg)
+        else:
+            extraction_json = out_dir / "extraction.json"
+            graph_json = out_dir / "graph.json"
+            if extraction_json.exists():
+                source_path = extraction_json
+            elif graph_json.exists():
+                source_path = graph_json
+            else:
+                print(
+                    f"error: no extraction.json or graph.json found in {out_dir!s}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+        try:
+            extraction = json.loads(source_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"error: could not read extraction from {source_path!s}: {e}",
+                  file=sys.stderr)
+            sys.exit(1)
+
+        # Normalize graph.json -> extraction dict shape (graph.json has nodes+edges already)
+        if "nodes" not in extraction or "edges" not in extraction:
+            print(
+                f"error: {source_path!s} does not contain 'nodes' and 'edges' keys",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        print(
+            f"[graphify] Running dedup on {len(extraction['nodes'])} nodes "
+            f"(fuzzy>={final_fuzzy}, cos>={final_embed}, cross_type={final_cross}) ...",
+            file=sys.stderr,
+        )
+        new_extraction, report = _dedup(
+            extraction,
+            fuzzy_threshold=final_fuzzy,
+            embed_threshold=final_embed,
+            cross_type=final_cross,
+        )
+        write_dedup_reports(report, out_dir)
+
+        # Write updated extraction.json alongside the report (preserve old as backup)
+        updated_path = out_dir / "extraction.json"
+        backup_path = out_dir / "extraction.pre-dedup.json"
+        if updated_path.exists() and not backup_path.exists():
+            backup_path.write_text(updated_path.read_text(encoding="utf-8"), encoding="utf-8")
+        updated_path.write_text(
+            json.dumps(new_extraction, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        summary = report["summary"]
+        print(
+            f"[graphify] dedup complete: {summary['total_nodes_before']} -> "
+            f"{summary['total_nodes_after']} nodes, {summary['merges']} merges. "
+            f"Reports: {out_dir / 'dedup_report.json'!s}, {out_dir / 'dedup_report.md'!s}",
+            file=sys.stderr,
+        )
         sys.exit(0)
 
     if cmd == "snapshot":

@@ -183,3 +183,119 @@ def test_help_mentions_new_flags():
     assert "--validate-profile" in result.stdout
     assert "--obsidian" in result.stdout
     assert "--dry-run" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# --dedup branch (Phase 10, GRAPH-02/03, D-14, D-17, T-10-04)
+# ---------------------------------------------------------------------------
+
+def _run_cli_in(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Invoke `python -m graphify <args...>` with a specific working directory.
+
+    Passes the project root on PYTHONPATH so the local graphify package is
+    used even when cwd is a tmp_path outside the project tree.
+    """
+    import os
+    env = os.environ.copy()
+    # Project root is two levels up from this test file (tests/../)
+    project_root = str(Path(__file__).parent.parent.resolve())
+    existing_path = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = f"{project_root}:{existing_path}" if existing_path else project_root
+    return subprocess.run(
+        [sys.executable, "-m", "graphify", *args],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=str(cwd),
+        env=env,
+    )
+
+
+def test_help_lists_dedup_flags():
+    """--help must list --dedup and its sub-flags (Phase 10 D-14, D-17)."""
+    result = _run_cli()  # no args → help path
+    assert result.returncode == 0
+    out = result.stdout
+    assert "--dedup" in out
+    assert "--dedup-fuzzy-threshold" in out
+    assert "--dedup-embed-threshold" in out
+    assert "--dedup-cross-type" in out
+    assert "--batch-token-budget" in out
+
+
+def test_dedup_missing_source_errors_cleanly(tmp_path):
+    """`graphify --dedup` with no extraction.json exits 1 with a readable error."""
+    (tmp_path / "graphify-out").mkdir()
+    result = _run_cli_in("--dedup", cwd=tmp_path)
+    assert result.returncode == 1
+    assert "no extraction.json or graph.json found" in result.stderr
+
+
+def test_dedup_unknown_flag_exits_2(tmp_path):
+    """Bad flag exits with code 2 per CLI convention."""
+    (tmp_path / "graphify-out").mkdir()
+    # Seed a minimal extraction.json so arg parsing runs before source lookup
+    (tmp_path / "graphify-out" / "extraction.json").write_text(
+        json.dumps({"nodes": [], "edges": []}), encoding="utf-8",
+    )
+    result = _run_cli_in("--dedup", "--nope", cwd=tmp_path)
+    assert result.returncode == 2
+    assert "unknown --dedup option" in result.stderr
+
+
+def test_dedup_reads_empty_extraction(tmp_path):
+    """`--dedup` on an empty extraction.json succeeds, writes a 0-merge report."""
+    (tmp_path / "graphify-out").mkdir()
+    (tmp_path / "graphify-out" / "extraction.json").write_text(
+        json.dumps({"nodes": [], "edges": []}), encoding="utf-8",
+    )
+    result = _run_cli_in("--dedup", cwd=tmp_path)
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    report = json.loads((tmp_path / "graphify-out" / "dedup_report.json").read_text())
+    assert report["summary"]["merges"] == 0
+
+
+def test_dedup_yaml_config_respected(tmp_path):
+    """D-17: .graphify/dedup.yaml values are loaded; CLI flags override."""
+    import textwrap
+    pytest.importorskip("yaml", reason="PyYAML required for this test")
+    (tmp_path / "graphify-out").mkdir()
+    (tmp_path / "graphify-out" / "extraction.json").write_text(
+        json.dumps({"nodes": [], "edges": []}), encoding="utf-8",
+    )
+    (tmp_path / ".graphify").mkdir()
+    (tmp_path / ".graphify" / "dedup.yaml").write_text(textwrap.dedent("""\
+        fuzzy_threshold: 0.95
+        embed_threshold: 0.88
+        cross_type: true
+    """), encoding="utf-8")
+    result = _run_cli_in("--dedup", cwd=tmp_path)
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    # Stderr line echoes the effective thresholds
+    assert "fuzzy>=0.95" in result.stderr
+    assert "cos>=0.88" in result.stderr
+    assert "cross_type=True" in result.stderr
+
+
+def test_dedup_yaml_safe_load_only():
+    """T-10-04: verify yaml.load (unsafe) is NOT called anywhere in __main__.py.
+
+    Dedup YAML loading must use yaml.safe_load exclusively to prevent
+    arbitrary-code-execution via PyYAML tag injection. Only actual call
+    sites (followed by '(') are flagged — docstring references are excluded.
+    """
+    import re
+    content = Path("graphify/__main__.py").read_text(encoding="utf-8")
+    # Match yaml.load( but NOT yaml.safe_load( and NOT yaml.load_all(
+    forbidden = re.findall(r"\byaml\.load\(", content)
+    assert not forbidden, "yaml.load( call found in __main__.py — must use yaml.safe_load (T-10-04)"
+
+
+def test_no_unsafe_yaml_load_in_any_module():
+    """T-10-04: graphify/dedup.py and graphify/__main__.py must not call yaml.load (unsafe)."""
+    import re
+    for mod_path in ["graphify/dedup.py", "graphify/__main__.py"]:
+        content = Path(mod_path).read_text(encoding="utf-8")
+        # Match yaml.load( but NOT yaml.safe_load( and NOT yaml.load_all(
+        forbidden = re.findall(r"\byaml\.load\(", content)
+        assert not forbidden, f"yaml.load( call found in {mod_path} — use yaml.safe_load (T-10-04)"
