@@ -2080,7 +2080,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             }
             text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
-        return _run_graph_summary(G, communities, _out_dir, arguments)
+        return _run_graph_summary(G, communities, _out_dir.parent, arguments)
 
     def _tool_connect_topics(arguments: dict) -> str:
         """Phase 11 SLASH-03: shortest path + globally surprising bridges between two topics."""
@@ -2110,7 +2110,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             }
             text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
-        return _run_entity_trace(G, _out_dir, _alias_map, arguments)
+        return _run_entity_trace(G, _out_dir.parent, _alias_map, arguments)
 
     def _tool_drift_nodes(arguments: dict) -> str:
         """Phase 11 SLASH-04: per-node trend vectors across snapshot chain."""
@@ -2125,7 +2125,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             }
             text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
-        return _run_drift_nodes(G, _out_dir, arguments)
+        return _run_drift_nodes(G, _out_dir.parent, arguments)
 
     def _tool_newly_formed_clusters(arguments: dict) -> str:
         """Phase 11 SLASH-05: communities new in current graph vs. most recent snapshot."""
@@ -2140,7 +2140,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             }
             text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
-        return _run_newly_formed_clusters(G, communities, _out_dir, arguments)
+        return _run_newly_formed_clusters(G, communities, _out_dir.parent, arguments)
 
     _handlers = {
         "query_graph": _tool_query_graph,

@@ -1686,6 +1686,53 @@ def test_graph_summary_compute_delta_four_arg_call(tmp_path, monkeypatch):
     assert len(args) == 4, f"Expected 4 positional args to compute_delta, got {len(args)}: {args!r}"
 
 
+def test_graph_summary_snapshot_root_not_double_nested(tmp_path):
+    """Regression: CR-01 — _out_dir.parent (project root) must be passed, not _out_dir.
+
+    Simulates the production path: graph_path = "graphify-out/graph.json"
+    so _out_dir = tmp_path / "graphify-out".
+    save_snapshot(..., root=tmp_path) writes to tmp_path/graphify-out/snapshots/.
+    If _run_graph_summary receives _out_dir instead of _out_dir.parent, list_snapshots()
+    would scan _out_dir/graphify-out/snapshots/ (double-nested, non-existent), returning []
+    and forcing delta == {'status': 'no_prior_snapshot'} even after a real snapshot was saved.
+    """
+    from graphify.snapshot import save_snapshot
+
+    # Simulate the production layout: graph lives at graphify-out/graph.json
+    graphify_out = tmp_path / "graphify-out"
+    graphify_out.mkdir()
+
+    G = _make_graph_for_phase11()
+    communities = _communities_from_graph(G)
+
+    # Save a snapshot to tmp_path/graphify-out/snapshots/ (what save_snapshot does by default)
+    save_snapshot(G, communities, root=tmp_path)
+
+    # Simulate a second (current) graph state
+    G2 = _make_graph_for_phase11()
+    G2.add_node("n_new", label="new_node", source_file="new.py", community=0)
+    communities2 = _communities_from_graph(G2)
+
+    # The closure in serve() does: _out_dir = Path(graph_path).parent = graphify_out
+    # The correct call is: _run_graph_summary(G, communities, _out_dir.parent, arguments)
+    # i.e. pass tmp_path (the project root), NOT graphify_out.
+    response = _run_graph_summary(G2, communities2, tmp_path, {})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+
+    # snapshot_count must be >= 1; if double-nested path were used it would be 0
+    assert meta["snapshot_count"] >= 1, (
+        "snapshot_count is 0 — snapshots were not found, indicating double-nested path bug "
+        "(pass _out_dir.parent not _out_dir to _run_graph_summary)"
+    )
+    # delta must not be the no-snapshot fallback
+    assert meta["delta"] != {"status": "no_prior_snapshot"}, (
+        "delta still shows no_prior_snapshot — list_snapshots() returned [] "
+        "because the wrong root directory was passed (double-nesting bug)"
+    )
+    assert meta["status"] == "ok"
+
+
 def test_connect_topics_envelope_ok(tmp_path):
     """Two connected labels: meta.status=='ok', path_length, surprise_count, surprise_scope present."""
     G = _make_graph_for_phase11()
