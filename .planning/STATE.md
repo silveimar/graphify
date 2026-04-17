@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Intelligent Analysis Continuation
 status: Ready to execute
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-04-17T16:48:46.672Z"
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-04-17T16:56:22.383Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 19
-  completed_plans: 13
-  percent: 68
+  completed_plans: 14
+  percent: 74
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-16 after v1.3 milestone open)
 ## Current Position
 
 Phase: 11 (narrative-mode-slash-commands) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
 Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
 Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
@@ -119,6 +119,7 @@ Key carry-forward decisions:
 - [Phase 10]: resolved_from_alias guard mirrored from happy-path to no_seed_nodes early-return in _run_query_graph (UAT gap 8)
 - [Phase 11-narrative-mode-slash-commands]: Pure helpers _run_graph_summary and _run_connect_topics extracted at module level for testability without MCP runtime
 - [Phase 11-narrative-mode-slash-commands]: connect_topics surprising bridges are GLOBAL to graph, not A-B filtered — labelled explicitly in text_body and meta.surprise_scope='global' (BLOCKER 4 Option A)
+- [Phase 11]: _run_entity_trace extracted as pure helper at module level; _tool_entity_trace closure in serve(); insufficient_history threshold = len(snaps) < 1 (live G counts as second data point)
 
 ### Blockers/Concerns
 
@@ -139,9 +140,10 @@ None.
 | Phase 10-cross-file-semantic-extraction P08 | 18 | 3 tasks | 6 files |
 | Phase 10 P09 | 10 | 2 tasks | 4 files |
 | Phase 11-narrative-mode-slash-commands P01 | 45 | 3 tasks | 2 files |
+| Phase 11-narrative-mode-slash-commands P02 | 7 | 3 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-04-17T16:48:46.669Z
-Stopped at: Completed 11-01-PLAN.md
+Last session: 2026-04-17T16:56:22.380Z
+Stopped at: Completed 11-02-PLAN.md
 Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
