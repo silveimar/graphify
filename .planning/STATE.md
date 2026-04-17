@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Intelligent Analysis Continuation
-status: Executing Phase 10
-stopped_at: Completed 10-cross-file-semantic-extraction-10-07-PLAN.md
-last_updated: "2026-04-17T13:49:06.464Z"
-last_activity: 2026-04-17 -- Phase 10 execution started
+status: Ready to execute
+stopped_at: Completed 10-cross-file-semantic-extraction-10-08-PLAN.md
+last_updated: "2026-04-17T14:00:19.030Z"
+last_activity: 2026-04-17
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 12
-  completed_plans: 10
-  percent: 83
+  completed_plans: 11
+  percent: 92
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-16 after v1.3 milestone open)
 ## Current Position
 
 Phase: 10 (cross-file-semantic-extraction) — EXECUTING
-Plan: 1 of 9
+Plan: 2 of 9
 Milestone: v1.3 Intelligent Analysis Continuation — 🚧 IN PROGRESS (started 2026-04-16)
 Previous milestone: v1.2 Intelligent Analysis & Cross-File Extraction — ✅ SHIPPED 2026-04-15 (phases 9 + 9.1 + 9.1.1)
 Next milestone: v1.4 Agent Discoverability & Obsidian Workflows (phases 12, 13–18 — planned)
-Last activity: 2026-04-17 -- Phase 10 execution started
+Last activity: 2026-04-17
 
 Progress: [░░░░░░░░░░] 0% (0/3 phases complete)
 
@@ -112,6 +112,8 @@ Key carry-forward decisions:
 - [Phase 10-cross-file-semantic-extraction]: dedup_report param placed last in generate() for backward compat; defense-in-depth: sanitize_label+_sanitize_md on all dedup labels (T-10-02)
 - [Phase 10]: D-16: _resolved_aliases dict scoped inside _run_query_graph per call (not module-level) for thread safety; resolved_from_alias omitted from meta when no redirect occurred for strict backward compat
 - [Phase 10-cross-file-semantic-extraction]: 10-07: aliases injected into frontmatter_fields after _build_frontmatter_fields, before _dump_frontmatter — avoids signature change to existing helper
+- [Phase 10-cross-file-semantic-extraction]: _iter_sources/_fmt_source_file placed in analyze.py (not _schema.py) to avoid circular imports; re-exported to export.py via direct import
+- [Phase 10-cross-file-semantic-extraction]: 10-08: source_files emit sites in analyze.py normalized to str via _fmt_source_file so callers always receive str values
 
 ### Blockers/Concerns
 
@@ -129,9 +131,10 @@ None.
 | Phase 10-cross-file-semantic-extraction P05 | 8 | 1 tasks | 2 files |
 | Phase 10 P06 | 18 | 1 tasks | 2 files |
 | Phase 10-cross-file-semantic-extraction P07 | 7 | 2 tasks | 5 files |
+| Phase 10-cross-file-semantic-extraction P08 | 18 | 3 tasks | 6 files |
 
 ## Session Continuity
 
-Last session: 2026-04-17T02:05:44.962Z
-Stopped at: Completed 10-cross-file-semantic-extraction-10-07-PLAN.md
+Last session: 2026-04-17T14:00:19.024Z
+Stopped at: Completed 10-cross-file-semantic-extraction-10-08-PLAN.md
 Next action: `/gsd-discuss-phase 9.2` or `/gsd-plan-phase 9.2` to begin Progressive Graph Retrieval
