@@ -1,176 +1,307 @@
-# Project Research Summary
+# Project Research Summary — graphify v1.4 Agent Discoverability & Obsidian Workflows
 
-**Project:** graphify v1.1 — Context Persistence & Agent Memory
-**Domain:** Python CLI library — graph delta analysis, MCP write-back, Obsidian round-trip awareness
-**Researched:** 2026-04-12
-**Confidence:** HIGH
+**Milestone:** v1.4 (Phases 12–18 + SEED-002 Harness Memory Export)
+**Synthesized:** 2026-04-17
+**Inputs:** `.planning/research/STACK.md` (340 lines), `FEATURES.md` (741 lines), `ARCHITECTURE.md` (288 lines), `PITFALLS.md` (607 lines)
+**Confidence (overall):** HIGH on stack, features, architecture; HIGH on pitfalls (includes v1.3 post-mortem grounding).
 
-## Executive Summary
+---
 
-graphify v1.1 extends a proven pure-function batch pipeline with three persistence and write-back layers without restructuring the existing seven-stage core. All three features (graph delta analysis, MCP mutation tools, Obsidian round-trip awareness) integrate at the pipeline's edges only: new modules `snapshot.py` and `delta.py` attach after `export()`, extensions to `serve.py` add sidecar annotation files alongside the read-only graph, and extensions to `merge.py` add a `PARTIAL_UPDATE` action path that preserves user-authored content while refreshing graphify-managed sections. Zero existing pipeline stages need changes; all stack additions are stdlib-only.
+## What v1.4 Is For (TL;DR)
 
-The recommended approach is strict data separation between pipeline-owned state (`graph.json`) and agent-owned state (`annotations.jsonl`, `proposed_notes.json`, `vault-manifest.json`). The pipeline's JSON output is never mutated by MCP tools. This invariant is the load-bearing architectural constraint for v1.1 — violating it causes silent data loss when the pipeline re-runs. The patterns are well-validated against seven reference repositories: Honcho's peer model drives the annotation schema, CPR's summary+archive pattern drives delta report format, Letta-Obsidian's proposal queue drives the `propose_vault_note` flow, and Context Constitution's staleness-as-first-class principle drives per-node metadata design.
+v1.4 turns graphify from a tool you run into a tool that **agents find, trust, compose with, and improve in the background**. It ships seven phases plus SEED-002 Harness Memory Export that collectively cover three outcomes: (a) *agent discoverability* — a self-describing MCP capability manifest + portable harness-memory export so graphify is findable via MCP registries and not locked into any single harness; (b) *Obsidian workflow depth* — vault-scoped thinking commands that leverage v1.0's profile adapter and v1.1's sentinel-preserved round-trip; (c) *graph quality over time* — heterogeneous file-to-model routing for cost-aware extraction, async background enrichment derivers, focus-aware zoom, conversational chat, and SPAR-Kit graph-argumentation — all layered on top of v1.0–v1.3 invariants (graph.json is read-only, sidecars are atomic, peer_id defaults to `"anonymous"`, everything routes through `security.py`).
 
-The primary risks are all in Phase 7 (MCP Write-Back): concurrent annotation writes need JSONL append semantics rather than read-modify-write JSON, peer identity must default to `"anonymous"` and never derive from environment variables, and `propose_vault_note` must write only to a staging directory with vault writes deferred until explicit human approval. The secondary risk is in Phase 6: staleness detection must use SHA256 hash comparison as the authoritative signal, not mtime alone, to handle file renames and clock skew. Phase 8 is the lowest risk — it extends existing well-tested merge engine logic with a new action type.
+The competitive wedge surfaced by FEATURES.md is that graphify is the *only* tool with a pre-built ABSTRACT substrate (the graph itself) that SPAR-Kit-style multi-perspective argumentation can plug into, the *only* dev tool routing by AST complexity rather than role, and the *only* harness-agnostic memory exporter with bidirectional round-trip. These differentiators are where marketing/docs should lead.
 
-## Key Findings
+---
 
-### Recommended Stack
+## Key Findings by Dimension
 
-v1.1 requires no new dependencies. All features use existing required dependencies (`networkx`, `json`, `os`, `datetime`, `pathlib`, `hashlib` from stdlib) plus the existing optional `mcp` extra. Graph snapshots use `networkx.readwrite.json_graph.node_link_data(G, edges="links")` — the exact format already used in `serve.py`'s `_load_graph()` — so round-trip fidelity is guaranteed without new code. MCP mutation tools are plain Python async functions within the existing `serve.py` dispatcher; the MCP SDK imposes no restriction on handler-side state mutation (confirmed against official docs).
+### Stack (STACK.md) — one new extra, conditional second
 
-**Core technologies:**
-- `networkx.readwrite.json_graph` (3.4.2, already installed): Graph snapshot serialization — verified round-trip of all node/edge attributes; 500-node graph serializes in 0.9ms, deserializes in 1.9ms
-- `json` + `os.replace()` (stdlib): Annotation persistence and atomic writes — same pattern as `cache.py`; JSONL append preferred over full-file rewrite for concurrency safety
-- `os.stat().st_mtime` / `hashlib.sha256` (stdlib): Two-tier staleness detection — fast mtime gate, hash confirmation on mismatch; ghost detection when `source_file` no longer exists
-- `mcp` 1.27.0 (existing optional extra): MCP mutation tools via `call_tool` handler extension — additive, no structural change to `serve.py`
-- `uuid.uuid4()` (stdlib): Session and proposal IDs — UUID4 only (never UUID1, which embeds MAC address)
+Net change is exactly **one new required optional extra** (`[routing] = radon>=6.0.1`) and **one conditional** (`[enrich] = apscheduler>=3.11.2`, only if Phase 15 requires wall-clock triggers). Everything else rides on stdlib or existing extras. No new required dependencies. Verified versions via Context7: `mcp` 1.27.0 (v2 not PyPI-released yet), `radon` 6.0.1, `apscheduler` 3.11.2, `jsonschema` 4.26.0 (already transitive via `[mcp]`). Negative findings: **SPAR-Kit has no PyPI package** (it is a prompt-protocol spec); **no MCP manifest standard has stabilized** — graphify ships its own schema under `_meta` namespace.
 
-### Expected Features
+### Features (FEATURES.md) — six graphify-unique capability cells
 
-**Must have (table stakes — Phase 6):**
-- Graph snapshot persistence: `graphify-out/snapshots/{timestamp}.json`, FIFO retention (default 10), automatic pruning on every write
-- Node-level diff: added / removed / community-migrated sets from set arithmetic on `G.nodes()`
-- Edge-level diff: added / removed edges from set arithmetic on `G.edges()`
-- `GRAPH_DELTA.md`: two-tier output — summary section (~500 words, agent-context-sized) + archive JSON (full machine-readable diff, not auto-loaded)
-- Per-node `extracted_at` (ISO-8601 UTC timestamp at build time) and `source_modified_at` (`os.stat().st_mtime`) metadata
-- Staleness flag: nodes where hash comparison shows source changed since extraction; `GHOST` status for nodes whose `source_file` no longer exists
+AST-metric complexity routing (Phase 12); graph-as-SPAR-Kit-ABSTRACT substrate (Phase 16); profile-driven Obsidian commands (Phase 14); graph-grounded chat with citation enforcement (Phase 17); cross-harness memory neutrality (Phase 13 + SEED-002); vault round-trip awareness (v1.1 leveraged by Phase 14). Table stakes grounded in MCP 2025-11-25, Honcho deriver pattern, SPAR-Kit POPULATE→ABSTRACT→RUMBLE→KNIT. Per-phase P1/P2/P3 prioritization matrix defines MVP tightly.
 
-**Must have (table stakes — Phase 7):**
-- `annotate_node`, `tag_node`, `flag_importance` MCP tools writing to `annotations.jsonl` (JSONL, append-only)
-- `add_edge` MCP tool writing to `agent-edges.json` sidecar
-- Peer identity: `peer_id` (explicit config or `"anonymous"`) and `session_id` (UUID4) on all write tools
-- `get_annotations` MCP tool: read path for accumulated knowledge
-- `propose_vault_note` MCP tool: writes only to `graphify-out/proposals/{uuid}.json`; human approval required via `graphify approve-proposal {id}` CLI
+### Architecture (ARCHITECTURE.md) — zero D-invariant conflicts
 
-**Must have (table stakes — Phase 8):**
-- `vault-manifest.json`: content hashes of all graphify-written notes, updated atomically after each `apply_merge_plan`
-- User-modified note detection: manifest hash comparison on re-run; `user_modified: bool` flag on `MergeAction`
-- `PARTIAL_UPDATE` merge action: rewrites frontmatter + refreshes sentinel-delimited sections; leaves user content outside sentinels intact
-- User-space sentinel block (`<!-- GRAPHIFY_USER_START -->` / `<!-- GRAPHIFY_USER_END -->`) in all built-in templates, inviolable on UPDATE
+All seven phases preserve D-02 (MCP envelope), D-16 (alias redirect), D-18 (compose don't plumb), D-73 (skill drives, CLI = utilities). Every phase lands as **new module + additive extensions** — no rewrites. `graph.json` stays read-only; all new state lives in sidecars. Single maintenance-hazard found: `_uninstall_commands()` hardcoded whitelist in `__main__.py:153` must migrate to directory-scan before Phase 14 commands.
 
-**Should have (competitive differentiators — v1.1.x after validation):**
-- `graphify diff <snapshot-a> <snapshot-b>` CLI command for arbitrary snapshot comparison
-- Session-scoped graph views via `start_session` MCP tool and session-filtered annotation reads
-- `get_peer_summary` MCP tool (annotation footprint per peer_id)
-- Community migration grouping in delta report (top 3 migrations by (old_community, new_community) pair)
-- ORPHAN user-modification tracking in vault-manifest
-- Confidence decay metadata (timestamp arithmetic: <30d=fresh, 30-90d=aging, >90d=stale)
-- Annotation TTL pruning: `graphify annotations prune --older-than 90d` (explicit, never auto)
+### Pitfalls (PITFALLS.md) — 11 critical, 9 moderate, 1 regression-risk category
 
-**Defer (v1.2+):**
-- LLM-assisted annotation enrichment — adds latency and token cost at query time
-- Real-time vault watching for change detection — event loop conflicts with watch.py
-- User-content-aware conflict resolution distinguishing user-edited sentinel content from corrupted sentinel
+Pitfall 20 codifies the v1.3 CR-01 bug into permanent regression: rename `snapshot.py` `root` → `project_root` with sentinel dataclass asserting `not path.name == "graphify-out"`. Cross-phase composition risks (15↔12, 16↔17, 14↔17, 13 describing non-determinism) are hypothesized but grounded.
 
-### Architecture Approach
+---
 
-v1.1 is additive at the pipeline's edges. The seven-stage pipeline (`detect -> extract -> build -> cluster -> analyze -> report -> export`) is untouched. Two new modules (`snapshot.py`, `delta.py`) attach after `export()`; `serve.py` gains four mutation tool handlers and annotation/proposal state loaded at startup; `merge.py` gains `detect_user_edits()`, `merge_with_user_blocks()`, and the `PARTIAL_UPDATE` action; `__main__.py` gains a `snapshot` subcommand. No existing module is restructured. Phases 6 and 7 have no cross-dependency and can be built in parallel; Phase 8 depends on Phase 7's proposal flow via existing merge engine hooks.
+## Stack Additions (Single Authoritative Table)
 
-**Major components:**
-1. `snapshot.py` (NEW, ~200 lines) — Save/load/diff graph snapshots; attach staleness metadata (`extracted_at`, `source_modified_at`, `source_hash`, `stale`, `ghost`); FIFO pruning on every write; reads `cache.py` mtime read-only
-2. `delta.py` (NEW, ~150 lines) — Render diff dict into GRAPH_DELTA.md (summary tier) and `delta/{timestamp}-archive.json` (archive tier); CPR summary+archive pattern; no LLM calls
-3. `serve.py` extensions — Four new MCP write tools (`annotate_node`, `add_edge`, `flag_importance`, `propose_vault_note`); JSONL append to `annotations.jsonl`; proposal staging to `graphify-out/proposals/`; mtime-based graph reload check (`_reload_if_stale`)
-4. `merge.py` extensions — `detect_user_edits()` and `merge_with_user_blocks()` functions; `PARTIAL_UPDATE` action type; `graphify_body_hash` frontmatter field for drift detection; `vault-manifest.json` written atomically after each `apply_merge_plan`
+| Phase | Optional extra | Library | Version | Rationale |
+|-------|---------------|---------|---------|-----------|
+| 12 Routing | **NEW: `[routing]`** | `radon` | `>=6.0.1` | Cyclomatic complexity + MI for Python. Non-Python piggybacks on existing tree-sitter Tree. |
+| 12 Routing | stdlib | `concurrent.futures.ThreadPoolExecutor` | 3.10+ | I/O-bound LLM fan-out. ARCHITECTURE: tree-sitter C state doesn't fork-clone on macOS. STACK: async would require rewriting every extractor. |
+| 13 Manifest | reuses `[mcp]` transitive | `jsonschema` | `>=4.26.0` | Optional validator for `graphify capability --validate`. |
+| 13/SEED-002 | reuses `[obsidian]` | `PyYAML` | `6.0.3` | Harness schemas in `graphify/harness_schemas/*.yaml`. |
+| 13/SEED-002 | stdlib | `string.Template` | 3.10+ | Keeps v1.0 "no Jinja2" precedent. |
+| 14 Commands | reuses `[obsidian]` + package_data | n/a | n/a | `graphify/commands/*.md` + frontmatter target filter. |
+| 15 Enrichment | stdlib | `asyncio.Queue` + `Task` | 3.10+ | Honcho DB-queue is wrong shape for a CLI. |
+| 15 Enrichment | **CONDITIONAL: `[enrich]`** | `apscheduler` | `>=3.11.2` | Only if wall-clock triggers required (open question OQ-1). |
+| 16 Argumentation | core only | `networkx` subgraph views | existing | `nx.ego_graph` IS SPAR-Kit ABSTRACT. |
+| 17 Chat | core only | existing MCP tools | — | Host harness is router; no langchain/llama-index. |
+| 18 Focus | core only | `nx.ego_graph` | existing | Pull-model via MCP arg. |
 
-### Critical Pitfalls
+**Net `pyproject.toml` change:** one new `[routing]` extra; one conditional `[enrich]`; update `[all]` accordingly.
 
-1. **MCP mutations corrupt graph.json** — Never mutate `G` in-place from MCP handlers; write ONLY to `annotations.jsonl` sidecar; add `_reload_if_stale()` mtime check so read tools see fresh pipeline output after a re-run; highest-priority design decision for Phase 7
+### Cross-dimension contradictions — reconciled
 
-2. **annotations.json concurrent write corruption** — Use JSONL append-only (one JSON object per line); append is atomic for small writes on all major filesystems; no locking required; compact (deduplicate) at server startup only; never read-modify-write the full JSON file
+| Observation | STACK | FEATURES | ARCHITECTURE | Resolution |
+|-------------|-------|----------|--------------|------------|
+| Phase 17 chat surface | Skill file, MCP tool optional | Skill file; NO new MCP tools initially | **Add MCP tool** `chat(query, session_id)` — skill has no home for session state | **ARCHITECTURE wins.** Ship MCP tool + structured citation packet in meta. |
+| Phase 13 manifest location | `graphify manifest` on demand | `server.json` repo root + MCP resource | Both static (`server.json`) AND runtime (`graphify-out/manifest.json`) | **Both.** Different consumers (MCP registry vs live-state). |
+| SEED-002 harness_export location | New modules `harness_export.py` + `harness_import.py` | Scoped inside Phase 13 | **NEW module `graphify/harness_export.py` — NOT bundled into `capability.py`** | All three agree. Keep separate modules (different concerns). |
+| Phase 12 parallelism | `ThreadPoolExecutor` (stdlib) | parallel extraction | ThreadPool, not ProcessPool (macOS fork issues) | All agree. |
+| Phase 15 triggers | asyncio.Queue; APScheduler conditional | queue + `graphify derive` CLI; entry-point derivers | new CLI subcommand; do NOT fold into `watch.py` | All agree — CLI-driven explicit invocation. |
 
-3. **propose_vault_note allows arbitrary vault writes** — Tool writes ONLY to `graphify-out/proposals/{uuid}.json` (never to vault); filename is server-generated UUID4; `validate_vault_path()` from `security.py` runs at approval time, not at proposal time; content sanitization runs at approval time too
+---
 
-4. **Staleness detection misses file renames and clock skew** — Use SHA256 hash as the authoritative staleness signal (matching `cache.py`); mtime is a fast first gate only; check `source_file` existence and report `GHOST` status when the file no longer exists
+## Feature Categories for Requirements Definition (Three Bundles)
 
-5. **Snapshot directory grows unbounded** — Prune inside `save_snapshot()` on every write (not as a separate optional command); default cap = 10 snapshots; compress full snapshots via `gzip` (stdlib); test: write 15 snapshots, assert only 10 remain
+### Bundle A — Infrastructure (Phase 12 + Phase 18 + Phase 15)
 
-6. **Peer identity leaks machine data** — `peer_id` defaults to `"anonymous"`, never `os.environ["USER"]` or `socket.gethostname()`; `session_id` is `uuid.uuid4()` only; add `graphify-out/` to `.gitignore` template installed by `graphify install`
+| | Phase 12 Routing | Phase 18 Focus | Phase 15 Enrichment |
+|--|------------------|----------------|---------------------|
+| **Table stakes** | Role-based model config, parallel extraction, per-node `extracted_by_model` stamp, token-cost summary (FEATURES — Aider/Continue precedent) | `get_focus_context(file_path)`, file-path→node resolver, "file not in graph" response (FEATURES — letta-obsidian reads raw files; graphify reasons over nodes) | File-backed queue, `graphify derive` CLI, enrichment sidecar distinct from graph.json, entry-point registration (FEATURES — Honcho session-queue) |
+| **Differentiators** | AST-metric classifier (no dev tool does this), per-file-type defaults, vision-model routing | Focus-aware chat routing, focus-filtered analysis, git-HEAD complement, focus transfer to vault commands | 4 built-ins (description/pattern/community/staleness), session-queue per community, dry-run cost preview |
+| **Anti-features** | No learned routing; no 20+ model auto-discovery; no silent cache fallback; no per-node mid-file routing | No real-time cursor tracking (LSP out of scope); no ambient filesystem watcher (D-18); no multi-file focus; no persistent cross-session focus | **NO real-time rebuild** (contradicts delta.py); NO blocking pipeline; **NO graph.json mutation** (Pitfall 3); NO arbitrary user-Python; NO LLM without budget caps; NO implicit deriver on MCP `get_node` |
 
-7. **User note body overwritten on re-run** — Extend merge engine with `PARTIAL_UPDATE` action; detect user modifications via `graphify_body_hash` stored in frontmatter; preserve all content outside sentinel markers verbatim; notes without sentinel markers fall through to v1.0 UPDATE behavior (backward compatible)
+### Bundle B — Discovery (Phase 13 + SEED-002)
 
-## Implications for Roadmap
+| | Phase 13 Capability Manifest | SEED-002 Harness Memory Export |
+|--|------------------------------|-------------------------------|
+| **Table stakes** | MCP `initialize` handshake compliance (2025-11-25), per-tool description+inputSchema audit, `server.json` at repo root, README capability section | Export `CLAUDE.md` + `AGENTS.md`, `graphify export-harness [--format claude\|agents\|all]` CLI |
+| **Differentiators** | Manifest as first-class MCP resource `graphify://capabilities/manifest`, `cost_class` annotations, self-describing `graphify.status()`, `_meta` publisher-provided metadata, version compatibility | Inverse import (closes lock-in-exit loop), canonical schema layer, round-trip byte-equal manifest, companion to Phase 13 |
+| **Anti-features** | NO proprietary schema (extend `server.json._meta`); NO auth in manifest (MCP transport handles); NO dynamic tool-appearance; NO auto-publish to registry | **NO annotations by default** (Pitfall 11); NO full MCP-call-trace export (privacy); NO auto-export on build; **NO unquarantined inverse import** (Pitfall 9) |
 
-Based on research, suggested phase structure:
+### Bundle C — Interaction (Phase 17 + Phase 14 + Phase 16)
 
-### Phase 6: Graph Delta Analysis
-**Rationale:** No dependency on Phase 7 or Phase 8; delivers standalone value (agents can see what changed between runs); validates the snapshot format before write-back tools depend on it; lowest implementation risk (pure stdlib, no MCP changes)
-**Delivers:** `graphify-out/snapshots/` with FIFO retention; `GRAPH_DELTA.md` (summary tier); `delta/{timestamp}-archive.json` (archive tier); `graphify snapshot` CLI subcommand; per-node `extracted_at`, `source_modified_at`, `source_hash`, `stale`, `ghost` attributes; staleness report in delta summary
-**Addresses:** Graph snapshot persistence (P1), node/edge diff (P1), GRAPH_DELTA.md (P1), per-node metadata (P1), staleness flagging (P2)
-**Avoids:** Pitfall 1 (unbounded snapshot growth — prune in `save_snapshot()`); Pitfall 5 (meta-staleness — hash-based staleness, ghost detection)
-**New modules:** `snapshot.py`, `delta.py`
-**Extended modules:** `__main__.py` (snapshot subcommand)
+| | Phase 17 Chat | Phase 14 Obsidian Commands | Phase 16 Argumentation |
+|--|---------------|----------------------------|------------------------|
+| **Table stakes** | NL → MCP tool-call translation, grounded answer with `[node:id]` citations, "no relevant graph content" template, session history (FEATURES — letta-obsidian chat sidebar) | `/moc`, `/related`, `/orphan`, `/wayfind`, profile-driven, writes through `propose_vault_note` | `argue(question)` MCP tool, subgraph ≤50-node budget, 3-persona default, mandatory `[cite: node_id]`, `GRAPH_ARGUMENT.md` output, advisory-only |
+| **Differentiators** | Grounded in structured graph (Cognee surfaces chunks; graphify surfaces nodes), auto-suggest follow-ups, chat-to-argue handoff, save-as-vault-note | `/bridge`, `/voice`, `/drift-notes`, Dataview output, profile-driven Ideaverse/Sefirot adaptation | **Graph-as-ABSTRACT substrate (unique per SPAR-Kit)**, citation-grounded, INTERROGATE step (+40% quality), clash/rumble/domain intensity, persona memory |
+| **Anti-features** | **NO chat without tool call**; **NO fabricated IDs** (Pitfall 7); NO cross-session memory (privacy); NO voice-matching without disclosure; NO answers > 500 tokens | NO duplicating Phase 11 names; NO auto-write bypassing `propose_vault_note`; NO Obsidian-plugin integration; NO file-watcher triggers | NO auto-applying to code; **NO fabrication** (Pitfall 5); NOT a Phase 9 replacement; round cap 6; **NO consensus-forcing**; **Phase 16 MUST NOT call Phase 17** (Pitfall 18) |
 
-### Phase 7: MCP Write-Back with Peer Modeling
-**Rationale:** Can be built in parallel with Phase 6 (no shared dependency); must complete before Phase 8 because Phase 8's `propose_vault_note` approval flow uses the merge engine; highest security surface area — peer identity and staging architecture must be locked before any annotation tool is written
-**Delivers:** `annotate_node`, `tag_node`, `flag_importance`, `add_edge` MCP tools; `annotations.jsonl` JSONL sidecar; `propose_vault_note` with staging to `graphify-out/proposals/`; `graphify approve-proposal` CLI; `get_annotations` read tool; peer_id + session_id on all write operations
-**Uses:** `uuid.uuid4()` for session/proposal IDs; `sanitize_label()` from `security.py` on all agent-supplied strings; `os.replace()` atomic write pattern from `cache.py`
-**Implements:** MCP WriteTools component in `serve.py`; Proposal Queue (Letta-Obsidian pattern); Append-Only Persistence pattern
-**Avoids:** Pitfall 2 (MCP mutation breaks read-only invariant — `_reload_if_stale`, no `G` mutation); Pitfall 3 (concurrent write corruption — JSONL append); Pitfall 6 (peer identity leak — `"anonymous"` default, UUID4 only); Pitfall 7 (arbitrary vault writes — staging-only, UUID4 filenames, approval-time validation)
+---
 
-### Phase 8: Obsidian Round-Trip Awareness
-**Rationale:** Depends on Phase 7's `propose_vault_note` approval flow (uses `apply_merge_plan` under the hood); extends existing v1.0 sentinel block grammar — lowest new-code footprint; protects user vault content from overwrites, which is the trust-critical feature for vault-writing workflows
-**Delivers:** `vault-manifest.json` (content hashes of all graphify-written notes); user-modified detection on re-run; `user_modified: bool` flag in merge plan dry-run output; `PARTIAL_UPDATE` merge action; user-space sentinel block in all built-in templates; graceful degradation when manifest is absent
-**Implements:** RoundTripDetector component in `merge.py`; Sentinel-Block Round-Trip pattern
-**Avoids:** Pitfall 4 (merge conflict on user-modified body — `PARTIAL_UPDATE` action, `graphify_body_hash` frontmatter field, backward-compatible fallback for notes without sentinels)
+## Recommended Build Order with Dependency Graph
 
-### Phase Ordering Rationale
+### Reconciliation of two independent orderings
 
-- Phase 6 first because it has no dependencies and delivers visible delta output that validates the snapshot format before Phase 7 consumes it
-- Phase 7 second because `propose_vault_note` (a Phase 7 deliverable) is required for Phase 8's vault write approval flow; the security architecture must be established before any vault interaction
-- Phase 8 last because it depends on both the merge engine (v1.0, already built) and the proposal approval flow (Phase 7); bugs here have the highest user-visible impact (overwriting curated vault content)
-- Phases 6 and 7 can be implemented in parallel since they share no module-level dependency; they only converge in Phase 8
+- **FEATURES.md implicit:** Infrastructure (12→18→15) → Discovery (13+SEED-002) → Interaction (17→14→16).
+- **ARCHITECTURE.md explicit:** 12 → 18 (parallel) → 15 → 17 → 16 → 14 → 13.
 
-### Research Flags
+### Reconciled order (adopted — ARCHITECTURE.md order + Phase 13 two-wave compromise)
 
-Phases likely needing deeper research during planning:
-- **Phase 7:** JSONL compaction performance — benchmark compaction time for large annotation files (>10K records) before committing to startup-time compaction
-- **Phase 7:** MCP session identity transport — MCP stdio does not carry session metadata in transport headers; caller-supplied peer_id/session_id is the only option; needs explicit documentation and fallback test coverage
-- **Phase 8:** `graphify_body_hash` frontmatter round-trip — confirm PyYAML does not add unexpected quoting or folding that would break hash comparison on subsequent reads
+```
+1. Phase 12 Routing            ──► HARD gates cache.py key format (router_version + model_id).
+                                    Must land first so downstream phases inherit stable keys.
+2. Phase 18 Focus              ──► Parallel with 12. No code overlap (serve.py only).
+                                    Small, testable. Unblocks Phase 14 /note-provenance.
+3. Phase 13 Wave A (plumbing)  ──► Manifest generator + `graphify capability` CLI + runtime
+                                    MCP tool. Describes surface present at this point; sets
+                                    the introspection pattern for 14/15/16/17 to auto-register.
+4. Phase 15 Enrichment         ──► Soft-depends on Phase 12 routing.json (skip-list). Writes
+                                    enrichment.json that Phase 17 chat can read.
+5. Phase 17 Chat               ──► Soft-depends on Phase 18 (focus_hint in args) + Phase 15
+                                    (enrichment overlay for citations).
+6. Phase 16 Argumentation      ──► Soft-depends on Phase 17 citation format. Reuses Phase 9
+                                    blind-label harness. MUST NOT call Phase 17 (Pitfall 18).
+7. Phase 14 Obsidian Commands  ──► HARD-depends on Phase 18 (/note-provenance) + Plan 00
+                                    commands-whitelist refactor. Soft-depends on Phase 17
+                                    for /voice.
+8. Phase 13 Wave B + SEED-002  ──► Final manifest regeneration with all 14–18 tools present.
+                                    SEED-002 bundled — both advertise graphify externally.
+```
 
-Phases with standard patterns (skip research-phase):
-- **Phase 6:** Snapshot serialization, diff computation, and pruning are verified stdlib patterns; `node_link_data` round-trip confirmed against live NetworkX 3.4.2; no research phase needed
-- **Phase 6:** Staleness metadata schema is directly derived from `cache.py`'s existing SHA256 pattern
-- **Phase 8:** Sentinel block grammar already established in v1.0 `merge.py`; `PARTIAL_UPDATE` is an additive action type on a well-tested code path
+### Dependency classification
+
+| Edge | Type | Rationale |
+|------|------|-----------|
+| 12 → cache.py key format | HARD | `file_hash()` gains `model_id` kwarg, backward compat for old callers but must land before Phase 15. |
+| 12 → 15 (routing.json skip-list) | SOFT | Enrichment runs without routing.json; quality degrades gracefully. |
+| 18 → 12 | NONE | Fully parallelizable. |
+| 13A → 14/15/16/17/18 | SOFT | Introspection pattern established; downstream phases register into it. |
+| 17 → 16 | SOFT | Phase 16 could predate; shipping 17 first shares citation-packet format. |
+| 18 → 14 `/note-provenance` | HARD | Concrete consumer of `get_focus_context`. |
+| Commands-whitelist refactor → 14 | HARD | Must land before any new command or we have a permanent hand-maintained list. |
+| 13B → all prior | HARD | Manifest as last-wave descriptive pass captures full surface. |
+| 16 ← 17 tool call | **FORBIDDEN** | Pitfall 18: recursion + non-determinism. Manifest declares `composable_from: []`. |
+
+---
+
+## Top Pitfalls v1.4 Must Design Around (Must-Prevent List)
+
+| # | Pitfall | Owning phase(s) | Prevention strategy |
+|---|---------|-----------------|---------------------|
+| **1** | **Router silent quality regression** — cheap model for dense file; validates but recall drops 30–60%; cached as "correct" | Phase 12 | Hard floor per `file_type` (code always ≥ mid-tier); canary probes (every N-th cheap route re-run on expensive, ratio ≥ 0.6); `router_version` in cache key |
+| **2** | **Concurrent-extraction stampede** — N parallel 429 retries = thundering herd; cost ceiling blown | Phase 12 | Central `threading.Semaphore` sized by provider concurrency (default 4); pre-flight `GRAPHIFY_COST_CEILING`; global 429 backoff via shared `threading.Event`; idempotent dedup at retry |
+| **3** | **Background enrichment overwrites `graph.json`** — violates v1.1 read-only invariant | Phase 15 | Enrichment writes ONLY `enrichment.jsonl` + `enrichment_index.json`; `fcntl.flock` on `.enrichment.lock` shared with foreground; `_write_graph_json` private + grep-CI test only `build.py`+`__main__.py` call it; enrichment consumes snapshot not live; merge-on-read |
+| **4** | **Debate fabricates nodes/edges** — Challenger invents `rm_rf_command`; Judge accepts; transcript indistinguishable from truth | Phase 16 | `{"claim", "cites": [node_id]}` mandatory schema; validator every turn, unknown cites → `[FABRICATED]` + re-prompt; temp ≤ 0.4; no consensus-forcing (`dissent`/`inconclusive` valid) |
+| **5** | **NL-chat fabricates node names** — single-LLM invents plausible answer for nonexistent entity | Phase 17 | Two-stage pipeline structurally enforced (Stage 1 tool-call only, Stage 2 answer from results only); empty results → templated fuzzy suggestions; post-process grep rejects uncited phrases; `sanitize_label` on all free text |
+| **6** | **Focus-object spoofing** — post-prompt-injection agent reports `/etc/passwd`; errors leak filesystem structure | Phase 18 | `security.py::validate_graph_path(base=vault_root)`; silent-ignore non-corpus (no error echo); `reported_at` ≤ 5 min freshness; 500 ms debounce |
+| **7** | **SEED-002 inverse-import prompt-injection** — compromised CLAUDE.md carries adversarial content; fires in downstream LLM stages | SEED-002 + Phase 12/16/17 | Quarantine to `imported_memory/` with `trusted: false`; downstream filters or wraps as untrusted; instruction-pattern scrubbing; NEVER auto-import |
+| **8** | **Snapshot path double-nesting (codifies v1.3 CR-01)** — `graphify-out/` passed as `root`; `tmp_path` tests hide it | Phase 12, 15, 17, 18 | Rename `root` → `project_root` in `snapshot.py`; sentinel dataclass `ProjectRoot(Path)` asserts `not path.name == "graphify-out"`; integration test with nested-dir fixture |
+
+---
+
+## Integration Decisions Locked by Research
+
+- **Router is NEW module `graphify/routing.py`**, NOT extended into `extract.py` (already 2817 LOC). Router is pure classifier; parallelism in `extract()`.
+- **Router uses `radon` for Python + tree-sitter walker for other languages** — reuses existing parse output, keeps `[routing]` extra tiny. Not `lizard` (bigger multi-language lib).
+- **Parallelism = `ThreadPoolExecutor`**, NOT asyncio (sync SDK path), NOT multiprocessing (tree-sitter C state, macOS fork). GIL releases on `socket.recv`.
+- **Enrichment writes overlay sidecar ONLY; graph.json pipeline-owned.** Merge-on-read in `_load_enrichment_overlay` (post-load, per ARCHITECTURE medium-confidence preference). Grep-CI guard.
+- **Enrichment pins `--snapshot-id` at start**; does NOT follow new snapshots mid-run. Foreground `/graphify` takes same lock → foreground wins, enrichment SIGTERM-aborts cleanly.
+- **Manifest is STATIC (`server.json` repo root) + RUNTIME (`graphify-out/manifest.json` + MCP resource).** Extends MCP `server.json` via `_meta` — no competing schema.
+- **Manifest generated from LIVE registry**, never hand-maintained (Pitfall 12). Hash embedded in every response envelope; CI `graphify manifest --validate` gate.
+- **Manifest declares `deterministic: false` for LLM-backed tools** (Pitfall 19). Per-tool `cacheable_until` hint.
+- **Phase 16 SUBSTRATE in `graphify/argue.py`; ORCHESTRATION in `skill.md`** (D-73; parallels Phase 9 autoreason tournament where LLM loop lives in skill.md:1324–1546).
+- **Phase 16 MUST NOT compose Phase 17 chat as primitive** (Pitfall 18). Debate uses lower-level deterministic `graph_context(node_id)`. Manifest declares chat `composable_from: []`.
+- **Focus is PULL-MODEL via MCP arg** (`focus_hint` dict with optional `function_name`/`line`/`neighborhood_depth`/`include_community`), NOT filesystem watcher.
+- **Phase 17 `chat` tool returns STRUCTURED PACKET in meta**, does NOT render narrative. `serve.py` has never made an LLM call and won't. Citations in `meta["citations"]` as `{node_id, label, source_file}`.
+- **SEED-002 `harness_export.py` is SEPARATE module from `capability.py`** — different concerns. Start with `claude.yaml`; generalize.
+- **SEED-002 exports EXCLUDE annotations by default** (Pitfall 11). Allow-list only `id/label/source_file/relation/confidence`; `--include-annotations` runs secret-scanner regex suite.
+- **SEED-002 imports are TRUSTED=FALSE by default** (Pitfall 9). Downstream LLM stages (12/16/17) check flag, fence untrusted content.
+- **Phase 14 commands prefix `/graphify-*`** (Pitfall 14). SKIP_PRESERVE sentinel reused; single registry shared with Phase 11.
+- **Phase 14 pipeline-triggering commands require explicit opt-in install + cost-preview banner** (Pitfall 15). `trigger_pipeline: true` frontmatter flag.
+- **Commands-whitelist refactor is Phase 14 Plan 00** — migrate `_uninstall_commands()` hardcoded tuple in `__main__.py:153` to directory-scan.
+
+---
+
+## Open Questions That Must Be Resolved in Requirements Scoping
+
+| # | Question | Proposed route |
+|---|----------|----------------|
+| OQ-1 | **Phase 15 scheduler:** need APScheduler wall-clock triggers? | **Default NO.** Ship without `[enrich]` extra. Revisit v1.4.x if UAT demands "re-enrich every 30 min". Honcho's pattern is queue-polling. |
+| OQ-2 | **Phase 12 routing granularity:** per-file or per-function? | **Per-file only.** Per-function breaks extraction atomicity and creates parallel race conditions (FEATURES anti-feature). |
+| OQ-3 | **Phase 13 manifest location:** `server.json` + `graphify-out/manifest.json`? | **Both.** `server.json` (MCP registry discovery, version-controlled); `graphify-out/manifest.json` (live state, dynamic). |
+| OQ-4 | **SEED-002 inverse-import scope:** v1.4 or v1.4.x? | **v1.4 but P2.** Asymmetric without it (Harrison Chase framing says bidirectional non-negotiable). If capacity tight, slip to v1.4.x with positioning note. |
+| OQ-5 | **SEED-002 harness schema count:** 4 targets or 1? | **One at launch (`claude.yaml`).** Generalize to AGENTS.md in v1.4.x. Letta/Honcho are API-backed, different handling. |
+| OQ-6 | **Phase 16 INTERROGATE + persona memory:** MVP or v1.4.x? | **v1.4.x.** P2 per prioritization matrix. Add `--interrogate` opt-in post-UAT. |
+| OQ-7 | **Phase 14 `/voice`/`/bridge`/`/drift-notes`:** MVP or v1.4.x? | **v1.4.x.** HIGH complexity + soft-depends on Phase 17 stabilizing. P1: `/moc`, `/related`, `/orphan`, `/wayfind`. |
+
+---
+
+## Regression-Risk Table — v1.0–v1.3 Guards v1.4 MUST Preserve
+
+| Guard | Established in | v1.4 regression vector | Mitigation |
+|-------|----------------|------------------------|------------|
+| `security.py::validate_url` SSRF + redirect re-validation | v1.0 | Phase 14 fetches user URL; Phase 17 chat accepts URL-shaped text | All external URLs through `validate_url`; forbid direct `urllib`/`requests` in new modules |
+| `security.py::validate_graph_path` confinement to `graphify-out/` | v1.0 | Phase 15 sidecar path computed from input; Phase 18 `focus_hint.file_path` bypassed; SEED-002 export target escapes | All new file I/O through `validate_graph_path(path, base=...)` |
+| `sanitize_label` / `sanitize_label_md` | v1.0 | Phase 17 echoes user query into MD; Phase 14 renders node label as raw HTML; Phase 16 transcript embeds unescaped prompts | All label renders in new output go through existing helpers |
+| `peer_id` default = `"anonymous"` | v1.2 | Phase 15 adds `socket.gethostname()` "for debugging"; Phase 18 session focus adds machine ID | CI asserts `peer_id` never reads `os.environ`/`socket.gethostname()`/`platform.node()` |
+| `graph.json` read-only from library (atomic `os.replace` sidecars) | v1.1 D-invariant | **Phase 15 writes directly** (Pitfall 3); Phase 16 argument persists into graph | Single-writer grep-CI test — only `build.py` + `__main__.py` call `_write_graph_json`; private underscore |
+| Atomic `.tmp` + `os.replace` on sidecars | v1.2 concurrent-MCP | Phase 13 manifest, Phase 15 index, Phase 18 session cache written naively | New sidecar writes use temp+rename; shared I/O helper |
+| `yaml.safe_load` (no `yaml.load`) — T-10-04 | Phase 10 | Phase 14 frontmatter parser or SEED-002 schema loader uses `yaml.load` | CI grep asserts no `yaml.load(` outside allow-listed test fixtures |
+| Phase 9 blind-label harness (shuffled A/B, stripped persona phrases) | Phase 9 | Phase 16 orchestrator skips shuffling → systematic Defender bias (Pitfall 6) | Phase 16 imports Phase 9 harness as-is; regression test replays Phase 9 bias suite |
+| Snapshot `root` = project root (not `graphify-out/`) — Phase 11 CR-01 | v1.3 | Phase 12/15/17/18 readers re-introduce double-nesting (Pitfall 20) | Rename `root` → `project_root` in `snapshot.py`; sentinel dataclass; nested-dir fixture test |
+| Phase 11 `_cursor_install()` signature (CR-02) | v1.3 | Phase 14 commands-whitelist refactor regresses platform installers | `_install_commands` signature tests; per-`_PLATFORM_CONFIG` round-trip test |
+| v1.1 `propose_vault_note + approve` trust boundary + sentinel blocks | v1.1 | Phase 14 `/moc` or `/bridge` auto-writes bypassing approval | All Phase 14 vault writes go through `compute_merge_plan`+`apply_merge_plan`; sentinel enforced by merge engine |
+| v1.3 dedup alias map (`_alias_map`, `_resolve_alias`) — D-16 | Phase 10 | Phase 15 enrichment/17 chat citation not alias-resolved | Every new handler threads IDs through `_resolve_alias`; Pitfall 17 mitigation |
+| MCP envelope `text_body + SENTINEL + json(meta)` — D-02 | v1.3 9.2 | Phase 13/16/17/18 MCP tools | Every new `_tool_*` uses existing envelope helper; integration test asserts sentinel |
+| Manifest hand-maintenance banned | v1.4 Phase 13 (new) | Dev adds v1.5 tool and updates manifest.md by hand | Introspection-only manifest; CI `manifest --validate` gate; manifest hash in every response |
+
+---
+
+## Traceability Crosswalk (Phase → REQ-ID prefix → Citations)
+
+| Phase | REQ prefix | FEATURES citation | Top PITFALLS risks | STACK extra / new module | ARCHITECTURE module |
+|-------|-----------|-------------------|--------------------|--------------------------|---------------------|
+| 12 Routing | `ROUTE-*` | "AST-metric classifier (unique)" | Pitfall 1, 2, 20 | `[routing]` = radon; ThreadPoolExecutor | `graphify/routing.py` + `extract.py:2652` + `cache.py:20 file_hash()` |
+| 13 Manifest | `MANIFEST-*` | "three-tier discovery; `_meta`" | Pitfall 12, 13, 19 | reuses `[mcp]` → jsonschema; stdlib json | `graphify/capability.py` + `serve.py _tool_capability_describe` |
+| 14 Obsidian Cmds | `OBSCMD-*` | "/moc, /related, /orphan, /wayfind; profile-driven" | Pitfall 14, 15, 16 | reuses `[obsidian]` + package_data | `graphify/commands/*.md` + `__main__.py:133` refactor |
+| 15 Enrichment | `ENRICH-*` | "4 built-in derivers; Honcho session-queue" | **Pitfall 3 CRIT**, 4, 17 | stdlib asyncio; conditional `[enrich]` | `graphify/enrich.py` + CLI + `enrichment.json` |
+| 16 Argumentation | `ARGUE-*` | "graph as ABSTRACT (unique); `[cite: node_id]`" | Pitfall 5, 6, 18 | reuses networkx + autoreason | `graphify/argue.py` + `skill.md` + `serve.py argue_topic` |
+| 17 Chat | `CHAT-*` | "NL→MCP; grounded citations (vs Cognee chunks)" | Pitfall 7, 16, 19 | core only | `serve.py _run_chat()` + `_tool_chat` + `commands/ask.md` |
+| 18 Focus | `FOCUS-*` | "`get_focus_context`; pull-model" | **Pitfall 8 CRIT**, 20 | core only (nx.ego_graph) | `serve.py _run_focus_context()` + `_tool_get_focus_context` |
+| SEED-002 Harness | `HARNESS-*` | "canonical schema; inverse import" | **Pitfall 9 CRIT**, 10, **11 CRIT** | reuses `[obsidian]` PyYAML + stdlib Template | `graphify/harness_export.py` + `harness_import.py` + `harness_schemas/*.yaml` |
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All decisions verified against live Python 3.10+ runtime; `node_link_data` round-trip benchmarked; MCP SDK mutation capability confirmed against official docs; no speculative dependencies |
-| Features | HIGH | Grounded in codebase audit of `serve.py`, `merge.py`, `cache.py`, `export.py` and cross-checked against 7 reference repos and 12 articles |
-| Architecture | HIGH | Based on direct reading of `serve.py`, `merge.py`, `cache.py`, `PROJECT.md`, and gap analysis; all components integrate at clearly identified pipeline boundaries |
-| Pitfalls | HIGH | All 7 critical pitfalls grounded in actual graphify code paths with specific line references and validated external repo patterns; recovery strategies included |
+| **Stack** | HIGH | All pins verified Context7. MEDIUM only on negative findings (no MCP manifest standard; SPAR-Kit not PyPI). |
+| **Features** | HIGH | MCP 2025-11-25 + Honcho docs + SPAR-Kit + MCP registry server.json all fetched. MEDIUM on Letta sleep-time compute (docs.letta.com blocked). |
+| **Architecture** | HIGH | Direct reads of `__main__.py`, `serve.py`, `watch.py`, `extract.py`, `cache.py`, `manifest.py`. MEDIUM on ThreadPool vs ProcessPool (benchmark in Plan 01 confirms). LOW on precise SEED-002 schema shape across 4 targets. |
+| **Pitfalls** | HIGH | Grounded in v1.3 post-execution REVIEW.md (the 2 production-breaking bugs user called out) + `security.py` source + project invariants. MEDIUM on cross-phase composition risks (15↔12, 16↔17, 14↔17). |
 
-**Overall confidence:** HIGH
+### Gaps That Need Attention During Planning
 
-### Gaps to Address
-
-- **JSONL compaction performance:** Research recommends startup-time compaction but does not benchmark against large annotation files. Validate during Phase 7 implementation with a 10K-record annotation file; target <500ms compaction time.
-- **PyYAML frontmatter round-trip for `graphify_body_hash`:** Confirm PyYAML does not add unexpected quoting or folding on the hash string field. Add a round-trip test in Phase 8.
-- **Snapshot compression load time:** PITFALLS.md recommends gzip-compressed full snapshots; STACK.md benchmarks uncompressed only. Verify gzip load time for a 5K-node compressed snapshot stays under the 50ms target.
-- **`graphify-out/` in .gitignore:** Required before Phase 7 ships. Confirm `graphify install` already creates or updates `.gitignore` and add this entry if absent — this is a pre-Phase 7 prerequisite.
-
-## Sources
-
-### Primary (HIGH confidence)
-- `graphify/serve.py` — verified read-only MCP server architecture, `_load_graph()` pattern, `call_tool` dispatcher; line 22: `json_graph.node_link_graph(data, edges="links")`
-- `graphify/merge.py` — MergeAction vocabulary, sentinel block grammar, field policy table, `compute_merge_plan` flow
-- `graphify/cache.py` — SHA256 file hash pattern, `os.replace()` atomic write, `file_hash()` function
-- `graphify/security.py` — `sanitize_label`, `validate_graph_path`, `safe_filename`, `validate_vault_path`
-- Live NetworkX 3.4.2 runtime — `node_link_data` round-trip verified; 500-node serialize 0.9ms, deserialize 1.9ms; set arithmetic diff verified
-- `modelcontextprotocol.io/docs/concepts/tools` (official MCP docs) — tool handlers are plain async functions; no mutation restriction
-- `pip3 index versions mcp` — confirmed mcp 1.27.0 is current latest
-
-### Secondary (MEDIUM confidence)
-- `.planning/notes/repo-gap-analysis.md` — 7 reference repos: honcho (peer model, session scoping), context-constitution (staleness-first), cpr (summary+archive delta pattern), letta-obsidian (propose_obsidian_note staging, human approval), llm-council, spar-kit, smolcluster
-- `.planning/notes/april-research-gap-analysis.md` — 12 articles including Sarah Wooders / Letta on memory harness, Harrison Chase on memory ownership
-- `.planning/PROJECT.md` — v1.1 active requirements list, milestone goal, key decisions, constraints
-
-### Tertiary (LOW confidence)
-- Python stdlib `uuid` module docs — UUID1 MAC address risk, UUID4 randomness guarantee
-- Python `fcntl` advisory lock docs — cited as fallback option; JSONL append strategy preferred
+- **Phase 15 scheduler (OQ-1)** must land in REQUIREMENTS.md before Phase 15 Plan 01 — determines whether `[enrich]` extra ships.
+- **SEED-002 inverse-import scope (OQ-4)** — Harrison Chase framing says bidirectional non-negotiable, but FEATURES rates HIGH complexity.
+- **SEED-002 harness target count (OQ-5)** — 1 vs 4 affects plan sequencing and test matrix.
+- **Phase 16 INTERROGATE + persona memory (OQ-6)** + **Phase 14 `/voice`/`/bridge`/`/drift-notes` (OQ-7)** — v1.4-vs-v1.4.x split should be decided up front.
+- **Commands-whitelist refactor positioning** — Plan 00 of Phase 14; confirm plan count reflects this.
 
 ---
-*Research completed: 2026-04-12*
-*Ready for roadmap: yes*
+
+## Sources (Aggregated)
+
+### Primary research dimensions
+- `.planning/research/STACK.md` (340 lines) — stack additions, alternatives, What NOT to Use
+- `.planning/research/FEATURES.md` (741 lines) — table stakes/differentiators/anti-features per phase; competitor matrix
+- `.planning/research/ARCHITECTURE.md` (288 lines) — module touch table, dependency graph, sidecar schema, D-invariant reconciliation
+- `.planning/research/PITFALLS.md` (607 lines) — 11 critical + 9 moderate pitfalls, regression table, "looks done" checklist, recovery strategies
+
+### External (fetched, HIGH confidence)
+- MCP Specification 2025-11-25 (`modelcontextprotocol.io/specification`)
+- MCP Registry `server.json` spec (`github.com/modelcontextprotocol/registry`)
+- Honcho (`github.com/plastic-labs/honcho`) — explicit finding: DB-queue wrong shape for CLI
+- SPAR-Kit protocol (`github.com/synthanai/spar-kit`) — POPULATE/ABSTRACT/RUMBLE/KNIT; NOT PyPI
+- `/modelcontextprotocol/python-sdk` Context7 — MCP 1.27.0; v2 not PyPI-released
+- `/rubik/radon` Context7 — v6.0.1 verified
+- `/agronholm/apscheduler` Context7 — v3.11.2 (3.x stable)
+- `/python-jsonschema/jsonschema` Context7 — v4.26.0, draft 2020-12
+- Letta-Obsidian README
+
+### External (MEDIUM confidence)
+- Letta sleep-time compute (`docs.letta.com`, Arxiv 2504.13171) — docs blocked
+- Continue/Aider/Cursor routing specifics — docs blocked
+
+### Internal (HIGH confidence, first-party)
+- `.planning/PROJECT.md` — v1.4 scope + Phase 12 pull-forward
+- `.planning/ROADMAP.md` — Phase 12–18 descriptions with informed-by citations
+- `.planning/seeds/SEED-002-harness-memory-export.md` — activation trigger; canonical schema
+- `.planning/notes/april-research-gap-analysis.md`, `repo-gap-analysis.md`, `april-2026-v1.3-priorities.md`, `agent-memory-research-gap-analysis.md`
+- `.planning/milestones/v1.3-phases/10-cross-file-semantic-extraction/10-REVIEW.md`, `11-narrative-mode-slash-commands/11-REVIEW.md` — CR-01 snapshot double-nesting; CR-02 `_cursor_install` — basis for Pitfall 20
+- `graphify/security.py`, `serve.py`, `__main__.py`, `extract.py`, `cache.py`, `snapshot.py`, `delta.py`, `profile.py`, `templates.py`, `merge.py`, `commands/*.md`
+
+---
+
+### Executive Summary
+
+v1.4 makes graphify agent-discoverable, vault-workflow-rich, and self-improving in the background — adding 7 phases (12 Routing, 13 Manifest, 14 Obsidian Commands, 15 Enrichment, 16 Argumentation, 17 Chat, 18 Focus) plus SEED-002 Harness Export to a shipped v1.3 product, with exactly one new required optional extra (`[routing] = radon`) and zero D-invariant conflicts.
+
+### Roadmap Implications
+
+Suggested phases: **8** (7 numbered + SEED-002 bundled with Phase 13).
+
+1. **Phase 12 Routing** — gates cache.py key format; must land first.
+2. **Phase 18 Focus** — parallel with 12, no overlap, unblocks Phase 14.
+3. **Phase 13 Wave A (plumbing)** — establishes introspection pattern for 14–18 auto-registration.
+4. **Phase 15 Enrichment** — soft-depends on Phase 12 routing.json.
+5. **Phase 17 Chat** — soft-depends on 18 + 15 (citation overlay).
+6. **Phase 16 Argumentation** — reuses Phase 9 blind-label; MUST NOT call Phase 17.
+7. **Phase 14 Obsidian Commands** — HARD-depends on 18 + commands-whitelist refactor Plan 00.
+8. **Phase 13 Wave B + SEED-002** — final manifest regeneration with full surface; bundled external-advertising wave.
+
+### Research Flags
+
+Needs deeper research during planning: **Phase 15** (scheduler decision OQ-1), **SEED-002** (harness target count OQ-5, inverse-import scope OQ-4), **Phase 13** (manifest location already settled, but wave A/B split needs requirements ratification).
+
+Standard patterns (skip additional research): **Phase 12** (thread pool + radon well-documented), **Phase 18** (pull-model via MCP arg, existing nx.ego_graph), **Phase 17** (MCP tool + skill prompt, pattern from Phase 11 commands), **Phase 16** (parallels Phase 9 autoreason tournament structure), **Phase 14** (extends Phase 11 commands infrastructure).
+
+### Confidence
+
+Overall: **HIGH** on stack/architecture/pitfalls; **HIGH** on features with MEDIUM for Letta sleep-time compute (docs blocked). Gaps listed above.
