@@ -19,8 +19,8 @@ Requirements grouped by priority category. Each maps to exactly one roadmap phas
 ### Graph Quality on Multi-Source Inputs (Priority b → Phase 10)
 
 - [ ] **GRAPH-01**: Graphify extracts import-connected or co-located file clusters as a single batch unit (one LLM call per cluster, not per file) so cross-file relationships are captured during extraction rather than inferred later
-- [ ] **GRAPH-02**: A new `graphify/dedup.py` module merges fuzzy-matched (string-similarity ≥ threshold) and embedding-similar (cosine ≥ threshold) entities into a single canonical node after extraction, eliminating the 5–50× entity fragmentation that currently occurs on multi-source corpora
-- [ ] **GRAPH-03**: When duplicate nodes merge, inbound edges are re-routed to the canonical node, edge weights are aggregated (sum for `weight`, max for `confidence_score`), and the chosen canonical label follows a deterministic tie-breaker (longest / most-connected / most-recent)
+- [x] **GRAPH-02**: A new `graphify/dedup.py` module merges fuzzy-matched (string-similarity ≥ threshold) and embedding-similar (cosine ≥ threshold) entities into a single canonical node after extraction, eliminating the 5–50× entity fragmentation that currently occurs on multi-source corpora
+- [x] **GRAPH-03**: When duplicate nodes merge, inbound edges are re-routed to the canonical node, edge weights are aggregated (sum for `weight`, max for `confidence_score`), and the chosen canonical label follows a deterministic tie-breaker (longest / most-connected / most-recent)
 - [ ] **GRAPH-04** *[stretch]*: Entity references align across source types — the `auth` function in `auth.py`, the "authentication" concept in `docs.md`, and the `AuthService` class referenced in `tests/` resolve to one canonical node via cross-source ontology alignment rules
 
 ### Human Thinking Partner via Slash Commands (Priority c → Phase 11)
@@ -78,8 +78,8 @@ Which phases cover which requirements. Filled by roadmap.
 | TOKEN-03 | Phase 9.2 | Complete |
 | TOKEN-04 | Phase 9.2 | Pending |
 | GRAPH-01 | Phase 10 | Pending |
-| GRAPH-02 | Phase 10 | Pending |
-| GRAPH-03 | Phase 10 | Pending |
+| GRAPH-02 | Phase 10 | Complete |
+| GRAPH-03 | Phase 10 | Complete |
 | GRAPH-04 | Phase 10 | Pending |
 | SLASH-01 | Phase 11 | Pending |
 | SLASH-02 | Phase 11 | Pending |
