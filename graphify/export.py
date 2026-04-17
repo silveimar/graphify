@@ -10,7 +10,7 @@ from pathlib import Path
 import networkx as nx
 from networkx.readwrite import json_graph
 from graphify.security import sanitize_label
-from graphify.analyze import _node_community_map
+from graphify.analyze import _node_community_map, _fmt_source_file
 from graphify.profile import safe_filename, safe_frontmatter_value, safe_tag
 
 COMMUNITY_COLORS = [
@@ -369,7 +369,7 @@ def to_html(
             "title": _html.escape(label),
             "community": cid,
             "community_name": sanitize_label((community_labels or {}).get(cid, f"Community {cid}")),
-            "source_file": sanitize_label(data.get("source_file", "")),
+            "source_file": sanitize_label(_fmt_source_file(data.get("source_file", ""))),
             "file_type": data.get("file_type", ""),
             "degree": deg,
         })
@@ -705,7 +705,7 @@ def to_canvas(
         seen_names: dict[str, int] = {}
         for node_id, data in sorted(
             G.nodes(data=True),
-            key=lambda nd: (nd[1].get("source_file", ""), nd[1].get("label", nd[0]))
+            key=lambda nd: (_fmt_source_file(nd[1].get("source_file", "")), nd[1].get("label", nd[0]))
         ):
             base = safe_filename(data.get("label", node_id))
             if base in seen_names:

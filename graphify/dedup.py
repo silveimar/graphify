@@ -442,7 +442,11 @@ def _merge_extraction(
         if canon is None:
             # Safety guard: canonical not found (should not happen)
             continue
-        # Merge source_file (str -> list[str]) using a set for O(1) dedup
+        # Merge source_file (str -> list[str]) using a set for O(1) dedup.
+        # WRITE SITE: canonical nodes end up with source_file: list[str] when ≥2
+        # distinct sources contributed. All downstream READ sites in analyze.py,
+        # report.py, and export.py MUST use graphify.analyze._iter_sources() /
+        # _fmt_source_file() to handle both str and list[str] shapes correctly.
         existing = canon.get("source_file", "")
         sf_set: set[str] = set(existing) if isinstance(existing, list) else ({existing} if existing else set())
         incoming = node.get("source_file", "")
