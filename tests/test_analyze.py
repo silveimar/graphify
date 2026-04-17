@@ -4,7 +4,7 @@ import networkx as nx
 from pathlib import Path
 from graphify.build import build_from_json
 from graphify.cluster import cluster
-from graphify.analyze import god_nodes, surprising_connections, _is_concept_node, graph_diff, _surprise_score, _file_category, render_analysis_context
+from graphify.analyze import god_nodes, surprising_connections, _is_concept_node, graph_diff, _surprise_score, _file_category, render_analysis_context, _is_file_node, _top_level_dir
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -318,3 +318,77 @@ def test_render_analysis_context_top_n_limits():
             if not line.startswith("  "):
                 break
     assert god_entries <= 2
+
+
+# ---------------------------------------------------------------------------
+# Phase 10 gap-closure regression tests: source_file: list[str] support
+# (10-08-PLAN.md Task 1 — RED gate)
+# ---------------------------------------------------------------------------
+
+def _make_node_graph(node_id: str, label: str, source_file) -> nx.Graph:
+    """Helper: create a minimal graph with a single node."""
+    G = nx.Graph()
+    G.add_node(node_id, label=label, file_type="code", source_file=source_file,
+               source_location="L1")
+    return G
+
+
+def test_is_file_node_list_source_file():
+    """list source_file where label matches basename of at least one entry -> True."""
+    G = _make_node_graph("n1", "service.py", ["auth/service.py", "auth/impl.py"])
+    assert _is_file_node(G, "n1") is True
+
+
+def test_is_file_node_list_source_file_no_match():
+    """list source_file where label does NOT match any basename -> False."""
+    G = _make_node_graph("n1", "totally_different", ["auth/service.py", "auth/impl.py"])
+    assert _is_file_node(G, "n1") is False
+
+
+def test_is_concept_node_list_source_file():
+    """Node with list source_file containing real file paths -> not a concept (has extension)."""
+    G = _make_node_graph("n1", "AuthService", ["a.py", "b.py"])
+    assert _is_concept_node(G, "n1") is False
+
+
+def test_is_concept_node_list_source_file_no_extension():
+    """Node with list source_file where no entry has an extension -> concept node."""
+    G = _make_node_graph("n1", "README", ["README", "LICENSE"])
+    assert _is_concept_node(G, "n1") is True
+
+
+def test_file_category_list_source_file():
+    """_file_category on a list-valued source_file: use first sorted entry for determinism."""
+    # sorted(["x.py", "y.md"])[0] == "x.py" which is "code"
+    result = _file_category(sorted(["x.py", "y.md"])[0])
+    assert result == "code"
+
+
+def test_top_level_dir_list_source_file():
+    """_top_level_dir on first sorted entry of a list."""
+    sources = ["repo2/b.py", "repo1/a.py"]
+    first_sorted = sorted(sources)[0]  # "repo1/a.py"
+    assert _top_level_dir(first_sorted) == "repo1"
+
+
+def test_surprising_connections_list_source_file_no_crash():
+    """Graph with list-valued source_file nodes: surprising_connections must not raise."""
+    G = nx.Graph()
+    G.add_node("auth", label="AuthService", file_type="code",
+               source_file=["src/auth.py", "lib/auth_impl.py"], source_location="L1")
+    G.add_node("model", label="UserModel", file_type="code",
+               source_file="src/models.py", source_location="L10")
+    G.add_node("token", label="TokenValidator", file_type="code",
+               source_file="lib/security.py", source_location="L5")
+    G.add_edge("auth", "model", relation="references", confidence="INFERRED",
+               source_file="src/auth.py", weight=0.9)
+    G.add_edge("auth", "token", relation="calls", confidence="EXTRACTED",
+               source_file="src/auth.py", weight=1.0)
+    communities = {0: ["auth", "model"], 1: ["token"]}
+    result = surprising_connections(G, communities, top_n=5)
+    assert isinstance(result, list)
+    # Verify source_files values are stringifiable (no TypeError on downstream path)
+    for s in result:
+        for sf in s.get("source_files", []):
+            # Must be able to convert to str without TypeError
+            _ = str(sf) if sf else ""

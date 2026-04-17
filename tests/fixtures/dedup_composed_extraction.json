@@ -1,0 +1,21 @@
+{
+  "nodes": [
+    {"id": "auth_service_a", "label": "AuthService", "file_type": "code", "source_file": "src/auth.py"},
+    {"id": "auth_service_b", "label": "AuthService", "file_type": "code", "source_file": "lib/auth_impl.py"},
+    {"id": "user_model", "label": "UserModel", "file_type": "code", "source_file": "src/models.py"},
+    {"id": "token_validator", "label": "TokenValidator", "file_type": "code", "source_file": "lib/security.py"},
+    {"id": "request_handler", "label": "RequestHandler", "file_type": "code", "source_file": "src/api.py"},
+    {"id": "session_bridge", "label": "session_bridge", "file_type": "code", "source_file": "src/api.py"},
+    {"id": "auth_concept", "label": "authentication", "file_type": "document", "source_file": ""},
+    {"id": "crypto_util", "label": "CryptoUtil", "file_type": "code", "source_file": "lib/crypto.py"}
+  ],
+  "edges": [
+    {"source": "auth_service_a", "target": "user_model", "relation": "references", "confidence": "EXTRACTED", "source_file": "src/auth.py", "weight": 1.0},
+    {"source": "auth_service_b", "target": "token_validator", "relation": "calls", "confidence": "EXTRACTED", "source_file": "lib/auth_impl.py", "weight": 1.0},
+    {"source": "request_handler", "target": "auth_service_a", "relation": "calls", "confidence": "EXTRACTED", "source_file": "src/api.py", "weight": 1.0},
+    {"source": "token_validator", "target": "crypto_util", "relation": "calls", "confidence": "EXTRACTED", "source_file": "lib/security.py", "weight": 1.0},
+    {"source": "auth_service_a", "target": "token_validator", "relation": "semantically_similar_to", "confidence": "INFERRED", "source_file": "src/auth.py", "weight": 0.8},
+    {"source": "user_model", "target": "session_bridge", "relation": "references", "confidence": "AMBIGUOUS", "source_file": "src/models.py", "weight": 0.6},
+    {"source": "request_handler", "target": "crypto_util", "relation": "references", "confidence": "INFERRED", "source_file": "src/api.py", "weight": 0.7}
+  ]
+}
