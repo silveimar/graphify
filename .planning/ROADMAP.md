@@ -260,7 +260,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 9/9 | Complete   | 2026-04-17 |
 | 11. Narrative Mode as Interactive Slash Commands | v1.3 | 7/7 | Complete   | 2026-04-17 |
 | 12. Heterogeneous Extraction Routing | v1.4 | 6/6 | Complete | 2026-04-17 |
-| 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 2/4 | In Progress | — |
+| 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 3/4 | In Progress | — |
 | 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
 | 15. Async Background Enrichment | v1.4 | 0/TBD | Planned | — |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
@@ -268,4 +268,4 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 18. Focus-Aware Graph Context | v1.4 | 0/TBD | Planned | — |
 
 ---
-*Last updated: 2026-04-17 — Phase 12 complete (6 plans). Phase 13 Plans 01 + 02 complete (MANIFEST-01..10 shipped, 1273 tests). Build order: 12 ✅ → 18 → 13A (1/2 plans shipped) → 15 → 17 → 16 → 14 → 13B. Next: `/gsd-execute-phase 13` continues with 13-03 (HARNESS-01..06) or `/gsd-discuss-phase 18`.*
+*Last updated: 2026-04-17 — Phase 12 complete (6 plans). Phase 13 Plans 01 + 02 + 03 complete (MANIFEST-01..10 + HARNESS-01..06 shipped, 1280 tests). Build order: 12 ✅ → 18 → 13A (2/2 wave-A plans shipped + 13-03 harness core) → 15 → 17 → 16 → 14 → 13B (Plan 04 HARNESS-07/08 P2). Next: `/gsd-execute-phase 13` continues with 13-04 (HARNESS-07/08) or `/gsd-discuss-phase 18`.*

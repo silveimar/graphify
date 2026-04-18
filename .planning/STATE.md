@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: Phase 13 Plans 01 + 02 complete (MANIFEST-01..10 shipped, 1273 tests passing); Plans 03/04 (HARNESS-01..08) ready to execute
-stopped_at: Plan 13-02 executed on main — da02ed7 (CI drift gate, MANIFEST-09), aab4967 (RED), c1c987e (GREEN, MANIFEST-10). server.json hash rolled forward to d066e4e1. Ready for /gsd-execute-phase 13 to continue with 13-03.
-last_updated: "2026-04-18T03:07:00.000Z"
+status: Phase 13 Plans 01 + 02 + 03 complete (MANIFEST-01..10 + HARNESS-01..06 shipped, 1280 tests passing); Plan 04 (HARNESS-07/08 P2) remaining
+stopped_at: Plan 13-03 executed on main — 6c29c97 (scaffold HARNESS-01..03), a60c125 (CLI + tests HARNESS-04..06). SEED-002 harness export core shipped; `graphify harness export` writes SOUL/HEARTBEAT/USER markdown under graphify-out/harness/ via string.Template.safe_substitute (no Jinja2). Ready for /gsd-execute-phase 13 to continue with 13-04.
+last_updated: "2026-04-18T03:15:00.000Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 14
 ---
 
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 ## Current Position
 
-Phase: 13 Agent Capability Manifest — Plans 01 + 02 (Wave A plumbing + MANIFEST-09/10 CI gate + docstring examples) complete + committed; Plans 03/04 ready to execute
-Plan: 13-03 (Wave 1, HARNESS-01..06 — SEED-002 harness export core) next for `/gsd-execute-phase 13`
+Phase: 13 Agent Capability Manifest — Plans 01 + 02 + 03 complete + committed; Plan 04 (HARNESS-07/08 P2 — secret scanner + round-trip fidelity) remaining
+Plan: 13-04 (Wave 3, HARNESS-07/08 — SEED-002 P2 hardening) next for `/gsd-execute-phase 13`
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17)
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Phase 12 complete. Phase 13 Plans 01 + 02 shipped — MANIFEST-01..10 closed. `capability.py` now exposes `extract_tool_examples`; every CAPABILITY_TOOLS entry carries `_meta.examples: list[str]`; CI runs `graphify capability --validate` as a non-bypassable drift gate on both 3.10 and 3.12. `server.json` hash rolled forward to `d066e4e1…`. 1273 tests pass. Next: `/gsd-execute-phase 13` runs Plans 03 (HARNESS-01..06) then 04 (HARNESS-07/08).
-Last activity: 2026-04-17 — commits da02ed7 (CI gate) + aab4967 (RED) + c1c987e (GREEN) closed MANIFEST-09/10 atomically on main
+Status: Phase 12 complete. Phase 13 Plans 01 + 02 + 03 shipped — MANIFEST-01..10 + HARNESS-01..06 closed. `graphify harness export` now emits SOUL/HEARTBEAT/USER markdown into `graphify-out/harness/` via a declarative `graphify/harness_schemas/claude.yaml` + `string.Template.safe_substitute` (no Jinja2). Annotations filtered through `{id, label, source_file, relation, confidence}` allow-list by default. Exporter uses `_clock` seam ready for Plan 04 byte-equality pinning. 1280 tests pass. Next: `/gsd-execute-phase 13` runs Plan 04 (HARNESS-07/08).
+Last activity: 2026-04-17 — commits 6c29c97 (scaffold) + a60c125 (CLI + tests) closed HARNESS-01..06 atomically on main
 
 Progress: [█░░░░░░░░░] 14% (1/7 phases complete)
 
@@ -128,6 +128,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-18T03:07:00.000Z
-Stopped at: Phase 13 Plan 02 executed (`pytest`: 1273 passed). MANIFEST-09 CI drift gate wired; MANIFEST-10 docstring `_meta.examples` extraction shipped; `server.json` hash rolled to `d066e4e1…`.
-Next action: `/gsd-execute-phase 13` to run Plan 13-03 (SEED-002 harness export core, HARNESS-01..06), followed by Plan 13-04 (HARNESS-07/08 P2). `gsd-sdk` still unavailable in local env — STATE.md and ROADMAP.md updated by hand; consider installing `gsd-sdk` before the next execution for automated progress tracking.
+Last session: 2026-04-18T03:15:00.000Z
+Stopped at: Phase 13 Plan 03 executed (`pytest`: 1280 passed; +7 new harness tests). SEED-002 harness export core shipped — `graphify harness export` emits SOUL/HEARTBEAT/USER markdown under `graphify-out/harness/` via declarative `claude.yaml` + `string.Template.safe_substitute`. Annotation allow-list defaults to `{id, label, source_file, relation, confidence}`. `_clock` seam present for Plan 04 byte-equality pinning. Commits 6c29c97 (scaffold) + a60c125 (CLI + tests) on main.
+Next action: `/gsd-execute-phase 13` to run Plan 13-04 (HARNESS-07/08 P2 — `--include-annotations` + secret scanner + round-trip fidelity byte-equal manifest). `gsd-sdk` still unavailable in local env — STATE.md and ROADMAP.md updated by hand.

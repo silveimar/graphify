@@ -42,12 +42,12 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 
 ### Harness Memory Export (SEED-002 — export-only in v1.4, claude.yaml only)
 
-- [ ] **HARNESS-01**: New module `graphify/harness_export.py` reads `graph.json` + `annotations.jsonl` + `agent-edges.json` + `telemetry.json` and emits SOUL/HEARTBEAT/USER harness files
-- [ ] **HARNESS-02**: `graphify/harness_schemas/claude.yaml` declares SOUL / HEARTBEAT / USER block structure with placeholders (`{{ god_nodes }}`, `{{ recent_deltas }}`, `{{ hot_paths }}`, `{{ agent_identity }}`) — one harness target at launch
-- [ ] **HARNESS-03**: Placeholder rendering uses `string.Template.safe_substitute` (reuses v1.0 "no Jinja2" precedent from `templates.py`)
-- [ ] **HARNESS-04**: New CLI subcommand `graphify harness export [--target claude] [--out PATH]` with default target `claude`
-- [ ] **HARNESS-05**: Output written to `graphify-out/harness/claude-SOUL.md`, `claude-HEARTBEAT.md`, `claude-USER.md` (+ optional `AGENTS.md` mirror)
-- [ ] **HARNESS-06**: Annotations excluded from export by default (allow-list: `id`, `label`, `source_file`, `relation`, `confidence`) — prevents leaking peer_id annotations, secrets in free-text fields (Pitfall 11 mitigation)
+- [x] **HARNESS-01**: New module `graphify/harness_export.py` reads `graph.json` + `annotations.jsonl` + `agent-edges.json` + `telemetry.json` and emits SOUL/HEARTBEAT/USER harness files
+- [x] **HARNESS-02**: `graphify/harness_schemas/claude.yaml` declares SOUL / HEARTBEAT / USER block structure with placeholders (`{{ god_nodes }}`, `{{ recent_deltas }}`, `{{ hot_paths }}`, `{{ agent_identity }}`) — one harness target at launch
+- [x] **HARNESS-03**: Placeholder rendering uses `string.Template.safe_substitute` (reuses v1.0 "no Jinja2" precedent from `templates.py`)
+- [x] **HARNESS-04**: New CLI subcommand `graphify harness export [--target claude] [--out PATH]` with default target `claude`
+- [x] **HARNESS-05**: Output written to `graphify-out/harness/claude-SOUL.md`, `claude-HEARTBEAT.md`, `claude-USER.md` (+ optional `AGENTS.md` mirror)
+- [x] **HARNESS-06**: Annotations excluded from export by default (allow-list: `id`, `label`, `source_file`, `relation`, `confidence`) — prevents leaking peer_id annotations, secrets in free-text fields (Pitfall 11 mitigation)
 - [ ] **HARNESS-07** `[P2]`: `--include-annotations` flag runs a secret-scanner regex suite over annotation text before inclusion; matches redacted or emit an error
 - [ ] **HARNESS-08** `[P2]`: `graphify harness export` emits a round-trip fidelity summary (byte-equal manifest) so repeated exports don't diverge from prior exports
 
@@ -204,12 +204,12 @@ Priority tags: `[P2]` indicates the requirement is in v1.4 scope per user confir
 | MANIFEST-08 | Phase 13 | TBD | planned | — |
 | MANIFEST-09 [P2] | Phase 13 | 13-02 | complete | 2026-04-17 |
 | MANIFEST-10 [P2] | Phase 13 | 13-02 | complete | 2026-04-17 |
-| HARNESS-01 | Phase 13 | TBD | planned | — |
-| HARNESS-02 | Phase 13 | TBD | planned | — |
-| HARNESS-03 | Phase 13 | TBD | planned | — |
-| HARNESS-04 | Phase 13 | TBD | planned | — |
-| HARNESS-05 | Phase 13 | TBD | planned | — |
-| HARNESS-06 | Phase 13 | TBD | planned | — |
+| HARNESS-01 | Phase 13 | 13-03 | complete | 2026-04-17 |
+| HARNESS-02 | Phase 13 | 13-03 | complete | 2026-04-17 |
+| HARNESS-03 | Phase 13 | 13-03 | complete | 2026-04-17 |
+| HARNESS-04 | Phase 13 | 13-03 | complete | 2026-04-17 |
+| HARNESS-05 | Phase 13 | 13-03 | complete | 2026-04-17 |
+| HARNESS-06 | Phase 13 | 13-03 | complete | 2026-04-17 |
 | HARNESS-07 [P2] | Phase 13 | TBD | planned | — |
 | HARNESS-08 [P2] | Phase 13 | TBD | planned | — |
 | OBSCMD-01 | Phase 14 | TBD | planned | — |
