@@ -129,3 +129,111 @@ def test_validate_cli_no_huge_diff_by_default(
     code, err = validate_cli(repo_root=tmp_path)
     assert code != 0
     assert len(err) < 2000
+
+
+# -------------------------------------------------------------------------
+# Phase 13 Plan 02 — MANIFEST-10 docstring → _meta.examples tests
+# -------------------------------------------------------------------------
+
+
+def test_extract_tool_examples_parses_examples_block() -> None:
+    """Deterministic, order-preserving extraction of an Examples: block."""
+    from graphify.capability import extract_tool_examples
+
+    doc = (
+        "Query the graph.\n"
+        "\n"
+        "Examples:\n"
+        "  query_graph(query='transformer')\n"
+        "  query_graph(query='attention', limit=5)\n"
+    )
+    assert extract_tool_examples(doc) == [
+        "query_graph(query='transformer')",
+        "query_graph(query='attention', limit=5)",
+    ]
+
+
+def test_extract_tool_examples_empty_when_no_block() -> None:
+    """Docstring without an Examples: header → [] (not None, not omitted)."""
+    from graphify.capability import extract_tool_examples
+
+    doc = "Query the graph.\n\nArgs:\n  query: str\n"
+    assert extract_tool_examples(doc) == []
+
+
+def test_extract_tool_examples_empty_on_none_docstring() -> None:
+    """None input is safe."""
+    from graphify.capability import extract_tool_examples
+
+    assert extract_tool_examples(None) == []
+
+
+def test_extract_tool_examples_stops_at_next_section() -> None:
+    """Collection terminates on blank line OR next 'Header:' section (e.g. Args:, Returns:)."""
+    from graphify.capability import extract_tool_examples
+
+    doc = (
+        "Do a thing.\n"
+        "\n"
+        "Examples:\n"
+        "  do_thing(a=1)\n"
+        "  do_thing(a=2)\n"
+        "Returns:\n"
+        "  str\n"
+    )
+    # 'Returns:' header ends the Examples block; only first two lines captured.
+    assert extract_tool_examples(doc) == ["do_thing(a=1)", "do_thing(a=2)"]
+
+
+def test_meta_examples_populated_in_manifest(monkeypatch: pytest.MonkeyPatch) -> None:
+    """MANIFEST-10: at least one tool carries a non-empty _meta.examples list
+    when a handler docstring has an Examples: block."""
+    from graphify.capability import build_manifest_dict
+    from graphify.mcp_tool_registry import tool_names_ordered
+
+    names = tool_names_ordered()
+    assert names, "registry must expose at least one tool"
+    target_name = names[0]
+    monkeypatch.setattr(
+        "graphify.mcp_tool_registry.build_handler_docstrings",
+        lambda: {
+            target_name: (
+                "Do something.\n\nExamples:\n  "
+                f"{target_name}(a=1)\n  {target_name}(a=2)\n"
+            )
+        },
+    )
+    manifest = build_manifest_dict()
+    entry = next(t for t in manifest["CAPABILITY_TOOLS"] if t["name"] == target_name)
+    assert entry["_meta"]["examples"] == [
+        f"{target_name}(a=1)",
+        f"{target_name}(a=2)",
+    ]
+
+
+def test_meta_examples_uniform_when_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """MANIFEST-10: tools without Examples: get _meta.examples == [] (field present, empty)."""
+    from graphify.capability import build_manifest_dict
+
+    monkeypatch.setattr(
+        "graphify.mcp_tool_registry.build_handler_docstrings",
+        lambda: {},  # no docstrings → every tool gets []
+    )
+    manifest = build_manifest_dict()
+    for entry in manifest["CAPABILITY_TOOLS"]:
+        assert "_meta" in entry
+        assert "examples" in entry["_meta"]
+        assert entry["_meta"]["examples"] == []
+
+
+def test_manifest_hash_stable_after_examples_added() -> None:
+    """Determinism: two successive build_manifest_dict calls produce identical hash
+    (examples list is order-preserving and registry order is stable)."""
+    a = build_manifest_dict()
+    b = build_manifest_dict()
+    assert canonical_manifest_hash(a) == canonical_manifest_hash(b)
+    # And every tool carries the examples key:
+    for entry in a["CAPABILITY_TOOLS"]:
+        assert "_meta" in entry
+        assert "examples" in entry["_meta"]
+        assert isinstance(entry["_meta"]["examples"], list)
