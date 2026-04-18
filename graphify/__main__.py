@@ -1055,6 +1055,7 @@ def main() -> None:
         print("    --delta                also generate GRAPH_DELTA.md comparing against previous snapshot")
         print("  benchmark [graph.json]  measure token reduction vs naive full-corpus approach")
         print("  capability [--stdout|--validate]  MCP capability manifest JSON / drift gate (Phase 13)")
+        print("  harness export [--target claude]  Emit SOUL/HEARTBEAT/USER harness files (Phase 13 / SEED-002)")
         print("  run [path] [--router]     AST extract with optional heterogeneous model routing (Phase 12)")
         print("  hook install            install post-commit/post-checkout git hooks (all platforms)")
         print("  hook uninstall          remove git hooks")
@@ -1771,6 +1772,31 @@ def main() -> None:
             sys.exit(code)
         print("Usage: graphify capability --stdout | graphify capability --validate", file=sys.stderr)
         sys.exit(2)
+    elif cmd == "harness":
+        # graphify harness export [--target claude] [--out PATH]  (Phase 13 / SEED-002)
+        rest = list(sys.argv[2:])
+        if not rest or rest[0] != "export":
+            print(
+                "Usage: graphify harness export [--target claude] [--out PATH]",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
+        import argparse as _ap
+
+        from graphify.harness_export import export_claude_harness
+
+        parser = _ap.ArgumentParser(prog="graphify harness export")
+        parser.add_argument("--target", default="claude", choices=["claude"])
+        parser.add_argument("--out", default="graphify-out")
+        # --include-annotations is Plan 04 territory; not registered here (locked).
+        opts = parser.parse_args(rest[1:])
+
+        out_dir = Path(opts.out).resolve()
+        written = export_claude_harness(out_dir, target=opts.target)
+        for p in written:
+            print(str(p))
+        sys.exit(0)
     elif cmd == "run":
         # graphify run [path] [--router]
         from graphify.pipeline import run_corpus

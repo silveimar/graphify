@@ -1656,6 +1656,21 @@ If a post-commit hook already exists, graphify appends to it rather than replaci
 
 ---
 
+## For harness memory export (SEED-002)
+
+Export a set of agent-readable memory files derived from the current graph:
+
+```bash
+graphify harness export [--target claude] [--out PATH]
+```
+
+- `graphify harness export [--target claude]` — dump SOUL/HEARTBEAT/USER markdown to `graphify-out/harness/` (export-only; no auto-trigger).
+- Only the `claude` target ships today; `--out` defaults to `graphify-out`.
+- Annotations are excluded by default (allow-list: `id`, `label`, `source_file`, `relation`, `confidence`). Free-text annotation bodies and `peer_id` never appear in the harness output.
+- Writes `claude-SOUL.md`, `claude-HEARTBEAT.md`, `claude-USER.md` via atomic `.tmp + os.replace`.
+
+---
+
 ## For native CLAUDE.md integration
 
 Run once per project to make graphify always-on in Claude Code sessions:
