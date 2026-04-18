@@ -257,3 +257,33 @@ def build_mcp_tools():
 def tool_names_ordered() -> list[str]:
     """Stable ordered tool names for manifest and assertions."""
     return [t.name for t in build_mcp_tools()]
+
+
+def build_handler_docstrings() -> dict[str, str | None]:
+    """Return {tool_name: handler.__doc__} for docstring-based manifest enrichment (MANIFEST-10).
+
+    The MCP tool handlers are closures defined inside `graphify.serve.serve()` — they
+    are only bound when the stdio server is booted (with a loaded graph). Calling
+    `serve()` just to harvest docstrings would require a graph on disk, which is
+    inappropriate for pure-unit manifest generation or `graphify capability --stdout`
+    on a fresh checkout.
+
+    Instead we call `graphify.serve._handlers_snapshot()` (a lightweight helper that
+    returns the live handler-docstring dict when `serve()` is currently running, or
+    `{}` otherwise). On any import/error path we fall back to `{}` — MANIFEST-10
+    schema-uniformity (`_meta.examples: []`) is still satisfied downstream.
+    """
+    try:
+        from graphify import serve as _serve  # local import to avoid cycles at module load
+    except Exception:
+        return {}
+    snapshot_fn = getattr(_serve, "_handlers_snapshot", None)
+    if snapshot_fn is None:
+        return {}
+    try:
+        snap = snapshot_fn()
+    except Exception:
+        return {}
+    if not isinstance(snap, dict):
+        return {}
+    return snap

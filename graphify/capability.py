@@ -36,7 +36,67 @@ def _load_yaml_meta() -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def _tool_to_manifest_entry(tool: Any, meta_defaults: dict[str, Any]) -> dict[str, Any]:
+def extract_tool_examples(docstring: str | None) -> list[str]:
+    """Parse an `Examples:` block out of a handler docstring (MANIFEST-10).
+
+    Grammar:
+      1. Split `docstring` into lines.
+      2. Locate the first line whose stripped value is exactly `Examples:`
+         (case-sensitive, no trailing text after the colon).
+      3. From the next line onward, collect lines until one of:
+           - a blank line (whitespace-only), or
+           - another `^[A-Za-z][A-Za-z ]*:$` section header
+             (e.g. `Args:`, `Returns:`, `Raises:`), or
+           - EOF.
+      4. For each collected line, call `.strip()`; drop empties; keep insertion order.
+      5. Return the resulting list.
+
+    Non-string / None input returns `[]` safely. Order-preserving and deterministic
+    so `canonical_manifest_hash(build_manifest_dict())` stays stable across runs.
+    """
+    if not isinstance(docstring, str):
+        return []
+    lines = docstring.split("\n")
+    # Locate Examples: header
+    header_idx = -1
+    for i, line in enumerate(lines):
+        if line.strip() == "Examples:":
+            header_idx = i
+            break
+    if header_idx < 0:
+        return []
+    examples: list[str] = []
+    for line in lines[header_idx + 1 :]:
+        stripped = line.strip()
+        if stripped == "":
+            break
+        # Detect another section header: alphabetic letters + spaces, ending in ':'
+        if _is_section_header(stripped):
+            break
+        examples.append(stripped)
+    return examples
+
+
+def _is_section_header(stripped_line: str) -> bool:
+    """Return True for lines like 'Args:', 'Returns:', 'Raises:' — alphabetic+spaces, trailing colon."""
+    if not stripped_line.endswith(":"):
+        return False
+    head = stripped_line[:-1]
+    if not head:
+        return False
+    if not head[0].isalpha() or not head[0].isupper():
+        return False
+    for ch in head:
+        if not (ch.isalpha() or ch == " "):
+            return False
+    return True
+
+
+def _tool_to_manifest_entry(
+    tool: Any,
+    meta_defaults: dict[str, Any],
+    handler_docstring: str | None = None,
+) -> dict[str, Any]:
     name = tool.name
     defaults = meta_defaults.get(name) or {}
     cost = defaults.get("cost_class", "cheap")
@@ -52,6 +112,13 @@ def _tool_to_manifest_entry(tool: Any, meta_defaults: dict[str, Any]) -> dict[st
     if not isinstance(comp, list):
         comp = []
     comp = [str(x) for x in comp]
+    # MANIFEST-10: per-tool _meta dict with docstring-extracted examples.
+    # Merge any YAML-sourced _meta (future-proof) with the extracted examples.
+    yaml_meta = defaults.get("_meta") or {}
+    if not isinstance(yaml_meta, dict):
+        yaml_meta = {}
+    merged_meta = dict(yaml_meta)
+    merged_meta["examples"] = extract_tool_examples(handler_docstring)
     return {
         "name": name,
         "description": tool.description,
@@ -60,19 +127,35 @@ def _tool_to_manifest_entry(tool: Any, meta_defaults: dict[str, Any]) -> dict[st
         "deterministic": det,
         "cacheable_until": cacheable,
         "composable_from": comp,
+        "_meta": merged_meta,
     }
 
 
 def build_manifest_dict() -> dict[str, Any]:
-    """JSON-serializable manifest from introspected MCP tools + MANIFEST-06 YAML."""
-    from graphify.mcp_tool_registry import build_mcp_tools
+    """JSON-serializable manifest from introspected MCP tools + MANIFEST-06 YAML.
 
-    tools = build_mcp_tools()
+    Per MANIFEST-10, each tool entry carries `_meta.examples: list[str]`
+    extracted from the matching handler's docstring via `extract_tool_examples`.
+    """
+    # Import inside the function so test monkeypatches of
+    # `graphify.mcp_tool_registry.build_handler_docstrings` take effect.
+    from graphify import mcp_tool_registry
+
+    tools = mcp_tool_registry.build_mcp_tools()
     meta_defaults = _load_yaml_meta()
+    try:
+        docstrings = mcp_tool_registry.build_handler_docstrings()
+    except Exception:
+        docstrings = {}
+    if not isinstance(docstrings, dict):
+        docstrings = {}
     return {
         "manifest_version": _MANIFEST_VERSION,
         "graphify_version": _graphify_version(),
-        "CAPABILITY_TOOLS": [_tool_to_manifest_entry(t, meta_defaults) for t in tools],
+        "CAPABILITY_TOOLS": [
+            _tool_to_manifest_entry(t, meta_defaults, docstrings.get(t.name))
+            for t in tools
+        ],
     }
 
 

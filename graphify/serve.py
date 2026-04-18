@@ -13,6 +13,18 @@ import networkx as nx
 from networkx.readwrite import json_graph
 from graphify.security import sanitize_label
 from graphify.delta import classify_staleness
+
+# Module-level snapshot of live handler docstrings (MANIFEST-10).
+# Populated when `serve()` binds its closure-local `_handlers` dict; empty when
+# the stdio server has not been booted. `capability.build_manifest_dict` reads
+# this via `mcp_tool_registry.build_handler_docstrings` to populate per-tool
+# `_meta.examples` — when absent, every tool uniformly gets `_meta.examples: []`.
+_HANDLER_DOCSTRINGS: dict[str, str | None] = {}
+
+
+def _handlers_snapshot() -> dict[str, str | None]:
+    """Return {tool_name: handler.__doc__} bound by the most recent serve() call, or {}."""
+    return dict(_HANDLER_DOCSTRINGS)
 from graphify.mcp_tool_registry import build_mcp_tools, query_graph_input_schema as _query_graph_input_schema
 
 
@@ -2061,6 +2073,11 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
     _reg_tools = build_mcp_tools()
     if {t.name for t in _reg_tools} != set(_handlers.keys()):
         raise RuntimeError("MCP tool registry and _handlers keys must match (MANIFEST-05)")
+
+    # MANIFEST-10: publish live handler docstrings so capability manifest can
+    # extract `_meta.examples` without needing a running MCP server of its own.
+    global _HANDLER_DOCSTRINGS
+    _HANDLER_DOCSTRINGS = {name: fn.__doc__ for name, fn in _handlers.items()}
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
