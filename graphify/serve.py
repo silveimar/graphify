@@ -13,6 +13,7 @@ import networkx as nx
 from networkx.readwrite import json_graph
 from graphify.security import sanitize_label
 from graphify.delta import classify_staleness
+from graphify.mcp_tool_registry import build_mcp_tools, query_graph_input_schema as _query_graph_input_schema
 
 
 def _append_annotation(out_dir: Path, record: dict) -> None:
@@ -935,64 +936,6 @@ def _run_query_graph(
     return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
 
-def _query_graph_input_schema() -> dict:
-    """Return the JSON Schema dict for the `query_graph` MCP tool input.
-
-    Extracted as a module-level function so tests can assert the schema shape without
-    spinning up the `mcp` runtime. `serve()`'s `list_tools` handler uses this.
-
-    Phase 9.2 D-01 extension: adds `budget`, `layer`, `continuation_token` properties;
-    keeps `token_budget` as deprecated alias for backward compatibility.
-    """
-    return {
-        "type": "object",
-        "properties": {
-            "question": {
-                "type": "string",
-                "description": "Natural language question or keyword search",
-            },
-            "mode": {
-                "type": "string",
-                "enum": ["bfs", "dfs"],
-                "default": "bfs",
-                "description": "bfs=broad context, dfs=trace a specific path (depth < 3 only)",
-            },
-            "depth": {
-                "type": "integer",
-                "default": 3,
-                "minimum": 1,
-                "maximum": 6,
-                "description": "Traversal depth (1-6). At depth >= 3 bidirectional BFS auto-activates.",
-            },
-            # Phase 9.2 D-01 — three new optional properties, backward compatible:
-            "budget": {
-                "type": "integer",
-                "default": 2000,
-                "minimum": 50,
-                "maximum": 100000,
-                "description": "Total token ceiling for the response",
-            },
-            "layer": {
-                "type": "integer",
-                "default": 1,
-                "enum": [1, 2, 3],
-                "description": "1=compact summary, 2=edges+neighbors, 3=full",
-            },
-            "continuation_token": {
-                "type": "string",
-                "description": "Opaque drill-down token from a prior Layer 1 or 2 response",
-            },
-            # DEPRECATED alias — retained indefinitely per D-01 for backward compatibility:
-            "token_budget": {
-                "type": "integer",
-                "default": 2000,
-                "description": "DEPRECATED - alias for `budget`. Kept for backward compatibility.",
-            },
-        },
-        "required": ["question"],
-    }
-
-
 def _filter_blank_stdin() -> None:
     """Filter blank lines from stdin before MCP reads it.
 
@@ -1681,197 +1624,15 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
     _telemetry: dict = _load_telemetry(_out_dir / "telemetry.json")
     _alias_map: dict[str, str] = _load_dedup_report(_out_dir)  # Phase 10 D-16
     _session_id = str(uuid.uuid4())
+    _dedup_mtime: float = -1.0
+    _manifest_sig: tuple[float, ...] | None = None
+    _manifest_hash_val: str | None = None
 
     server = Server("graphify")
 
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:
-        return [
-            types.Tool(
-                name="query_graph",
-                description="Search the knowledge graph using BFS or DFS. Returns relevant nodes and edges as text context.",
-                inputSchema=_query_graph_input_schema(),
-            ),
-            types.Tool(
-                name="get_node",
-                description="Get full details for a specific node by label or ID.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {"label": {"type": "string", "description": "Node label or ID to look up"}},
-                    "required": ["label"],
-                },
-            ),
-            types.Tool(
-                name="get_neighbors",
-                description="Get all direct neighbors of a node with edge details.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "label": {"type": "string"},
-                        "relation_filter": {"type": "string", "description": "Optional: filter by relation type"},
-                    },
-                    "required": ["label"],
-                },
-            ),
-            types.Tool(
-                name="get_community",
-                description="Get all nodes in a community by community ID.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {"community_id": {"type": "integer", "description": "Community ID (0-indexed by size)"}},
-                    "required": ["community_id"],
-                },
-            ),
-            types.Tool(
-                name="god_nodes",
-                description="Return the most connected nodes - the core abstractions of the knowledge graph.",
-                inputSchema={"type": "object", "properties": {"top_n": {"type": "integer", "default": 10}}},
-            ),
-            types.Tool(
-                name="graph_stats",
-                description="Return summary statistics: node count, edge count, communities, confidence breakdown.",
-                inputSchema={"type": "object", "properties": {}},
-            ),
-            types.Tool(
-                name="shortest_path",
-                description="Find the shortest path between two concepts in the knowledge graph.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "source": {"type": "string", "description": "Source concept label or keyword"},
-                        "target": {"type": "string", "description": "Target concept label or keyword"},
-                        "max_hops": {"type": "integer", "default": 8, "description": "Maximum hops to consider"},
-                    },
-                    "required": ["source", "target"],
-                },
-            ),
-            types.Tool(
-                name="annotate_node",
-                description="Add a free-text annotation to a node. Persisted across server restarts.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "node_id": {"type": "string", "description": "ID of the node to annotate"},
-                        "text": {"type": "string", "description": "Annotation text"},
-                        "peer_id": {"type": "string", "description": "Peer identifier (default: anonymous)"},
-                    },
-                    "required": ["node_id", "text"],
-                },
-            ),
-            types.Tool(
-                name="flag_node",
-                description="Flag a node's importance level. Persisted across server restarts.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "node_id": {"type": "string", "description": "ID of the node to flag"},
-                        "importance": {"type": "string", "enum": ["high", "medium", "low"], "description": "Importance level"},
-                        "peer_id": {"type": "string", "description": "Peer identifier (default: anonymous)"},
-                    },
-                    "required": ["node_id", "importance"],
-                },
-            ),
-            types.Tool(
-                name="add_edge",
-                description="Add an agent-inferred edge between two nodes. Stored in agent-edges.json sidecar; never modifies graph.json.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "source": {"type": "string", "description": "Source node ID"},
-                        "target": {"type": "string", "description": "Target node ID"},
-                        "relation": {"type": "string", "description": "Edge relation type"},
-                        "peer_id": {"type": "string", "description": "Peer identifier (default: anonymous)"},
-                    },
-                    "required": ["source", "target", "relation"],
-                },
-            ),
-            types.Tool(
-                name="propose_vault_note",
-                description="Stage a proposed vault note for human approval. Does NOT write to the vault — only to graphify-out/proposals/.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "title": {"type": "string", "description": "Note title"},
-                        "note_type": {"type": "string", "default": "note", "description": "Note type (e.g., note, person, source)"},
-                        "body_markdown": {"type": "string", "description": "Full markdown content for the note body"},
-                        "suggested_folder": {"type": "string", "description": "Suggested vault folder path"},
-                        "tags": {"type": "array", "items": {"type": "string"}, "description": "Tags for the note"},
-                        "rationale": {"type": "string", "description": "Why the agent proposes this note"},
-                        "peer_id": {"type": "string", "default": "anonymous"},
-                    },
-                    "required": ["title", "body_markdown"],
-                },
-            ),
-            types.Tool(
-                name="get_annotations",
-                description="Query stored annotations, optionally filtered by peer, session, or time range.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "peer_id": {"type": "string", "description": "Filter by peer identifier"},
-                        "session_id": {"type": "string", "description": "Filter by session ID"},
-                        "time_from": {"type": "string", "description": "ISO-8601 lower bound (inclusive)"},
-                        "time_to": {"type": "string", "description": "ISO-8601 upper bound (inclusive)"},
-                    },
-                },
-            ),
-            types.Tool(
-                name="get_agent_edges",
-                description=(
-                    "Query agent-inferred edges from agent-edges.json, optionally filtered "
-                    "by peer_id, session_id, or node_id (matches source or target)."
-                ),
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "peer_id": {"type": "string", "description": "Filter by peer identifier"},
-                        "session_id": {"type": "string", "description": "Filter by session ID"},
-                        "node_id": {"type": "string", "description": "Filter edges involving a specific node (source or target)"},
-                    },
-                },
-            ),
-            types.Tool(
-                name="graph_summary",
-                description="Return a full graph-backed summary: god nodes, top communities, and delta from the most recent snapshot. Used by the /context slash command.",
-                inputSchema={"type": "object", "properties": {
-                    "top_n": {"type": "integer", "default": 10, "minimum": 1, "maximum": 50},
-                    "budget": {"type": "integer", "default": 500, "minimum": 50, "maximum": 100000},
-                }},
-            ),
-            types.Tool(
-                name="connect_topics",
-                description="Return the shortest path between two topics PLUS a separate block of globally surprising cross-community bridges (NOT filtered to the A-B path). Used by the /connect slash command.",
-                inputSchema={"type": "object", "properties": {
-                    "topic_a": {"type": "string"},
-                    "topic_b": {"type": "string"},
-                    "budget": {"type": "integer", "default": 500},
-                }, "required": ["topic_a", "topic_b"]},
-            ),
-            types.Tool(
-                name="entity_trace",
-                description="Return the evolution of a named entity across graph snapshots: first-seen, per-snapshot community and degree, current status. Used by the /trace slash command.",
-                inputSchema={"type": "object", "properties": {
-                    "entity": {"type": "string"},
-                    "budget": {"type": "integer", "default": 500},
-                }, "required": ["entity"]},
-            ),
-            types.Tool(
-                name="drift_nodes",
-                description="Return nodes whose community or centrality has trended consistently across recent snapshots. Used by the /drift slash command.",
-                inputSchema={"type": "object", "properties": {
-                    "top_n": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100},
-                    "max_snapshots": {"type": "integer", "default": 10, "minimum": 2, "maximum": 50},
-                    "budget": {"type": "integer", "default": 500},
-                }},
-            ),
-            types.Tool(
-                name="newly_formed_clusters",
-                description="Return communities that are new in the current graph compared to the most recent prior snapshot. Used by the /emerge slash command.",
-                inputSchema={"type": "object", "properties": {
-                    "budget": {"type": "integer", "default": 500},
-                }},
-            ),
-        ]
+        return build_mcp_tools()
 
     def _reload_if_stale() -> None:
         """Reload G and communities if graph.json mtime has changed (D-13).
@@ -1889,6 +1650,70 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             communities = _communities_from_graph(G)
             _branching_factor = _compute_branching_factor(G)
             _graph_mtime = mtime
+
+    def _maybe_reload_dedup() -> None:
+        nonlocal _alias_map, _dedup_mtime
+        p = _out_dir / "dedup_report.json"
+        try:
+            mt = p.stat().st_mtime if p.exists() else 0.0
+        except OSError:
+            mt = 0.0
+        if mt != _dedup_mtime:
+            _alias_map = _load_dedup_report(_out_dir)
+            _dedup_mtime = mt
+
+    def _manifest_source_paths() -> list[Path]:
+        pkg = Path(__file__).resolve().parent
+        return [
+            pkg / "mcp_tool_registry.py",
+            pkg / "capability.py",
+            pkg / "capability_tool_meta.yaml",
+        ]
+
+    def _sidecar_paths_for_manifest() -> list[Path]:
+        return [
+            Path(graph_path),
+            _out_dir / "dedup_report.json",
+            _out_dir / "telemetry.json",
+            _out_dir / "annotations.jsonl",
+            _out_dir / "agent-edges.json",
+            _out_dir / "enrichment.json",
+        ]
+
+    def _manifest_invalidation_tuple() -> tuple[float, ...]:
+        t: list[float] = []
+        for p in _manifest_source_paths() + _sidecar_paths_for_manifest():
+            try:
+                t.append(p.stat().st_mtime)
+            except OSError:
+                t.append(0.0)
+        return tuple(t)
+
+    def _get_manifest_hash() -> str:
+        nonlocal _manifest_sig, _manifest_hash_val
+        sig = _manifest_invalidation_tuple()
+        if _manifest_hash_val is not None and _manifest_sig == sig:
+            return _manifest_hash_val
+        from graphify.capability import build_manifest_dict, canonical_manifest_hash
+
+        h = canonical_manifest_hash(build_manifest_dict())
+        _manifest_hash_val = h
+        _manifest_sig = sig
+        return h
+
+    def _merge_manifest_meta(text: str, manifest_hash: str) -> str:
+        if QUERY_GRAPH_META_SENTINEL in text:
+            body, rest = text.split(QUERY_GRAPH_META_SENTINEL, 1)
+            try:
+                meta = json.loads(rest.strip())
+            except json.JSONDecodeError:
+                meta = {"status": "ok", "meta_parse_error": True}
+            if not isinstance(meta, dict):
+                meta = {"status": "ok", "meta_shape_error": True}
+            meta["manifest_content_hash"] = manifest_hash
+            return body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+        meta = {"status": "ok", "manifest_content_hash": manifest_hash}
+        return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
     def _tool_query_graph(arguments: dict) -> str:
         # Phase 9.2 D-02: synchronous dispatch returning str. The hybrid response format
@@ -2143,6 +1968,74 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
         return _run_newly_formed_clusters(G, communities, _out_dir.parent, arguments)
 
+    def _file_mtime_or_zero(path: Path) -> float:
+        try:
+            return path.stat().st_mtime
+        except OSError:
+            return 0.0
+
+    def _enrichment_snapshot_id() -> str | None:
+        p = _out_dir / "enrichment.json"
+        if not p.exists():
+            return None
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+        if not isinstance(data, dict):
+            return None
+        sid = data.get("snapshot_id", data.get("version"))
+        return str(sid) if sid is not None else None
+
+    def _tool_capability_describe(arguments: dict) -> str:
+        """MANIFEST-03: static manifest + live non-secret scalars (T-13-01)."""
+        del arguments  # reserved
+        _reload_if_stale()
+        _maybe_reload_dedup()
+        from graphify.capability import build_manifest_dict
+
+        md = build_manifest_dict()
+        lines = [
+            "## Capability",
+            "",
+            f"**Tools (manifest):** {len(md.get('CAPABILITY_TOOLS', []))}",
+            f"**graphify version:** {md.get('graphify_version', '')}",
+            "",
+            "## Live graph",
+            "",
+        ]
+        gp = Path(graph_path)
+        if gp.exists():
+            lines += [
+                f"- nodes: {G.number_of_nodes()}",
+                f"- edges: {G.number_of_edges()}",
+                f"- communities: {len(communities)}",
+            ]
+        else:
+            lines.append("- (no graph loaded)")
+        lines += ["", "## Sidecars", ""]
+        lines.append(f"- alias_map entries: {len(_alias_map)}")
+        lines.append(f"- enrichment snapshot_id: {json.dumps(_enrichment_snapshot_id())}")
+        for label, rel in [
+            ("graph.json", None),
+            ("dedup_report.json", "dedup_report.json"),
+            ("telemetry.json", "telemetry.json"),
+            ("annotations.jsonl", "annotations.jsonl"),
+            ("agent-edges.json", "agent-edges.json"),
+            ("enrichment.json", "enrichment.json"),
+        ]:
+            p = gp if rel is None else _out_dir / rel
+            lines.append(f"- {label} mtime: {_file_mtime_or_zero(p)}")
+        text_body = "\n".join(lines)
+        meta = {
+            "status": "ok",
+            "layer": 0,
+            "search_strategy": "capability_describe",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+        }
+        return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
     _handlers = {
         "query_graph": _tool_query_graph,
         "get_node": _tool_get_node,
@@ -2162,17 +2055,25 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "entity_trace": _tool_entity_trace,
         "drift_nodes": _tool_drift_nodes,
         "newly_formed_clusters": _tool_newly_formed_clusters,
+        "capability_describe": _tool_capability_describe,
     }
+
+    _reg_tools = build_mcp_tools()
+    if {t.name for t in _reg_tools} != set(_handlers.keys()):
+        raise RuntimeError("MCP tool registry and _handlers keys must match (MANIFEST-05)")
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+        _maybe_reload_dedup()
+        mh = _get_manifest_hash()
         handler = _handlers.get(name)
         if not handler:
-            return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
+            return [types.TextContent(type="text", text=_merge_manifest_meta(f"Unknown tool: {name}", mh))]
         try:
-            return [types.TextContent(type="text", text=handler(arguments))]
+            raw = handler(arguments)
+            return [types.TextContent(type="text", text=_merge_manifest_meta(raw, mh))]
         except Exception as exc:
-            return [types.TextContent(type="text", text=f"Error executing {name}: {exc}")]
+            return [types.TextContent(type="text", text=_merge_manifest_meta(f"Error executing {name}: {exc}", mh))]
 
     import asyncio
 

@@ -1054,6 +1054,8 @@ def main() -> None:
         print("    --to <path>            compare TO this snapshot (for delta generation)")
         print("    --delta                also generate GRAPH_DELTA.md comparing against previous snapshot")
         print("  benchmark [graph.json]  measure token reduction vs naive full-corpus approach")
+        print("  capability [--stdout|--validate]  MCP capability manifest JSON / drift gate (Phase 13)")
+        print("  run [path] [--router]     AST extract with optional heterogeneous model routing (Phase 12)")
         print("  hook install            install post-commit/post-checkout git hooks (all platforms)")
         print("  hook uninstall          remove git hooks")
         print("  hook status             check if git hooks are installed")
@@ -1754,6 +1756,34 @@ def main() -> None:
             source_nodes=opts.nodes or None,
         )
         print(f"Saved to {out}")
+    elif cmd == "capability":
+        # graphify capability [--stdout|--validate]
+        rest = list(sys.argv[2:])
+        from graphify.capability import print_manifest_stdout, validate_cli
+
+        if "--stdout" in rest:
+            print_manifest_stdout()
+            sys.exit(0)
+        if "--validate" in rest:
+            code, err = validate_cli()
+            if err:
+                print(err, file=sys.stderr, end="")
+            sys.exit(code)
+        print("Usage: graphify capability --stdout | graphify capability --validate", file=sys.stderr)
+        sys.exit(2)
+    elif cmd == "run":
+        # graphify run [path] [--router]
+        from graphify.pipeline import run_corpus
+
+        rest = list(sys.argv[2:])
+        use_router = "--router" in rest
+        rest = [a for a in rest if a != "--router"]
+        raw_target = rest[0] if rest else "."
+        target = Path(raw_target).resolve()
+        if not target.exists():
+            print(f"error: path not found: {target}", file=sys.stderr)
+            sys.exit(2)
+        run_corpus(target, use_router=use_router)
     elif cmd == "benchmark":
         from graphify.benchmark import run_benchmark, print_benchmark
         graph_path = sys.argv[2] if len(sys.argv) > 2 else "graphify-out/graph.json"

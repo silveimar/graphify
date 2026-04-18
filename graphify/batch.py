@@ -12,6 +12,8 @@ from pathlib import Path
 
 import networkx as nx
 
+from graphify.routing import ResolvedRoute, Router
+
 _DEFAULT_TOKEN_BUDGET = 50_000
 _CHARS_PER_TOKEN = 4  # conservative heuristic (RESEARCH Pattern 8, A3)
 
@@ -210,3 +212,19 @@ def _estimate_tokens(files: list[str]) -> int:
         except OSError:
             total += 4000  # ~1000-token fallback per missing file
     return max(1, total // _CHARS_PER_TOKEN)
+
+
+def max_tier_route(cluster_files: list[Path], router: Router) -> ResolvedRoute:
+    """Return the highest tier route among cluster members (Phase 12, CONTEXT D-01).
+
+    Ordering: trivial < simple < complex < vision.
+    """
+    if not cluster_files:
+        return ResolvedRoute(tier="trivial", model_id="", endpoint="", skip_extraction=False)
+    best: ResolvedRoute | None = None
+    for p in cluster_files:
+        r: ResolvedRoute = router.resolve(p)
+        if best is None or r.rank() > best.rank():
+            best = r
+    assert best is not None
+    return best

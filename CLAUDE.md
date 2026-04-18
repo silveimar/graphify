@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Test Commands
 
 ```bash
-pip install -e ".[all]"          # install with all optional deps (mcp, neo4j, pdf, watch, leiden, office)
+pip install -e ".[all]"          # install with all optional deps (mcp, neo4j, pdf, watch, leiden, office, routing)
 pip install -e ".[mcp,pdf,watch]" # install with CI-matching deps
+pip install -e ".[routing]"      # PyYAML + radon for heterogeneous routing (Phase 12)
 pytest tests/ -q                  # run all tests
 pytest tests/test_extract.py -q   # run a single test file
 pytest tests/test_extract.py::test_name -q  # run a single test

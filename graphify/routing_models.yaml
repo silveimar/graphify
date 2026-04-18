@@ -1,0 +1,42 @@
+# Declarative model mapping per complexity tier (ROUTE-02). Safe defaults merged in code when keys omitted.
+# Tier order for max-selection: trivial < simple < complex < vision
+
+tiers:
+  trivial:
+    model_id: "anthropic/claude-3-5-haiku-latest"
+    endpoint: "https://api.anthropic.com/v1/messages"
+  simple:
+    model_id: "anthropic/claude-3-5-sonnet-latest"
+    endpoint: "https://api.anthropic.com/v1/messages"
+  complex:
+    model_id: "anthropic/claude-3-5-opus-latest"
+    endpoint: "https://api.anthropic.com/v1/messages"
+
+# Vision slot (ROUTE-10). Empty model_id => router returns skip sentinel (no vision extraction).
+vision:
+  model_id: ""
+  endpoint: "https://api.anthropic.com/v1/messages"
+
+# Optional image alias (same as vision for routing)
+image:
+  model_id: ""
+  endpoint: "https://api.anthropic.com/v1/messages"
+
+# YAML-driven tunability (D-05); merged with Router defaults when omitted
+thresholds:
+  trivial_max_cc: 5
+  simple_max_cc: 15
+  trivial_max_lines: 80
+  simple_max_lines: 400
+
+weights:
+  import_weight: 1.0
+  nesting_weight: 1.2
+  symbol_weight: 0.5
+
+# P2: canary every Nth cheap-routed file (see routing_canary.py)
+canary:
+  every_n: 20
+
+# P2: optional USD per 1M tokens (rough); if absent, cost uses tier weights only
+pricing: {}

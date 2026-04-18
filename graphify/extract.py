@@ -5,11 +5,17 @@ import json
 import os
 import re
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Any
+from typing import Callable, Any, TYPE_CHECKING
 from datetime import datetime, timezone
 from .cache import load_cached, save_cached, file_hash
+
+if TYPE_CHECKING:
+    from graphify.routing import Router
+    from graphify.routing_audit import RoutingAudit
 
 
 def _make_id(*parts: str) -> str:
@@ -2649,16 +2655,26 @@ def _check_tree_sitter_version() -> None:
         )
 
 
-def extract(paths: list[Path]) -> dict:
+def extract(
+    paths: list[Path],
+    *,
+    router: Router | None = None,
+    audit: RoutingAudit | None = None,
+) -> dict:
     """Extract AST nodes and edges from a list of code files.
 
     Two-pass process:
     1. Per-file structural extraction (classes, functions, imports)
     2. Cross-file import resolution: turns file-level imports into
        class-level INFERRED edges (DigestAuth --uses--> Response)
+
+    When *router* is set (Phase 12), per-file cache keys include ``model_id`` and
+    extraction runs in a thread pool with ROUTE-07 slot limits.
     """
+    from graphify.routing import Router as _Router
+    from graphify.routing_cost import enforce_cost_ceiling
+
     _check_tree_sitter_version()
-    per_file: list[dict] = []
 
     # Infer a common root for cache keys
     try:
@@ -2674,6 +2690,10 @@ def extract(paths: list[Path]) -> dict:
             root = Path(*paths[0].parts[:common_len]) if common_len else Path(".")
     except Exception:
         root = Path(".")
+
+    if router is not None:
+        # GRAPHIFY_COST_CEILING (see graphify.routing_cost)
+        enforce_cost_ceiling(paths, router)
 
     _DISPATCH: dict[str, Any] = {
         ".py": extract_python,
@@ -2710,39 +2730,116 @@ def extract(paths: list[Path]) -> dict:
         ".svelte": extract_js,
     }
 
+    per_file: list[dict | None] = [None] * len(paths)
+
+    def _pick_extractor(path: Path):
+        if path.name.endswith(".blade.php"):
+            return extract_blade
+        return _DISPATCH.get(path.suffix)
+
+    def _extract_pair(item: tuple[int, Path]) -> tuple[int, dict | None]:
+        i, path = item
+        extractor = _pick_extractor(path)
+        if extractor is None:
+            return i, None
+        mid = ""
+        resolved = None
+        if router is not None:
+            assert isinstance(router, _Router)
+            resolved = router.resolve(path)
+            if resolved.skip_extraction:
+                empty = {"nodes": [], "edges": [], "input_tokens": 0, "output_tokens": 0}
+                if audit is not None:
+                    audit.record(
+                        path,
+                        resolved.tier,
+                        resolved.model_id,
+                        resolved.endpoint,
+                        0,
+                        0.0,
+                    )
+                return i, empty
+            mid = resolved.model_id
+        try:
+            cached = load_cached(path, root, model_id=mid)
+        except ValueError:
+            cached = None
+        if cached is not None:
+            if audit is not None and resolved is not None:
+                audit.record(
+                    path,
+                    resolved.tier,
+                    resolved.model_id,
+                    resolved.endpoint,
+                    0,
+                    0.0,
+                )
+            return i, cached
+        ctx = router.enter_slot() if router is not None else _nullcontext()
+        with ctx:
+            t0 = time.perf_counter()
+            result = extractor(path)
+            ms = (time.perf_counter() - t0) * 1000.0
+        if audit is not None and resolved is not None:
+            audit.record(
+                path,
+                resolved.tier,
+                resolved.model_id,
+                resolved.endpoint,
+                0,
+                ms,
+            )
+        if "error" not in result:
+            try:
+                save_cached(path, result, root, model_id=mid)
+            except ValueError:
+                pass
+        return i, result
+
     total = len(paths)
     _PROGRESS_INTERVAL = 100
-    for i, path in enumerate(paths):
-        if total >= _PROGRESS_INTERVAL and i % _PROGRESS_INTERVAL == 0 and i > 0:
-            print(f"  AST extraction: {i}/{total} files ({i * 100 // total}%)", flush=True)
-        # .blade.php must be checked before suffix lookup since Path.suffix returns .php
-        if path.name.endswith(".blade.php"):
-            extractor = extract_blade
-        else:
-            extractor = _DISPATCH.get(path.suffix)
-        if extractor is None:
-            continue
-        cached = load_cached(path, root)
-        if cached is not None:
-            per_file.append(cached)
-            continue
-        result = extractor(path)
-        if "error" not in result:
-            save_cached(path, result, root)
-        per_file.append(result)
+
+    class _nullcontext:
+        def __enter__(self) -> None:
+            return None
+
+        def __exit__(self, *exc: object) -> None:
+            return None
+
+    if router is None:
+        for i, path in enumerate(paths):
+            if total >= _PROGRESS_INTERVAL and i % _PROGRESS_INTERVAL == 0 and i > 0:
+                print(f"  AST extraction: {i}/{total} files ({i * 100 // total}%)", flush=True)
+            ii, res = _extract_pair((i, path))
+            per_file[ii] = res
+    else:
+        workers = max(1, int(os.environ.get("GRAPHIFY_EXTRACT_WORKERS", "4")))
+
+        def _work(item: tuple[int, Path]) -> tuple[int, dict | None]:
+            i, path = item
+            if total >= _PROGRESS_INTERVAL and i % _PROGRESS_INTERVAL == 0 and i > 0:
+                print(f"  AST extraction: {i}/{total} files ({i * 100 // total}%)", flush=True)
+            return _extract_pair((i, path))
+
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            for i, res in ex.map(_work, enumerate(paths)):
+                per_file[i] = res
+
     if total >= _PROGRESS_INTERVAL:
         print(f"  AST extraction: {total}/{total} files (100%)", flush=True)
 
     all_nodes: list[dict] = []
     all_edges: list[dict] = []
     for result in per_file:
+        if result is None:
+            continue
         all_nodes.extend(result.get("nodes", []))
         all_edges.extend(result.get("edges", []))
 
-    # Add cross-file class-level edges (Python only - uses Python parser internally)
-    py_paths = [p for p in paths if p.suffix == ".py"]
+    py_indices = [i for i, p in enumerate(paths) if p.suffix == ".py" and per_file[i] is not None]
+    py_paths = [paths[i] for i in py_indices]
+    py_results = [per_file[i] for i in py_indices]
     if py_paths:
-        py_results = [r for r, p in zip(per_file, paths) if p.suffix == ".py"]
         try:
             cross_file_edges = _resolve_cross_file_imports(py_results, py_paths)
             all_edges.extend(cross_file_edges)

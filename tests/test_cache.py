@@ -1,7 +1,16 @@
 """Tests for graphify/cache.py."""
 import pytest
 from pathlib import Path
-from graphify.cache import file_hash, cache_dir, load_cached, save_cached, cached_files, clear_cache, _body_content
+from graphify.cache import (
+    file_hash,
+    cache_dir,
+    load_cached,
+    save_cached,
+    save_semantic_cache,
+    cached_files,
+    clear_cache,
+    _body_content,
+)
 
 
 @pytest.fixture
@@ -112,6 +121,46 @@ def test_non_md_file_hashed_fully(tmp_path):
     f.write_text("# changed comment\nx = 1")
     h2 = file_hash(f)
     assert h1 != h2
+
+
+def test_model_id_splits_cache(tmp_path, cache_root):
+    """ROUTE-04: different model_id → different cache paths; empty matches legacy key."""
+    f = tmp_path / "a.py"
+    f.write_text("print(1)", encoding="utf-8")
+    h0 = file_hash(f)
+    h1 = file_hash(f, model_id="m-a")
+    h2 = file_hash(f, model_id="m-b")
+    assert h0 != h1
+    assert h1 != h2
+    assert ":" not in h0
+    assert ":m-a" in h1
+    save_cached(f, {"nodes": [], "edges": []}, root=cache_root, model_id="m-a")
+    save_cached(f, {"nodes": [{"id": "x"}], "edges": []}, root=cache_root, model_id="m-b")
+    assert load_cached(f, root=cache_root, model_id="m-a") == {"nodes": [], "edges": []}
+    assert load_cached(f, root=cache_root, model_id="m-b")["nodes"][0]["id"] == "x"
+
+
+def test_model_id_path_rejected(tmp_path):
+    import pytest
+
+    f = tmp_path / "x.py"
+    f.write_text("a = 1")
+    with pytest.raises(ValueError):
+        file_hash(f, model_id="../evil")
+
+
+def test_semantic_cache_model_id(tmp_path, cache_root):
+    """save_semantic_cache passes model_id into per-file save_cached."""
+    f = tmp_path / "s.py"
+    f.write_text("a = 1", encoding="utf-8")
+    absf = str(f.resolve())
+    save_semantic_cache(
+        [{"id": "n1", "source_file": absf, "label": "a"}],
+        [],
+        root=cache_root,
+        model_id="tier1",
+    )
+    assert load_cached(f, root=cache_root, model_id="tier1") is not None
 
 
 def test_body_content_strips_frontmatter():

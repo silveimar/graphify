@@ -27,14 +27,13 @@ def _read(name: str) -> str:
 
 
 def _registered_tool_names() -> set[str]:
-    """Regex-extract every types.Tool(name="...") from graphify/serve.py source.
+    """Regex-extract every types.Tool(name="...") from MCP registry source.
 
-    serve.py builds _handlers inside a closure, so direct introspection would
-    require standing up the MCP runtime. Regex over source is sufficient for a
-    drift detector (plan-checker WARNING 3 fix).
+    Tools live in graphify/mcp_tool_registry.py (Phase 13); serve.py imports
+    build_mcp_tools(). Regex over source is sufficient for a drift detector.
     """
-    serve_src = (Path(graphify.__file__).parent / "serve.py").read_text(encoding="utf-8")
-    return set(re.findall(r'types\.Tool\s*\(\s*name="([^"]+)"', serve_src))
+    reg_src = (Path(graphify.__file__).parent / "mcp_tool_registry.py").read_text(encoding="utf-8")
+    return set(re.findall(r'types\.Tool\s*\(\s*name="([^"]+)"', reg_src))
 
 
 def test_command_files_exist_in_package():
@@ -95,7 +94,7 @@ def test_parameterized_commands_reference_arguments():
 
 
 def test_command_files_reference_registered_tools():
-    """Every tool name used by a command file must be registered in serve.py.
+    """Every tool name used by a command file must be registered in the MCP registry.
 
     Plan-checker WARNING 3: detects tool-name drift. If serve.py renames
     `graph_summary` to `graph_digest` but context.md still says `graph_summary`,
@@ -105,7 +104,7 @@ def test_command_files_reference_registered_tools():
     referenced = set(CORE_COMMANDS.values())
     missing = referenced - registered
     assert not missing, (
-        f"Command files reference tools not registered in serve.py: {sorted(missing)}. "
+        f"Command files reference tools not registered in mcp_tool_registry.py: {sorted(missing)}. "
         f"Registered tools: {sorted(registered)}"
     )
 

@@ -299,6 +299,16 @@ def to_json(G: nx.Graph, communities: dict[int, list[str]], output_path: str) ->
     data["hyperedges"] = getattr(G, "graph", {}).get("hyperedges", [])
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+    # MANIFEST-02: runtime manifest alongside graph.json (same success path).
+    try:
+        from graphify.capability import write_runtime_manifest
+
+        write_runtime_manifest(Path(output_path).parent)
+    except Exception as exc:
+        raise RuntimeError(
+            "graphify-out/manifest.json could not be written; install graphify with [mcp] extras "
+            "(jsonschema, PyYAML) or see prior exception"
+        ) from exc
 
 
 def _cypher_escape(s: str) -> str:

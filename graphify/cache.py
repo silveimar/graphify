@@ -17,12 +17,8 @@ def _body_content(content: bytes) -> bytes:
     return content
 
 
-def file_hash(path: Path) -> str:
-    """SHA256 of file contents + resolved path. Prevents cache collisions on identical content.
-
-    For Markdown files (.md), only the body below the YAML frontmatter is hashed,
-    so metadata-only changes (e.g. reviewed, status, tags) do not invalidate the cache.
-    """
+def _inner_hash(path: Path) -> str:
+    """SHA256 of file contents + resolved path (legacy cache key body)."""
     p = Path(path)
     raw = p.read_bytes()
     content = _body_content(raw) if p.suffix.lower() == ".md" else raw
@@ -33,6 +29,44 @@ def file_hash(path: Path) -> str:
     return h.hexdigest()
 
 
+def _sanitize_model_id(model_id: str) -> str:
+    """Reject path-like model_id values (cache poisoning / traversal)."""
+    if ".." in model_id or "/" in model_id or "\\" in model_id:
+        raise ValueError("model_id must not contain path segments or '..'")
+    if not model_id:
+        return ""
+    # Reasonable length cap
+    if len(model_id) > 512:
+        raise ValueError("model_id too long")
+    return model_id
+
+
+def _cache_key_string(inner: str, model_id: str) -> str:
+    """ROUTE-04: returned file_hash string; empty model_id preserves legacy 64-char hex."""
+    if not model_id:
+        return inner
+    return f"{inner}:{model_id}"
+
+
+def _cache_json_filename(key: str) -> str:
+    """Map logical cache key to a filesystem-safe .json basename (no ':' on Windows)."""
+    if ":" not in key:
+        return f"{key}.json"
+    return f"{hashlib.sha256(key.encode('utf-8')).hexdigest()}.json"
+
+
+def file_hash(path: Path, model_id: str = "") -> str:
+    """SHA256 of file contents + resolved path, optional ROUTE-04 model_id suffix.
+
+    When ``model_id`` is empty, returns the legacy 64-char hex digest only.
+    When non-empty, returns ``hexdigest + ':' + model_id`` and uses a hashed
+    filename under ``graphify-out/cache/`` so paths stay portable.
+    """
+    _sanitize_model_id(model_id)
+    inner = _inner_hash(path)
+    return _cache_key_string(inner, model_id)
+
+
 def cache_dir(root: Path = Path(".")) -> Path:
     """Returns graphify-out/cache/ - creates it if needed."""
     d = Path(root) / "graphify-out" / "cache"
@@ -40,18 +74,15 @@ def cache_dir(root: Path = Path(".")) -> Path:
     return d
 
 
-def load_cached(path: Path, root: Path = Path(".")) -> dict | None:
-    """Return cached extraction for this file if hash matches, else None.
-
-    Cache key: SHA256 of file contents.
-    Cache value: stored as graphify-out/cache/{hash}.json
-    Returns None if no cache entry or file has changed.
-    """
+def load_cached(path: Path, root: Path = Path("."), *, model_id: str = "") -> dict | None:
+    """Return cached extraction for this file if hash matches, else None."""
     try:
-        h = file_hash(path)
+        key = file_hash(path, model_id=model_id)
+    except ValueError:
+        return None
     except OSError:
         return None
-    entry = cache_dir(root) / f"{h}.json"
+    entry = cache_dir(root) / _cache_json_filename(key)
     if not entry.exists():
         return None
     try:
@@ -60,14 +91,16 @@ def load_cached(path: Path, root: Path = Path(".")) -> dict | None:
         return None
 
 
-def save_cached(path: Path, result: dict, root: Path = Path(".")) -> None:
-    """Save extraction result for this file.
-
-    Stores as graphify-out/cache/{hash}.json where hash = SHA256 of current file contents.
-    result should be a dict with 'nodes' and 'edges' lists.
-    """
-    h = file_hash(path)
-    entry = cache_dir(root) / f"{h}.json"
+def save_cached(
+    path: Path,
+    result: dict,
+    root: Path = Path("."),
+    *,
+    model_id: str = "",
+) -> None:
+    """Save extraction result for this file under a key that includes optional ``model_id``."""
+    key = file_hash(path, model_id=model_id)
+    entry = cache_dir(root) / _cache_json_filename(key)
     tmp = entry.with_suffix(".tmp")
     try:
         tmp.write_text(json.dumps(result), encoding="utf-8")
@@ -78,9 +111,12 @@ def save_cached(path: Path, result: dict, root: Path = Path(".")) -> None:
 
 
 def cached_files(root: Path = Path(".")) -> set[str]:
-    """Return set of file paths that have a valid cache entry (hash still matches)."""
+    """Return set of cache key stems present (legacy hex or hashed names)."""
     d = cache_dir(root)
-    return {p.stem for p in d.glob("*.json")}
+    out: set[str] = set()
+    for p in d.glob("*.json"):
+        out.add(p.stem)
+    return out
 
 
 def clear_cache(root: Path = Path(".")) -> None:
@@ -93,19 +129,17 @@ def clear_cache(root: Path = Path(".")) -> None:
 def check_semantic_cache(
     files: list[str],
     root: Path = Path("."),
+    *,
+    model_id: str = "",
 ) -> tuple[list[dict], list[dict], list[dict], list[str]]:
-    """Check semantic extraction cache for a list of absolute file paths.
-
-    Returns (cached_nodes, cached_edges, cached_hyperedges, uncached_files).
-    Uncached files need Claude extraction; cached files are merged directly.
-    """
+    """Check semantic extraction cache for a list of absolute file paths."""
     cached_nodes: list[dict] = []
     cached_edges: list[dict] = []
     cached_hyperedges: list[dict] = []
     uncached: list[str] = []
 
     for fpath in files:
-        result = load_cached(Path(fpath), root)
+        result = load_cached(Path(fpath), root, model_id=model_id)
         if result is not None:
             cached_nodes.extend(result.get("nodes", []))
             cached_edges.extend(result.get("edges", []))
@@ -121,12 +155,10 @@ def save_semantic_cache(
     edges: list[dict],
     hyperedges: list[dict] | None = None,
     root: Path = Path("."),
+    *,
+    model_id: str = "",
 ) -> int:
-    """Save semantic extraction results to cache, keyed by source_file.
-
-    Groups nodes and edges by source_file, then saves one cache entry per file.
-    Returns the number of files cached.
-    """
+    """Save semantic extraction results to cache, keyed by source_file."""
     from collections import defaultdict
 
     by_file: dict[str, dict] = defaultdict(lambda: {"nodes": [], "edges": [], "hyperedges": []})
@@ -149,6 +181,6 @@ def save_semantic_cache(
         if not p.is_absolute():
             p = Path(root) / p
         if p.exists():
-            save_cached(p, result, root)
+            save_cached(p, result, root, model_id=model_id)
             saved += 1
     return saved

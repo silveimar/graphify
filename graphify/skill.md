@@ -2,6 +2,7 @@
 name: graphify
 description: any input (code, docs, papers, images) → knowledge graph → clustered communities → HTML + JSON + audit report
 trigger: /graphify
+capability_manifest: graphify-out/manifest.json
 ---
 
 # /graphify
@@ -15,6 +16,7 @@ Turn any folder of files into a navigable knowledge graph with community detecti
 /graphify <path>                                      # full pipeline on specific path
 /graphify <path> --mode deep                          # thorough extraction, richer INFERRED edges
 /graphify <path> --update                             # incremental - re-extract only new/changed files
+/graphify <path> --router                            # heterogeneous model routing (CLI: `graphify run <path> --router`, Phase 12)
 /graphify <path> --directed                            # build directed graph (preserves edge direction: source→target)
 /graphify <path> --whisper-model medium                # use a larger Whisper model for better transcription accuracy
 /graphify <path> --cluster-only                       # rerun clustering on existing graph
