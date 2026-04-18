@@ -37,8 +37,8 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 - [ ] **MANIFEST-06**: Each tool entry declares `cost_class: free|cheap|expensive`, `deterministic: bool`, `cacheable_until`, `composable_from: [tool_name]` so agents can reason about cost + composition before calling
 - [ ] **MANIFEST-07**: A manifest content-hash is embedded in every MCP response envelope meta so agents detect drift between what was advertised and what responded (Pitfall 13 mitigation)
 - [ ] **MANIFEST-08**: Skill frontmatter gains a `capability_manifest: graphify-out/manifest.json` line so other skills can discover graphify's surface declaratively
-- [ ] **MANIFEST-09** `[P2]`: CI gate `graphify capability --validate` fails builds when manifest drifts from `serve.py` registrations
-- [ ] **MANIFEST-10** `[P2]`: Per-tool usage examples auto-extracted from docstrings and embedded under `_meta.examples` (extends MCP `_meta` publisher-provided metadata namespace)
+- [x] **MANIFEST-09** `[P2]`: CI gate `graphify capability --validate` fails builds when manifest drifts from `serve.py` registrations
+- [x] **MANIFEST-10** `[P2]`: Per-tool usage examples auto-extracted from docstrings and embedded under `_meta.examples` (extends MCP `_meta` publisher-provided metadata namespace)
 
 ### Harness Memory Export (SEED-002 — export-only in v1.4, claude.yaml only)
 
@@ -202,8 +202,8 @@ Priority tags: `[P2]` indicates the requirement is in v1.4 scope per user confir
 | MANIFEST-06 | Phase 13 | TBD | planned | — |
 | MANIFEST-07 | Phase 13 | TBD | planned | — |
 | MANIFEST-08 | Phase 13 | TBD | planned | — |
-| MANIFEST-09 [P2] | Phase 13 | TBD | planned | — |
-| MANIFEST-10 [P2] | Phase 13 | TBD | planned | — |
+| MANIFEST-09 [P2] | Phase 13 | 13-02 | complete | 2026-04-17 |
+| MANIFEST-10 [P2] | Phase 13 | 13-02 | complete | 2026-04-17 |
 | HARNESS-01 | Phase 13 | TBD | planned | — |
 | HARNESS-02 | Phase 13 | TBD | planned | — |
 | HARNESS-03 | Phase 13 | TBD | planned | — |

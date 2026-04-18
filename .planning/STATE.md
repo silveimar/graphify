@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: Phase 13 Plan 01 complete + committed (MANIFEST-01..08 shipped, 1263 tests passing); Plans 02/03/04 (MANIFEST-09/10, HARNESS-01..08) ready to execute
-stopped_at: Safety commits cf788b7 (phase-12 + plan-01 code) and 254a622 (plans 02/03/04) landed on main — ready for /gsd-execute-phase 13 --auto on clean HEAD
-last_updated: "2026-04-18T02:00:00.000Z"
+status: Phase 13 Plans 01 + 02 complete (MANIFEST-01..10 shipped, 1273 tests passing); Plans 03/04 (HARNESS-01..08) ready to execute
+stopped_at: Plan 13-02 executed on main — da02ed7 (CI drift gate, MANIFEST-09), aab4967 (RED), c1c987e (GREEN, MANIFEST-10). server.json hash rolled forward to d066e4e1. Ready for /gsd-execute-phase 13 to continue with 13-03.
+last_updated: "2026-04-18T03:07:00.000Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 10
-  completed_plans: 7
+  completed_plans: 8
   percent: 14
 ---
 
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 ## Current Position
 
-Phase: 13 Agent Capability Manifest — Plan 01 (Wave A) complete + committed; Plans 02/03/04 ready to execute
-Plan: 13-02 (Wave 1, MANIFEST-09/10) next for `/gsd-execute-phase 13 --auto`
+Phase: 13 Agent Capability Manifest — Plans 01 + 02 (Wave A plumbing + MANIFEST-09/10 CI gate + docstring examples) complete + committed; Plans 03/04 ready to execute
+Plan: 13-03 (Wave 1, HARNESS-01..06 — SEED-002 harness export core) next for `/gsd-execute-phase 13`
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17)
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Phase 12 complete. Phase 13 Plan 01 (MANIFEST-01..08) shipped — `capability.py`, `mcp_tool_registry.py`, `server.json`, `capability_describe` MCP tool, `graphify capability --stdout/--validate` CLI all on main. 1263 tests pass. Next: `/gsd-execute-phase 13 --auto` runs Plans 02/03/04 in three waves (MANIFEST-09/10 → HARNESS-01..06 → HARNESS-07/08).
-Last activity: 2026-04-17 — safety commits cf788b7 (phase-12 + plan-01) and 254a622 (plans 02/03/04) landed; HEAD now reflects working-tree state for clean worktree-executor base
+Status: Phase 12 complete. Phase 13 Plans 01 + 02 shipped — MANIFEST-01..10 closed. `capability.py` now exposes `extract_tool_examples`; every CAPABILITY_TOOLS entry carries `_meta.examples: list[str]`; CI runs `graphify capability --validate` as a non-bypassable drift gate on both 3.10 and 3.12. `server.json` hash rolled forward to `d066e4e1…`. 1273 tests pass. Next: `/gsd-execute-phase 13` runs Plans 03 (HARNESS-01..06) then 04 (HARNESS-07/08).
+Last activity: 2026-04-17 — commits da02ed7 (CI gate) + aab4967 (RED) + c1c987e (GREEN) closed MANIFEST-09/10 atomically on main
 
 Progress: [█░░░░░░░░░] 14% (1/7 phases complete)
 
@@ -128,6 +128,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-17T23:35:00.000Z
-Stopped at: Phase 12 execution verified (`pytest`: 1257 passed); chain advance to Phase 13.
-Next action (auto-chain): choose next phase from build order — e.g. `/gsd-discuss-phase 18` or `/gsd-discuss-phase 13` (no `13-CONTEXT.md` / `18-CONTEXT.md` yet unless created). Install `gsd-sdk` locally for full GSD `phase.complete` and automated commits.
+Last session: 2026-04-18T03:07:00.000Z
+Stopped at: Phase 13 Plan 02 executed (`pytest`: 1273 passed). MANIFEST-09 CI drift gate wired; MANIFEST-10 docstring `_meta.examples` extraction shipped; `server.json` hash rolled to `d066e4e1…`.
+Next action: `/gsd-execute-phase 13` to run Plan 13-03 (SEED-002 harness export core, HARNESS-01..06), followed by Plan 13-04 (HARNESS-07/08 P2). `gsd-sdk` still unavailable in local env — STATE.md and ROADMAP.md updated by hand; consider installing `gsd-sdk` before the next execution for automated progress tracking.
