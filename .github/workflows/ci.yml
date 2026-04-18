@@ -34,3 +34,7 @@ jobs:
         run: |
           graphify --help
           graphify install
+
+      - name: Verify MCP capability manifest has not drifted
+        run: |
+          graphify capability --validate

@@ -65,3 +65,67 @@ def test_pipeline_writes_manifest_json(tmp_path: Path) -> None:
     assert man.exists()
     data = json.loads(man.read_text(encoding="utf-8"))
     validate_manifest(data)
+
+
+# -------------------------------------------------------------------------
+# Phase 13 Plan 02 — MANIFEST-09 CI drift gate tests (D-03 stderr contract)
+# -------------------------------------------------------------------------
+
+
+def test_validate_cli_drift_detected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MANIFEST-09 + D-03: committed hash differs from live → non-zero exit,
+    stderr contains expected-hash, actual-hash, server.json path, and regenerate command."""
+    bogus_server = {
+        "name": "graphify",
+        "_meta": {"manifest_content_hash": "0" * 64},
+    }
+    monkeypatch.setattr(
+        "graphify.capability.load_committed_server_json",
+        lambda repo_root=None: bogus_server,
+    )
+    code, err = validate_cli(repo_root=tmp_path)
+    assert code != 0
+    # D-03 stability — assert each literal token independently:
+    assert "expected" in err
+    assert "actual" in err
+    assert "server.json" in err
+    assert "graphify capability --stdout > server.json" in err
+
+
+def test_validate_cli_clean_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """validate_cli returns 0 when committed hash matches live hash."""
+    from graphify.capability import build_manifest_dict, canonical_manifest_hash
+
+    live_hash = canonical_manifest_hash(build_manifest_dict())
+    clean_server = {
+        "name": "graphify",
+        "_meta": {"manifest_content_hash": live_hash},
+    }
+    monkeypatch.setattr(
+        "graphify.capability.load_committed_server_json",
+        lambda repo_root=None: clean_server,
+    )
+    code, err = validate_cli(repo_root=tmp_path)
+    assert code == 0
+    assert err == ""
+
+
+def test_validate_cli_no_huge_diff_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D-03: 'no huge unified diffs by default' — minimal failure path stays short."""
+    bogus_server = {
+        "name": "graphify",
+        "_meta": {"manifest_content_hash": "0" * 64},
+    }
+    monkeypatch.setattr(
+        "graphify.capability.load_committed_server_json",
+        lambda repo_root=None: bogus_server,
+    )
+    code, err = validate_cli(repo_root=tmp_path)
+    assert code != 0
+    assert len(err) < 2000
