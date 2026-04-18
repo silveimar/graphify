@@ -1,0 +1,58 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "id": "transformer",
+      "label": "Transformer",
+      "file_type": "code",
+      "source_file": "model.py"
+    },
+    {
+      "id": "attention",
+      "label": "Attention",
+      "file_type": "code",
+      "source_file": "model.py"
+    },
+    {
+      "id": "tokenizer",
+      "label": "Tokenizer",
+      "file_type": "code",
+      "source_file": "tokenizer.py"
+    },
+    {
+      "id": "config",
+      "label": "Config",
+      "file_type": "code",
+      "source_file": "config.py"
+    }
+  ],
+  "links": [
+    {
+      "source": "transformer",
+      "target": "attention",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "model.py",
+      "weight": 1.0
+    },
+    {
+      "source": "transformer",
+      "target": "tokenizer",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "source_file": "model.py",
+      "weight": 1.0
+    },
+    {
+      "source": "transformer",
+      "target": "config",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "source_file": "model.py",
+      "weight": 1.0,
+      "confidence_score": 0.8
+    }
+  ]
+}

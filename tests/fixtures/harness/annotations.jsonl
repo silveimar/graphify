@@ -1,0 +1,3 @@
+{"id": "transformer", "label": "Transformer", "source_file": "model.py", "relation": "defines_class", "confidence": "EXTRACTED", "peer_id": "SECRET_PEER", "body": "free-text leak with api_key=sk-LEAK"}
+{"id": "attention", "label": "Attention", "relation": "defines_class", "confidence": "EXTRACTED"}
+{"id": "tokenizer", "label": "Tokenizer", "peer_id": "another-peer", "body": "another free-text note"}

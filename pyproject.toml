@@ -62,3 +62,4 @@ include = ["graphify*"]
 
 [tool.setuptools.package-data]
 graphify = ["skill.md", "skill-codex.md", "skill-opencode.md", "skill-aider.md", "skill-copilot.md", "skill-claw.md", "skill-windows.md", "skill-droid.md", "skill-trae.md", "builtin_templates/*.md", "commands/*.md", "routing_models.yaml", "capability_manifest.schema.json", "capability_tool_meta.yaml"]
+"graphify.harness_schemas" = ["claude.yaml", "*.yaml"]

@@ -1,0 +1,10 @@
+{
+  "tool_calls": 42,
+  "last_run_ts": "2026-04-17T00:00:00Z",
+  "graphify_version": "1.4.0",
+  "hot_paths": [
+    {"path": "transformer -> attention", "count": 17},
+    {"path": "transformer -> tokenizer", "count": 9},
+    {"path": "attention -> config", "count": 3}
+  ]
+}
