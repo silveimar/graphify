@@ -1773,11 +1773,14 @@ def main() -> None:
         print("Usage: graphify capability --stdout | graphify capability --validate", file=sys.stderr)
         sys.exit(2)
     elif cmd == "harness":
-        # graphify harness export [--target claude] [--out PATH]  (Phase 13 / SEED-002)
+        # graphify harness export [--target claude] [--out PATH]
+        #   [--include-annotations] [--secrets-mode {redact,error}]
+        # (Phase 13 / SEED-002; HARNESS-07/08 flags added in Plan 04.)
         rest = list(sys.argv[2:])
         if not rest or rest[0] != "export":
             print(
-                "Usage: graphify harness export [--target claude] [--out PATH]",
+                "Usage: graphify harness export [--target claude] [--out PATH] "
+                "[--include-annotations] [--secrets-mode {redact,error}]",
                 file=sys.stderr,
             )
             sys.exit(2)
@@ -1789,11 +1792,34 @@ def main() -> None:
         parser = _ap.ArgumentParser(prog="graphify harness export")
         parser.add_argument("--target", default="claude", choices=["claude"])
         parser.add_argument("--out", default="graphify-out")
-        # --include-annotations is Plan 04 territory; not registered here (locked).
+        parser.add_argument(
+            "--include-annotations",
+            action="store_true",
+            help="Include full annotation text (scanned for secrets first)",
+        )
+        parser.add_argument(
+            "--secrets-mode",
+            default="redact",
+            choices=["redact", "error"],
+            help="Behavior when a SECRET_PATTERNS match fires on annotation text",
+        )
         opts = parser.parse_args(rest[1:])
 
         out_dir = Path(opts.out).resolve()
-        written = export_claude_harness(out_dir, target=opts.target)
+        try:
+            written = export_claude_harness(
+                out_dir,
+                target=opts.target,
+                include_annotations=opts.include_annotations,
+                secrets_mode=opts.secrets_mode,
+            )
+        except ValueError as exc:
+            # HARNESS-07: secret scanner in ``mode='error'`` raises
+            # ValueError listing offending annotation ids. Exit code 3
+            # distinguishes secret-scan failure from generic argparse errors
+            # (code 2) and unknown-target/schema errors (also ValueError).
+            print(f"[graphify] {exc}", file=sys.stderr)
+            sys.exit(3)
         for p in written:
             print(str(p))
         sys.exit(0)

@@ -10,6 +10,7 @@ Placeholder rendering uses ``string.Template.safe_substitute`` exclusively —
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -37,6 +38,119 @@ _TOKEN_PATTERN = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
 # Deterministic block emission order (T-13-06 byte-stability).
 _BLOCK_ORDER: tuple[str, ...] = ("soul", "heartbeat", "user")
+
+
+# ---------------------------------------------------------------------------
+# HARNESS-07 / T-13-07: secret-scanner regex suite
+# ---------------------------------------------------------------------------
+# Module-level tuple of (name, compiled_pattern) pairs. Compiled once at
+# import — runs when ``export_claude_harness`` is called with
+# ``include_annotations=True``. Kept inline (no new file) per planner guidance;
+# can be extracted if the suite ever exceeds 15 patterns.
+
+_AWS_KEY = re.compile(r"AKIA[0-9A-Z]{16}")
+_GITHUB_PAT = re.compile(r"ghp_[A-Za-z0-9]{36}")
+_OPENAI_KEY = re.compile(r"sk-[A-Za-z0-9]{20,}")
+_SLACK_TOKEN = re.compile(r"xox[baprs]-[A-Za-z0-9-]+")
+_BEARER = re.compile(r"Bearer\s+[A-Za-z0-9._-]{20,}")
+_PEM_PRIVATE_KEY = re.compile(r"-----BEGIN[ A-Z]+PRIVATE KEY-----")
+# Email-style credential heuristic — only flag when ':' appears AFTER an '@'
+# to reduce false positives on ordinary prose containing colons.
+_EMAIL_CRED = re.compile(
+    r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+:[A-Za-z0-9@#$%^&*()_+=!\-]{8,}"
+)
+
+SECRET_PATTERNS: tuple[tuple[str, "re.Pattern[str]"], ...] = (
+    ("aws_access_key", _AWS_KEY),
+    ("github_pat", _GITHUB_PAT),
+    ("openai_api_key", _OPENAI_KEY),
+    ("slack_token", _SLACK_TOKEN),
+    ("bearer_token", _BEARER),
+    ("pem_private_key", _PEM_PRIVATE_KEY),
+    ("email_credential", _EMAIL_CRED),
+)
+
+_REDACTION_MARKER = "[REDACTED]"
+
+
+def _redact_secrets(value: str) -> tuple[str, list[str]]:
+    """Return ``(cleaned_value, matched_pattern_names)``.
+
+    Applies every :data:`SECRET_PATTERNS` entry in declaration order. Matches
+    are replaced with the literal marker :data:`_REDACTION_MARKER`. The
+    matched name is appended once per pattern that fired (not once per
+    occurrence) so callers can group findings by pattern family.
+    """
+    matches: list[str] = []
+    cleaned = value
+    for name, pattern in SECRET_PATTERNS:
+        if pattern.search(cleaned):
+            matches.append(name)
+            cleaned = pattern.sub(_REDACTION_MARKER, cleaned)
+    return cleaned, matches
+
+
+def scan_annotations_for_secrets(
+    annotations: list[dict[str, Any]],
+    *,
+    mode: str = "redact",
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Scan every string value in an annotation dict that is NOT in
+    :data:`ANNOTATION_ALLOW_LIST`.
+
+    The allow-list fields (``id``, ``label``, ``source_file``, ``relation``,
+    ``confidence``) are treated as user-facing safe fields and bypass the
+    scanner — changing them would break downstream consumers. Only the
+    *delta* (free-text ``body``, ``peer_id``, and any other keys) is scanned.
+
+    Parameters
+    ----------
+    annotations:
+        List of annotation dicts (as loaded by :func:`_load_sidecars`).
+    mode:
+        ``"redact"`` replaces matches with :data:`_REDACTION_MARKER`.
+        ``"error"`` raises :class:`ValueError` listing offending annotation
+        ids (CLI converts to exit-code 3).
+
+    Returns
+    -------
+    ``(cleaned_annotations, findings)`` where ``findings`` is a list of
+    ``{"id": annotation_id, "field": key, "patterns": [name, ...]}`` dicts.
+
+    Raises
+    ------
+    ValueError
+        If ``mode not in {"redact", "error"}`` or (in ``"error"`` mode) at
+        least one annotation field matched a secret pattern.
+    """
+    if mode not in {"redact", "error"}:
+        raise ValueError(f"unknown secrets_mode: {mode!r}")
+
+    cleaned: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = []
+    for a in annotations:
+        new_a: dict[str, Any] = {}
+        ann_id = str(a.get("id") or "<unknown>")
+        for k, v in a.items():
+            if k in ANNOTATION_ALLOW_LIST or not isinstance(v, str):
+                new_a[k] = v
+                continue
+            redacted, matched = _redact_secrets(v)
+            new_a[k] = redacted
+            if matched:
+                findings.append(
+                    {"id": ann_id, "field": k, "patterns": matched}
+                )
+        cleaned.append(new_a)
+
+    if mode == "error" and findings:
+        ids = sorted({f["id"] for f in findings})
+        raise ValueError(
+            "harness export: secret patterns detected in annotations; "
+            f"offending annotation ids: {ids}. "
+            "Re-run with --secrets-mode redact to continue."
+        )
+    return cleaned, findings
 
 
 def _normalize_placeholders(text: str) -> str:
@@ -314,6 +428,99 @@ def _collect_agent_identity(telemetry: dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# HARNESS-08: injectable clock seam + round-trip fidelity manifest helpers
+# ---------------------------------------------------------------------------
+
+
+def _system_clock() -> datetime:
+    """Default clock — real wall-clock time in UTC."""
+    return datetime.now(timezone.utc)
+
+
+# Module-level override hook. Tests and the HARNESS-08 byte-equal self-check
+# call :func:`set_clock` to pin ``generated_at`` across successive runs.
+_default_clock: Callable[[], datetime] = _system_clock
+
+
+def set_clock(fn: Callable[[], datetime]) -> None:
+    """Override the default ``generated_at`` provider.
+
+    Primary use: tests + round-trip fidelity self-check. Passing a
+    ``_clock`` kwarg to :func:`export_claude_harness` still takes precedence
+    over this module-level override.
+    """
+    global _default_clock
+    _default_clock = fn
+
+
+def _sha256_file(path: Path) -> str:
+    """Return the lowercase hex SHA-256 of ``path``'s bytes.
+
+    Mirrors :func:`graphify.capability.canonical_manifest_hash` discipline
+    so round-trip comparisons use the same hashing contract as the MCP
+    capability manifest.
+    """
+    h = hashlib.sha256()
+    h.update(path.read_bytes())
+    return h.hexdigest()
+
+
+def _write_fidelity_manifest(
+    harness_dir: Path,
+    written: list[Path],
+    *,
+    prior: dict[str, Any] | None = None,
+    target: str = "claude",
+) -> Path:
+    """HARNESS-08: record per-file SHA-256 + byte-length for every written file.
+
+    On the first run ``round_trip`` is ``"first-export"``. On subsequent runs
+    the existing ``fidelity.json`` is passed in as ``prior``; if every file
+    matches byte-for-byte the field flips to ``"byte-equal"``, otherwise
+    ``"drift"``. Written via ``.tmp`` + :func:`os.replace` so readers never
+    observe a torn file.
+    """
+    files: dict[str, dict[str, Any]] = {}
+    for p in written:
+        files[p.name] = {
+            "sha256": _sha256_file(p),
+            "bytes": p.stat().st_size,
+        }
+
+    round_trip = "first-export"
+    if prior is not None:
+        prior_files = prior.get("files") or {}
+        if (
+            prior_files
+            and set(prior_files.keys()) == set(files.keys())
+            and all(
+                prior_files.get(name, {}).get("sha256") == meta["sha256"]
+                and prior_files.get(name, {}).get("bytes") == meta["bytes"]
+                for name, meta in files.items()
+            )
+        ):
+            round_trip = "byte-equal"
+        else:
+            round_trip = "drift"
+
+    manifest = {
+        "version": 1,
+        "target": target,
+        "round_trip": round_trip,
+        "files": files,
+    }
+
+    out = harness_dir / "fidelity.json"
+    tmp = out.with_suffix(".tmp")
+    payload = (
+        json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    )
+    tmp.write_text(payload, encoding="utf-8")
+    os.replace(tmp, out)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Main export (HARNESS-01..05)
 # ---------------------------------------------------------------------------
 
@@ -323,6 +530,7 @@ def export_claude_harness(
     *,
     target: str = "claude",
     include_annotations: bool = False,
+    secrets_mode: str = "redact",
     _clock: Callable[[], datetime] | None = None,
 ) -> list[Path]:
     """Emit SOUL/HEARTBEAT/USER markdown files under ``out_dir/harness/``.
@@ -335,14 +543,23 @@ def export_claude_harness(
         Harness target. Only ``"claude"`` is supported at launch.
     include_annotations:
         When ``False`` (default), annotations are filtered through
-        :data:`ANNOTATION_ALLOW_LIST`. The ``True`` branch is reserved for
-        Plan 04 (HARNESS-07 secret scanner) — this module honors the kwarg
-        but does not add a secret scanner here.
+        :data:`ANNOTATION_ALLOW_LIST`. When ``True``, the full annotation
+        set is retained but first passed through
+        :func:`scan_annotations_for_secrets` (HARNESS-07 / T-13-07) so
+        matched credentials are either redacted inline or surfaced as a
+        non-zero exit.
+    secrets_mode:
+        One of ``"redact"`` or ``"error"`` — only consulted when
+        ``include_annotations=True``. ``"redact"`` (default) replaces
+        matches with ``[REDACTED]`` and emits a stderr summary; ``"error"``
+        raises :class:`ValueError` listing the offending annotation ids
+        (the CLI converts that to exit-code 3).
     _clock:
         Injectable ``() -> datetime`` seam used to pin ``generated_at`` in
         tests (T-13-06 byte-equality). When ``None`` (default), falls back
-        to ``datetime.now(timezone.utc)`` — NOT deterministic across runs.
-        Plan 04 (HARNESS-08) wires a user-facing knob on top of this seam.
+        to the module-level clock override via :func:`set_clock` or to
+        ``datetime.now(timezone.utc)``. HARNESS-08 (round-trip fidelity)
+        relies on a pinned clock to produce byte-equal output.
 
     Returns
     -------
@@ -391,20 +608,32 @@ def export_claude_harness(
 
     sidecars = _load_sidecars(base)
     annotations = sidecars["annotations"]
-    if not include_annotations:
+    findings: list[dict[str, Any]] = []
+    if include_annotations:
+        # HARNESS-07 / T-13-07: scan BEFORE skipping allow-list so redaction is
+        # visible in output. ``mode='error'`` raises ValueError; the CLI maps
+        # that to exit-code 3.
+        annotations, findings = scan_annotations_for_secrets(
+            annotations, mode=secrets_mode
+        )
+    else:
         annotations = _filter_annotations_allowlist(annotations)
-    # NOTE: annotations are filtered eagerly so Plan 04's include-path can wire
-    # its secret scanner before this call and still respect the allow-list
-    # default. The filtered list is not currently rendered into the schema
-    # bodies (HARNESS-06 is about what we *never* leak); Plan 04 will add the
-    # annotation-aware body blocks behind the flag.
+
+    if findings:
+        unique_ids = len({f["id"] for f in findings})
+        print(
+            f"[graphify] harness export: redacted {len(findings)} secret "
+            f"match(es) across {unique_ids} annotation(s)",
+            file=sys.stderr,
+        )
 
     god_nodes = _collect_god_nodes(sidecars["graph_data"])
     recent_deltas = _collect_recent_deltas(sidecars["agent_edges"])
     hot_paths = _collect_hot_paths(sidecars["telemetry"])
     agent_identity = _collect_agent_identity(sidecars["telemetry"])
 
-    clock = _clock or (lambda: datetime.now(timezone.utc))
+    # HARNESS-08: kwarg > module override > system wall clock.
+    clock = _clock or _default_clock
     generated_at = clock().isoformat(timespec="seconds")
     graphify_version = str(sidecars["telemetry"].get("graphify_version", "unknown"))
 
@@ -448,5 +677,36 @@ def export_claude_harness(
         tmp.write_text(rendered, encoding="utf-8")
         os.replace(tmp, out_path)
         written.append(out_path)
+
+    # HARNESS-08: write the round-trip fidelity manifest AFTER the three
+    # block files exist so the per-file SHA-256 reflects final on-disk bytes.
+    prior: dict[str, Any] | None = None
+    fidelity_path = validated_dir / "fidelity.json"
+    if fidelity_path.exists():
+        try:
+            loaded = json.loads(fidelity_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                prior = loaded
+        except json.JSONDecodeError:
+            # Corrupt prior — treat as first export rather than false-positive
+            # "byte-equal" against an unreadable manifest.
+            prior = None
+
+    fidelity_out = _write_fidelity_manifest(
+        validated_dir, written, prior=prior, target=target
+    )
+    written.append(fidelity_out)
+
+    # Stable, grep-friendly stderr summary for CI + operators.
+    try:
+        rt = json.loads(fidelity_out.read_text(encoding="utf-8")).get(
+            "round_trip", "unknown"
+        )
+    except json.JSONDecodeError:
+        rt = "unknown"
+    print(
+        f"[graphify] harness export: round_trip={rt}",
+        file=sys.stderr,
+    )
 
     return written
