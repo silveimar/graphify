@@ -6,6 +6,7 @@ nyquist_compliant: true
 wave_0_complete: true
 created: 2026-04-17
 updated: 2026-04-17
+last_validated: 2026-04-17
 ---
 
 # Phase 12 — Validation Strategy
@@ -80,3 +81,13 @@ updated: 2026-04-17
 **Notes:** `gsd-sdk` was not available in the validation session; audit performed by cross-referencing `tests/` against PLAN requirements and running the Phase 12 pytest bundle (35 tests) and confirming full `pytest tests/` green. No implementation changes required; VALIDATION.md updated from draft to compliant.
 
 **Chain (`--chain`):** Proceed to milestone audit when ready: `/gsd-audit-milestone` (with your workspace suffix if you use GSD workspaces).
+
+## Validation Audit 2026-04-17 (re-run)
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+**Evidence:** Phase 12 bundle `pytest tests/test_routing.py tests/test_cache.py tests/test_extract_router.py tests/test_routing_sidecar.py tests/test_routing_p2.py tests/test_cli_run.py tests/test_route_requirements_smoke.py -q` → 35 passed. Full suite `pytest tests/ -q` → 1257 passed (2 warnings, unrelated). Per-task map unchanged; ROUTE-01..10 remain COVERED. `nyquist_compliant: true` retained.

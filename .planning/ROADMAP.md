@@ -125,7 +125,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 
 **Phases:**
 
-- [ ] Phase 12: Heterogeneous Extraction Routing — Per-file complexity classifier (AST metrics) routes extraction to cheap/mid/expensive model classes with parallel fan-out, cost ceiling enforcement, model-isolated cache keys, and a `routing.json` sidecar audit trail.
+- [x] Phase 12: Heterogeneous Extraction Routing — Per-file complexity classifier (AST metrics) routes extraction to cheap/mid/expensive model classes with parallel fan-out, cost ceiling enforcement, model-isolated cache keys, and a `routing.json` sidecar audit trail. (6/6 plans, completed 2026-04-17)
 - [ ] Phase 13: Agent Capability Manifest (+ SEED-002 Harness Memory Export) — Static `server.json` + runtime `manifest.json` with MCP `capability_describe` tool, CLI `graphify capability`, introspection-driven generation (never hand-maintained), manifest-hash drift detection, and bundled SEED-002 `graphify harness export` producing SOUL/HEARTBEAT/USER triplet for Claude harness. Executes in two waves (see Execution Waves below).
 - [ ] Phase 14: Obsidian Thinking Commands — Vault-scoped `/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind` slash commands (plus P2 `/graphify-bridge`, `/graphify-voice`, `/graphify-drift-notes`) with `target: obsidian|code|both` frontmatter filtering, mandatory `propose_vault_note + approve` trust boundary, and a Plan 00 refactor migrating `_uninstall_commands()` from hardcoded whitelist to directory-scan.
 - [ ] Phase 15: Async Background Enrichment — Four-pass background enricher (description, patterns, community summaries, staleness) writing overlay-only `enrichment.json`; event-driven via `watch.py` post-rebuild hook; `fcntl.flock`-coordinated with foreground `/graphify`; snapshot-pinned at process start for determinism.
@@ -154,7 +154,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   3. Re-running extraction with a different model for the same file produces a distinct cache entry — no cross-contamination between routing decisions (model_id participates in the cache key).
   4. User sets `GRAPHIFY_COST_CEILING` and extraction aborts with a clear pre-flight cost-overrun message before any expensive LLM call fires.
   5. A pathological concurrency test (8 workers, 10 provider-429 responses) completes without thundering-herd retries — the central semaphore and global 429 `threading.Event` enforce polite backoff.
-**Plans**: TBD (planner will refine; 5–7 plans expected, including router module, parallel fan-out wiring, cache-key migration, routing.json sidecar, canary probes, cost ceiling enforcement).
+**Plans**: 6/6 complete (12-01 routing + YAML, 12-02 cache keys, 12-03 extract + batch tier helper, 12-04 routing audit, 12-05 P2 cost/canary/vision, 12-06 CLI + skill). Summaries under `.planning/phases/12-heterogeneous-extraction-routing/12-*-SUMMARY.md`.
 
 ### Phase 13: Agent Capability Manifest (+ SEED-002 Harness Memory Export)
 **Goal**: Agents that don't already know graphify exists can discover it via MCP registries, describe its surface before calling it, and export graphify's state into any supported agent harness without lock-in.
@@ -259,8 +259,8 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 9.2 Progressive Graph Retrieval | v1.3 | 3/3 | Complete | 2026-04-17 |
 | 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 9/9 | Complete   | 2026-04-17 |
 | 11. Narrative Mode as Interactive Slash Commands | v1.3 | 7/7 | Complete   | 2026-04-17 |
-| 12. Heterogeneous Extraction Routing | v1.4 | 0/TBD | Planned | — |
-| 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 0/TBD | Planned | — |
+| 12. Heterogeneous Extraction Routing | v1.4 | 6/6 | Complete | 2026-04-17 |
+| 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 1/4 | In Progress | — |
 | 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
 | 15. Async Background Enrichment | v1.4 | 0/TBD | Planned | — |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
@@ -268,4 +268,4 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 18. Focus-Aware Graph Context | v1.4 | 0/TBD | Planned | — |
 
 ---
-*Last updated: 2026-04-17 — v1.4 milestone opened, 86 REQ-IDs (P1 + P2) committed (19488ef), roadmap structured across 7 phases with Phase 13 bundling SEED-002 via two-wave execution. Build order locked: 12 → 18 → 13A → 15 → 17 → 16 → 14 → 13B. Next: `/gsd-discuss-phase 12 ${GSD_WS}`.*
+*Last updated: 2026-04-17 — Phase 12 complete (6 plans). Build order: 12 ✅ → 18 → 13A → 15 → 17 → 16 → 14 → 13B. Next: `/gsd-discuss-phase 18` or `/gsd-discuss-phase 13` per capacity.*

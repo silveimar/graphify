@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: Phase 13 discuss complete — CONTEXT + RESEARCH + Plan 01 drafted; execution not started
-stopped_at: /gsd-discuss-phase 13 --chain — 13-CONTEXT.md, 13-DISCUSSION-LOG.md, 13-RESEARCH.md, 13-01-PLAN.md (Wave A)
-last_updated: "2026-04-17T23:35:00.000Z"
+status: Phase 13 Plan 01 complete + committed (MANIFEST-01..08 shipped, 1263 tests passing); Plans 02/03/04 (MANIFEST-09/10, HARNESS-01..08) ready to execute
+stopped_at: Safety commits cf788b7 (phase-12 + plan-01 code) and 254a622 (plans 02/03/04) landed on main — ready for /gsd-execute-phase 13 --auto on clean HEAD
+last_updated: "2026-04-18T02:00:00.000Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 10
+  completed_plans: 7
   percent: 14
 ---
 
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 ## Current Position
 
-Phase: 13 Agent Capability Manifest — planning artifacts present; implementation pending
-Plan: 13-01 (Wave A) ready for `/gsd-execute-phase 13` or manual execution
+Phase: 13 Agent Capability Manifest — Plan 01 (Wave A) complete + committed; Plans 02/03/04 ready to execute
+Plan: 13-02 (Wave 1, MANIFEST-09/10) next for `/gsd-execute-phase 13 --auto`
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17)
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Phase 12 complete. Phase 13: `13-CONTEXT.md`, `13-RESEARCH.md`, `13-01-PLAN.md` (Wave A) exist under `.planning/phases/13-agent-capability-manifest/`. Next: run `/gsd-execute-phase 13` (or implement Plan 01) when ready; additional plans needed for MANIFEST-09/10 P2 and Wave B harness.
-Last activity: 2026-04-17 — `/gsd-discuss-phase 13 --chain` (context + planner follow-up for research + Plan 01)
+Status: Phase 12 complete. Phase 13 Plan 01 (MANIFEST-01..08) shipped — `capability.py`, `mcp_tool_registry.py`, `server.json`, `capability_describe` MCP tool, `graphify capability --stdout/--validate` CLI all on main. 1263 tests pass. Next: `/gsd-execute-phase 13 --auto` runs Plans 02/03/04 in three waves (MANIFEST-09/10 → HARNESS-01..06 → HARNESS-07/08).
+Last activity: 2026-04-17 — safety commits cf788b7 (phase-12 + plan-01) and 254a622 (plans 02/03/04) landed; HEAD now reflects working-tree state for clean worktree-executor base
 
 Progress: [█░░░░░░░░░] 14% (1/7 phases complete)
 

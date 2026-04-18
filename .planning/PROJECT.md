@@ -200,9 +200,11 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Codebase:** Python 3.10/3.12; `graphify/` ~16,481 LOC across modules; `tests/` ~16,529 LOC with 1,234 tests passing (up from 1,023 at v1.2 close). 108 files changed in v1.3, +24,057 / −161 lines.
 
+**v1.4 progress:** Phase 12 Heterogeneous Extraction Routing complete (2026-04-17) — `graphify/routing.py`, model-isolated cache keys (`ROUTE-04`), optional `extract(..., router=...)`, `routing.json` audit, P2 cost/canary/vision, `graphify run --router`. Verified: full `pytest` suite green.
+
 ## Next Milestone Goals
 
 v1.4 milestone opened 2026-04-17; scope confirmed and requirements pending (see Current Milestone section above). v1.5+ is unscoped — revisit after v1.4 ships and user feedback lands. SEED-001 (Tacit Elicitation) remains a candidate for v1.5+ if onboarding/discovery becomes the milestone theme.
 
 ---
-*Last updated: 2026-04-17 — v1.4 scope confirmed via /gsd-new-milestone; SEED-002 activated alongside Phase 13; requirements gathering + roadmap next*
+*Last updated: 2026-04-17 — Phase 12 complete; remaining v1.4 phases 13–18 per ROADMAP build order*
