@@ -126,7 +126,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 **Phases:**
 
 - [x] Phase 12: Heterogeneous Extraction Routing — Per-file complexity classifier (AST metrics) routes extraction to cheap/mid/expensive model classes with parallel fan-out, cost ceiling enforcement, model-isolated cache keys, and a `routing.json` sidecar audit trail. (6/6 plans, completed 2026-04-17)
-- [ ] Phase 13: Agent Capability Manifest (+ SEED-002 Harness Memory Export) — Static `server.json` + runtime `manifest.json` with MCP `capability_describe` tool, CLI `graphify capability`, introspection-driven generation (never hand-maintained), manifest-hash drift detection, and bundled SEED-002 `graphify harness export` producing SOUL/HEARTBEAT/USER triplet for Claude harness. Executes in two waves (see Execution Waves below).
+- [x] Phase 13: Agent Capability Manifest (+ SEED-002 Harness Memory Export) — Static `server.json` + runtime `manifest.json` with MCP `capability_describe` tool, CLI `graphify capability`, introspection-driven generation (never hand-maintained), manifest-hash drift detection, and bundled SEED-002 `graphify harness export` producing SOUL/HEARTBEAT/USER triplet for Claude harness. Shipped 2026-04-17 (4/4 plans, 18/18 REQ-IDs).
 - [ ] Phase 14: Obsidian Thinking Commands — Vault-scoped `/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind` slash commands (plus P2 `/graphify-bridge`, `/graphify-voice`, `/graphify-drift-notes`) with `target: obsidian|code|both` frontmatter filtering, mandatory `propose_vault_note + approve` trust boundary, and a Plan 00 refactor migrating `_uninstall_commands()` from hardcoded whitelist to directory-scan.
 - [ ] Phase 15: Async Background Enrichment — Four-pass background enricher (description, patterns, community summaries, staleness) writing overlay-only `enrichment.json`; event-driven via `watch.py` post-rebuild hook; `fcntl.flock`-coordinated with foreground `/graphify`; snapshot-pinned at process start for determinism.
 - [ ] Phase 16: Graph Argumentation Mode — `graphify/argue.py` substrate populates a SPAR-Kit-style `ArgumentPackage` from a graph subgraph; `skill.md` orchestrates the LLM debate (Phase 9 blind-label harness reused); mandatory `{claim, cites: [node_id]}` schema rejects fabricated node IDs; round cap 6; `dissent`/`inconclusive` valid outputs; `GRAPH_ARGUMENT.md` advisory-only artifact.
@@ -173,7 +173,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - **Wave A (plumbing — 3rd in build order):** Manifest generator + `graphify capability` CLI + runtime `capability_describe` MCP tool. Describes the surface present at this point (Phases 12 + 18 landed). Establishes the introspection pattern that Phases 14/15/16/17 auto-register into.
 - **Wave B (final regeneration — 8th in build order):** Manifest regenerates with all 14–18 tools present. SEED-002 `graphify harness export` bundles here — both waves advertise graphify externally, and Wave B captures the full SEED-002 + manifest surface together.
 
-**Plans**: TBD (planner will refine; 5–7 plans expected across both waves combined, including manifest introspection, `capability_describe` tool, `graphify capability` CLI, response-envelope hash wiring, `harness_export.py` + `claude.yaml` schema, `graphify harness export` CLI, annotation allow-list + secret scanner).
+**Plans**: 4/4 complete. 13-01 (MANIFEST-01..08 manifest generator + CLI + MCP tool + drift gate), 13-02 (MANIFEST-09..10 CI gate + examples), 13-03 (HARNESS-01..06 harness export core — SOUL/HEARTBEAT/USER), 13-04 (HARNESS-07..08 secret scanner + round-trip fidelity). Summaries under `.planning/phases/13-agent-capability-manifest/13-*-SUMMARY.md`.
 
 ### Phase 14: Obsidian Thinking Commands
 **Goal**: Obsidian vault users invoke graphify-aware slash commands directly inside their vault to navigate, query, and expand their graphify-enriched notes, with every write routed through the v1.1 `propose_vault_note + approve` trust boundary.
@@ -260,7 +260,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 10. Cross-File Semantic Extraction with Entity Deduplication | v1.3 | 9/9 | Complete   | 2026-04-17 |
 | 11. Narrative Mode as Interactive Slash Commands | v1.3 | 7/7 | Complete   | 2026-04-17 |
 | 12. Heterogeneous Extraction Routing | v1.4 | 6/6 | Complete | 2026-04-17 |
-| 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 3/4 | In Progress | — |
+| 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 4/4 | Complete | 2026-04-17 |
 | 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
 | 15. Async Background Enrichment | v1.4 | 0/TBD | Planned | — |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
@@ -268,4 +268,4 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 18. Focus-Aware Graph Context | v1.4 | 0/TBD | Planned | — |
 
 ---
-*Last updated: 2026-04-17 — Phase 12 complete (6 plans). Phase 13 Plans 01 + 02 + 03 complete (MANIFEST-01..10 + HARNESS-01..06 shipped, 1280 tests). Build order: 12 ✅ → 18 → 13A (2/2 wave-A plans shipped + 13-03 harness core) → 15 → 17 → 16 → 14 → 13B (Plan 04 HARNESS-07/08 P2). Next: `/gsd-execute-phase 13` continues with 13-04 (HARNESS-07/08) or `/gsd-discuss-phase 18`.*
+*Last updated: 2026-04-17 — Phase 12 complete (6 plans). **Phase 13 complete (4/4 plans, 18/18 REQ-IDs shipped: MANIFEST-01..10 + HARNESS-01..08, 1295 tests).** Build order: 12 ✅ → 13 ✅ → 18 → 15 → 17 → 16 → 14 → final manifest regen (Wave B final sweep deferred until 14–18 land). Next: `/gsd-discuss-phase 18` or `/gsd-discuss-phase 15` per capacity.*

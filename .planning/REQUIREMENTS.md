@@ -48,8 +48,8 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 - [x] **HARNESS-04**: New CLI subcommand `graphify harness export [--target claude] [--out PATH]` with default target `claude`
 - [x] **HARNESS-05**: Output written to `graphify-out/harness/claude-SOUL.md`, `claude-HEARTBEAT.md`, `claude-USER.md` (+ optional `AGENTS.md` mirror)
 - [x] **HARNESS-06**: Annotations excluded from export by default (allow-list: `id`, `label`, `source_file`, `relation`, `confidence`) — prevents leaking peer_id annotations, secrets in free-text fields (Pitfall 11 mitigation)
-- [ ] **HARNESS-07** `[P2]`: `--include-annotations` flag runs a secret-scanner regex suite over annotation text before inclusion; matches redacted or emit an error
-- [ ] **HARNESS-08** `[P2]`: `graphify harness export` emits a round-trip fidelity summary (byte-equal manifest) so repeated exports don't diverge from prior exports
+- [x] **HARNESS-07** `[P2]`: `--include-annotations` flag runs a secret-scanner regex suite over annotation text before inclusion; matches redacted or emit an error
+- [x] **HARNESS-08** `[P2]`: `graphify harness export` emits a round-trip fidelity summary (byte-equal manifest) so repeated exports don't diverge from prior exports
 
 ### Obsidian Thinking Commands (Phase 14)
 
@@ -210,8 +210,8 @@ Priority tags: `[P2]` indicates the requirement is in v1.4 scope per user confir
 | HARNESS-04 | Phase 13 | 13-03 | complete | 2026-04-17 |
 | HARNESS-05 | Phase 13 | 13-03 | complete | 2026-04-17 |
 | HARNESS-06 | Phase 13 | 13-03 | complete | 2026-04-17 |
-| HARNESS-07 [P2] | Phase 13 | TBD | planned | — |
-| HARNESS-08 [P2] | Phase 13 | TBD | planned | — |
+| HARNESS-07 [P2] | Phase 13 | 13-04 | complete | 2026-04-17 |
+| HARNESS-08 [P2] | Phase 13 | 13-04 | complete | 2026-04-17 |
 | OBSCMD-01 | Phase 14 | TBD | planned | — |
 | OBSCMD-02 | Phase 14 | TBD | planned | — |
 | OBSCMD-03 | Phase 14 | TBD | planned | — |

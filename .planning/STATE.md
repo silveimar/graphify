@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: Phase 13 Plans 01 + 02 + 03 complete (MANIFEST-01..10 + HARNESS-01..06 shipped, 1280 tests passing); Plan 04 (HARNESS-07/08 P2) remaining
-stopped_at: Plan 13-03 executed on main — 6c29c97 (scaffold HARNESS-01..03), a60c125 (CLI + tests HARNESS-04..06). SEED-002 harness export core shipped; `graphify harness export` writes SOUL/HEARTBEAT/USER markdown under graphify-out/harness/ via string.Template.safe_substitute (no Jinja2). Ready for /gsd-execute-phase 13 to continue with 13-04.
-last_updated: "2026-04-18T03:15:00.000Z"
+status: Phase 13 complete (4/4 plans, 18/18 REQ-IDs — MANIFEST-01..10 + HARNESS-01..08; 1295 tests passing). Phases 14, 15, 16, 17, 18 planned but not started.
+stopped_at: Plan 13-04 executed on main — 1296f43 (HARNESS-07 secret scanner + HARNESS-08 round-trip fidelity). SEED-002 hardening layer shipped; `graphify harness export --include-annotations --secrets-mode {redact,error}` + `graphify-out/harness/fidelity.json` with `round_trip` status (first-export / byte-equal / drift). Phase 13 closes — ready for /gsd-discuss-phase 18 or 15 next per build order.
+last_updated: "2026-04-18T04:30:00.000Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 7
-  completed_phases: 1
-  total_plans: 10
-  completed_plans: 9
-  percent: 14
+  completed_phases: 2
+  total_plans: 11
+  completed_plans: 11
+  percent: 29
 ---
 
 # Project State
@@ -21,28 +21,29 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis and usage-weighted self-improvement, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, now being extended in v1.4 to agent discoverability (MCP capability manifest + SEED-002 harness export), Obsidian thinking-command depth, and graph-quality-over-time via heterogeneous routing + async enrichment + focus-aware zoom + grounded chat + SPAR-Kit argumentation.
-**Current focus:** Phase 12 done. v1.4 build order next candidates: **Phase 18** (parallel, no code overlap with 12) or **Phase 13 Wave A** — pick per capacity; see Build order list below.
+**Current focus:** Phases 12 + 13 done. v1.4 build order next candidates: **Phase 18** (parallel, no code overlap) or **Phase 15** (soft-depends on 12 routing.json) — pick per capacity; see Build order list below.
 
 ## Current Position
 
-Phase: 13 Agent Capability Manifest — Plans 01 + 02 + 03 complete + committed; Plan 04 (HARNESS-07/08 P2 — secret scanner + round-trip fidelity) remaining
-Plan: 13-04 (Wave 3, HARNESS-07/08 — SEED-002 P2 hardening) next for `/gsd-execute-phase 13`
-Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17)
+Phase: 13 Agent Capability Manifest — ✅ COMPLETE (4/4 plans, 18/18 REQ-IDs). MANIFEST-01..10 + HARNESS-01..08 all shipped.
+Plan: none in-flight. Next milestone phase per build order: Phase 18 Focus-Aware Graph Context, or Phase 15 Async Background Enrichment.
+Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 2/7 phases complete.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Phase 12 complete. Phase 13 Plans 01 + 02 + 03 shipped — MANIFEST-01..10 + HARNESS-01..06 closed. `graphify harness export` now emits SOUL/HEARTBEAT/USER markdown into `graphify-out/harness/` via a declarative `graphify/harness_schemas/claude.yaml` + `string.Template.safe_substitute` (no Jinja2). Annotations filtered through `{id, label, source_file, relation, confidence}` allow-list by default. Exporter uses `_clock` seam ready for Plan 04 byte-equality pinning. 1280 tests pass. Next: `/gsd-execute-phase 13` runs Plan 04 (HARNESS-07/08).
-Last activity: 2026-04-17 — commits 6c29c97 (scaffold) + a60c125 (CLI + tests) closed HARNESS-01..06 atomically on main
+Status: Phase 12 + Phase 13 complete. Phase 13 final plan (13-04) shipped HARNESS-07/08 P2 hardening: secret-scanner regex suite (7 families — AWS, GitHub PAT, OpenAI, Slack, Bearer, PEM, email-credential) gates `--include-annotations`; `graphify-out/harness/fidelity.json` records per-file SHA-256 + byte-length with `round_trip` status (first-export / byte-equal / drift). Module-level `set_clock` seam + kwarg `_clock` pin `generated_at` for CI byte-equality gates. CLI: `graphify harness export --include-annotations --secrets-mode {redact,error}` with exit code 3 for secret-scan failures. 1295 tests pass.
+Last activity: 2026-04-17 — commit 1296f43 closed HARNESS-07+08 atomically on main, completing Phase 13.
 
-Progress: [█░░░░░░░░░] 14% (1/7 phases complete)
+Progress: [███░░░░░░░] 29% (2/7 phases complete — 12 ✅, 13 ✅)
 
 **Build order (locked in SUMMARY.md):**
-1. Phase 12 Routing — HARD gates `cache.py` key format
-2. Phase 18 Focus — parallel with 12, no code overlap
-3. Phase 13 Wave A — plumbing (manifest generator + CLI + `capability_describe` tool)
-4. Phase 15 Enrichment — soft-depends on 12 routing.json
+1. Phase 12 Routing — HARD gates `cache.py` key format — ✅ COMPLETE
+2. Phase 18 Focus — parallel with 12, no code overlap — ⏳ next candidate
+3. Phase 13 Wave A — plumbing (manifest generator + CLI + `capability_describe` tool) — ✅ COMPLETE
+4. Phase 15 Enrichment — soft-depends on 12 routing.json — ⏳ next candidate
 5. Phase 17 Chat — soft-depends on 18 + 15
 6. Phase 16 Argumentation — soft-depends on 17 citation format; MUST NOT call 17
 7. Phase 14 Obsidian Commands — HARD-depends on 18 + Plan 00 whitelist refactor
-8. Phase 13 Wave B + SEED-002 — final manifest regen with full surface
+8. Phase 13 Wave B final regen — manifest final sweep after 14–18 land (no new plan IDs; just a regeneration pass)
+9. SEED-002 hardening — ✅ COMPLETE (shipped with Phase 13 Plan 03 + Plan 04)
 
 **Seeds activated in v1.4:**
 - SEED-002 Harness Memory Export — bundled under Phase 13 Wave B (claude.yaml only; export-only)
@@ -128,6 +129,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-18T03:15:00.000Z
-Stopped at: Phase 13 Plan 03 executed (`pytest`: 1280 passed; +7 new harness tests). SEED-002 harness export core shipped — `graphify harness export` emits SOUL/HEARTBEAT/USER markdown under `graphify-out/harness/` via declarative `claude.yaml` + `string.Template.safe_substitute`. Annotation allow-list defaults to `{id, label, source_file, relation, confidence}`. `_clock` seam present for Plan 04 byte-equality pinning. Commits 6c29c97 (scaffold) + a60c125 (CLI + tests) on main.
-Next action: `/gsd-execute-phase 13` to run Plan 13-04 (HARNESS-07/08 P2 — `--include-annotations` + secret scanner + round-trip fidelity byte-equal manifest). `gsd-sdk` still unavailable in local env — STATE.md and ROADMAP.md updated by hand.
+Last session: 2026-04-18T04:30:00.000Z
+Stopped at: Phase 13 Plan 04 executed (`pytest`: 1295 passed; +15 new harness tests). SEED-002 hardening layer shipped — HARNESS-07 secret scanner (7 regex families inline in `harness_export.py`) + HARNESS-08 round-trip fidelity manifest (`graphify-out/harness/fidelity.json` with per-file SHA-256 + byte-length + `round_trip` status). CLI surfaces `--include-annotations` and `--secrets-mode {redact,error}` with exit code 3 on secret-scan failures. Module-level `set_clock` joins Plan 03's `_clock` kwarg for byte-equality pinning. Commit 1296f43 on main. Phase 13 closes: all 4 plans + 18 REQ-IDs shipped.
+Next action: `/gsd-discuss-phase 18` (Focus-Aware Graph Context — parallel, no dependency) or `/gsd-discuss-phase 15` (Async Background Enrichment — soft-depends on 12 routing.json). Build order recommends 18 next since it unlocks Phase 14 + 17. `gsd-sdk` still unavailable in local env — STATE.md / ROADMAP.md / REQUIREMENTS.md updated by hand.
