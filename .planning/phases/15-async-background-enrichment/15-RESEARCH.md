@@ -934,9 +934,11 @@ Total (LLM): 10,000 tokens (matches budget — will complete all 3 LLM passes)
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED by plans)
 
-1. **Foreground lock acquisition mechanism**
+> All three questions below were operationalized in the plans. This section is kept as an audit trail; see the `RESOLVED:` markers for the plan that pins each answer.
+
+1. **Foreground lock acquisition mechanism** — RESOLVED in Plan 15-05: acquire `.enrichment.lock` in `__main__.py::run` wrapping the `to_json()` call site; SIGTERM-kick-then-block pattern.
    - What we know: `__main__.py` runs `/graphify` rebuild via `build.py`; foreground must acquire `.enrichment.lock` before writing `graph.json`
    - What's unclear: Where exactly in `__main__.py` the lock acquisition goes — before `to_json()` in the pipeline, or wrapped around the entire `graphify run` command
    - Recommendation: Planner should identify the exact line in `__main__.py` where `to_json()` / `_write_graph_json` is called and insert lock acquisition there
