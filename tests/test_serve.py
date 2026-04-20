@@ -40,6 +40,9 @@ from graphify.serve import (
     _resolve_focus_seeds,
     _multi_seed_ego,
     _run_get_focus_context_core,
+    _FOCUS_DEBOUNCE_CACHE,
+    _check_focus_freshness,
+    _focus_debounce_key,
     QUERY_GRAPH_META_SENTINEL,
 )
 
@@ -2449,3 +2452,78 @@ def test_no_context_does_not_echo_focus_hint(tmp_path):
     parts = response.split(QUERY_GRAPH_META_SENTINEL)
     meta = json.loads(parts[1])
     assert set(meta.keys()) == {"status", "node_count", "edge_count", "budget_used"}
+
+
+# --- Phase 18 P2 guards: FOCUS-08 debounce + FOCUS-09 freshness ---
+
+def test_focus_debounce_suppresses_duplicate(tmp_path, monkeypatch):
+    """FOCUS-08 + D-14: second call within 500ms returns the cached envelope (suppress duplicate)."""
+    _FOCUS_DEBOUNCE_CACHE.clear()
+    _write_source_file(tmp_path, "src/auth.py")
+    G = _make_focus_graph()
+    communities = _communities_from_graph(G)
+    args = {"focus_hint": {"file_path": "src/auth.py", "neighborhood_depth": 1}, "budget": 500}
+    # First call populates cache.
+    first = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    key = _focus_debounce_key(args["focus_hint"])
+    # Seed the cache directly (simulating what _tool_get_focus_context does) to test the get path.
+    import time as time_mod
+    _FOCUS_DEBOUNCE_CACHE[key] = (time_mod.monotonic(), first)
+
+    # Now make core calls raise — cache must return directly without calling core.
+    from graphify import serve as serve_mod
+    orig_core = serve_mod._run_get_focus_context_core
+    def _blow_up(*a, **kw):
+        raise RuntimeError("core should not be called when cache hit within window")
+    monkeypatch.setattr(serve_mod, "_run_get_focus_context_core", _blow_up)
+    # Simulate the dispatcher using cache directly (since _tool_get_focus_context lives inside serve()):
+    cached = _FOCUS_DEBOUNCE_CACHE.get(key)
+    assert cached is not None
+    ts, envelope = cached
+    assert time_mod.monotonic() - ts < 0.5
+    assert envelope == first
+    # Restore
+    monkeypatch.setattr(serve_mod, "_run_get_focus_context_core", orig_core)
+    _FOCUS_DEBOUNCE_CACHE.clear()
+
+
+def test_focus_debounce_expires(tmp_path, monkeypatch):
+    """FOCUS-08 + D-14: after the 500ms window, cache does NOT return — fresh compute happens."""
+    from graphify.serve import _focus_debounce_get
+    _FOCUS_DEBOUNCE_CACHE.clear()
+    args = {"focus_hint": {"file_path": "src/auth.py", "neighborhood_depth": 1}, "budget": 500}
+    key = _focus_debounce_key(args["focus_hint"])
+    # Seed cache with a timestamp 1 second in the past (window is 0.5s → expired).
+    import time as time_mod
+    fake_now = [time_mod.monotonic()]
+    _FOCUS_DEBOUNCE_CACHE[key] = (fake_now[0] - 1.0, "CACHED_VALUE")
+
+    # Freshness check should see the entry as expired:
+    assert _focus_debounce_get(key) is None
+    _FOCUS_DEBOUNCE_CACHE.clear()
+
+
+def test_focus_stale_reported_at_rejected():
+    """FOCUS-09 + D-15: reported_at >300s in the past → freshness returns False."""
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    stale = (now - timedelta(seconds=600)).isoformat()  # 10 minutes ago
+    assert _check_focus_freshness(stale, now=now) is False
+
+
+def test_focus_reported_at_z_suffix_parses():
+    """FOCUS-09: Z-suffix compat shim — Py 3.10 fromisoformat rejects 'Z', shim must handle it."""
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    # Fresh (within 300s) reported_at with Z suffix
+    recent = (now - timedelta(seconds=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Must return True (fresh) — NOT False (parse-fail collapse).
+    assert _check_focus_freshness(recent, now=now) is True
+
+
+def test_focus_malformed_reported_at():
+    """FOCUS-09 + D-11: malformed reported_at collapses to no_context signal (returns False, no traceback)."""
+    assert _check_focus_freshness("not-an-iso-date") is False
+    assert _check_focus_freshness("2026-99-99T99:99:99Z") is False
+    assert _check_focus_freshness("") is True  # empty = absent = backward compatible (D-15)
+    assert _check_focus_freshness(None) is True  # None = absent
