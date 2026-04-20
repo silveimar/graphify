@@ -365,7 +365,18 @@ def _collect_god_nodes(graph_data: dict[str, Any], limit: int = 10) -> str:
 def _collect_recent_deltas(
     agent_edges: list[dict[str, Any]], limit: int = 10
 ) -> str:
-    """Most recent N agent edges. Sort by (ts DESC, from ASC, to ASC)."""
+    """Most recent N agent edges. Sort by (ts DESC, from ASC, to ASC).
+
+    WR-05 (Phase 13 review): the previous implementation built per-char
+    Unicode-complement strings (``chr(0x10FFFF - ord(c))``) to flip DESC
+    order inside a single ``sorted`` key. That trick produced unreadable
+    keys and risked emitting noncharacter codepoints. Python's sort is
+    stable, so a two-pass sort delivers the same total order without the
+    surrogate-pair hazard:
+
+      1. ASC sort by tie-breakers ``(from, to)``
+      2. DESC sort by ``ts`` (stable — preserves the ASC tie-breaker)
+    """
     if not agent_edges:
         return "(no recent deltas)"
     sanitized = [
@@ -377,29 +388,15 @@ def _collect_recent_deltas(
         }
         for e in agent_edges
     ]
-    ranked = sorted(
-        sanitized,
-        key=lambda e: (_neg_ts(e["ts"]), e["from"], e["to"]),
-    )[:limit]
+    # Two-pass stable sort (WR-05): tie-breakers first, then primary key.
+    ranked = sorted(sanitized, key=lambda e: (e["from"], e["to"]))
+    ranked.sort(key=lambda e: e["ts"], reverse=True)
+    ranked = ranked[:limit]
     lines = [
         f"- `{e['ts']}` · {e['from']} → {e['to']} ({e['relation']})"
         for e in ranked
     ]
     return "\n".join(lines)
-
-
-def _neg_ts(ts: str) -> str:
-    """Return a sort key that inverts lexicographic order of ISO-ish timestamps.
-
-    Sorting ``"\uffff" - char`` per position flips DESC → ASC while remaining a
-    stable deterministic string key. Falls back to empty string when ``ts``
-    is empty.
-    """
-    if not ts:
-        return ""
-    # Simpler + deterministic: tuple of per-char negatives. We return a string
-    # by mapping each char to its Unicode complement within a sane range.
-    return "".join(chr(0x10FFFF - ord(c)) if ord(c) < 0x10FFFF else c for c in ts)
 
 
 def _collect_hot_paths(telemetry: dict[str, Any], limit: int = 5) -> str:
