@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: in_progress
-stopped_at: Phase 18 ✅ COMPLETE — verifier flipped gaps_found → passed; ready for Phase 15 (Async Background Enrichment)
-last_updated: "2026-04-20T20:55:00.000Z"
-last_activity: 2026-04-20 — Phase 18 closed. Plan 18-04 gap closure shipped (4 atomic commits); code review re-run 0 critical / 0 warning / 3 info cosmetic (d3bb569); verifier re-run status=passed, 5/5 SCs VERIFIED, 9/9 FOCUS REQ-IDs complete (7fc0ba5). Full suite 1329 passing. Next build-order candidate: Phase 15 Async Background Enrichment (soft-depends on Phase 12 routing.json). Phase 14 Obsidian Commands was HARD-blocked on 18 — now unblocked.
+status: "Phase 18 delivered `get_focus_context(focus_hint)` MCP tool — BFS ego-graph + community summary in D-02 envelope, path-spoof-silent via `validate_graph_path(path, base=project_root)`, `source_file: str | list[str]` handled via `analyze._iter_sources`, 500ms LRU debounce, 300s `reported_at` freshness with Py 3.10 Z-suffix compat shim. CR-01 snapshot double-nesting regression now structurally blocked at all 4 production callsites (Phases 12/15/17 inherit the guard automatically). Suite 1329 tests passing; +4 new production-callsite sentinel tests land in this phase."
+stopped_at: Phase 15 context gathered
+last_updated: "2026-04-20T22:34:35.112Z"
+last_activity: "2026-04-20 — Phase 18 closed post gap closure. Commits: 81d904a (RED) → 28b0f34 (GREEN snapshot guards, SC4 structural closure) → edf793a (refactor serve alias_map removal + WR-03/04 strengthening) → 7692b0c (gap closure docs) → d3bb569 (code review update) → 7fc0ba5 (verification passed). Phase 14 Obsidian Commands was HARD-blocked on 18 — now unblocked."
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 13
-  completed_plans: 13
+  total_plans: 14
+  completed_plans: 14
   percent: 100
 ---
 
@@ -136,6 +136,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-20T20:55:00Z
-Stopped at: Phase 18 ✅ COMPLETE — verifier flipped gaps_found → passed, 5/5 SCs VERIFIED, 9/9 FOCUS REQ-IDs satisfied, 1329 tests passing, code review 0 critical / 0 warning / 3 info cosmetic. Phase 14 Obsidian Commands now unblocked.
+Last session: 2026-04-20T22:34:35.102Z
+Stopped at: Phase 15 context gathered
 Next action: Pick next phase from v1.4 build order — **Phase 15 Async Background Enrichment** is the recommended candidate (soft-depends on Phase 12 routing.json). Start with `/gsd-discuss-phase 15` to lock decisions, or `/gsd-plan-phase 15` if design is already clear. Alternative candidates: Phase 14 (Obsidian Commands, HARD-depends on 18 ✅ + Plan 00 whitelist refactor) or Phase 17 (Conversational Graph Chat, soft-depends on 18 ✅ + 15).
