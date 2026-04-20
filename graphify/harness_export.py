@@ -50,7 +50,14 @@ _BLOCK_ORDER: tuple[str, ...] = ("soul", "heartbeat", "user")
 
 _AWS_KEY = re.compile(r"AKIA[0-9A-Z]{16}")
 _GITHUB_PAT = re.compile(r"ghp_[A-Za-z0-9]{36}")
-_OPENAI_KEY = re.compile(r"sk-[A-Za-z0-9]{20,}")
+# CR-02 (Phase 13 review): the original ``sk-[A-Za-z0-9]{20,}`` was too
+# permissive — it matched legitimate identifiers such as ``sk-learn-...``
+# and arbitrary 20+ char ``sk-`` prefixed tokens, causing false positives
+# in error mode and mangling unrelated content in redact mode. Tighten to
+# the documented OpenAI key shapes: ``sk-<48+>`` and ``sk-proj-<64+>``.
+_OPENAI_KEY = re.compile(
+    r"\b(?:sk-proj-[A-Za-z0-9_-]{64,}|sk-[A-Za-z0-9]{48,})\b"
+)
 _SLACK_TOKEN = re.compile(r"xox[baprs]-[A-Za-z0-9-]+")
 _BEARER = re.compile(r"Bearer\s+[A-Za-z0-9._-]{20,}")
 # CR-01 (Phase 13 review): match the entire PEM block — header, body, and

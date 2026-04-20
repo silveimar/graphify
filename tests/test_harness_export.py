@@ -266,12 +266,39 @@ def test_scanner_detects_github_pat() -> None:
 
 
 def test_scanner_detects_openai_key() -> None:
-    cleaned, matched = _redact_secrets(
-        "leak: sk-ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"
-    )
+    # 48 alphanumeric chars after the ``sk-`` prefix — matches the
+    # tightened CR-02 pattern that targets the documented OpenAI shape.
+    real_shape = "sk-" + ("A" * 48)
+    cleaned, matched = _redact_secrets(f"leak: {real_shape}")
     assert "[REDACTED]" in cleaned
-    assert "sk-ABCDEFGHIJKLMNOPQRSTUVWXYZ012345" not in cleaned
+    assert real_shape not in cleaned
     assert "openai_api_key" in matched
+
+
+def test_scanner_detects_openai_proj_key() -> None:
+    """CR-02: ``sk-proj-`` prefix with 64+ chars must also be redacted."""
+    proj = "sk-proj-" + ("a" * 64)
+    cleaned, matched = _redact_secrets(f"leak: {proj}")
+    assert "[REDACTED]" in cleaned
+    assert proj not in cleaned
+    assert "openai_api_key" in matched
+
+
+def test_scanner_does_not_match_sk_learn_or_short_sk_tokens() -> None:
+    """CR-02 false-positive guard: legitimate ``sk-`` prefixed identifiers
+    (e.g. ``sk-learn-...``) and short tokens must NOT be redacted under the
+    tightened OpenAI pattern.
+    """
+    benign_inputs = [
+        "package: sk-learn-20240101abcdefghij",  # sk-learn package id
+        "short token: sk-abc123def456",  # 12 chars after sk-
+        "sk-foo-bar",  # too short, hyphenated
+        "sk-" + ("X" * 47),  # one char short of the 48-char threshold
+    ]
+    for line in benign_inputs:
+        cleaned, matched = _redact_secrets(line)
+        assert "openai_api_key" not in matched, f"false positive on {line!r}"
+        assert "[REDACTED]" not in cleaned, f"unexpected redaction on {line!r}"
 
 
 def test_scanner_redacts_full_pem_private_key_body() -> None:
