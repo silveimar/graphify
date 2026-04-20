@@ -184,7 +184,13 @@ def test_validate_cli_narrows_exception_type_in_message(
 
 
 def test_extract_tool_examples_parses_examples_block() -> None:
-    """Deterministic, order-preserving extraction of an Examples: block."""
+    """Deterministic, order-preserving extraction of an Examples: block.
+
+    WR-07 (Phase 13 review): the new grammar treats blank lines as the
+    entry-separator inside the Examples block. Each contiguous run of
+    non-blank lines becomes one entry, with relative indentation
+    preserved.
+    """
     from graphify.capability import extract_tool_examples
 
     doc = (
@@ -192,12 +198,45 @@ def test_extract_tool_examples_parses_examples_block() -> None:
         "\n"
         "Examples:\n"
         "  query_graph(query='transformer')\n"
+        "\n"
         "  query_graph(query='attention', limit=5)\n"
     )
     assert extract_tool_examples(doc) == [
         "query_graph(query='transformer')",
         "query_graph(query='attention', limit=5)",
     ]
+
+
+def test_extract_tool_examples_preserves_multiline_indentation() -> None:
+    """WR-07 (Phase 13 review): a multi-line example (e.g. an indented
+    if-body) must keep its internal newlines and relative indentation —
+    the old per-line ``.strip()`` collapsed both.
+    """
+    from graphify.capability import extract_tool_examples
+
+    doc = (
+        "Run a thing.\n"
+        "\n"
+        "Examples:\n"
+        "    if x is None:\n"
+        "        run(default=True)\n"
+        "    else:\n"
+        "        run(value=x)\n"
+        "\n"
+        "    run(value=2)\n"
+    )
+    examples = extract_tool_examples(doc)
+    assert len(examples) == 2
+    # First entry preserves internal newlines and the 4-space relative
+    # indent of the if/else bodies after textwrap.dedent removes the
+    # common 4-space leader.
+    assert examples[0] == (
+        "if x is None:\n"
+        "    run(default=True)\n"
+        "else:\n"
+        "    run(value=x)"
+    )
+    assert examples[1] == "run(value=2)"
 
 
 def test_extract_tool_examples_empty_when_no_block() -> None:
@@ -216,7 +255,12 @@ def test_extract_tool_examples_empty_on_none_docstring() -> None:
 
 
 def test_extract_tool_examples_stops_at_next_section() -> None:
-    """Collection terminates on blank line OR next 'Header:' section (e.g. Args:, Returns:)."""
+    """Collection terminates on the next 'Header:' section (Args:, Returns:).
+
+    WR-07 (Phase 13 review): a blank line inside the Examples block is now
+    only an entry-separator — it does NOT close the block. Only a section
+    header (or EOF) closes it.
+    """
     from graphify.capability import extract_tool_examples
 
     doc = (
@@ -224,11 +268,13 @@ def test_extract_tool_examples_stops_at_next_section() -> None:
         "\n"
         "Examples:\n"
         "  do_thing(a=1)\n"
+        "\n"
         "  do_thing(a=2)\n"
         "Returns:\n"
         "  str\n"
     )
-    # 'Returns:' header ends the Examples block; only first two lines captured.
+    # 'Returns:' header ends the Examples block; the two example calls are
+    # captured as separate entries thanks to the blank-line separator.
     assert extract_tool_examples(doc) == ["do_thing(a=1)", "do_thing(a=2)"]
 
 
@@ -241,12 +287,14 @@ def test_meta_examples_populated_in_manifest(monkeypatch: pytest.MonkeyPatch) ->
     names = tool_names_ordered()
     assert names, "registry must expose at least one tool"
     target_name = names[0]
+    # WR-07 (Phase 13 review): blank line is the entry-separator under
+    # the new grammar so each call becomes its own _meta.examples entry.
     monkeypatch.setattr(
         "graphify.mcp_tool_registry.build_handler_docstrings",
         lambda: {
             target_name: (
                 "Do something.\n\nExamples:\n  "
-                f"{target_name}(a=1)\n  {target_name}(a=2)\n"
+                f"{target_name}(a=1)\n\n  {target_name}(a=2)\n"
             )
         },
     )

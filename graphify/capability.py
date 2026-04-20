@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import textwrap
 from importlib import metadata
 from pathlib import Path
 from typing import Any
@@ -39,20 +40,32 @@ def _load_yaml_meta() -> dict[str, Any]:
 def extract_tool_examples(docstring: str | None) -> list[str]:
     """Parse an `Examples:` block out of a handler docstring (MANIFEST-10).
 
-    Grammar:
+    Grammar (WR-07, Phase 13 review — preserves multi-line examples):
       1. Split `docstring` into lines.
       2. Locate the first line whose stripped value is exactly `Examples:`
          (case-sensitive, no trailing text after the colon).
       3. From the next line onward, collect lines until one of:
-           - a blank line (whitespace-only), or
            - another `^[A-Za-z][A-Za-z ]*:$` section header
              (e.g. `Args:`, `Returns:`, `Raises:`), or
            - EOF.
-      4. For each collected line, call `.strip()`; drop empties; keep insertion order.
-      5. Return the resulting list.
+      4. Apply `textwrap.dedent()` to the collected block so common leading
+         whitespace is removed once, but RELATIVE indentation inside the
+         block (e.g. an indented if-body) is preserved.
+      5. Split the dedented block into examples on blank-line boundaries —
+         each contiguous run of non-blank lines becomes one entry, with
+         internal newlines preserved.
+      6. Strip leading/trailing whitespace per entry; drop empties; keep
+         insertion order.
 
-    Non-string / None input returns `[]` safely. Order-preserving and deterministic
-    so `canonical_manifest_hash(build_manifest_dict())` stays stable across runs.
+    Non-string / None input returns `[]` safely. Order-preserving and
+    deterministic so `canonical_manifest_hash(build_manifest_dict())` stays
+    stable across runs.
+
+    Backward-compatibility note: a docstring with single-line examples and
+    no blank-line separators between them collapses into ONE multi-line
+    entry under this grammar. Authors who want each call as its own entry
+    must separate them with a blank line — the standard Numpy/Google
+    convention.
     """
     if not isinstance(docstring, str):
         return []
@@ -65,15 +78,42 @@ def extract_tool_examples(docstring: str | None) -> list[str]:
             break
     if header_idx < 0:
         return []
-    examples: list[str] = []
+    # Collect every line after the header until a section header / EOF.
+    # Note: we no longer break on blank lines here — blanks are the
+    # entry-separator inside the block.
+    raw: list[str] = []
     for line in lines[header_idx + 1 :]:
         stripped = line.strip()
-        if stripped == "":
+        # Detect another section header: alphabetic letters + spaces,
+        # ending in ':'. A blank line on its own does NOT terminate.
+        if stripped and _is_section_header(stripped):
             break
-        # Detect another section header: alphabetic letters + spaces, ending in ':'
-        if _is_section_header(stripped):
-            break
-        examples.append(stripped)
+        raw.append(line)
+    # Trim trailing blank lines so they don't yield phantom empty entries.
+    while raw and raw[-1].strip() == "":
+        raw.pop()
+    if not raw:
+        return []
+    # textwrap.dedent strips the longest common leading whitespace shared
+    # by every non-blank line — preserves relative indentation within
+    # multi-line entries (e.g. the body of an indented ``if`` block).
+    dedented = textwrap.dedent("\n".join(raw))
+    # Split on blank-line boundaries; each contiguous run becomes one entry.
+    examples: list[str] = []
+    current: list[str] = []
+    for line in dedented.split("\n"):
+        if line.strip() == "":
+            if current:
+                entry = "\n".join(current).strip("\n")
+                if entry.strip():
+                    examples.append(entry)
+                current = []
+            continue
+        current.append(line)
+    if current:
+        entry = "\n".join(current).strip("\n")
+        if entry.strip():
+            examples.append(entry)
     return examples
 
 
