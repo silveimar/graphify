@@ -215,6 +215,10 @@ def _load_sidecars(out_dir: Path) -> dict[str, Any]:
     annotations: list[dict[str, Any]] = []
     ann_path = out_dir / "annotations.jsonl"
     if ann_path.exists():
+        # WR-06 (Phase 13 review): also emit an aggregate count so a
+        # half-truncated sidecar surfaces as a single visible warning,
+        # not just buried per-line notices.
+        skipped_lines = 0
         for idx, line in enumerate(ann_path.read_text(encoding="utf-8").splitlines(), 1):
             stripped = line.strip()
             if not stripped:
@@ -222,6 +226,7 @@ def _load_sidecars(out_dir: Path) -> dict[str, Any]:
             try:
                 rec = json.loads(stripped)
             except json.JSONDecodeError:
+                skipped_lines += 1
                 print(
                     f"[graphify] annotations.jsonl line {idx}: skipped (invalid JSON)",
                     file=sys.stderr,
@@ -229,6 +234,12 @@ def _load_sidecars(out_dir: Path) -> dict[str, Any]:
                 continue
             if isinstance(rec, dict):
                 annotations.append(rec)
+        if skipped_lines:
+            print(
+                f"[graphify] warning: skipped {skipped_lines} corrupt "
+                f"annotations.jsonl line(s); kept {len(annotations)}",
+                file=sys.stderr,
+            )
     else:
         print(
             "[graphify] annotations.jsonl missing — continuing with empty annotations",

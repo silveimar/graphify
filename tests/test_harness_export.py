@@ -620,3 +620,28 @@ def test_path_guard_rejects_sibling_prefix_collision(tmp_path: Path) -> None:
     # Semantic guard must fail (this is the WR-03 fix invariant).
     with pytest.raises(ValueError):
         sibling.relative_to(base)
+
+
+# ---------------------------------------------------------------------------
+# WR-06 (Phase 13 review): _load_sidecars must emit an aggregate count
+# of skipped corrupt annotations so a half-truncated sidecar surfaces.
+# ---------------------------------------------------------------------------
+
+
+def test_load_sidecars_summary_when_corrupt_jsonl_lines(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out_dir = tmp_path / "out"
+    _copy_fixtures(out_dir)
+    # Overwrite annotations.jsonl with a mix of valid and corrupt lines.
+    (out_dir / "annotations.jsonl").write_text(
+        json.dumps({"id": "a1", "label": "ok"}) + "\n"
+        + "{ this is not json\n"
+        + json.dumps({"id": "a2", "label": "ok2"}) + "\n"
+        + "} also not json\n",
+        encoding="utf-8",
+    )
+    export_claude_harness(out_dir, _clock=_frozen_clock)
+    err = capsys.readouterr().err
+    assert "skipped 2 corrupt annotations.jsonl line(s)" in err
+    assert "kept 2" in err
