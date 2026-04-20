@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
 status: completed
-stopped_at: Phase 18 context gathered
-last_updated: "2026-04-20T18:37:29.210Z"
-last_activity: 2026-04-17 — commit 1296f43 closed HARNESS-07+08 atomically on main, completing Phase 13.
+stopped_at: Phase 18 planned — ready to execute
+last_updated: "2026-04-20T19:00:00.000Z"
+last_activity: 2026-04-20 — Phase 18 planned (3 plans, 11 tasks, 9 REQ-IDs covered, checker PASSED with 2 advisory warnings); commit 53c5b9b.
 progress:
   total_phases: 7
   completed_phases: 2
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 ## Current Position
 
-Phase: 13 Agent Capability Manifest — ✅ COMPLETE (4/4 plans, 18/18 REQ-IDs). MANIFEST-01..10 + HARNESS-01..08 all shipped.
-Plan: none in-flight. Next milestone phase per build order: Phase 18 Focus-Aware Graph Context, or Phase 15 Async Background Enrichment.
+Phase: 18 Focus-Aware Graph Context — 📋 PLANNED (0/3 plans, 9/9 REQ-IDs mapped). Plans 18-01 resolver (Wave 1), 18-02 MCP tool + sentinel (Wave 2), 18-03 P2 debounce + freshness (Wave 3).
+Plan: none in-flight. Ready to execute Plan 18-01 (Focus Resolver). Previous phase: Phase 13 ✅ COMPLETE.
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 2/7 phases complete.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
 Status: Phase 12 + Phase 13 complete. Phase 13 final plan (13-04) shipped HARNESS-07/08 P2 hardening: secret-scanner regex suite (7 families — AWS, GitHub PAT, OpenAI, Slack, Bearer, PEM, email-credential) gates `--include-annotations`; `graphify-out/harness/fidelity.json` records per-file SHA-256 + byte-length with `round_trip` status (first-export / byte-equal / drift). Module-level `set_clock` seam + kwarg `_clock` pin `generated_at` for CI byte-equality gates. CLI: `graphify harness export --include-annotations --secrets-mode {redact,error}` with exit code 3 for secret-scan failures. 1295 tests pass.
@@ -133,5 +133,5 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 ## Session Continuity
 
 Last session: 2026-04-20T18:37:29.200Z
-Stopped at: Phase 18 context gathered
-Next action: `/gsd-discuss-phase 18` (Focus-Aware Graph Context — parallel, no dependency) or `/gsd-discuss-phase 15` (Async Background Enrichment — soft-depends on 12 routing.json). Build order recommends 18 next since it unlocks Phase 14 + 17. `gsd-sdk` still unavailable in local env — STATE.md / ROADMAP.md / REQUIREMENTS.md updated by hand.
+Stopped at: Phase 18 planned — 3 plans authored, checker passed, ready to execute
+Next action: `/gsd-execute-phase 18` (auto-advancing now via /gsd-plan-phase 18 --chain). Plan 18-01 (Focus Resolver, Wave 1) runs first; 18-02 (MCP tool + ProjectRoot sentinel + snapshot rename + nested-dir fixture, Wave 2) gated on 18-01; 18-03 (P2 debounce + Py 3.10 freshness shim, Wave 3) gated on 18-02. Key pitfalls pre-resolved in plans: (1) nx.ego_graph single-seed → use nx.compose_all; (2) datetime.fromisoformat Z-suffix → .replace("Z","+00:00") shim; (3) validate_graph_path base=project_root explicit override.
