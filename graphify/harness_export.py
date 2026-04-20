@@ -48,7 +48,12 @@ _BLOCK_ORDER: tuple[str, ...] = ("soul", "heartbeat", "user")
 # ``include_annotations=True``. Kept inline (no new file) per planner guidance;
 # can be extracted if the suite ever exceeds 15 patterns.
 
-_AWS_KEY = re.compile(r"AKIA[0-9A-Z]{16}")
+# WR-01 (Phase 13 review): include the full set of AWS access-key prefixes,
+# not just long-term IAM keys (AKIA). ASIA covers STS/SSO temporary creds
+# and is now the most common shape in cloud-native workloads.
+_AWS_KEY = re.compile(
+    r"(?:AKIA|ASIA|AGPA|AIDA|AROA|ANPA|ANVA|AIPA)[0-9A-Z]{16}"
+)
 _GITHUB_PAT = re.compile(r"ghp_[A-Za-z0-9]{36}")
 # CR-02 (Phase 13 review): the original ``sk-[A-Za-z0-9]{20,}`` was too
 # permissive — it matched legitimate identifiers such as ``sk-learn-...``

@@ -257,6 +257,19 @@ def test_scanner_detects_aws_key() -> None:
     assert "aws_access_key" in matched
 
 
+def test_scanner_detects_aws_temporary_credentials() -> None:
+    """WR-01 (Phase 13 review): STS/SSO/role credentials use ASIA, AGPA,
+    AIDA, AROA, ANPA, ANVA, AIPA prefixes — all must be redacted in
+    addition to long-term AKIA keys.
+    """
+    for prefix in ("ASIA", "AGPA", "AIDA", "AROA", "ANPA", "ANVA", "AIPA"):
+        token = prefix + "IOSFODNN7EXAMPLE"
+        cleaned, matched = _redact_secrets(f"creds: {token}")
+        assert "[REDACTED]" in cleaned, f"missed {prefix} prefix"
+        assert token not in cleaned, f"failed to redact {token}"
+        assert "aws_access_key" in matched, f"no aws_access_key tag for {prefix}"
+
+
 def test_scanner_detects_github_pat() -> None:
     token = "ghp_" + "a" * 36
     cleaned, matched = _redact_secrets(f"leaked token: {token}")
