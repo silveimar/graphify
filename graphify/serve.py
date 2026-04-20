@@ -13,6 +13,7 @@ import networkx as nx
 from networkx.readwrite import json_graph
 from graphify.security import sanitize_label
 from graphify.delta import classify_staleness
+from graphify.analyze import _iter_sources
 
 # Module-level snapshot of live handler docstrings (MANIFEST-10).
 # Populated when `serve()` binds its closure-local `_handlers` dict; empty when
@@ -749,6 +750,75 @@ def _find_node(G: nx.Graph, label: str) -> list[str]:
     term = label.lower()
     return [nid for nid, d in G.nodes(data=True)
             if term in d.get("label", "").lower() or term == nid.lower()]
+
+
+def _multi_seed_ego(G: "nx.Graph", seeds: "list", radius: int) -> "nx.Graph":
+    """Multi-seed ego-graph via nx.compose_all - D-01 union semantics (FOCUS-06).
+
+    NetworkX's nx.ego_graph is single-seed only; passing a list raises NodeNotFound.
+    This helper composes per-seed ego-graphs, filtering out seeds that aren't in G
+    (defensive; never raises on missing seeds). Attributes are preserved by compose_all.
+    """
+    if not seeds:
+        return nx.Graph()
+    subgraphs = [nx.ego_graph(G, s, radius=radius) for s in seeds if s in G]
+    if not subgraphs:
+        return nx.Graph()
+    if len(subgraphs) == 1:
+        return subgraphs[0]
+    return nx.compose_all(subgraphs)
+
+
+def _resolve_focus_seeds(
+    G: "nx.Graph",
+    target_path: "Path",
+    *,
+    function_name: "str | None" = None,
+    line: "int | None" = None,
+) -> "list[str]":
+    """Resolve a file_path (and optional function_name/line) to matching node_ids.
+
+    Per D-01 (multi-seed union), every node whose source_file matches `target_path`
+    (either as stored or resolved-absolute) is a seed. Per D-02, function_name and
+    line narrow the union - when absent, full union is returned. Per D-04, the
+    target path is compared both as-stored AND as resolved absolute so relative and
+    absolute stored paths both match.
+
+    Returns empty list when no node matches; callers map this to no_context (D-03).
+    Does NOT raise - path confinement is the caller's responsibility (FOCUS-04).
+    """
+    target_raw = str(target_path)
+    try:
+        target_abs = str(target_path.resolve())
+    except (OSError, RuntimeError):
+        target_abs = target_raw
+    seeds: list[str] = []
+    for nid, data in G.nodes(data=True):
+        for s in _iter_sources(data.get("source_file")):
+            if s == target_raw or s == target_abs:
+                seeds.append(nid)
+                break
+            # Also compare resolved absolute form of the stored path
+            try:
+                if str(Path(s).resolve()) == target_abs:
+                    seeds.append(nid)
+                    break
+            except (OSError, RuntimeError):
+                continue
+    # D-02: optional narrowing when function_name or line provided
+    if function_name or line is not None:
+        narrowed: list[str] = []
+        for nid in seeds:
+            data = G.nodes[nid]
+            label = data.get("label", "")
+            loc = data.get("source_location", "")
+            if function_name and function_name not in label:
+                continue
+            if line is not None and loc != f"L{line}":
+                continue
+            narrowed.append(nid)
+        seeds = narrowed
+    return seeds
 
 
 # Sentinel for Phase 9.2 D-02 hybrid response format.
