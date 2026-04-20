@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: completed
-stopped_at: Phase 18 planned — ready to execute
-last_updated: "2026-04-20T19:00:00.000Z"
-last_activity: 2026-04-20 — Phase 18 planned (3 plans, 11 tasks, 9 REQ-IDs covered, checker PASSED with 2 advisory warnings); commit 53c5b9b.
+status: in_progress
+stopped_at: Phase 18 Plan 01 complete — ready to execute Plan 18-02
+last_updated: "2026-04-20T20:10:00.000Z"
+last_activity: 2026-04-20 — Plan 18-01 shipped (focus resolver + multi-seed ego helpers in serve.py, 3 tests, FOCUS-02 + FOCUS-06 closed); commits 529e4e9 + cb04973.
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 11
+  completed_plans: 11
   percent: 100
 ---
 
@@ -25,19 +25,19 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 ## Current Position
 
-Phase: 18 Focus-Aware Graph Context — 📋 PLANNED (0/3 plans, 9/9 REQ-IDs mapped). Plans 18-01 resolver (Wave 1), 18-02 MCP tool + sentinel (Wave 2), 18-03 P2 debounce + freshness (Wave 3).
-Plan: none in-flight. Ready to execute Plan 18-01 (Focus Resolver). Previous phase: Phase 13 ✅ COMPLETE.
-Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 2/7 phases complete.
+Phase: 18 Focus-Aware Graph Context — 🚧 IN PROGRESS (1/3 plans, FOCUS-02 + FOCUS-06 closed). Plans 18-01 resolver ✅ (Wave 1), 18-02 MCP tool + sentinel ⏳ (Wave 2), 18-03 P2 debounce + freshness ⏳ (Wave 3).
+Plan: Plan 18-01 ✅ COMPLETE (TDD RED 529e4e9 → GREEN cb04973). Ready to execute Plan 18-02 (MCP tool `get_focus_context` + snapshot sentinel).
+Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 2/7 phases complete, Phase 18 in flight.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Phase 12 + Phase 13 complete. Phase 13 final plan (13-04) shipped HARNESS-07/08 P2 hardening: secret-scanner regex suite (7 families — AWS, GitHub PAT, OpenAI, Slack, Bearer, PEM, email-credential) gates `--include-annotations`; `graphify-out/harness/fidelity.json` records per-file SHA-256 + byte-length with `round_trip` status (first-export / byte-equal / drift). Module-level `set_clock` seam + kwarg `_clock` pin `generated_at` for CI byte-equality gates. CLI: `graphify harness export --include-annotations --secrets-mode {redact,error}` with exit code 3 for secret-scan failures. 1295 tests pass.
-Last activity: 2026-04-17 — commit 1296f43 closed HARNESS-07+08 atomically on main, completing Phase 13.
+Status: Phase 18 Plan 01 ships `_resolve_focus_seeds` + `_multi_seed_ego` helpers in `graphify/serve.py` that close FOCUS-02 (handles `source_file: str | list[str]` via `analyze._iter_sources`) + FOCUS-06 (multi-seed ego-graph via `nx.compose_all` — avoids the NetworkX 3.x `NodeNotFound` trap from multi-seed `nx.ego_graph`). 3 TDD-locked tests (test_focus_resolver_str_source_file, test_focus_resolver_list_source_file_multi_seed, test_multi_seed_compose_all_matches_expected) pass. Full suite: 1307 tests passing (was 1304 → +3 additive).
+Last activity: 2026-04-20 — commits 529e4e9 + cb04973 on main; Plan 18-01 SUMMARY.md written; ready for Plan 18-02 execution.
 
 Progress: [███░░░░░░░] 29% (2/7 phases complete — 12 ✅, 13 ✅)
 
 **Build order (locked in SUMMARY.md):**
 
 1. Phase 12 Routing — HARD gates `cache.py` key format — ✅ COMPLETE
-2. Phase 18 Focus — parallel with 12, no code overlap — ⏳ next candidate
+2. Phase 18 Focus — parallel with 12, no code overlap — 🚧 IN PROGRESS (Plan 01 ✅, Plans 02+03 pending)
 3. Phase 13 Wave A — plumbing (manifest generator + CLI + `capability_describe` tool) — ✅ COMPLETE
 4. Phase 15 Enrichment — soft-depends on 12 routing.json — ⏳ next candidate
 5. Phase 17 Chat — soft-depends on 18 + 15
@@ -109,6 +109,7 @@ Key carry-forward decisions (affect v1.4):
 - **D-02 (Phase 9.2)**: MCP responses use hybrid `text_body + SENTINEL + json(meta)` envelope with status codes — all future MCP tools inherit (applies to Phase 13 manifest + Phase 16 `argue_topic` + Phase 17 `chat` + Phase 18 `get_focus_context`)
 - **D-16 (Phase 10)**: MCP `query_graph` transparently redirects merged-away aliases — agent callsites preserved across dedup (applies to Phases 15, 16, 17, 18)
 - **D-18 (Phase 11)**: New MCP tools should compose existing `analyze.py` / `delta.py` / `snapshot.py` primitives — no new graphify/ modules for plumbing; new analysis algorithms get their own phase (applies to Phase 15 `enrich.py`, Phase 16 `argue.py`, Phase 17 chat plumbing, Phase 18 focus handler)
+- **Plan 18-01 (2026-04-20)**: Focus resolver lives as two module-private helpers in `graphify/serve.py` (`_resolve_focus_seeds`, `_multi_seed_ego`). Multi-seed ego-graph MUST use `nx.compose_all([nx.ego_graph(G, s, r) for s in seeds])` — never multi-seed `nx.ego_graph(G, [seeds], r)` which raises `NodeNotFound` in NetworkX 3.x. `source_file: str | list[str]` handling delegates to `analyze._iter_sources` (never inline `isinstance` checks).
 
 Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 
@@ -132,6 +133,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-20T18:37:29.200Z
-Stopped at: Phase 18 planned — 3 plans authored, checker passed, ready to execute
-Next action: `/gsd-execute-phase 18` (auto-advancing now via /gsd-plan-phase 18 --chain). Plan 18-01 (Focus Resolver, Wave 1) runs first; 18-02 (MCP tool + ProjectRoot sentinel + snapshot rename + nested-dir fixture, Wave 2) gated on 18-01; 18-03 (P2 debounce + Py 3.10 freshness shim, Wave 3) gated on 18-02. Key pitfalls pre-resolved in plans: (1) nx.ego_graph single-seed → use nx.compose_all; (2) datetime.fromisoformat Z-suffix → .replace("Z","+00:00") shim; (3) validate_graph_path base=project_root explicit override.
+Last session: 2026-04-20T20:10:00.000Z
+Stopped at: Phase 18 Plan 01 complete — ready to execute Plan 18-02
+Next action: Execute Plan 18-02 (MCP tool `get_focus_context` + `ProjectRoot` sentinel + `snapshot.py` `root→project_root` rename + nested-dir fixture). Helpers from 18-01 (`_resolve_focus_seeds`, `_multi_seed_ego`) are ready for composition. Then Plan 18-03 (P2 debounce + Py 3.10 freshness shim) gated on 18-02. Pitfalls still pre-resolved in Plans 02+03: (1) datetime.fromisoformat Z-suffix → .replace("Z","+00:00") shim; (2) validate_graph_path base=project_root explicit override; (3) construction-time sentinel rejects `path.name == "graphify-out"` per v1.3 CR-01.

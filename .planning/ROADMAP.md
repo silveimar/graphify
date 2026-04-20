@@ -238,7 +238,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   4. A regression test constructs `Snapshot(project_root=Path("graphify-out"))` and the sentinel raises before any path operation — the renamed field + assertion prevents Phase 12/15/17 from reintroducing CR-01.
   5. Focus is pull-model via MCP arg — no filesystem watcher thread exists; `nx.ego_graph` is reused (no new traversal algorithms) per D-18 compose-don't-plumb.
 **Plans**: 3 plans (locked 2026-04-20 per CONTEXT.md D-13).
-- [ ] 18-01-PLAN.md — Focus Resolver: `_resolve_focus_seeds` + `_multi_seed_ego` (FOCUS-02, FOCUS-06)
+- [x] 18-01-PLAN.md — Focus Resolver: `_resolve_focus_seeds` + `_multi_seed_ego` (FOCUS-02, FOCUS-06) — ✅ 2026-04-20 (commits 529e4e9 + cb04973)
 - [ ] 18-02-PLAN.md — MCP Tool + Snapshot Sentinel: `get_focus_context` + `ProjectRoot` + `root`→`project_root` rename + nested-dir fixture (FOCUS-01, FOCUS-03, FOCUS-04, FOCUS-05, FOCUS-07)
 - [ ] 18-03-PLAN.md — P2 Debounce + Freshness: 500ms debounce cache + `reported_at` freshness with Py 3.10 Z-suffix shim (FOCUS-08 [P2], FOCUS-09 [P2])
 
@@ -268,7 +268,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 15. Async Background Enrichment | v1.4 | 0/TBD | Planned | — |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
 | 17. Conversational Graph Chat | v1.4 | 0/TBD | Planned | — |
-| 18. Focus-Aware Graph Context | v1.4 | 0/3 | Planned | — |
+| 18. Focus-Aware Graph Context | v1.4 | 1/3 | In Progress | — |
 
 ---
-*Last updated: 2026-04-17 — Phase 12 complete (6 plans). **Phase 13 complete (4/4 plans, 18/18 REQ-IDs shipped: MANIFEST-01..10 + HARNESS-01..08, 1295 tests).** Build order: 12 ✅ → 13 ✅ → 18 → 15 → 17 → 16 → 14 → final manifest regen (Wave B final sweep deferred until 14–18 land). Next: `/gsd-discuss-phase 18` or `/gsd-discuss-phase 15` per capacity.*
+*Last updated: 2026-04-20 — Phase 18 Plan 01 ✅ (focus resolver helpers in serve.py; FOCUS-02 + FOCUS-06 closed; 1307 tests). Build order: 12 ✅ → 13 ✅ → 18 🚧 (1/3) → 15 → 17 → 16 → 14 → final manifest regen. Next: Plan 18-02 (MCP tool `get_focus_context` + snapshot sentinel + `root`→`project_root` rename).*

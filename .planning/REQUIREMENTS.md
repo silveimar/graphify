@@ -115,11 +115,11 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 ### Focus-Aware Graph Context (Phase 18)
 
 - [ ] **FOCUS-01**: New MCP tool `get_focus_context(focus_hint: dict, budget: int = ...)` where `focus_hint` is structured: `{file_path, function_name?, line?, neighborhood_depth?, include_community?}`
-- [ ] **FOCUS-02**: Tool resolves `file_path` → matching node_ids, handling `source_file` as `str | list[str]` per v1.3 schema
+- [x] **FOCUS-02**: Tool resolves `file_path` → matching node_ids, handling `source_file` as `str | list[str]` per v1.3 schema
 - [ ] **FOCUS-03**: Returns BFS subgraph at specified depth with citations, community summary, D-02 envelope
 - [ ] **FOCUS-04**: `security.py::validate_graph_path(path, base=project_root)` enforces vault_root / project_root confinement; spoofed paths silently ignored without echo (Pitfall 6 mitigation — no filesystem structure leak)
 - [ ] **FOCUS-05**: Focus is **pull-model** via MCP arg — no filesystem watcher side-channel (Pitfall 6 + D-18 honored)
-- [ ] **FOCUS-06**: Uses `nx.ego_graph` for bounded-depth neighborhood (no new algorithms — D-18 compose, not plumb)
+- [x] **FOCUS-06**: Uses `nx.ego_graph` for bounded-depth neighborhood (no new algorithms — D-18 compose, not plumb)
 - [ ] **FOCUS-07**: Snapshot-path-double-nesting regression guard — renames `snapshot.py` `root` → `project_root`; asserts `not path.name == "graphify-out"` at construction (Pitfall 20 codifies v1.3 CR-01)
 - [ ] **FOCUS-08** `[P2]`: 500 ms debounce on focus changes prevents cache thrash when agent reports focus every keystroke
 - [ ] **FOCUS-09** `[P2]`: `focus_hint.reported_at` freshness check (≤ 5 min) rejects stale focus-spoofing attempts after agent context resets
@@ -262,11 +262,11 @@ Priority tags: `[P2]` indicates the requirement is in v1.4 scope per user confir
 | CHAT-11 [P2] | Phase 17 | TBD | planned | — |
 | CHAT-12 [P2] | Phase 17 | TBD | planned | — |
 | FOCUS-01 | Phase 18 | TBD | planned | — |
-| FOCUS-02 | Phase 18 | TBD | planned | — |
+| FOCUS-02 | Phase 18 | `graphify/serve.py::_resolve_focus_seeds` (via `analyze._iter_sources`) | complete | 2026-04-20 |
 | FOCUS-03 | Phase 18 | TBD | planned | — |
 | FOCUS-04 | Phase 18 | TBD | planned | — |
 | FOCUS-05 | Phase 18 | TBD | planned | — |
-| FOCUS-06 | Phase 18 | TBD | planned | — |
+| FOCUS-06 | Phase 18 | `graphify/serve.py::_multi_seed_ego` (nx.compose_all) | complete | 2026-04-20 |
 | FOCUS-07 | Phase 18 | TBD | planned | — |
 | FOCUS-08 [P2] | Phase 18 | TBD | planned | — |
 | FOCUS-09 [P2] | Phase 18 | TBD | planned | — |
