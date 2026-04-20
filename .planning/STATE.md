@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
 status: in_progress
-stopped_at: Phase 18 Plan 01 complete — ready to execute Plan 18-02
-last_updated: "2026-04-20T20:10:00.000Z"
-last_activity: 2026-04-20 — Plan 18-01 shipped (focus resolver + multi-seed ego helpers in serve.py, 3 tests, FOCUS-02 + FOCUS-06 closed); commits 529e4e9 + cb04973.
+stopped_at: Phase 18 Plan 02 complete — ready to execute Plan 18-03 (P2 debounce + freshness)
+last_updated: "2026-04-20T20:37:11Z"
+last_activity: 2026-04-20 — Plan 18-02 shipped (get_focus_context MCP tool + ProjectRoot sentinel + root→project_root rename; 13 tests; FOCUS-01/03/04/05/07 closed); commits 6c63501 / 39a8236 / 1d0169c / b058d37 / 4da9efb.
 progress:
   total_phases: 7
   completed_phases: 2
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 ## Current Position
 
-Phase: 18 Focus-Aware Graph Context — 🚧 IN PROGRESS (1/3 plans, FOCUS-02 + FOCUS-06 closed). Plans 18-01 resolver ✅ (Wave 1), 18-02 MCP tool + sentinel ⏳ (Wave 2), 18-03 P2 debounce + freshness ⏳ (Wave 3).
-Plan: Plan 18-01 ✅ COMPLETE (TDD RED 529e4e9 → GREEN cb04973). Ready to execute Plan 18-02 (MCP tool `get_focus_context` + snapshot sentinel).
+Phase: 18 Focus-Aware Graph Context — 🚧 IN PROGRESS (2/3 plans, FOCUS-01/02/03/04/05/06/07 closed). Plans 18-01 resolver ✅ (Wave 1), 18-02 MCP tool + sentinel ✅ (Wave 2), 18-03 P2 debounce + freshness ⏳ (Wave 3).
+Plan: Plan 18-02 ✅ COMPLETE (RED 6c63501 → GREEN 39a8236 → RED 1d0169c → GREEN b058d37 → CHORE 4da9efb). Ready to execute Plan 18-03 (P2 debounce + freshness gate).
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 2/7 phases complete, Phase 18 in flight.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Phase 18 Plan 01 ships `_resolve_focus_seeds` + `_multi_seed_ego` helpers in `graphify/serve.py` that close FOCUS-02 (handles `source_file: str | list[str]` via `analyze._iter_sources`) + FOCUS-06 (multi-seed ego-graph via `nx.compose_all` — avoids the NetworkX 3.x `NodeNotFound` trap from multi-seed `nx.ego_graph`). 3 TDD-locked tests (test_focus_resolver_str_source_file, test_focus_resolver_list_source_file_multi_seed, test_multi_seed_compose_all_matches_expected) pass. Full suite: 1307 tests passing (was 1304 → +3 additive).
-Last activity: 2026-04-20 — commits 529e4e9 + cb04973 on main; Plan 18-01 SUMMARY.md written; ready for Plan 18-02 execution.
+Status: Phase 18 Plan 02 ships the `get_focus_context` MCP tool (pull-model focus → scoped ego-graph + community summary via D-02 envelope), the `ProjectRoot` frozen-dataclass sentinel in snapshot.py (codifies v1.3 CR-01 / Pitfall 20), and the `root`→`project_root` rename across 4 snapshot signatures (load_snapshot unchanged). Binary status invariant (D-03 + D-11) holds: spoofed / unindexed / missing-on-disk paths all yield byte-identical no_context envelopes with no focus_hint echo (D-12). Outer-hop-first budget degradation (D-08) shrinks ego-graph radius before char-clipping. 13 TDD-locked tests pass (10 in test_serve.py, 3 in test_snapshot.py). Full suite: 1320 tests passing (was 1307 → +13 additive).
+Last activity: 2026-04-20 — commits 6c63501 (RED snapshot), 39a8236 (GREEN snapshot), 1d0169c (RED serve), b058d37 (GREEN serve), 4da9efb (server.json hash regen) on main; Plan 18-02 SUMMARY.md written; ready for Plan 18-03 execution.
 
 Progress: [███░░░░░░░] 29% (2/7 phases complete — 12 ✅, 13 ✅)
 
@@ -110,6 +110,8 @@ Key carry-forward decisions (affect v1.4):
 - **D-16 (Phase 10)**: MCP `query_graph` transparently redirects merged-away aliases — agent callsites preserved across dedup (applies to Phases 15, 16, 17, 18)
 - **D-18 (Phase 11)**: New MCP tools should compose existing `analyze.py` / `delta.py` / `snapshot.py` primitives — no new graphify/ modules for plumbing; new analysis algorithms get their own phase (applies to Phase 15 `enrich.py`, Phase 16 `argue.py`, Phase 17 chat plumbing, Phase 18 focus handler)
 - **Plan 18-01 (2026-04-20)**: Focus resolver lives as two module-private helpers in `graphify/serve.py` (`_resolve_focus_seeds`, `_multi_seed_ego`). Multi-seed ego-graph MUST use `nx.compose_all([nx.ego_graph(G, s, r) for s in seeds])` — never multi-seed `nx.ego_graph(G, [seeds], r)` which raises `NodeNotFound` in NetworkX 3.x. `source_file: str | list[str]` handling delegates to `analyze._iter_sources` (never inline `isinstance` checks).
+- **Plan 18-02 (2026-04-20)**: `get_focus_context` MCP tool composes the Plan 18-01 resolver into a D-02 envelope. Binary status invariant (D-03 + D-11): only `{ok, no_context}` — no intermediate `no_graph` / `insufficient_history` statuses; missing graph collapses to no_context. Path confinement MUST pass `base=project_root` explicitly (default `graphify-out/` rejects all legitimate source files); relative `file_path` resolved against project_root BEFORE validate_graph_path (Path.resolve uses CWD, not base). Silent-ignore catches BOTH `ValueError` AND `FileNotFoundError` (T-18-A + T-18-B). No focus_hint echo in no_context envelope (D-12 / T-18-D). Outer-hop-first budget degradation (D-08): shrink ego-graph radius before char-clipping.
+- **Plan 18-02 (2026-04-20)**: `ProjectRoot(path: Path)` frozen-dataclass sentinel in `graphify/snapshot.py` codifies v1.3 CR-01 (Pitfall 20). Construction fails fast when `path.name == "graphify-out"`. `snapshot.py` public API renamed `root` → `project_root` across 4 signatures (`snapshots_dir`, `list_snapshots`, `save_snapshot`, `auto_snapshot_and_delta`); `load_snapshot(path)` unchanged. All repo callers migrated; `make_snapshot_chain` fixture retains `root=` alias for backwards-compat only.
 
 Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 

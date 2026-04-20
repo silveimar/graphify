@@ -239,7 +239,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   5. Focus is pull-model via MCP arg — no filesystem watcher thread exists; `nx.ego_graph` is reused (no new traversal algorithms) per D-18 compose-don't-plumb.
 **Plans**: 3 plans (locked 2026-04-20 per CONTEXT.md D-13).
 - [x] 18-01-PLAN.md — Focus Resolver: `_resolve_focus_seeds` + `_multi_seed_ego` (FOCUS-02, FOCUS-06) — ✅ 2026-04-20 (commits 529e4e9 + cb04973)
-- [ ] 18-02-PLAN.md — MCP Tool + Snapshot Sentinel: `get_focus_context` + `ProjectRoot` + `root`→`project_root` rename + nested-dir fixture (FOCUS-01, FOCUS-03, FOCUS-04, FOCUS-05, FOCUS-07)
+- [x] 18-02-PLAN.md — MCP Tool + Snapshot Sentinel: `get_focus_context` + `ProjectRoot` + `root`→`project_root` rename + nested-dir fixture (FOCUS-01, FOCUS-03, FOCUS-04, FOCUS-05, FOCUS-07) — ✅ 2026-04-20 (commits 6c63501 + 39a8236 + 1d0169c + b058d37 + 4da9efb)
 - [ ] 18-03-PLAN.md — P2 Debounce + Freshness: 500ms debounce cache + `reported_at` freshness with Py 3.10 Z-suffix shim (FOCUS-08 [P2], FOCUS-09 [P2])
 
 ## Progress
@@ -268,7 +268,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 15. Async Background Enrichment | v1.4 | 0/TBD | Planned | — |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
 | 17. Conversational Graph Chat | v1.4 | 0/TBD | Planned | — |
-| 18. Focus-Aware Graph Context | v1.4 | 1/3 | In Progress | — |
+| 18. Focus-Aware Graph Context | v1.4 | 2/3 | In Progress | — |
 
 ---
-*Last updated: 2026-04-20 — Phase 18 Plan 01 ✅ (focus resolver helpers in serve.py; FOCUS-02 + FOCUS-06 closed; 1307 tests). Build order: 12 ✅ → 13 ✅ → 18 🚧 (1/3) → 15 → 17 → 16 → 14 → final manifest regen. Next: Plan 18-02 (MCP tool `get_focus_context` + snapshot sentinel + `root`→`project_root` rename).*
+*Last updated: 2026-04-20 — Phase 18 Plan 02 ✅ (`get_focus_context` MCP tool + `ProjectRoot` sentinel + `root`→`project_root` rename; FOCUS-01/03/04/05/07 closed; 1320 tests). Build order: 12 ✅ → 13 ✅ → 18 🚧 (2/3) → 15 → 17 → 16 → 14 → final manifest regen. Next: Plan 18-03 P2 (500ms debounce + `reported_at` freshness gate).*
