@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: "Phase 18 delivered `get_focus_context(focus_hint)` MCP tool — BFS ego-graph + community summary in D-02 envelope, path-spoof-silent via `validate_graph_path(path, base=project_root)`, `source_file: str | list[str]` handled via `analyze._iter_sources`, 500ms LRU debounce, 300s `reported_at` freshness with Py 3.10 Z-suffix compat shim. CR-01 snapshot double-nesting regression now structurally blocked at all 4 production callsites (Phases 12/15/17 inherit the guard automatically). Suite 1329 tests passing; +4 new production-callsite sentinel tests land in this phase."
+status: executing
 stopped_at: Phase 15 context gathered
-last_updated: "2026-04-20T22:34:35.112Z"
-last_activity: "2026-04-20 — Phase 18 closed post gap closure. Commits: 81d904a (RED) → 28b0f34 (GREEN snapshot guards, SC4 structural closure) → edf793a (refactor serve alias_map removal + WR-03/04 strengthening) → 7692b0c (gap closure docs) → d3bb569 (code review update) → 7fc0ba5 (verification passed). Phase 14 Obsidian Commands was HARD-blocked on 18 — now unblocked."
+last_updated: "2026-04-20T23:25:01.910Z"
+last_activity: 2026-04-20 -- Phase 15 planning complete
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 14
+  total_plans: 20
   completed_plans: 14
-  percent: 100
+  percent: 70
 ---
 
 # Project State
@@ -29,8 +29,8 @@ Phase: 18 Focus-Aware Graph Context — ✅ COMPLETE 2026-04-20. All 4 plans shi
 Plan: No active plan — Phase 18 done. Next candidate: Phase 15 Async Background Enrichment (plans TBD; soft-depends on Phase 12 routing.json).
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 3/7 phases complete (12 ✅ + 13 ✅ + 18 ✅), Phase 15 next.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Phase 18 delivered `get_focus_context(focus_hint)` MCP tool — BFS ego-graph + community summary in D-02 envelope, path-spoof-silent via `validate_graph_path(path, base=project_root)`, `source_file: str | list[str]` handled via `analyze._iter_sources`, 500ms LRU debounce, 300s `reported_at` freshness with Py 3.10 Z-suffix compat shim. CR-01 snapshot double-nesting regression now structurally blocked at all 4 production callsites (Phases 12/15/17 inherit the guard automatically). Suite 1329 tests passing; +4 new production-callsite sentinel tests land in this phase.
-Last activity: 2026-04-20 — Phase 18 closed post gap closure. Commits: 81d904a (RED) → 28b0f34 (GREEN snapshot guards, SC4 structural closure) → edf793a (refactor serve alias_map removal + WR-03/04 strengthening) → 7692b0c (gap closure docs) → d3bb569 (code review update) → 7fc0ba5 (verification passed). Phase 14 Obsidian Commands was HARD-blocked on 18 — now unblocked.
+Status: Ready to execute
+Last activity: 2026-04-20 -- Phase 15 planning complete
 
 Progress: [██████░░░░] 43% (3/7 phases complete — 12 ✅, 13 ✅, 18 ✅)
 
