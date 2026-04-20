@@ -154,3 +154,23 @@ def nested_project_root(tmp_path):
     (project / "src").mkdir()
     (project / "src" / "auth.py").write_text("def login(): pass\n")
     return project
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 enrichment fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def enrich_out_dir(tmp_path: Path) -> Path:
+    """Create graphify-out/ + minimal snapshot; yield out_dir; teardown unlinks .enrichment.lock and .enrichment.pid."""
+    out_dir = tmp_path / "graphify-out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "snapshots").mkdir(exist_ok=True)
+    # Minimal snapshot file (stem = snapshot_id)
+    (out_dir / "snapshots" / "2026-04-20T14-30-00.json").write_text(
+        json.dumps({"graph": {"nodes": [], "links": []}, "communities": {}, "meta": {}})
+    )
+    yield out_dir
+    # Teardown: remove lock + pid so next test starts clean
+    (out_dir / ".enrichment.lock").unlink(missing_ok=True)
+    (out_dir / ".enrichment.pid").unlink(missing_ok=True)
