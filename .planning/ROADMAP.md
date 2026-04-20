@@ -235,12 +235,13 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   1. Agent calls `get_focus_context({"file_path": "...", "neighborhood_depth": 2, "include_community": true})` and receives a BFS ego-graph + community summary in the D-02 envelope with full citations.
   2. Agent spoofs `focus_hint.file_path = "/etc/passwd"` — the handler silently ignores the request (no filesystem-structure leak, no error echo) via `security.py::validate_graph_path(path, base=project_root)`.
   3. `source_file` as `str | list[str]` (v1.3 schema) resolves correctly — a node with multiple source files returns matching node_ids without crashing the focus resolver.
-  4. A regression test constructs `Snapshot(project_root=Path("graphify-out"))` and the sentinel raises before any path operation — the renamed field + assertion prevents Phase 12/15/17 from reintroducing CR-01.
+  4. A regression test constructs `Snapshot(project_root=Path("graphify-out"))` and the sentinel raises before any path operation — the renamed field + assertion prevents Phase 12/15/17 from reintroducing CR-01. ✅ **VERIFIED 2026-04-20** via Plan 18-04 — inline `Path(project_root).name == "graphify-out"` guard wired into all 4 production snapshot helpers (`snapshots_dir`, `list_snapshots`, `save_snapshot`, `auto_snapshot_and_delta`); 4 production-callsite tests in `tests/test_snapshot.py` confirm rejection; structural SC4 check in 18-04-SUMMARY.md runs all 4 helpers against `graphify-out/` and each raises `ValueError`.
   5. Focus is pull-model via MCP arg — no filesystem watcher thread exists; `nx.ego_graph` is reused (no new traversal algorithms) per D-18 compose-don't-plumb.
 **Plans**: 3 plans (locked 2026-04-20 per CONTEXT.md D-13).
 - [x] 18-01-PLAN.md — Focus Resolver: `_resolve_focus_seeds` + `_multi_seed_ego` (FOCUS-02, FOCUS-06) — ✅ 2026-04-20 (commits 529e4e9 + cb04973)
 - [x] 18-02-PLAN.md — MCP Tool + Snapshot Sentinel: `get_focus_context` + `ProjectRoot` + `root`→`project_root` rename + nested-dir fixture (FOCUS-01, FOCUS-03, FOCUS-04, FOCUS-05, FOCUS-07) — ✅ 2026-04-20 (commits 6c63501 + 39a8236 + 1d0169c + b058d37 + 4da9efb)
 - [x] 18-03-PLAN.md — P2 Debounce + Freshness: 500ms debounce cache + `reported_at` freshness with Py 3.10 Z-suffix shim (FOCUS-08 [P2], FOCUS-09 [P2]) — ✅ 2026-04-20 (commits 2309a57 + 0f06629)
+- [x] 18-04-PLAN.md — Gap closure: CR-01 sentinel wiring + WR-02/03/04 cleanups (SC4 PARTIAL → VERIFIED; inline `Path(project_root).name == "graphify-out"` guard in 4 snapshot helpers; dead `alias_map` param removed from `_run_get_focus_context_core`; WR-03 dispatcher-exercising test + WR-04 D-08 strict-depth invariants) — ✅ 2026-04-20 (commits 81d904a + 28b0f34 + edf793a + docs commit)
 
 ## Progress
 
@@ -268,7 +269,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 15. Async Background Enrichment | v1.4 | 0/TBD | Planned | — |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
 | 17. Conversational Graph Chat | v1.4 | 0/TBD | Planned | — |
-| 18. Focus-Aware Graph Context | v1.4 | 3/3 | In Progress | — |
+| 18. Focus-Aware Graph Context | v1.4 | 4/4 | In Progress | — |
 
 ---
-*Last updated: 2026-04-20 — Phase 18 Plan 03 ✅ (500ms debounce cache + `reported_at` freshness with Py 3.10 Z-shim; FOCUS-08/09 closed; all 9 FOCUS REQ-IDs now complete; 1325 tests). Phase 18 all 3 plans shipped — awaiting `/gsd-verify-work 18`. Build order: 12 ✅ → 13 ✅ → 18 ✅ (3/3, pending verify) → 15 → 17 → 16 → 14 → final manifest regen.*
+*Last updated: 2026-04-20 — Phase 18 Plan 04 ✅ gap closure (SC4 PARTIAL → VERIFIED via inline `Path(project_root).name == "graphify-out"` guard in all 4 snapshot helpers; dead `alias_map` param removed from `_run_get_focus_context_core`; WR-03 dispatcher test + WR-04 D-08 strict-depth invariants strengthened; 1325 → 1329 tests passing). All 9 FOCUS REQ-IDs complete; Phase 18 all 4 plans shipped — awaiting `/gsd-verify-work 18` re-run for final sign-off. Build order: 12 ✅ → 13 ✅ → 18 ✅ (4/4, pending re-verify) → 15 → 17 → 16 → 14 → final manifest regen.*

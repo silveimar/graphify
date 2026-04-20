@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
 status: in_progress
-stopped_at: Phase 18 gap closure planned — 18-04 ready to execute
-last_updated: "2026-04-20T20:30:00.000Z"
-last_activity: 2026-04-20 — Phase 18 verified with gaps_found (SC4 PARTIAL: ProjectRoot sentinel defined but not wired to production callers). Gap plan 18-04 authored (4 tasks, 4 files) + checker PASSED first-pass. Next: /gsd-execute-phase 18 --gaps-only. Commits 641e9b5 (review) → 64244a1 (verification) → a9a6a6c (gap plan).
+stopped_at: Phase 18 gap closure Plan 18-04 ✅ shipped — SC4 structurally VERIFIED, awaiting /gsd-verify-work 18 re-run
+last_updated: "2026-04-20T20:45:00.000Z"
+last_activity: 2026-04-20 — Plan 18-04 gap closure shipped. 4 inline `Path(project_root).name == "graphify-out"` guards wired into snapshot helpers (SC4 PARTIAL → VERIFIED); dead `alias_map` param removed from `_run_get_focus_context_core`; WR-03 dispatcher test + WR-04 D-08 strict-depth invariants strengthened. Full suite 1325 → 1329 passing. Commits 81d904a (RED) → 28b0f34 (GREEN snapshot guards) → edf793a (refactor serve + WR-03/04) → docs commit. Next: /gsd-verify-work 18 re-run for final Phase 18 sign-off.
 progress:
   total_phases: 7
   completed_phases: 3
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 ## Current Position
 
-Phase: 18 Focus-Aware Graph Context — 🚧 GAP CLOSURE IN PROGRESS. Plans 18-01/02/03 ✅ shipped; verification found SC4 PARTIAL (ProjectRoot sentinel defined but not wired to production). Plan 18-04 📋 PLANNED (4 tasks) — closes SC4 structurally + bundles WR-02/03/04 cleanups.
-Plan: Plan 18-04 planned (gap_closure: true, wave 4, deps [18-01,18-02,18-03]). Ready to execute via `/gsd-execute-phase 18 --gaps-only` (filters on gap_closure flag, skips the 3 shipped plans).
+Phase: 18 Focus-Aware Graph Context — ✅ GAP CLOSURE SHIPPED. Plans 18-01/02/03 + 18-04 all shipped. SC4 flipped PARTIAL → VERIFIED via Plan 18-04 (inline `Path(project_root).name == "graphify-out"` guard wired into all 4 snapshot helpers). All 9 FOCUS REQ-IDs complete. Awaiting `/gsd-verify-work 18` re-run for final phase sign-off.
+Plan: Plan 18-04 ✅ shipped 2026-04-20 (gap_closure: true, wave 4, deps [18-01,18-02,18-03]). 4 atomic commits — test(18-04) 81d904a → feat(18-04) 28b0f34 → refactor(18-04) edf793a → docs(18-04) this commit. WR-01/02/03/04 all closed. Suite 1325 → 1329 passing.
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 3/7 phases shipped (12 + 13 + 18 pending verify), Phase 15 next candidate.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
 Status: Phase 18 Plan 03 ships the two P2 dispatch-layer guards: FOCUS-08 debounce (module-level LRU cache, `time.monotonic()`-based 500ms window, bounded eviction at 256 entries) and FOCUS-09 freshness (`_check_focus_freshness` with Py 3.10 `.replace("Z","+00:00")` compat shim before `datetime.fromisoformat`, 300s D-15 window). Both guards wrap `_run_get_focus_context_core` in `_tool_get_focus_context` — freshness gate FIRST (fail-fast before traversal), then debounce check, then core, then cache-put. Both rejections collapse to the same 4-key no_context envelope as any other failure (D-03/D-11 binary invariant preserved). Debounce caches core output pre-manifest-merge per Pitfall 7. 5 TDD-locked tests pass (names locked in 18-VALIDATION.md 18-03-01..05). Full suite: 1325 tests passing (was 1320 → +5 additive, zero regressions).
-Last activity: 2026-04-20 — commits 2309a57 (RED 18-03), 0f06629 (GREEN 18-03) on main; Plan 18-03 SUMMARY.md written; Phase 18 complete pending verify.
+Last activity: 2026-04-20 — Plan 18-04 gap closure shipped. Commits 81d904a (RED) → 28b0f34 (GREEN snapshot guards, SC4 structural closure) → edf793a (refactor serve alias_map removal + WR-03/04 strengthening) → docs commit. Full suite 1329 passing. Phase 18 all 4 plans ✅ pending `/gsd-verify-work 18` re-run.
 
 Progress: [████░░░░░░] 43% (3/7 phases complete — 12 ✅, 13 ✅, 18 ✅ pending verify)
 
@@ -136,6 +136,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-20T19:52:41Z
-Stopped at: Phase 18 gap closure planned — Plan 18-04 ready to execute
-Next action: Run `/gsd-execute-phase 18 --gaps-only` to ship Plan 18-04 (wires ProjectRoot sentinel to 4 production snapshot helpers via inline `Path(project_root).name == "graphify-out"` guard; signatures preserved so Phase 11's 4 wrapper callsites still type-check; bundles WR-02 dead-param removal + WR-03/04 test strengthening). Expected outcome: ROADMAP SC4 flips PARTIAL → VERIFIED, suite grows 1325 → ≥1329, Phase 18 transitions to ✅ COMPLETE. Then re-run `/gsd-verify-work 18` for final sign-off, after which next build-order candidate is Phase 15 (Async Background Enrichment, soft-depends on Phase 12 routing.json). Phase 14 (Obsidian Commands) remains HARD-blocked on Phase 18 fully verified.
+Last session: 2026-04-20T20:45:00Z
+Stopped at: Plan 18-04 gap closure ✅ shipped — SC4 structurally VERIFIED (4 inline guards wired, alias_map dead param removed, WR-03/04 tests strengthened). 1329 tests passing. Phase 18 all 4 plans complete.
+Next action: Re-run `/gsd-verify-work 18` for final Phase 18 sign-off (SC4 should now flip gaps_found → passed). After sign-off, next build-order candidate is Phase 15 (Async Background Enrichment, soft-depends on Phase 12 routing.json). Phase 14 (Obsidian Commands) remains HARD-blocked on Phase 18 fully verified.
