@@ -33,6 +33,13 @@ class ProjectRoot:
 
 def snapshots_dir(project_root: Path = Path(".")) -> Path:
     """Returns graphify-out/snapshots/ - creates it if needed."""
+    if Path(project_root).name == "graphify-out":
+        raise ValueError(
+            f"snapshots_dir() received {project_root!r} whose name is 'graphify-out'. "
+            f"Pass the directory CONTAINING graphify-out/, not graphify-out/ itself. "
+            f"Try: snapshots_dir({Path(project_root).parent!r}). "
+            f"(Codifies v1.3 CR-01 Pitfall 20.)"
+        )
     d = Path(project_root) / "graphify-out" / "snapshots"
     d.mkdir(parents=True, exist_ok=True)
     return d
@@ -40,6 +47,13 @@ def snapshots_dir(project_root: Path = Path(".")) -> Path:
 
 def list_snapshots(project_root: Path = Path(".")) -> list[Path]:
     """Return sorted list of snapshot Paths (oldest first by mtime)."""
+    if Path(project_root).name == "graphify-out":
+        raise ValueError(
+            f"list_snapshots() received {project_root!r} whose name is 'graphify-out'. "
+            f"Pass the directory CONTAINING graphify-out/, not graphify-out/ itself. "
+            f"Try: list_snapshots({Path(project_root).parent!r}). "
+            f"(Codifies v1.3 CR-01 Pitfall 20.)"
+        )
     d = snapshots_dir(project_root)
     snaps = list(d.glob("*.json"))
     snaps.sort(key=lambda p: p.stat().st_mtime)
@@ -58,6 +72,13 @@ def save_snapshot(
     Atomic write via tmp+os.replace. FIFO prune keeps at most `cap` snapshots.
     Returns the path to the saved snapshot.
     """
+    if Path(project_root).name == "graphify-out":
+        raise ValueError(
+            f"save_snapshot() received {project_root!r} whose name is 'graphify-out'. "
+            f"Pass the directory CONTAINING graphify-out/, not graphify-out/ itself. "
+            f"Try: save_snapshot(..., project_root={Path(project_root).parent!r}). "
+            f"(Codifies v1.3 CR-01 Pitfall 20.)"
+        )
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
     if name is not None:
         sanitized = re.sub(r"[^\w-]", "_", name)[:64]
@@ -113,6 +134,13 @@ def auto_snapshot_and_delta(
     Returns (snapshot_path, delta_path_or_None).
     Called by skill after cluster() returns (D-11, D-13).
     """
+    if Path(project_root).name == "graphify-out":
+        raise ValueError(
+            f"auto_snapshot_and_delta() received {project_root!r} whose name is 'graphify-out'. "
+            f"Pass the directory CONTAINING graphify-out/, not graphify-out/ itself. "
+            f"Try: auto_snapshot_and_delta(..., project_root={Path(project_root).parent!r}). "
+            f"(Codifies v1.3 CR-01 Pitfall 20.)"
+        )
     # Get list of existing snapshots BEFORE saving the new one
     existing = list_snapshots(project_root)
 
