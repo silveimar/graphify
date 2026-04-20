@@ -1731,7 +1731,6 @@ def _render_focus_community_summary(G: "nx.Graph", focused: "nx.Graph", communit
 def _run_get_focus_context_core(
     G: "nx.Graph",
     communities: dict,
-    alias_map: dict,
     project_root: "Path",
     arguments: dict,
 ) -> str:
@@ -2283,7 +2282,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         # CR-01 invariant: pass _out_dir.parent (project root), NOT _out_dir (graphify-out).
         # The ProjectRoot sentinel in snapshot.py guards against accidental regression,
         # but this call-site is the Phase 18 production entry point.
-        envelope = _run_get_focus_context_core(G, communities, _alias_map, _out_dir.parent, arguments)
+        envelope = _run_get_focus_context_core(G, communities, _out_dir.parent, arguments)
         _focus_debounce_put(key, envelope)
         return envelope
 

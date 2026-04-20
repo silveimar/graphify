@@ -2312,7 +2312,7 @@ def test_get_focus_context_envelope_ok(tmp_path):
     G = _make_focus_graph()
     communities = _communities_from_graph(G)
     args = {"focus_hint": {"file_path": "src/auth.py", "neighborhood_depth": 2}, "budget": 500}
-    response = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    response = _run_get_focus_context_core(G, communities, tmp_path, args)
     assert QUERY_GRAPH_META_SENTINEL in response
     parts = response.split(QUERY_GRAPH_META_SENTINEL)
     assert len(parts) == 2
@@ -2328,7 +2328,7 @@ def test_get_focus_context_community_summary(tmp_path):
     G = _make_focus_graph()
     communities = _communities_from_graph(G)
     args = {"focus_hint": {"file_path": "src/auth.py", "include_community": True}, "budget": 500}
-    response = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    response = _run_get_focus_context_core(G, communities, tmp_path, args)
     parts = response.split(QUERY_GRAPH_META_SENTINEL)
     meta = json.loads(parts[1])
     has_summary = "community_summary" in meta or "community" in parts[0].lower()
@@ -2340,7 +2340,7 @@ def test_get_focus_context_spoofed_path_silent(tmp_path):
     G = _make_focus_graph()
     communities = _communities_from_graph(G)
     args = {"focus_hint": {"file_path": "/etc/passwd"}, "budget": 500}
-    response = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    response = _run_get_focus_context_core(G, communities, tmp_path, args)
     parts = response.split(QUERY_GRAPH_META_SENTINEL)
     assert parts[0] == ""  # D-09 empty text_body
     meta = json.loads(parts[1])
@@ -2353,7 +2353,7 @@ def test_get_focus_context_missing_file_silent(tmp_path):
     G = _make_focus_graph()
     communities = _communities_from_graph(G)
     args = {"focus_hint": {"file_path": "src/auth.py"}, "budget": 500}
-    response = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    response = _run_get_focus_context_core(G, communities, tmp_path, args)
     parts = response.split(QUERY_GRAPH_META_SENTINEL)
     meta = json.loads(parts[1])
     assert meta["status"] == "no_context"
@@ -2402,15 +2402,15 @@ def test_binary_status_invariant(tmp_path):
     expected_keys = {"status", "node_count", "edge_count", "budget_used"}
 
     # 1. Spoofed path (outside project_root)
-    r1 = _run_get_focus_context_core(G, communities, {}, tmp_path,
+    r1 = _run_get_focus_context_core(G, communities, tmp_path,
                                      {"focus_hint": {"file_path": "/etc/passwd"}, "budget": 500})
     # 2. Unindexed but valid path (file exists in project_root but no graph node)
     (tmp_path / "src").mkdir(exist_ok=True)
     (tmp_path / "src" / "unknown.py").write_text("pass\n")
-    r2 = _run_get_focus_context_core(G, communities, {}, tmp_path,
+    r2 = _run_get_focus_context_core(G, communities, tmp_path,
                                      {"focus_hint": {"file_path": "src/unknown.py"}, "budget": 500})
     # 3. Missing on disk (graph claims it but file absent)
-    r3 = _run_get_focus_context_core(G, communities, {}, tmp_path,
+    r3 = _run_get_focus_context_core(G, communities, tmp_path,
                                      {"focus_hint": {"file_path": "src/auth.py"}, "budget": 500})
 
     for resp in (r1, r2, r3):
@@ -2452,8 +2452,9 @@ def test_budget_drop_outer_hop_first(tmp_path):
     focus_hint = {"file_path": "src/auth.py", "neighborhood_depth": 2}
 
     # Tight budget forces outer-hop drop. Post-Plan-18-04 signature: (G, communities, project_root, arguments)
+    # Budget chosen so that depth=2 (10 nodes) overflows char_budget but depth=1 (4 nodes) fits.
     small = _run_get_focus_context_core(G, communities, tmp_path,
-                                        {"focus_hint": focus_hint, "budget": 50})
+                                        {"focus_hint": focus_hint, "budget": 300})
     large = _run_get_focus_context_core(G, communities, tmp_path,
                                         {"focus_hint": focus_hint, "budget": 10000})
     small_meta = json.loads(small.split(QUERY_GRAPH_META_SENTINEL)[1])
@@ -2464,15 +2465,22 @@ def test_budget_drop_outer_hop_first(tmp_path):
         f"tight budget should drop outer hop: small={small_meta['node_count']} "
         f"large={large_meta['node_count']}"
     )
-    # (c) inner hop preserved — the 3 depth-1 neighbors must all still appear in the small-budget result.
-    if small_meta["status"] == "ok":
+    # (b) depth_used monotonicity — small-budget must have STRICTLY less depth_used than large
+    # (outer hop dropped per D-08 shrink-radius-before-char-clip).
+    assert "depth_used" in small_meta and "depth_used" in large_meta, (
+        "D-08 envelope must expose depth_used on ok status"
+    )
+    assert small_meta["depth_used"] < large_meta["depth_used"], (
+        f"outer hop not dropped: small depth_used ({small_meta['depth_used']}) "
+        f"must be < large ({large_meta['depth_used']})"
+    )
+    # (c) inner hop preserved when outer dropped — seed + 3 depth-1 neighbors = 4 nodes minimum.
+    # Only assert when D-08 landed at depth=1 (inner preserved); if it had to go to depth=0 the fixture
+    # needed a larger budget, which is fixture-tuning, not a D-08 invariant.
+    if small_meta["status"] == "ok" and small_meta["depth_used"] >= 1:
         assert small_meta["node_count"] >= 4, (
-            f"inner hop dropped prematurely: small returned {small_meta['node_count']} nodes"
-        )
-    # (b) depth_used monotonicity — small-budget must have <= large-budget depth_used (outer hop dropped).
-    if "depth_used" in small_meta and "depth_used" in large_meta:
-        assert small_meta["depth_used"] <= large_meta["depth_used"], (
-            f"small depth_used ({small_meta['depth_used']}) must be <= large ({large_meta['depth_used']})"
+            f"inner hop dropped prematurely: small returned {small_meta['node_count']} nodes "
+            f"at depth_used={small_meta['depth_used']}"
         )
 
 
@@ -2482,7 +2490,7 @@ def test_no_context_does_not_echo_focus_hint(tmp_path):
     communities = _communities_from_graph(G)
     args = {"focus_hint": {"file_path": "/etc/passwd", "function_name": "SECRET_FN",
                            "line": 424242}, "budget": 500}
-    response = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    response = _run_get_focus_context_core(G, communities, tmp_path, args)
     assert "/etc/passwd" not in response
     assert "SECRET_FN" not in response
     assert "424242" not in response
