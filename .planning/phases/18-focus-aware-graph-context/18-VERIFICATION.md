@@ -1,121 +1,210 @@
 ---
 phase: 18-focus-aware-graph-context
-verified: 2026-04-20
-status: gaps_found
-score: 4/5 roadmap success criteria, 9/9 REQ-IDs (SC4 PARTIAL — sentinel not wired to production callers)
+verified_at: 2026-04-20T20:54:00Z
+status: passed
+score: 5/5 roadmap success criteria, 9/9 FOCUS REQ-IDs
 overrides_applied: 0
-re_verification: null
-gaps:
-  - truth: "SC4: The ProjectRoot sentinel prevents Phase 12/15/17 from reintroducing CR-01"
-    status: partial
-    reason: "Sentinel raises correctly in the test (test_project_root_sentinel_rejects_graphify_out passes), but none of the snapshot helpers (snapshots_dir, list_snapshots, save_snapshot, auto_snapshot_and_delta) actually accept or construct ProjectRoot — they take `project_root: Path`. No production caller in graphify/serve.py (lines 1072, 1359, 1514, 1611), graphify/__main__.py (line 1459), or graphify/skill.md (lines 504, 1062) invokes ProjectRoot(...). A future phase passing Path('graphify-out') directly to save_snapshot would still silently double-nest without tripping the sentinel. This matches 18-REVIEW.md WR-01 exactly."
-    artifacts:
-      - path: "graphify/snapshot.py"
-        issue: "ProjectRoot defined (lines 15-31) but never referenced by snapshots_dir/list_snapshots/save_snapshot/auto_snapshot_and_delta; only the class definition + two test imports reference it."
-      - path: "graphify/serve.py"
-        issue: "Production callers pass raw `_out_dir.parent` (lines 1072, 2214, 2244, 2286, 2303, 2318) directly, bypassing the sentinel."
-    missing:
-      - "Runtime guard inside snapshots_dir / save_snapshot / list_snapshots / auto_snapshot_and_delta that rejects `path.name == 'graphify-out'` (matches 18-REVIEW.md WR-01 fix option (a))."
-      - "OR: change parameter type to accept `Path | ProjectRoot` and unwrap internally (18-REVIEW.md WR-01 fix option (b))."
+req_ids_verified:
+  - FOCUS-01
+  - FOCUS-02
+  - FOCUS-03
+  - FOCUS-04
+  - FOCUS-05
+  - FOCUS-06
+  - FOCUS-07
+  - FOCUS-08
+  - FOCUS-09
+req_ids_missing: []
+success_criteria_breakdown:
+  SC1:
+    status: VERIFIED
+    evidence: |
+      graphify/serve.py::_run_get_focus_context_core (serve.py:1731) emits D-02 envelope
+      (text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta)) with status="ok",
+      node_count >= 1. _render_focus_community_summary at serve.py:1688 renders
+      per-community top-3-by-degree members. Tests:
+      tests/test_serve.py::test_get_focus_context_envelope_ok PASSES,
+      tests/test_serve.py::test_get_focus_context_community_summary PASSES.
+  SC2:
+    status: VERIFIED
+    evidence: |
+      serve.py:1785 calls validate_graph_path(candidate, base=project_root);
+      serve.py:1786 `except (ValueError, FileNotFoundError): return _no_context()`.
+      Tests: test_get_focus_context_spoofed_path_silent PASSES,
+      test_no_context_does_not_echo_focus_hint PASSES (asserts /etc/passwd,
+      SECRET_FN, 424242 absent from envelope), test_binary_status_invariant PASSES
+      (spoof/unindexed/missing all yield byte-identical 4-key meta).
+  SC3:
+    status: VERIFIED
+    evidence: |
+      _resolve_focus_seeds at serve.py:773 delegates to analyze._iter_sources
+      (imported at serve.py:17); handles both schemas at serve.py:797
+      (`for s in _iter_sources(data.get("source_file"))`). Tests:
+      test_focus_resolver_str_source_file PASSES,
+      test_focus_resolver_list_source_file_multi_seed PASSES.
+  SC4:
+    status: VERIFIED
+    flipped_from: PARTIAL
+    closed_by: "Plan 18-04 (commits 81d904a + 28b0f34 + edf793a)"
+    evidence: |
+      Plan 18-04 closed the WR-01 gap by wiring the ProjectRoot sentinel's guard
+      structurally into all 4 production snapshot helpers via inline
+      `Path(project_root).name == "graphify-out"` check. grep confirms exactly 4
+      guard instances in graphify/snapshot.py (lines 36, 50, 75, 137). Runtime
+      spot-check confirms all 4 helpers raise ValueError when passed
+      Path('graphify-out') directly:
+        snapshots_dir -> raises OK
+        list_snapshots -> raises OK
+        save_snapshot -> raises OK
+        auto_snapshot_and_delta -> raises OK
+      Production-callsite tests (tests/test_snapshot.py lines 320-360):
+        test_snapshots_dir_rejects_graphify_out_as_project_root PASSES
+        test_list_snapshots_rejects_graphify_out_as_project_root PASSES
+        test_save_snapshot_rejects_graphify_out_as_project_root PASSES
+        test_auto_snapshot_and_delta_rejects_graphify_out_as_project_root PASSES
+      Existing constructor sentinel test
+      test_project_root_sentinel_rejects_graphify_out (line 290) continues to
+      PASS. A future Phase 12/15/17 author passing Path("graphify-out") directly
+      to any of the 4 helpers now raises ValueError at the helper entry rather
+      than silently double-nesting — SC4 intent structurally enforced, not
+      caller-discipline-dependent.
+  SC5:
+    status: VERIFIED
+    evidence: |
+      _multi_seed_ego at serve.py:756 uses nx.compose_all([nx.ego_graph(G, s, radius=r) for s in seeds]).
+      Tests: test_no_watchdog_import_in_focus_path PASSES,
+      test_multi_seed_compose_all_matches_expected PASSES.
+      Grep: `grep "import watchdog\|from watchdog" graphify/serve.py` returns 0.
+      Grep: `grep "nx.ego_graph(G, \\[" graphify/serve.py` returns 0 (no multi-seed anti-pattern).
+re_verification:
+  previous_status: gaps_found
+  previous_score: "4/5 SCs, 9/9 REQ-IDs (SC4 PARTIAL — sentinel orphaned from production)"
+  previous_verification_commit: 64244a1
+  gaps_closed:
+    - "SC4 PARTIAL → VERIFIED: ProjectRoot sentinel structurally wired into all 4 production snapshot helpers via inline guard (Plan 18-04)"
+  additional_wr_findings_closed:
+    - "WR-02: dead alias_map parameter removed from _run_get_focus_context_core (signature 5→4 params)"
+    - "WR-03: test_focus_debounce_suppresses_duplicate rewritten to exercise dispatcher path with monkeypatch counter (not just cache seeding)"
+    - "WR-04: test_budget_drop_outer_hop_first rewritten with 3 D-08 invariant assertions (node-count reduction, strict depth monotonicity, inner-hop preservation)"
+  gaps_remaining: []
+  regressions: []
+  tests_added: 4
+  tests_modified: 2
+  test_count_before: 1325
+  test_count_after: 1329
+  full_suite_result: "1329 passed, 2 warnings in 39.86s"
+gaps: []
 deferred: []
 human_verification: []
 ---
 
-# Phase 18: Focus-Aware Graph Context Verification Report
+# Phase 18: Focus-Aware Graph Context Verification Report (Re-Verification)
 
-**Phase Goal (ROADMAP.md:229):** An agent reports what the user is currently focused on (a file path, optionally a function or line) and graphify returns a scoped subgraph — neighbors, community, and citations — so downstream tools can reason about the local neighborhood without loading the full graph.
+**Phase Goal (ROADMAP.md §Phase 18):** An agent reports what the user is currently focused on (a file path, optionally a function or line) and graphify returns a scoped subgraph — neighbors, community, and citations — so downstream tools can reason about the local neighborhood without loading the full graph.
 
-**Verified:** 2026-04-20
-**Status:** gaps_found (SC4 PARTIAL — sentinel not wired)
-**Re-verification:** No — initial verification
+**Verified:** 2026-04-20T20:54:00Z
+**Status:** passed
+**Re-verification:** Yes — initial verification at commit 64244a1 flagged SC4 PARTIAL; Plan 18-04 shipped gap closure (commits 81d904a + 28b0f34 + edf793a + docs); this re-verification confirms structural closure.
 
 ## Goal Achievement
 
 ### ROADMAP Success Criteria
 
-| # | Criterion | Method | Evidence | Verdict |
-|---|-----------|--------|----------|---------|
-| 1 | `get_focus_context({"file_path":"...", "neighborhood_depth":2, "include_community":true})` returns BFS ego-graph + community summary in D-02 envelope with full citations | pytest + grep + runtime call | `tests/test_serve.py::test_get_focus_context_envelope_ok` PASSES; `tests/test_serve.py::test_get_focus_context_community_summary` PASSES; envelope emitted by `_run_get_focus_context_core` at serve.py:1840 uses `text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta)` with `meta.status == "ok"`, `node_count >= 1`, `edge_count >= 0`; `_render_focus_community_summary` at serve.py:1688 renders per-community top-3-by-degree members | PASS |
-| 2 | Spoofed `focus_hint.file_path = "/etc/passwd"` returns silent no_context (no leak, no echo) via `validate_graph_path(path, base=project_root)` | pytest + grep | `tests/test_serve.py::test_get_focus_context_spoofed_path_silent` PASSES; serve.py:1785 `validate_graph_path(candidate, base=project_root)`; serve.py:1786 `except (ValueError, FileNotFoundError): return _no_context()`; `tests/test_serve.py::test_no_context_does_not_echo_focus_hint` PASSES (asserts `/etc/passwd`, `SECRET_FN`, `424242` absent from envelope); `tests/test_serve.py::test_binary_status_invariant` PASSES (spoof/unindexed/missing all yield byte-identical `{status, node_count, edge_count, budget_used}` meta) | PASS |
-| 3 | `source_file` as `str \| list[str]` resolves correctly — multi-source node returns matching node_ids without crashing | pytest | `tests/test_serve.py::test_focus_resolver_str_source_file` PASSES; `tests/test_serve.py::test_focus_resolver_list_source_file_multi_seed` PASSES; `_resolve_focus_seeds` at serve.py:773 delegates to `analyze._iter_sources` (imported at serve.py:17); handles both schemas via iteration at serve.py:797 `for s in _iter_sources(data.get("source_file"))` | PASS |
-| 4 | Regression test constructs `Snapshot(project_root=Path("graphify-out"))` and sentinel raises before any path operation — renamed field + assertion prevents Phase 12/15/17 from reintroducing CR-01 | pytest + grep | `tests/test_snapshot.py::test_project_root_sentinel_rejects_graphify_out` PASSES (line 290-296 of test_snapshot.py); `snapshot.py::ProjectRoot.__post_init__` at line 25-31 raises `ValueError` on `path.name == "graphify-out"`. **PARTIAL because:** `ProjectRoot` is defined but NEVER USED by `snapshots_dir` / `list_snapshots` / `save_snapshot` / `auto_snapshot_and_delta` — all four accept `project_root: Path`, not `ProjectRoot`. Production callers in serve.py (lines 1072, 2214, 2244, 2286, 2303, 2318) and __main__.py (line 1459) pass raw `Path` objects directly. A Phase 12/15/17 author passing `Path("graphify-out")` to `save_snapshot(...)` would still silently double-nest — the sentinel only fires when a caller explicitly wraps in `ProjectRoot(...)`, which happens only in the two unit tests. See 18-REVIEW.md WR-01. | PARTIAL |
-| 5 | Focus is pull-model via MCP arg — no filesystem watcher thread exists; `nx.ego_graph` is reused (no new traversal algorithms) | pytest + grep | `tests/test_serve.py::test_no_watchdog_import_in_focus_path` PASSES; `grep "import watchdog\|from watchdog" graphify/serve.py` returns 0 lines; `grep "nx.ego_graph(G, *\[" graphify/serve.py` returns 0 lines (correct multi-seed form via `nx.compose_all` at serve.py:770); `_multi_seed_ego` at serve.py:756 composes per-seed `nx.ego_graph` calls via `nx.compose_all` | PASS |
+| # | Criterion | Verdict | Evidence |
+|---|-----------|---------|----------|
+| SC1 | `get_focus_context({"file_path":..., "neighborhood_depth":2, "include_community":true})` returns BFS ego-graph + community summary in D-02 envelope with full citations | VERIFIED | `_run_get_focus_context_core` at serve.py:1731; `_render_focus_community_summary` at serve.py:1688; `test_get_focus_context_envelope_ok` + `test_get_focus_context_community_summary` PASS |
+| SC2 | Spoofed `focus_hint.file_path = "/etc/passwd"` returns silent no_context (no leak, no echo) via `validate_graph_path(path, base=project_root)` | VERIFIED | serve.py:1785 `validate_graph_path(..., base=project_root)`; serve.py:1786 silent except; `test_get_focus_context_spoofed_path_silent`, `test_no_context_does_not_echo_focus_hint`, `test_binary_status_invariant` PASS |
+| SC3 | `source_file` as `str \| list[str]` (v1.3 schema) resolves correctly — multi-source node returns matching node_ids without crashing | VERIFIED | `_resolve_focus_seeds` at serve.py:773 delegates to `analyze._iter_sources` (serve.py:17 import; serve.py:797 loop); `test_focus_resolver_str_source_file` + `test_focus_resolver_list_source_file_multi_seed` PASS |
+| SC4 | Regression test constructs `Snapshot(project_root=Path("graphify-out"))` and sentinel raises before any path operation — prevents Phase 12/15/17 from reintroducing CR-01 | **VERIFIED** (flipped from PARTIAL via Plan 18-04) | ProjectRoot class at snapshot.py:15 + 4 inline guards at snapshot.py:36, 50, 75, 137; 4 production-callsite tests + 1 constructor test PASS; runtime spot-check confirms all 4 helpers reject `Path("graphify-out")` with ValueError |
+| SC5 | Focus is pull-model via MCP arg — no filesystem watcher thread exists; `nx.ego_graph` is reused per D-18 compose-don't-plumb | VERIFIED | `_multi_seed_ego` at serve.py:756 uses `nx.compose_all([nx.ego_graph(...) for s in seeds])`; `grep "import watchdog" graphify/serve.py` returns 0; `test_no_watchdog_import_in_focus_path`, `test_multi_seed_compose_all_matches_expected` PASS |
 
-**Score:** 4/5 criteria fully VERIFIED · 1/5 PARTIAL (SC4)
+**Score:** 5/5 criteria VERIFIED (up from 4/5 at commit 64244a1).
 
-### Required Artifacts
+### Required Artifacts (post-18-04)
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `graphify/serve.py::_resolve_focus_seeds` | Path→node_id resolver handling str \| list[str] | VERIFIED | line 773 |
-| `graphify/serve.py::_multi_seed_ego` | Multi-seed ego-graph via nx.compose_all | VERIFIED | line 756; uses `nx.compose_all(subgraphs)` at line 770 |
-| `graphify/serve.py::_run_get_focus_context_core` | Pure dispatch core returning D-02 envelope | VERIFIED | line 1731 |
-| `graphify/serve.py::_render_focus_community_summary` | Community summary renderer | VERIFIED | line 1688 |
-| `graphify/serve.py::_tool_get_focus_context` | MCP handler closure with freshness+debounce gates | VERIFIED | line 2246 |
-| `graphify/serve.py::_FOCUS_DEBOUNCE_CACHE` | Module-level debounce dict | VERIFIED | line 1850 |
-| `graphify/serve.py::_FOCUS_DEBOUNCE_WINDOW` | 0.5-second constant | VERIFIED | line 1851 (`= 0.5`) |
-| `graphify/serve.py::_focus_debounce_key` / `_get` / `_put` | Debounce helpers | VERIFIED | lines 1854, 1865, 1876 |
-| `graphify/serve.py::_check_focus_freshness` | Freshness helper with Py 3.10 Z-shim | VERIFIED | line 1886; `.replace("Z", "+00:00")` at line 1901 |
-| `graphify/snapshot.py::ProjectRoot` | Frozen-dataclass sentinel | EXISTS but ORPHANED | line 16; raises on `path.name == "graphify-out"` at line 26; **not imported by any production caller — only by two tests. Fails Level-3 wiring check for its intended purpose (SC4).** |
-| `graphify/mcp_tool_registry.py::get_focus_context Tool` | MCP schema entry | VERIFIED | line 231 with full inputSchema |
-| `tests/conftest.py::nested_project_root` | Shared fixture | VERIFIED | line 144 |
-| `tests/test_snapshot.py` | 3 sentinel + nested-dir tests | VERIFIED | lines 290-312 |
-| `tests/test_serve.py` | 18 new phase-18 tests | VERIFIED | all names in 18-VALIDATION.md present |
+| `graphify/serve.py::_resolve_focus_seeds` | Path→node_id resolver handling str \| list[str] | VERIFIED | serve.py:773 |
+| `graphify/serve.py::_multi_seed_ego` | Multi-seed ego-graph via nx.compose_all | VERIFIED | serve.py:756; `nx.compose_all(subgraphs)` at serve.py:770 |
+| `graphify/serve.py::_run_get_focus_context_core` | Pure dispatch core returning D-02 envelope — signature `(G, communities, project_root, arguments)` post-18-04 (alias_map removed) | VERIFIED | serve.py:1731; `grep -A 5 '^def _run_get_focus_context_core' ... \| grep -c alias_map` returns 0 |
+| `graphify/serve.py::_render_focus_community_summary` | Community summary renderer | VERIFIED | serve.py:1688 |
+| `graphify/serve.py::_tool_get_focus_context` | MCP handler closure with freshness+debounce gates; calls core without alias_map | VERIFIED | serve.py:2245; caller at serve.py:2285 uses 4-arg signature `_run_get_focus_context_core(G, communities, _out_dir.parent, arguments)` |
+| `graphify/serve.py::_FOCUS_DEBOUNCE_CACHE` / `_WINDOW` | Module-level debounce dict + 0.5s constant | VERIFIED | serve.py:1850-1851 |
+| `graphify/serve.py::_focus_debounce_key` / `_get` / `_put` | Debounce helpers | VERIFIED | serve.py:1854, 1865, 1876 |
+| `graphify/serve.py::_check_focus_freshness` | Freshness helper with Py 3.10 Z-shim | VERIFIED | serve.py:1886; `.replace("Z", "+00:00")` at serve.py:1901 |
+| `graphify/snapshot.py::ProjectRoot` | Frozen-dataclass sentinel raising on construction | VERIFIED | snapshot.py:15-32 |
+| `graphify/snapshot.py::snapshots_dir` inline CR-01 guard | Rejects `project_root.name == "graphify-out"` | VERIFIED | snapshot.py:36 guard; runtime spot-check raises OK |
+| `graphify/snapshot.py::list_snapshots` inline CR-01 guard | Rejects `project_root.name == "graphify-out"` | VERIFIED | snapshot.py:50 guard; runtime spot-check raises OK |
+| `graphify/snapshot.py::save_snapshot` inline CR-01 guard | Rejects `project_root.name == "graphify-out"` | VERIFIED | snapshot.py:75 guard; runtime spot-check raises OK |
+| `graphify/snapshot.py::auto_snapshot_and_delta` inline CR-01 guard | Rejects `project_root.name == "graphify-out"` | VERIFIED | snapshot.py:137 guard; runtime spot-check raises OK |
+| `graphify/mcp_tool_registry.py::get_focus_context Tool` | MCP schema entry | VERIFIED | registry entry present; `build_mcp_tools()` includes `get_focus_context` |
+| `tests/test_snapshot.py` 4 new production-callsite sentinel tests | One per helper | VERIFIED | lines 320, 329, 338, 350 |
+| `tests/test_snapshot.py::test_project_root_sentinel_rejects_graphify_out` | Existing constructor test | VERIFIED | line 290 (continues to pass) |
+| `tests/test_serve.py::test_focus_debounce_suppresses_duplicate` | WR-03 dispatcher-exercising test | VERIFIED | line 2504; uses monkeypatch counter on `_run_get_focus_context_core`; asserts call_counter == 1 after cache hit |
+| `tests/test_serve.py::_make_large_focus_graph` | 10-node 2-hop chain fixture for WR-04 | VERIFIED | line 2424 |
+| `tests/test_serve.py::test_budget_drop_outer_hop_first` | WR-04 D-08 invariants test | VERIFIED | line 2446; 3 assertions — node_count reduction, strict depth_used monotonicity, inner-hop preservation |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|----|----|--------|---------|
-| `serve.py::_resolve_focus_seeds` | `analyze.py::_iter_sources` | `from graphify.analyze import _iter_sources` | WIRED | serve.py:17 import confirmed; used at serve.py:797 |
-| `serve.py::_multi_seed_ego` | `networkx` | `nx.compose_all([nx.ego_graph(G, s, radius=r) for s in seeds])` | WIRED | serve.py:770 |
-| `serve.py::_run_get_focus_context_core` | `security.py::validate_graph_path` | `validate_graph_path(candidate, base=project_root)` | WIRED | serve.py:1785 with explicit `base=project_root` per Pitfall 3 |
-| `serve.py::_run_get_focus_context_core` | `serve.py::_resolve_focus_seeds` | direct call | WIRED | serve.py:1798 |
-| `serve.py::_run_get_focus_context_core` | `serve.py::_multi_seed_ego` | direct call | WIRED | serve.py:1806, 1819 |
-| `serve.py::_tool_get_focus_context` | `_out_dir.parent` | positional arg (CR-01 mitigation) | WIRED | serve.py:2286 `_run_get_focus_context_core(G, communities, _alias_map, _out_dir.parent, arguments)` |
-| `serve.py::_tool_get_focus_context` | `_check_focus_freshness` | `if not _check_focus_freshness(focus_hint.get("reported_at"))` | WIRED | serve.py:2271 |
-| `serve.py::_tool_get_focus_context` | `_focus_debounce_get`/`_put` | closure calls | WIRED | serve.py:2279 (get) and 2287 (put) |
-| `snapshot.py::ProjectRoot.__post_init__` | `raise ValueError` | `path.name == "graphify-out"` | WIRED (class-internal) | snapshot.py:26-31 |
-| `snapshot.py::ProjectRoot` | `snapshot.py::snapshots_dir` + `list_snapshots` + `save_snapshot` + `auto_snapshot_and_delta` | **(no link)** | **ORPHANED** | `grep -rn "ProjectRoot" graphify/` returns 0 usages outside the class definition itself (serve.py only has it in comments/docstrings). Helpers accept `project_root: Path`, never `ProjectRoot`. **This is the WR-01/SC4 gap.** |
-| `serve.py::_handlers` dict | `get_focus_context` handler | `"get_focus_context": _tool_get_focus_context` | WIRED | serve.py:2405 (MANIFEST-05 invariant holds — registry + handlers keyset match) |
+| `serve.py::_resolve_focus_seeds` | `analyze.py::_iter_sources` | `from graphify.analyze import _iter_sources` | WIRED | serve.py:17 import + serve.py:797 usage |
+| `serve.py::_multi_seed_ego` | `networkx.ego_graph` + `nx.compose_all` | composition pattern | WIRED | serve.py:770 |
+| `serve.py::_run_get_focus_context_core` | `security.py::validate_graph_path` | `validate_graph_path(candidate, base=project_root)` | WIRED | serve.py:1785 |
+| `serve.py::_run_get_focus_context_core` | `serve.py::_resolve_focus_seeds` | direct call | WIRED | serve.py body (no alias_map in signature) |
+| `serve.py::_tool_get_focus_context` | `_run_get_focus_context_core` | 4-arg positional call (post-18-04, no alias_map) | WIRED | serve.py:2285 `_run_get_focus_context_core(G, communities, _out_dir.parent, arguments)` |
+| `serve.py::_tool_get_focus_context` | `_check_focus_freshness` | `if not _check_focus_freshness(...)` | WIRED | serve.py:2270 |
+| `serve.py::_tool_get_focus_context` | `_focus_debounce_get` / `_put` | closure calls around core | WIRED | serve.py:2279 (get) and 2286 (put) |
+| `snapshot.py::snapshots_dir` | CR-01 ValueError | inline `Path(project_root).name == "graphify-out"` guard | **WIRED (flipped from ORPHANED)** | snapshot.py:36 — Plan 18-04 closure |
+| `snapshot.py::list_snapshots` | CR-01 ValueError | inline guard (defense-in-depth) | **WIRED (flipped from ORPHANED)** | snapshot.py:50 — Plan 18-04 closure |
+| `snapshot.py::save_snapshot` | CR-01 ValueError | inline guard | **WIRED (flipped from ORPHANED)** | snapshot.py:75 — Plan 18-04 closure |
+| `snapshot.py::auto_snapshot_and_delta` | CR-01 ValueError | inline guard | **WIRED (flipped from ORPHANED)** | snapshot.py:137 — Plan 18-04 closure |
+| `snapshot.py::ProjectRoot.__post_init__` | `raise ValueError` | `self.path.name == "graphify-out"` | WIRED | snapshot.py:26-31 (class-internal; still exists for callers that choose to wrap explicitly) |
+| `serve.py::_handlers` dict | `get_focus_context` handler | `"get_focus_context": _tool_get_focus_context` | WIRED | MANIFEST-05 invariant holds |
 
 ### Data-Flow Trace (Level 4)
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
-|----------|---------------|--------|--------------------|---------| 
-| `_run_get_focus_context_core` | `focused` (nx.Graph) | `_multi_seed_ego(G, seeds, radius=depth)` — real graph composition from live `G.nodes`/`G.edges` | Yes (real nx subgraph) | FLOWING |
-| `_run_get_focus_context_core` | `text_body` | `_subgraph_to_text(fg, set(fg.nodes), list(fg.edges), token_budget=budget, layer=2)` | Yes (reused Phase 9.2 renderer) | FLOWING |
+|----------|---------------|--------|--------------------|---------|
+| `_run_get_focus_context_core` | `focused` (nx.Graph) | `_multi_seed_ego(G, seeds, radius=depth)` — real graph composition | Yes (real nx subgraph) | FLOWING |
+| `_run_get_focus_context_core` | `text_body` | `_subgraph_to_text(fg, set(fg.nodes), list(fg.edges), ...)` | Yes (reused Phase 9.2 renderer) | FLOWING |
 | `_render_focus_community_summary` | `touched` (set of community IDs) | iterates `focused.nodes` and reads `G.nodes[nid].get("community")` | Yes (real attrs) | FLOWING |
-| `_tool_get_focus_context` | `envelope` | `_run_get_focus_context_core(G, communities, _alias_map, _out_dir.parent, arguments)` | Yes (wired to full pipeline) | FLOWING |
-| `_focus_debounce_get`/`_put` | `_FOCUS_DEBOUNCE_CACHE` | module-level dict populated on every successful core call | Yes | FLOWING |
-| `_check_focus_freshness` | parsed `datetime` | `datetime.fromisoformat(reported_at.replace("Z", "+00:00"))` | Yes (live parse) | FLOWING |
-| `snapshot.py::ProjectRoot.path` | — | frozen-dataclass field | N/A (class sentinel only) | **DISCONNECTED** — no production caller instantiates `ProjectRoot`; the `.path` field is never consumed downstream. |
+| `_tool_get_focus_context` | `envelope` | `_run_get_focus_context_core(G, communities, _out_dir.parent, arguments)` | Yes (wired to full pipeline) | FLOWING |
+| `_focus_debounce_get`/`_put` | `_FOCUS_DEBOUNCE_CACHE` | module-level dict; populated after successful core dispatch | Yes | FLOWING |
+| `_check_focus_freshness` | parsed `datetime` | `datetime.fromisoformat(reported_at.replace("Z", "+00:00"))` | Yes (live parse with Py 3.10 shim) | FLOWING |
+| `snapshot.py::snapshots_dir` CR-01 guard | `project_root` | bound on every call; evaluated before `d = Path(...) / "graphify-out" / "snapshots"` | Yes — rejects immediately when path.name == "graphify-out" | FLOWING |
+| `snapshot.py::list_snapshots` / `save_snapshot` / `auto_snapshot_and_delta` | `project_root` | bound on every call; inline guard at top | Yes (identical semantics to snapshots_dir) | FLOWING |
+| `snapshot.py::ProjectRoot.path` | — | frozen-dataclass field | N/A (class sentinel retained for explicit-wrap callers) | SECONDARY PATH (not disconnected — it's an additional entry point for callers who choose to construct ProjectRoot explicitly; the inline helpers are now the primary guard) |
 
 ### Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| Full phase-18 test set (21 locked tests) passes | `pytest tests/test_serve.py::{18 tests} tests/test_snapshot.py::{3 tests}` | `21 passed in 0.54s` | PASS |
-| Full suite regression | `pytest tests/ -q` | `1325 passed, 2 warnings in 39.04s` | PASS |
-| `get_focus_context` in MCP tool names | `python -c "from graphify.mcp_tool_registry import build_mcp_tools; print('get_focus_context' in {t.name for t in build_mcp_tools()})"` | `True` (20 tools total; `get_focus_context` present) | PASS |
-| `ProjectRoot` sentinel actually raises at construction | `python -c "from graphify.snapshot import ProjectRoot; from pathlib import Path; ProjectRoot(path=Path('graphify-out'))"` | Raises `ValueError: ProjectRoot received PosixPath('graphify-out')...` | PASS |
-| `_check_focus_freshness` behavior | `python -c` with fresh/stale/malformed/absent inputs | `fresh=True`, `stale=False`, `malformed=False`, `absent=True` | PASS |
-| `_FOCUS_DEBOUNCE_WINDOW == 0.5`, key derivation | `python -c "from graphify.serve import _focus_debounce_key, _FOCUS_DEBOUNCE_WINDOW"` | `window=0.5`, `key=('x.py', '', -1, 2, True)` | PASS |
+| SC4 structural enforcement across all 4 helpers | `python3 -c "..."` invoking snapshots_dir, list_snapshots, save_snapshot, auto_snapshot_and_delta with `Path("graphify-out")` | All 4 raise `ValueError` with "graphify-out" in message | PASS |
+| CR-01 guard count in snapshot.py | `grep -c 'Path(project_root).name == "graphify-out"' graphify/snapshot.py` | `4` | PASS |
+| alias_map removed from focus core signature | `grep -A 5 '^def _run_get_focus_context_core' graphify/serve.py \| grep -c alias_map` | `0` | PASS |
+| alias_map preserved elsewhere (not over-deleted) | `grep -cn 'alias_map' graphify/serve.py` | `22` (down from 24 pre-18-04 — exactly 2 references removed: param decl + caller) | PASS |
+| WR-03 dispatcher test uses monkeypatch counter | `grep -A 40 'def test_focus_debounce_suppresses_duplicate' ... \| grep -c 'monkeypatch\|call_counter'` | `7` (≥3 expected) | PASS |
+| WR-04 D-08 invariants present | `grep -A 40 'def test_budget_drop_outer_hop_first' ... \| grep -Ec 'node_count\|depth_used\|within depth'` | `15` (≥3 expected) | PASS |
+| 7 SC4/WR targeted tests | `pytest tests/test_snapshot.py::{5 sentinel tests} tests/test_serve.py::test_focus_debounce_suppresses_duplicate tests/test_serve.py::test_budget_drop_outer_hop_first -q` | `7 passed in 0.19s` | PASS |
+| Full Phase 18 focus test set | `pytest tests/test_serve.py -q -k "focus or binary_status_invariant or no_watchdog or multi_seed or no_context"` | `16 passed, 154 deselected in 0.42s` | PASS |
+| Full suite regression | `pytest tests/ -q` | `1329 passed, 2 warnings in 39.86s` | PASS |
 
 ### Requirements Coverage
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |-------------|-------------|-------------|--------|----------|
-| FOCUS-01 | 18-02 | New MCP tool `get_focus_context(focus_hint, budget)` | SATISFIED | `graphify/serve.py::_tool_get_focus_context` (line 2246) + `mcp_tool_registry.py` entry (line 231) + `_handlers` dict (line 2405); test `test_get_focus_context_registered` passes |
-| FOCUS-02 | 18-01 | Resolves `file_path`→node_ids handling `source_file: str \| list[str]` | SATISFIED | `graphify/serve.py::_resolve_focus_seeds` (line 773) delegates to `analyze._iter_sources`; tests `test_focus_resolver_str_source_file` + `test_focus_resolver_list_source_file_multi_seed` pass |
-| FOCUS-03 | 18-02 | Returns BFS subgraph at depth with citations, community summary, D-02 envelope | SATISFIED | `_run_get_focus_context_core` (line 1731) + `_render_focus_community_summary` (line 1688); tests `test_get_focus_context_envelope_ok` + `test_get_focus_context_community_summary` pass |
-| FOCUS-04 | 18-02 | `validate_graph_path(path, base=project_root)` confinement; spoofed paths silently ignored | SATISFIED | serve.py:1785 `base=project_root`; serve.py:1786 `except (ValueError, FileNotFoundError)`; tests `test_get_focus_context_spoofed_path_silent`, `test_get_focus_context_missing_file_silent`, `test_binary_status_invariant`, `test_no_context_does_not_echo_focus_hint` all pass |
-| FOCUS-05 | 18-02 | Pull-model via MCP arg — no filesystem watcher side-channel | SATISFIED | `test_no_watchdog_import_in_focus_path` passes; `grep "import watchdog\|from watchdog" graphify/serve.py` returns 0 |
-| FOCUS-06 | 18-01 | Uses `nx.ego_graph` for bounded-depth neighborhood | SATISFIED | `_multi_seed_ego` at serve.py:756 uses `nx.compose_all([nx.ego_graph(G, s, radius=r) for s in seeds])`; test `test_multi_seed_compose_all_matches_expected` passes; grep confirms no multi-seed `nx.ego_graph(G, [...])` anti-pattern |
-| FOCUS-07 | 18-02 | Snapshot-path-double-nesting regression guard — renames `root`→`project_root`; asserts `not path.name == "graphify-out"` at construction | **PARTIAL** | `ProjectRoot` class exists at `snapshot.py:16` and raises at construction; `root`→`project_root` rename completed across 4 signatures (snapshot.py lines 34, 41, 49, 105); 3 sentinel tests pass. **HOWEVER**: the sentinel is not wired into the 4 snapshot helpers — they accept `project_root: Path`, not `ProjectRoot`. Production callers in `serve.py` and `__main__.py` bypass the sentinel. A Phase 12/15/17 author passing `Path("graphify-out")` directly would still silently double-nest. The REQ text ("asserts `not path.name == 'graphify-out'` at construction") is literally satisfied by the class, but the *intent* ("prevents downstream phases from reintroducing CR-01") is not enforced. See 18-REVIEW.md WR-01. |
-| FOCUS-08 [P2] | 18-03 | 500ms debounce prevents cache thrash | SATISFIED | `_FOCUS_DEBOUNCE_CACHE` + `_FOCUS_DEBOUNCE_WINDOW = 0.5` at serve.py:1850-1851; `_focus_debounce_key/_get/_put` at lines 1854, 1865, 1876; wired into `_tool_get_focus_context` at lines 2279 (get) and 2287 (put); tests `test_focus_debounce_suppresses_duplicate` + `test_focus_debounce_expires` pass (see 18-REVIEW.md WR-03 note: first test's coverage is narrow — tests the get helper, not the wrapper path — but the wrapper wiring is grep-verifiable) |
-| FOCUS-09 [P2] | 18-03 | `focus_hint.reported_at` freshness (≤5 min) rejects stale focus | SATISFIED | `_check_focus_freshness` at serve.py:1886 with Py 3.10 Z-shim at line 1901 (`reported_at.replace("Z", "+00:00")`); wired into `_tool_get_focus_context` at serve.py:2271; tests `test_focus_stale_reported_at_rejected` + `test_focus_reported_at_z_suffix_parses` + `test_focus_malformed_reported_at` all pass |
+| FOCUS-01 | 18-02 | MCP tool `get_focus_context(focus_hint, budget)` | SATISFIED | `_tool_get_focus_context` at serve.py:2245 + mcp_tool_registry entry + `_handlers` dict |
+| FOCUS-02 | 18-01 | Resolves `file_path` → node_ids handling `source_file: str \| list[str]` | SATISFIED | `_resolve_focus_seeds` at serve.py:773 delegates to `analyze._iter_sources` |
+| FOCUS-03 | 18-02 | BFS subgraph at depth with citations, community summary, D-02 envelope | SATISFIED | `_run_get_focus_context_core` (serve.py:1731) + `_render_focus_community_summary` (serve.py:1688) |
+| FOCUS-04 | 18-02 | `validate_graph_path(path, base=project_root)` confinement; spoofed silently ignored | SATISFIED | serve.py:1785-1786 |
+| FOCUS-05 | 18-02 | Pull-model via MCP arg — no filesystem watcher | SATISFIED | `test_no_watchdog_import_in_focus_path` PASSES; grep confirms 0 watchdog imports |
+| FOCUS-06 | 18-01 | Uses `nx.ego_graph` for bounded-depth neighborhood | SATISFIED | `_multi_seed_ego` at serve.py:756 uses `nx.compose_all([nx.ego_graph(G, s, radius=r) for s in seeds])` |
+| FOCUS-07 | 18-02 + **18-04** | Snapshot-path-double-nesting regression guard — rename + assertion | **SATISFIED** (fully — sentinel wired structurally) | ProjectRoot at snapshot.py:15 + inline guards at snapshot.py:36, 50, 75, 137; 4 production-callsite tests PASS; REQUIREMENTS.md line 270 updated with new test names |
+| FOCUS-08 [P2] | 18-03 | 500ms debounce prevents cache thrash | SATISFIED | `_FOCUS_DEBOUNCE_CACHE` + helpers at serve.py:1850-1886; wired at serve.py:2279+2286; WR-03 dispatcher test now PASSES with monkeypatch counter |
+| FOCUS-09 [P2] | 18-03 | `focus_hint.reported_at` freshness (≤5 min) rejects stale | SATISFIED | `_check_focus_freshness` at serve.py:1886; wired at serve.py:2270 |
 
-**Note on PARTIAL:** FOCUS-07 is classified SATISFIED against the literal REQ text (the sentinel *does* assert at construction) but the *ROADMAP SC4 intent* (prevent downstream phases from reintroducing CR-01) is PARTIAL because the sentinel is orphaned from production call sites. The REQUIREMENTS.md row (line 270) marks it complete; the gap is a wiring issue, not a feature-existence issue.
+**REQ-ID coverage:** 9/9 FOCUS REQ-IDs verified. Zero orphaned requirements — REQUIREMENTS.md Phase 18 rows (lines 264-272) all marked `complete` with traceability entries pointing to shipped code. REQUIREMENTS.md line 281 confirms "Phase 18 Focus-Aware Graph Context: 9 REQ-IDs (FOCUS-01..09)".
 
 ### Anti-Patterns Scanned
 
@@ -123,69 +212,46 @@ human_verification: []
 |------|------|---------|----------|--------|
 | `graphify/serve.py` | — | `nx.ego_graph(G, [` multi-seed anti-pattern | — | 0 matches (ABSENT, correct) |
 | `graphify/serve.py` | — | `import watchdog` / `from watchdog` | — | 0 matches (ABSENT, correct per FOCUS-05) |
-| `graphify/serve.py` | 1848 | `time.time()` | Info | 1 match — it is inside a *comment* explaining why `time.monotonic()` is used instead. Not an anti-pattern instance. |
-| `graphify/` + `tests/` (excluding conftest) | — | legacy `root=` kwarg on snapshot helpers | — | 0 matches (rename complete; conftest has backward-compat alias per plan) |
-| `graphify/snapshot.py` | — | `ProjectRoot` consumption in helpers | Warning | 0 matches (the sentinel is never consumed by the helpers it's meant to guard — WR-01 / SC4 PARTIAL root cause) |
+| `graphify/serve.py` | — | TODO/FIXME/PLACEHOLDER in focus code | — | 0 matches in focus-related surfaces |
+| `graphify/snapshot.py` | — | TODO/FIXME/PLACEHOLDER | — | 0 matches |
+| `graphify/snapshot.py` | — | Unused `ProjectRoot` class — previously a WR-01 anti-pattern | **Resolved** | Still defined intentionally as an optional explicit-wrap sentinel; the 4 inline helpers now carry structural enforcement, so the class is no longer the sole gatekeeper — both paths converge on the same error shape |
+| `graphify/` + `tests/` | — | legacy `root=` kwarg on snapshot helpers | — | 0 matches (rename complete; conftest has backward-compat alias) |
 
-### 18-REVIEW.md Findings Summary
+### Prior Gaps Closed
 
-The Phase 18 code review (`18-REVIEW.md`, reviewed 2026-04-20T19:58:00Z, status `issues_found`) surfaced **0 Critical, 4 Warning, 5 Info** findings. This verification confirms:
+The previous verification (commit 64244a1, 2026-04-20 earlier) flagged exactly one gap:
 
-- **WR-01 (ProjectRoot not wired)** — CONFIRMED. Classified as a real gap (SC4 PARTIAL above). The class exists and raises correctly in tests, but no production caller constructs `ProjectRoot(...)` before passing to snapshot helpers. Fix suggested in review: add inline `if project_root.name == "graphify-out": raise ValueError(...)` inside each of the four helpers (or change param type to `Path | ProjectRoot` with unwrap). Non-blocking for the literal REQ text but blocking for the SC4 intent.
-- **WR-02 (dead `alias_map` parameter)** — CONFIRMED via grep: `_run_get_focus_context_core` declares `alias_map: dict` at serve.py:1733 but the body never references `alias_map` (0 occurrences inside the function body lines 1731-1841). The caller at serve.py:2286 still passes `_alias_map`. Classified as **dead code / Warning**, not a functional gap. Recommend removing the parameter in a follow-up plan, per 18-REVIEW.md WR-02 fix suggestion.
-- **WR-03 (`test_focus_debounce_suppresses_duplicate` shallow coverage)** — CONFIRMED. The test seeds `_FOCUS_DEBOUNCE_CACHE` manually and reads it back; it never calls `_tool_get_focus_context` nor triggers the `monkeypatch.setattr` on the core blow-up. The wrapper's debounce wiring is *grep-verifiable* (serve.py:2279 `_focus_debounce_get(key)`, serve.py:2287 `_focus_debounce_put(key, envelope)`) but is not *integration-tested*. Classified as a **Warning / test-quality gap**, not a functional gap.
-- **WR-04 (`test_budget_drop_outer_hop_first` assertions too weak)** — CONFIRMED. Test asserts `len(small_body) <= len(large_body)` and `status ∈ {"ok","no_context"}` (tautological); does not assert `depth_used` reduction. Would pass even if D-08 outer-hop-first logic were replaced by naive char-clipping. The D-08 loop *does* exist at serve.py:1820-1823 (grep confirms) but is only weakly tested. Classified as a **Warning / test-quality gap**, not a functional gap.
-- **IN-01..IN-05** — all stylistic / Info-level observations; do not affect goal achievement.
+**SC4 PARTIAL → VERIFIED** — `ProjectRoot` sentinel defined but orphaned from production callers. Plan 18-04 closed this by wiring a structurally equivalent inline guard into all 4 production snapshot helpers (`snapshots_dir`, `list_snapshots`, `save_snapshot`, `auto_snapshot_and_delta`). The guard fires at helper entry, before any path composition — satisfying both the literal REQ-07 text ("asserts `not path.name == 'graphify-out'` at construction") and the ROADMAP SC4 intent ("prevents Phase 12/15/17 from reintroducing CR-01"). Post-18-04, a future author passing `Path("graphify-out")` directly to any of the 4 helpers raises `ValueError` at entry rather than silently double-nesting.
 
-### Deviations from Plan (from SUMMARY.md sections)
+Three non-blocking code review findings from 18-REVIEW.md were also closed as bundled cleanups in Plan 18-04:
 
-Extracted from the three SUMMARY.md `Deviations` sections:
+- **WR-02**: dead `alias_map` parameter removed from `_run_get_focus_context_core` (signature reduced 5→4 params). Caller at serve.py:2285 updated positionally. alias_map usage preserved in the 4 other functions (`_run_trace_neighborhood`, `_run_entity_trace`, `_run_topic_summary`, `_run_connect_topics`) where legitimately consumed for D-16 merged-alias resolution. Post-change count: 22 references (pre: 24 — exactly 2 removed).
+- **WR-03**: `test_focus_debounce_suppresses_duplicate` rewritten to exercise production dispatcher path. New version monkeypatches `_run_get_focus_context_core` with counting stub, executes the `key → core → put` sequence, asserts cache hit + byte-identical envelope + `call_counter == 1` (core NOT re-invoked on hit). Eliminates the tautological cache-seed-then-read pattern.
+- **WR-04**: `test_budget_drop_outer_hop_first` rewritten with 3 D-08 invariant assertions over a new 10-node 2-hop fixture `_make_large_focus_graph()`: (a) `small_meta["node_count"] < large_meta["node_count"]` (node-count reduction, not text-length), (b) `small_meta["depth_used"] < large_meta["depth_used"]` (strict depth monotonicity), (c) `node_count >= 4` when status=ok and depth>=1 (inner hop preserved).
 
-| # | Deviation | Classification | Plan | Notes |
-|---|-----------|----------------|------|-------|
-| 1 | `_run_focus_core` (RESEARCH.md) renamed to `_run_get_focus_context_core` (PATTERNS.md convention) | intentional | 18-02 | Matches VALIDATION.md test naming (`test_get_focus_context_*`) and MCP tool name |
-| 2 | `validate_graph_path` with relative `file_path` false-escaped tmp_path — fixed by prepending `project_root` to relative paths before calling `validate_graph_path` | bug fix (intentional) | 18-02 | Documented as Pitfall-3 extension; serve.py:1782-1784 |
-| 3 | `_resolve_focus_seeds` needs project-root-relative target (not absolute) — fixed by computing `Path(validated).relative_to(project_root.resolve())` | bug fix (intentional) | 18-02 | serve.py:1796-1799; stored `source_file` values are relative |
-| 4 | `test_no_watchdog_import_in_focus_path` scan range narrowed to `[_run_get_focus_context_core, next top-level def]` | intentional | 18-02 | Original broad scan false-tripped on unrelated `_filter_blank_stdin` stdio helper |
-| 5 | `_tool_get_focus_context` missing-graph path collapses to `no_context` (not `no_graph`) to preserve binary invariant | intentional | 18-02 | T-18-A/B/C tested by `test_binary_status_invariant` |
-| 6 | `make_snapshot_chain` fixture accepts both `project_root=` (new) and `root=` (legacy) as backwards-compat shim | intentional | 18-02 | Documented; cleanup deferred to follow-up per 18-REVIEW.md IN-05 |
-| 7 | `skill.md` runtime callsites updated from `root=` to `project_root=` (lines 504, 1062) | intentional | 18-02 | Required by rename; would have crashed skill runtime otherwise |
-| 8 | Plan 18-03: zero deviations | — | 18-03 | Plan executed verbatim |
+### Deviations from Plan
 
-No regressions detected. All deviations either fix discovered plan defects, adopt clearer naming, or preserve invariants.
+From 18-04-SUMMARY.md:
+
+| # | Deviation | Classification | Notes |
+|---|-----------|----------------|-------|
+| 1 | WR-04 budget tuned 50 → 300 to force observable outer-hop drop without collapsing to depth=0 | fixture tuning (allowed by plan) | D-08 invariant semantics unchanged; test asserts **strict** depth monotonicity (`<`) rather than plan's `<=` |
+
+No other deviations. Signatures preserved, imports unchanged, all 4 snapshot helpers guarded per spec, `alias_map` surgically removed from exactly one function.
 
 ### Human Verification Required
 
-None. All phase behaviors have automated coverage per 18-VALIDATION.md.
+None. All phase behaviors have automated coverage per 18-VALIDATION.md. The Plan 18-04 closure work is entirely verifiable programmatically (grep + pytest + runtime spot-check).
 
 ### Gaps Summary
 
-One real gap: **SC4 is PARTIAL because the `ProjectRoot` sentinel is defined but not wired to production callers.** The class raises correctly in tests (so the literal REQ-07 "asserts at construction" text is satisfied) but the SC4 intent ("prevents Phase 12/15/17 from reintroducing CR-01") is not structurally enforced — future authors passing `Path("graphify-out")` directly to `snapshots_dir` / `list_snapshots` / `save_snapshot` / `auto_snapshot_and_delta` will still silently double-nest. This is exactly the class of bug the phase was meant to permanently prevent.
+**Zero remaining gaps.** All 5 ROADMAP Success Criteria VERIFIED. All 9 FOCUS REQ-IDs SATISFIED. All prior-verification gaps (SC4 PARTIAL + 3 WR-class code review findings) closed in Plan 18-04. Full test suite green (1329 passed, +4 new, 2 modified, 0 regressions). No anti-patterns detected in changed surfaces.
 
-**Recommended follow-up fix** (matches 18-REVIEW.md WR-01 option (a) — minimal surface area):
-
-Add a runtime guard at the top of each of the four snapshot helpers:
-
-```python
-def snapshots_dir(project_root: Path = Path(".")) -> Path:
-    p = Path(project_root)
-    if p.name == "graphify-out":
-        raise ValueError(
-            f"snapshots_dir received {p!r}; pass the directory CONTAINING "
-            f"graphify-out/, not graphify-out/ itself. Try: {p.parent!r}"
-        )
-    d = p / "graphify-out" / "snapshots"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-```
-
-…and similar one-liners at the top of `list_snapshots`, `save_snapshot`, `auto_snapshot_and_delta`. Scope: ~30 LOC + 4 targeted tests (one per helper, same pattern as the existing `ProjectRoot` sentinel tests). Low-risk; makes SC4 fully structural rather than relying on caller discipline.
-
-The other three Warning-level findings (WR-02 dead parameter, WR-03 shallow debounce test, WR-04 weak budget-drop assertion) are **non-blocking code-quality improvements** that do not affect goal achievement and are not gating the phase — they should be tracked as follow-up tasks, not re-opening Phase 18.
-
-All 9 REQ-IDs have traceability entries in REQUIREMENTS.md pointing to shipped code (lines 264-272). All 21 locked tests pass. Full test suite green (1325 passed). No regressions.
+Phase 18 goal — "an agent reports what the user is currently focused on and graphify returns a scoped subgraph so downstream tools can reason about the local neighborhood without loading the full graph" — is achieved and structurally protected against the Phase 11-era CR-01 regression class.
 
 ---
 
-_Verified: 2026-04-20_
+_Re-verified: 2026-04-20T20:54:00Z_
 _Verifier: Claude (gsd-verifier)_
+_Prior verification: 2026-04-20 (commit 64244a1) — status: gaps_found (SC4 PARTIAL)_
+_Gap closure: Plan 18-04 (commits 81d904a + 28b0f34 + edf793a + docs commit)_
