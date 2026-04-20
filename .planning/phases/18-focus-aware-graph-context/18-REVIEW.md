@@ -1,12 +1,11 @@
 ---
 phase: 18-focus-aware-graph-context
-reviewed: 2026-04-20T19:58:00Z
+reviewed: 2026-04-20T20:48:00Z
 depth: standard
-files_reviewed: 9
+files_reviewed: 8
 files_reviewed_list:
   - graphify/mcp_tool_registry.py
   - graphify/serve.py
-  - graphify/skill.md
   - graphify/snapshot.py
   - server.json
   - tests/conftest.py
@@ -15,174 +14,106 @@ files_reviewed_list:
   - tests/test_snapshot.py
 findings:
   critical: 0
-  warning: 4
-  info: 5
-  total: 9
+  warning: 0
+  info: 3
+  total: 3
 status: issues_found
 ---
 
-# Phase 18: Code Review Report
+# Phase 18: Code Review Report (Post-Gap-Closure)
 
-**Reviewed:** 2026-04-20T19:58:00Z
+**Reviewed:** 2026-04-20T20:48:00Z
 **Depth:** standard
-**Files Reviewed:** 9
-**Status:** issues_found
+**Files Reviewed:** 8
+**Status:** issues_found (all Info / non-blocking)
 
 ## Summary
 
-Phase 18 "Focus-Aware Graph Context" ships the `get_focus_context` MCP tool, the `ProjectRoot` snapshot sentinel, and the P2 debounce + freshness guards across three plans. Full test suite (213 tests) passes cleanly.
+This is a post-gap-closure re-review of Phase 18 (Focus-Aware Graph Context) after Plan 18-04 wired the `CR-01` sentinel guard into four snapshot helpers, removed the dead `alias_map` parameter from `_run_get_focus_context_core`, and strengthened two tests (`test_focus_debounce_suppresses_duplicate` and `test_budget_drop_outer_hop_first`).
 
-The seven invariants flagged in the phase context all check out:
+**All prior findings (WR-01/02/03/04 from the pre-gap-closure review) are correctly addressed:**
 
-1. Binary status invariant (D-03/D-11) — `_run_get_focus_context_core` and `_tool_get_focus_context` both emit the 4-key `{status, node_count, edge_count, budget_used}` shape on every no-context path, with empty `text_body`. No `focus_hint` values echo in error responses (confirmed by `test_no_context_does_not_echo_focus_hint`).
-2. Path-confinement — `validate_graph_path(candidate, base=project_root)` is called with the explicit `base=` override, and both `ValueError` and `FileNotFoundError` are caught.
-3. NetworkX 3.x — `_multi_seed_ego` correctly uses `nx.compose_all([ego_graph(G, s, r) for s in seeds])`. No `nx.ego_graph(G, [...])` multi-seed pattern exists.
-4. Py 3.10 compat — `datetime.fromisoformat(reported_at.replace("Z", "+00:00"))` shim is present and tested.
-5. Debounce cache — uses `time.monotonic()`, has bounded growth (evicts oldest 64 when size exceeds 256).
-6. Snapshot sentinel — `ProjectRoot.__post_init__` raises on `path.name == "graphify-out"` as designed.
-7. Envelope parity under debounce — the cached envelope is byte-identical to the core's output (no "cached: true" marker).
+- **WR-01 (SC4 structural sentinel wiring):** The `CR-01`/Pitfall-20 guard is now replicated as an inline `raise ValueError` at the top of `snapshots_dir()`, `list_snapshots()`, `save_snapshot()`, and `auto_snapshot_and_delta()` in `graphify/snapshot.py` (lines 36, 50, 75, 137). Four new regression tests in `tests/test_snapshot.py:2383-2419` pin each production callsite.
+- **WR-02 (dead `alias_map` parameter):** Fully removed from `_run_get_focus_context_core` (`graphify/serve.py:1731-1751`). The function now takes `(G, communities, project_root, arguments)` — no `alias_map`. The only callsite `_tool_get_focus_context` (`serve.py:2285`) mirrors the new signature. Zero lingering `alias` references exist in the 120-line function body.
+- **WR-03 (`test_focus_debounce_suppresses_duplicate` strengthening):** The test now monkeypatches `serve_mod._run_get_focus_context_core` with a counting wrapper and asserts `call_counter["n"] == 1` both after the first call and after the cache-get, proving the core is not re-invoked on cache hit. This correctly exercises the dispatcher path (`tests/test_serve.py:2504-2545`).
+- **WR-04 (`test_budget_drop_outer_hop_first` rewrite):** The test now asserts D-08 strict-depth invariants — `small.node_count < large.node_count`, `small.depth_used < large.depth_used`, and (when `depth_used >= 1`) `small.node_count >= 4` (seed + 3 inner neighbors). Uses a purpose-built 10-node two-hop fixture (`_make_large_focus_graph`). The earlier inner-hop logic error (observation 1640) is resolved by tuning the fixture and pinning invariants instead of magic numbers (`tests/test_serve.py:2446-2485`).
 
-Four Warning-level issues surface around test-assertion tightness, a dead parameter, the ProjectRoot sentinel not being wired into the production call sites it was meant to guard, and test-quality gaps in the debounce assertions. Five Info items cover stylistic and minor hygiene observations. No Critical issues.
+**Source-file review:**
 
-## Warnings
+- `graphify/snapshot.py` — 4 new guards land cleanly; no regressions to the `ProjectRoot` dataclass. Minor message-format inconsistency noted (IN-01).
+- `graphify/serve.py` — `_run_get_focus_context_core` signature is tight, the `_tool_get_focus_context` callsite is clean, and the debounce + freshness helpers are correctly placed. One minor DoS-cap eviction nit noted (IN-02).
+- `tests/test_snapshot.py` — Four new callsite-guard tests (one per helper) follow the existing pattern (`tmp_path / "graphify-out"` + `pytest.raises(ValueError, match="graphify-out")`). Solid.
+- `tests/test_serve.py` — WR-03 and WR-04 rewrites are well-commented and exercise the intended invariants. One small style nit noted (IN-03).
+- `graphify/mcp_tool_registry.py`, `server.json`, `tests/conftest.py`, `tests/test_delta.py` — No phase-18 changes or issues detected.
 
-### WR-01: `ProjectRoot` sentinel defined but not wired into protected call sites
-
-**File:** `graphify/snapshot.py:15-31`
-**Issue:** `ProjectRoot` is a frozen dataclass that raises on `path.name == "graphify-out"` — this is the codified guard against v1.3 CR-01 (Pitfall 20). However, it is never actually used to protect `snapshots_dir`, `save_snapshot`, `list_snapshots`, or `auto_snapshot_and_delta`. Those functions all take `project_root: Path` (not `project_root: ProjectRoot`). In-tree production callers (`serve.py` passes `_out_dir.parent`, `skill.md` passes `Path('.')`) bypass the sentinel entirely; only the two unit tests construct `ProjectRoot(...)`. The regression the sentinel was designed to prevent remains reachable if a future maintainer passes `_out_dir` directly to `save_snapshot`. The sentinel currently documents intent but does not enforce it.
-**Fix:** Either (a) add a runtime guard inside `snapshots_dir` / `save_snapshot` / `list_snapshots` that rejects `Path` arguments whose `.name == "graphify-out"`, or (b) change the parameter type to accept either `Path | ProjectRoot`, unwrap `ProjectRoot.path` internally, and reject raw `Path(...) / "graphify-out"` at the boundary. Option (a) is smaller:
-```python
-def snapshots_dir(project_root: Path = Path(".")) -> Path:
-    p = Path(project_root)
-    if p.name == "graphify-out":
-        raise ValueError(
-            f"snapshots_dir received {p!r}; pass the directory CONTAINING "
-            f"graphify-out/, not graphify-out/ itself. Try: {p.parent!r}"
-        )
-    d = p / "graphify-out" / "snapshots"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-```
-
-### WR-02: Unused `alias_map` parameter in `_run_get_focus_context_core`
-
-**File:** `graphify/serve.py:1731-1735`
-**Issue:** `_run_get_focus_context_core(G, communities, alias_map, project_root, arguments)` declares `alias_map: dict` but the function body never references it (confirmed via grep: 0 occurrences inside the function body). The caller `_tool_get_focus_context` still passes `_alias_map` positionally. This is dead API surface that invites future misuse — a reader will reasonably assume alias resolution is happening.
-**Fix:** Either remove the parameter (and update the caller):
-```python
-def _run_get_focus_context_core(
-    G: "nx.Graph",
-    communities: dict,
-    project_root: "Path",
-    arguments: dict,
-) -> str:
-    ...
-```
-…or wire alias resolution into `_resolve_focus_seeds` (so `function_name` and `file_path` can be alias-translated the same way `_run_entity_trace` uses `_alias_map`). Given the phase scope is "pull-model per-call focus," removing the parameter is the simpler path; add an alias-map TODO if future resolution is desired.
-
-### WR-03: `test_focus_debounce_suppresses_duplicate` does not exercise the production dispatcher
-
-**File:** `tests/test_serve.py:2459-2488`
-**Issue:** The test name claims it verifies that "second call within 500ms returns the cached envelope," but the test body seeds `_FOCUS_DEBOUNCE_CACHE` manually via `_FOCUS_DEBOUNCE_CACHE[key] = (time_mod.monotonic(), first)` and then merely reads it back with `_FOCUS_DEBOUNCE_CACHE.get(key)` — it does NOT invoke `_tool_get_focus_context` at all. The `monkeypatch.setattr(serve_mod, "_run_get_focus_context_core", _blow_up)` setup is unreachable — the test never calls any function that could route through the mock. The claim `"core should not be called when cache hit within window"` is not actually verified: you could delete the entire `_tool_get_focus_context` body and this test would still pass. The assertion `envelope == first` only verifies dict lookup round-trips, not the debounce wrapper's behavior.
-**Fix:** Exercise the actual dispatcher path. Since `_tool_get_focus_context` is a closure inside `serve()`, extract the debounce logic to a module-level helper or refactor the test to stand up the full `serve()` closure. A focused alternative:
-```python
-def test_focus_debounce_suppresses_duplicate(tmp_path, monkeypatch):
-    _FOCUS_DEBOUNCE_CACHE.clear()
-    key = _focus_debounce_key({"file_path": "src/auth.py"})
-    # Seed cache + assert the get-path returns within the window
-    _FOCUS_DEBOUNCE_CACHE[key] = (time.monotonic(), "CACHED_ENV")
-    assert _focus_debounce_get(key) == "CACHED_ENV"
-    # Simulate window expiry by rewriting the stored monotonic timestamp
-    _FOCUS_DEBOUNCE_CACHE[key] = (time.monotonic() - 1.0, "CACHED_ENV")
-    assert _focus_debounce_get(key) is None
-    _FOCUS_DEBOUNCE_CACHE.clear()
-```
-…and ADD a separate integration test that stands up `serve()` and calls `_tool_get_focus_context` twice in quick succession to verify the wrapper path. The current test overlaps `test_focus_debounce_expires` (both verify the get helper) and leaves the wrapper logic uncovered.
-
-### WR-04: `test_budget_drop_outer_hop_first` assertions are too weak to validate D-08
-
-**File:** `tests/test_serve.py:2391-2405`
-**Issue:** The test docstring claims it verifies "D-08: when ego-graph + community summary > budget*3 chars, drop outer hop first." But the actual assertions are:
-1. `len(small_parts[0]) <= len(large_parts[0])` — only proves text is shorter with smaller budget, not that the outer hop was dropped first.
-2. `small_meta["status"] in ("ok", "no_context")` — tautological; those are the only two possible statuses.
-
-There is no assertion that `small_meta["depth_used"] < large_meta["depth_used"]` (the actual D-08 signature). A char-clip-only truncation (no hop reduction) would pass this test. The 4-node synthetic graph `_make_focus_graph()` may not even be large enough to force hop reduction at the radius=2 default, so `depth_used` might equal `2` for both the small-budget and large-budget cases — making a stronger assertion non-trivial without a bigger fixture.
-**Fix:** Either strengthen the assertion with a larger graph:
-```python
-# Build a wider graph so radius=2 ego-graph overflows a tiny budget
-G = _make_wide_focus_graph(n_nodes=50)  # new fixture with many hop-2 reachable nodes
-...
-small_meta = json.loads(small.split(QUERY_GRAPH_META_SENTINEL)[1])
-large_meta = json.loads(large.split(QUERY_GRAPH_META_SENTINEL)[1])
-if small_meta["status"] == "ok":
-    assert small_meta["depth_used"] <= large_meta["depth_used"], \
-        f"D-08 expected depth reduction: small={small_meta!r} large={large_meta!r}"
-```
-…or rename/re-scope the test to `test_budget_reduces_text_body_size` and accept it as a weaker regression net, with a separate D-08-specific test covering the hop-reduction path on a purpose-built fixture.
+**No Critical or Warning findings.** The three Info items below are cosmetic / defense-in-depth observations that do not block phase sign-off.
 
 ## Info
 
-### IN-01: `function_name` narrowing uses substring match (`in`) without word-boundary
+### IN-01: `ProjectRoot.__post_init__` error message omits "CR-01 Pitfall 20" tag
 
-**File:** `graphify/serve.py:815-816`
-**Issue:** `if function_name and function_name not in label: continue` — `function_name="a"` matches every label containing letter "a". Per D-02 this is accepted (narrowing is a courtesy, not strict filter), and the phase docstring describes this as "narrows the union," so behavior is intentional. But it may surprise callers who pass short function names.
-**Fix:** Consider documenting the substring-match behavior in the tool's `inputSchema` description, or use `==` for exact match when `function_name` is short (<4 chars). Minor — current behavior matches D-02 spec.
+**File:** `graphify/snapshot.py:26-32`
+**Issue:** The four function-level guards (`snapshots_dir`, `list_snapshots`, `save_snapshot`, `auto_snapshot_and_delta`) each end their `ValueError` message with the canonical suffix `"(Codifies v1.3 CR-01 Pitfall 20.)"` (lines 41, 55, 80, 142). The `ProjectRoot.__post_init__` guard (lines 26-32) does not — its message ends at the `Try: ProjectRoot(...)` suggestion. This is the *earliest* sentinel in the stack and the most likely one an agent will hit first; the missing tag makes it slightly harder to grep-find the originating issue.
 
-### IN-02: Private helper `_iter_sources` imported across modules
-
-**File:** `graphify/serve.py:17`
-**Issue:** `from graphify.analyze import _iter_sources` — the leading underscore marks it as module-private per Python convention. Cross-module consumption of a `_private` helper couples `serve.py` to `analyze.py`'s internals and signals the symbol should be lifted to a shared non-private location. Phase 10 noted the same pattern elsewhere.
-**Fix:** Promote `_iter_sources` to `graphify/validate.py` or a new `graphify/node_helpers.py` as a non-underscore public helper (`iter_sources`), and update the three current call sites (`analyze.py`, `dedup.py`, `serve.py`). Low-risk rename; defer to v1.5 if phase budget is tight.
-
-### IN-03: Commented-out-looking trailing `f""` truncation marker
-
-**File:** `graphify/serve.py:1823`
-**Issue:** `text_body = text_body[:char_budget] + f"\n... (truncated to ~{budget} token budget)"` — the marker hints text was clipped but is emitted as part of the `text_body` the agent reads, not as meta. An LLM agent may interpret the literal "truncated to ~N token budget" as a fact about its own context window. Minor but noteworthy.
-**Fix:** Move truncation signaling into `meta`:
+**Fix:**
 ```python
-was_truncated = len(text_body) > char_budget
-if was_truncated:
-    text_body = text_body[:char_budget]
-...
-if was_truncated:
-    meta["truncated"] = True
+def __post_init__(self) -> None:
+    if self.path.name == "graphify-out":
+        raise ValueError(
+            f"ProjectRoot received {self.path!r} which has name 'graphify-out'. "
+            f"Pass the directory CONTAINING graphify-out/, not graphify-out/ itself. "
+            f"Try: ProjectRoot({self.path.parent!r}). "
+            f"(Codifies v1.3 CR-01 Pitfall 20.)"
+        )
 ```
-…and drop the inline marker. Consistent with the D-02 "structured meta" philosophy.
 
-### IN-04: `datetime.now(timezone.utc)` called twice in `save_snapshot`
+The class-level docstring (lines 17-22) already mentions "v1.3 CR-01 (Pitfall 20)", so the tag is consistent with existing prose — it just belongs in the raised message too for grep parity with the other four guards.
 
-**File:** `graphify/snapshot.py:62,81`
-**Issue:** `save_snapshot` calls `datetime.now(timezone.utc)` once to build the filename stem (line 62) and again to populate `metadata.timestamp` (line 81). The two timestamps can differ by milliseconds to seconds (especially on slow systems). Callers who try to correlate filename to payload.metadata.timestamp may be surprised. Pre-existing behavior; not introduced in Phase 18, but Phase 18 touched this file.
-**Fix:** Capture once:
+### IN-02: `_focus_debounce_put` eviction uses Python `sorted()` on every overflow
+
+**File:** `graphify/serve.py:1875-1881`
+**Issue:** When the debounce cache exceeds 256 entries the code calls `sorted(_FOCUS_DEBOUNCE_CACHE.items(), key=lambda kv: kv[1][0])[:64]` to pick the 64 oldest. This sorts all ~257 entries (O(N log N)) just to get the 64 smallest — `heapq.nsmallest(64, ...)` would be ~O(N log 64) and cleaner intent. Correctness is unaffected; the cap is tiny (256) so the performance delta is negligible. Flagged as Info rather than Warning because: (a) v1 review scope excludes performance, (b) the cap ceiling keeps the worst case bounded.
+
+**Fix (optional):**
 ```python
-now = datetime.now(timezone.utc)
-ts = now.strftime("%Y-%m-%dT%H-%M-%S")
-...
-"metadata": {
-    "timestamp": now.isoformat(),
-    ...
-}
+import heapq
+if len(_FOCUS_DEBOUNCE_CACHE) > 256:
+    oldest = heapq.nsmallest(64, _FOCUS_DEBOUNCE_CACHE.items(), key=lambda kv: kv[1][0])
+    for k, _ in oldest:
+        _FOCUS_DEBOUNCE_CACHE.pop(k, None)
 ```
-Low priority (pre-existing); note for future snapshot hardening.
 
-### IN-05: `tests/conftest.py` `make_snapshot_chain` backward-compat kwarg pattern
+### IN-03: `test_focus_debounce_expires` uses list-of-one indirection for `fake_now`
 
-**File:** `tests/conftest.py:106-110`
-**Issue:** The fixture accepts both `project_root=` (new) and `root=` (legacy) kwargs and coalesces them:
+**File:** `tests/test_serve.py:2553-2559`
+**Issue:** The test defines `fake_now = [time_mod.monotonic()]` and then uses `fake_now[0] - 1.0` as the cached timestamp. The list-of-one indirection has no purpose (nothing else references `fake_now` later). Collapsing to a scalar keeps the test's intent obvious.
+
+**Fix (optional):**
 ```python
-def _make(n: int = 3, project_root: "Path | None" = None, root: "Path | None" = None) -> "list[Path]":
-    effective = project_root if project_root is not None else root
-    base = Path(effective) if effective is not None else tmp_path
+past_ts = time_mod.monotonic() - 1.0
+_FOCUS_DEBOUNCE_CACHE[key] = (past_ts, "CACHED_VALUE")
 ```
-This is a reasonable transition pattern, but it hides the kwarg rename from future readers. A grep for `root=` in tests now yields both legitimate callers (that should migrate) and the shim arm of this fixture. Recommend adding a deprecation docstring or migrating all `root=` callers (visible by grep) and removing the shim after the phase closes.
-**Fix:** Either add an explicit `DeprecationWarning` when `root=` is passed, or grep for remaining `root=` callers in the test suite and migrate them:
-```bash
-grep -rn 'make_snapshot_chain.*root=' tests/
-```
-Then drop the backward-compat arm. Defer to the Phase 18 cleanup commit or follow-up housekeeping.
+
+This is purely cosmetic — the test correctly verifies the 500ms window expiration.
+
+## Observations (Positive — not findings)
+
+These are intentionally highlighted because they represent good engineering hygiene that should be preserved:
+
+1. **Layered `CR-01` defense:** `auto_snapshot_and_delta` guards at entry (line 137) *and* then calls `list_snapshots` (line 145) and `save_snapshot` (line 148), both of which re-guard. This defense-in-depth is correct — each public helper is independently robust even if a future refactor bypasses the top-level guard.
+
+2. **`_run_get_focus_context_core` never raises (D-03 / D-11 invariant):** All failure paths collapse to `_no_context()` which returns a clean 4-key meta envelope. The try/except at line 1785 catches *both* `ValueError` and `FileNotFoundError` per Pitfall 4 — a bare `except ValueError` would leak tracebacks on `T-18-B`.
+
+3. **Debounce uses `time.monotonic()` not `time.time()`:** Correct per Pitfall 6 — immune to NTP adjustments / system suspend-resume. Comment on lines 1846-1847 documents the choice.
+
+4. **`_check_focus_freshness` Py 3.10 Z-suffix shim:** `reported_at.replace("Z", "+00:00")` before `fromisoformat` is the correct compat pattern; Python 3.11 would handle `Z` natively but the project targets 3.10+.
+
+5. **`test_binary_status_invariant` pins the D-11 binary-status contract:** Three failure modes (spoofed, unindexed, missing) all asserted to produce identical 4-key meta. This is exactly the kind of cross-cutting invariant test that prevents the no_graph/no_context status drift noted in the `_tool_get_focus_context` docstring (lines 2258-2262).
+
+6. **`test_no_context_does_not_echo_focus_hint` pins T-18-D:** Explicit `assert "/etc/passwd" not in response` + `assert "SECRET_FN" not in response` + `assert "424242" not in response` ensures no focus_hint values leak — crucial for the spoof-indistinguishable-from-unindexed security posture.
 
 ---
 
-_Reviewed: 2026-04-20T19:58:00Z_
+_Reviewed: 2026-04-20T20:48:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
