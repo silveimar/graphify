@@ -606,11 +606,16 @@ def export_claude_harness(
     # ValueError on escape and FileNotFoundError if the resolved path does
     # not exist — the mkdir above guarantees it exists for a valid ``base``.
     validated_dir = validate_graph_path(harness_dir, base=base)
-    # Sanity: composed file path must still resolve under the base.
-    if not str(validated_dir.resolve()).startswith(str(base)):
+    # WR-03 (Phase 13 review): the previous ``startswith(str(base))`` guard
+    # is vulnerable to prefix collisions (``/tmp/out`` vs ``/tmp/outX``).
+    # Use ``Path.resolve().is_relative_to(...)`` instead — semantic path
+    # containment, not lexical prefix matching.
+    try:
+        validated_dir.resolve().relative_to(base)
+    except ValueError as exc:
         raise ValueError(
             f"harness_dir {validated_dir} escaped base {base}"
-        )
+        ) from exc
 
     # Load schema first so an unknown target fails before any I/O on sidecars.
     schema_doc = yaml.safe_load(schema_path(target).read_text(encoding="utf-8"))
@@ -687,10 +692,14 @@ def export_claude_harness(
         out_path = validated_dir / filename
         # Final guard — filename could conceivably contain ``..``; ensure the
         # resolved child path still lives under the validated directory.
-        if not str(out_path.resolve()).startswith(str(base)):
+        # WR-03 (Phase 13 review): use ``relative_to`` instead of string
+        # prefix matching to avoid sibling-directory prefix collisions.
+        try:
+            out_path.resolve().relative_to(base)
+        except ValueError as exc:
             raise ValueError(
                 f"harness filename {filename!r} escapes base {base}"
-            )
+            ) from exc
 
         tmp = out_path.with_suffix(out_path.suffix + ".tmp")
         tmp.write_text(rendered, encoding="utf-8")

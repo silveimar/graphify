@@ -596,3 +596,27 @@ def test_set_clock_module_override(tmp_path: Path) -> None:
     finally:
         # Restore the default clock so later tests / session state is clean.
         set_clock(prior)
+
+
+# ---------------------------------------------------------------------------
+# WR-03 (Phase 13 review): path-confinement uses ``relative_to`` not
+# string ``startswith`` — sibling-directory prefix collisions must not
+# satisfy the guard.
+# ---------------------------------------------------------------------------
+
+
+def test_path_guard_rejects_sibling_prefix_collision(tmp_path: Path) -> None:
+    """A sibling directory like ``/tmp/outX`` must NOT pass the confinement
+    check just because its string starts with ``/tmp/out``. The fix uses
+    ``Path.resolve().relative_to(base)`` instead of ``startswith(str(base))``.
+    """
+    base = (tmp_path / "out").resolve()
+    base.mkdir()
+    sibling = (tmp_path / "outX" / "harness").resolve()
+    sibling.mkdir(parents=True)
+
+    # Lexical guard would pass: str(sibling).startswith(str(base)) is True.
+    assert str(sibling).startswith(str(base))
+    # Semantic guard must fail (this is the WR-03 fix invariant).
+    with pytest.raises(ValueError):
+        sibling.relative_to(base)
