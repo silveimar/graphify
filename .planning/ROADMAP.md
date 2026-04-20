@@ -131,7 +131,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - [ ] Phase 15: Async Background Enrichment — Four-pass background enricher (description, patterns, community summaries, staleness) writing overlay-only `enrichment.json`; event-driven via `watch.py` post-rebuild hook; `fcntl.flock`-coordinated with foreground `/graphify`; snapshot-pinned at process start for determinism.
 - [ ] Phase 16: Graph Argumentation Mode — `graphify/argue.py` substrate populates a SPAR-Kit-style `ArgumentPackage` from a graph subgraph; `skill.md` orchestrates the LLM debate (Phase 9 blind-label harness reused); mandatory `{claim, cites: [node_id]}` schema rejects fabricated node IDs; round cap 6; `dissent`/`inconclusive` valid outputs; `GRAPH_ARGUMENT.md` advisory-only artifact.
 - [ ] Phase 17: Conversational Graph Chat — Two-stage structurally-enforced `chat(query, session_id)` MCP tool (Stage 1 tool-call only, Stage 2 compose from results only); every claim cited to `{node_id, label, source_file}`; empty results return templated fuzzy suggestions; session-scoped history; `/graphify-ask` slash command.
-- [ ] Phase 18: Focus-Aware Graph Context — `get_focus_context(focus_hint)` MCP tool returns BFS ego-graph + community summary for a structured focus hint (`file_path`, optional `function_name`/`line`/`neighborhood_depth`/`include_community`); pull-model (no filesystem watcher); codifies v1.3 CR-01 snapshot-root fix; silently ignores spoofed paths.
+- [x] Phase 18: Focus-Aware Graph Context — `get_focus_context(focus_hint)` MCP tool returns BFS ego-graph + community summary for a structured focus hint (`file_path`, optional `function_name`/`line`/`neighborhood_depth`/`include_community`); pull-model (no filesystem watcher); codifies v1.3 CR-01 snapshot-root fix; silently ignores spoofed paths. ✅ 2026-04-20
 
 **Deferred to v1.4.x (not v1.4 scope):**
 
@@ -269,7 +269,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 15. Async Background Enrichment | v1.4 | 0/TBD | Planned | — |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
 | 17. Conversational Graph Chat | v1.4 | 0/TBD | Planned | — |
-| 18. Focus-Aware Graph Context | v1.4 | 4/4 | In Progress | — |
+| 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
 
 ---
-*Last updated: 2026-04-20 — Phase 18 Plan 04 ✅ gap closure (SC4 PARTIAL → VERIFIED via inline `Path(project_root).name == "graphify-out"` guard in all 4 snapshot helpers; dead `alias_map` param removed from `_run_get_focus_context_core`; WR-03 dispatcher test + WR-04 D-08 strict-depth invariants strengthened; 1325 → 1329 tests passing). All 9 FOCUS REQ-IDs complete; Phase 18 all 4 plans shipped — awaiting `/gsd-verify-work 18` re-run for final sign-off. Build order: 12 ✅ → 13 ✅ → 18 ✅ (4/4, pending re-verify) → 15 → 17 → 16 → 14 → final manifest regen.*
+*Last updated: 2026-04-20 — Phase 18 ✅ COMPLETE. Verifier re-run post gap closure flipped status `gaps_found → passed`: 5/5 SCs VERIFIED (including SC4 via inline `Path(project_root).name == "graphify-out"` guard in all 4 snapshot helpers), 9/9 FOCUS REQ-IDs satisfied, 1329 tests passing, code review 0 critical / 0 warning / 3 info (cosmetic). v1.4 progress: 3/7 phases complete (12 + 13 + 18). Build order: 12 ✅ → 13 ✅ → 18 ✅ → 15 (next candidate) → 17 → 16 → 14 → final manifest regen.*
