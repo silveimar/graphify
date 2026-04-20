@@ -53,7 +53,14 @@ _GITHUB_PAT = re.compile(r"ghp_[A-Za-z0-9]{36}")
 _OPENAI_KEY = re.compile(r"sk-[A-Za-z0-9]{20,}")
 _SLACK_TOKEN = re.compile(r"xox[baprs]-[A-Za-z0-9-]+")
 _BEARER = re.compile(r"Bearer\s+[A-Za-z0-9._-]{20,}")
-_PEM_PRIVATE_KEY = re.compile(r"-----BEGIN[ A-Z]+PRIVATE KEY-----")
+# CR-01 (Phase 13 review): match the entire PEM block — header, body, and
+# footer — so redaction does not leave the base64 key material behind.
+_PEM_PRIVATE_KEY = re.compile(
+    r"-----BEGIN[ A-Z]+PRIVATE KEY-----"
+    r".*?"
+    r"-----END[ A-Z]+PRIVATE KEY-----",
+    re.DOTALL,
+)
 # Email-style credential heuristic — only flag when ':' appears AFTER an '@'
 # to reduce false positives on ordinary prose containing colons.
 _EMAIL_CRED = re.compile(

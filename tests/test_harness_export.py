@@ -274,6 +274,25 @@ def test_scanner_detects_openai_key() -> None:
     assert "openai_api_key" in matched
 
 
+def test_scanner_redacts_full_pem_private_key_body() -> None:
+    """CR-01 (Phase 13 review): the PEM detector must redact the entire
+    block (header + base64 body + footer), not just the BEGIN line.
+    """
+    pem = (
+        "-----BEGIN RSA PRIVATE KEY-----\n"
+        "MIIEowIBAAKCAQEAvR8L0pK7nC9VgN4xZ1JwGd9bP+UQ0sGmBcYbE5sL3oXg+0nF\n"
+        "abCDefGHijKLmnOPqrSTuvWXyz0123456789ABCDEFGHIJKLmnopqrstuvwxyzAB\n"
+        "-----END RSA PRIVATE KEY-----"
+    )
+    cleaned, matched = _redact_secrets(f"key dump:\n{pem}\n")
+    assert "pem_private_key" in matched
+    assert "[REDACTED]" in cleaned
+    # Body and footer must be gone — not only the BEGIN header line.
+    assert "-----END" not in cleaned
+    assert "MIIEowIBAAKCAQEAvR8L0pK7nC9VgN4xZ1JwGd9bP" not in cleaned
+    assert "abCDefGHijKLmnOPqrSTuvWXyz" not in cleaned
+
+
 def test_scanner_redact_mode() -> None:
     annotations = [
         {
