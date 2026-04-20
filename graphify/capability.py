@@ -209,9 +209,41 @@ def load_committed_server_json(repo_root: Path | None = None) -> dict[str, Any]:
 
 
 def validate_cli(*, repo_root: Path | None = None) -> tuple[int, str]:
-    """Return (exit_code, stderr_text). D-03 stable stderr on failure."""
+    """Return (exit_code, stderr_text). D-03 stable stderr on failure.
+
+    WR-02 (Phase 13 review): the previous bare ``except Exception`` flattened
+    every failure mode (missing PyYAML, corrupt YAML, missing jsonschema,
+    malformed server.json, hash mismatch with field-level drift) into the
+    same opaque message. We now narrow the catch to the documented failure
+    types and surface ``type(exc).__name__`` so CI logs distinguish between
+    "server.json genuinely drifted" and "PyYAML not installed". WR-04 also
+    augments the drift message with ``graphify_version`` and ``tool_count``
+    so operators can triage the diff without re-running the build.
+    """
     root = repo_root or Path.cwd()
     lines: list[str] = []
+    try:
+        import yaml  # imported here so we can name yaml.YAMLError below
+    except ImportError as exc:
+        lines.append(f"error: capability validate failed: ImportError: {exc}")
+        lines.append("  hint: pip install 'graphifyy[mcp]'")
+        lines.append(f"  cwd: {root}")
+        lines.append("regenerate:")
+        lines.append("  graphify capability --stdout > server.json")
+        return 1, "\n".join(lines) + "\n"
+
+    # jsonschema is also optional; surface it with the same hint so the
+    # catch list below can name jsonschema.exceptions.ValidationError.
+    try:
+        import jsonschema.exceptions as _jsonschema_exc
+    except ImportError as exc:
+        lines.append(f"error: capability validate failed: ImportError: {exc}")
+        lines.append("  hint: pip install 'graphifyy[mcp]'")
+        lines.append(f"  cwd: {root}")
+        lines.append("regenerate:")
+        lines.append("  graphify capability --stdout > server.json")
+        return 1, "\n".join(lines) + "\n"
+
     try:
         built = build_manifest_dict()
         validate_manifest(built)
@@ -228,16 +260,49 @@ def validate_cli(*, repo_root: Path | None = None) -> tuple[int, str]:
             lines.append("  graphify capability --stdout > server.json")
             return 1, "\n".join(lines) + "\n"
         if expected != actual_hash:
+            # WR-04 (Phase 13 review): include the field-level signals so
+            # operators can identify whether drift came from version, tool
+            # count, or _meta payload changes without rebuilding locally.
+            built_version = built.get("graphify_version", "unknown")
+            built_tool_count = len(built.get("CAPABILITY_TOOLS", []) or [])
+            server_meta = server.get("_meta") or {}
+            committed_version = server_meta.get("graphify_version") or server.get(
+                "graphify_version", "unknown"
+            )
+            committed_tool_count = server_meta.get("tool_count")
+            if committed_tool_count is None:
+                committed_tools = server.get("CAPABILITY_TOOLS")
+                if isinstance(committed_tools, list):
+                    committed_tool_count = len(committed_tools)
+                else:
+                    committed_tool_count = "unknown"
             lines.append("error: manifest content hash mismatch (committed vs generated)")
             lines.append(f"  expected: {expected}")
             lines.append(f"  actual:   {actual_hash}")
+            lines.append(
+                f"  graphify_version: committed={committed_version} built={built_version}"
+            )
+            lines.append(
+                f"  tool_count:       committed={committed_tool_count} built={built_tool_count}"
+            )
             lines.append(f"  server.json: {root / 'server.json'}")
             lines.append("regenerate:")
             lines.append("  graphify capability --stdout > server.json")
             return 1, "\n".join(lines) + "\n"
         return 0, ""
-    except Exception as exc:
-        lines.append(f"error: capability validate failed: {exc}")
+    except (
+        json.JSONDecodeError,
+        yaml.YAMLError,
+        _jsonschema_exc.ValidationError,
+        ImportError,
+        FileNotFoundError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        lines.append(
+            f"error: capability validate failed: {type(exc).__name__}: {exc}"
+        )
         lines.append(f"  cwd: {root}")
         lines.append("regenerate:")
         lines.append("  graphify capability --stdout > server.json")

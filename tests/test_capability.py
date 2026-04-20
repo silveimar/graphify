@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -129,6 +130,52 @@ def test_validate_cli_no_huge_diff_by_default(
     code, err = validate_cli(repo_root=tmp_path)
     assert code != 0
     assert len(err) < 2000
+
+
+def test_validate_cli_drift_message_includes_field_diff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WR-04 (Phase 13 review): the drift error must surface graphify_version
+    and tool_count so operators can identify the source of the diff without
+    rebuilding locally.
+    """
+    bogus_server = {
+        "name": "graphify",
+        "_meta": {
+            "manifest_content_hash": "0" * 64,
+            "graphify_version": "0.0.0-stale",
+            "tool_count": 1,
+        },
+    }
+    monkeypatch.setattr(
+        "graphify.capability.load_committed_server_json",
+        lambda repo_root=None: bogus_server,
+    )
+    code, err = validate_cli(repo_root=tmp_path)
+    assert code != 0
+    assert "graphify_version" in err
+    assert "tool_count" in err
+    assert "committed=0.0.0-stale" in err
+    assert "committed=1" in err
+
+
+def test_validate_cli_narrows_exception_type_in_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WR-02 (Phase 13 review): bare ``except Exception`` was replaced by a
+    narrowed catch list; the error message must surface the exception type
+    name so CI logs distinguish failure modes.
+    """
+    def _explode(repo_root: Path | None = None) -> dict[str, Any]:
+        raise FileNotFoundError("server.json missing in test")
+
+    monkeypatch.setattr(
+        "graphify.capability.load_committed_server_json", _explode
+    )
+    code, err = validate_cli(repo_root=tmp_path)
+    assert code != 0
+    assert "FileNotFoundError" in err
+    assert "server.json missing in test" in err
 
 
 # -------------------------------------------------------------------------
