@@ -37,6 +37,8 @@ from graphify.serve import (
     _run_entity_trace,
     _run_drift_nodes,
     _run_newly_formed_clusters,
+    _resolve_focus_seeds,
+    _multi_seed_ego,
     QUERY_GRAPH_META_SENTINEL,
 )
 
@@ -2212,3 +2214,56 @@ def test_newly_formed_clusters_envelope_structure(tmp_path):
         assert key in meta, f"Required key missing: {key}"
     assert meta["layer"] == 1
     assert meta["search_strategy"] == "emerge"
+
+
+
+# --- Phase 18 focus resolver tests (FOCUS-02, FOCUS-06) ---
+
+def test_focus_resolver_str_source_file(tmp_path):
+    """FOCUS-02: resolver handles source_file as str (single-source v1.3 schema)."""
+    from pathlib import Path
+    G = nx.Graph()
+    G.add_node("n_login", label="login", source_file="src/auth.py",
+               source_location="L10", file_type="code", community=0)
+    G.add_node("n_other", label="other", source_file="src/other.py",
+               source_location="L1", file_type="code", community=0)
+    # Write the target file so validate_graph_path-style callers can resolve; resolver itself compares strings.
+    target = tmp_path / "src" / "auth.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("def login(): pass\n")
+    # Resolver compares against both the raw stored string AND the resolved absolute form (D-04).
+    seeds = _resolve_focus_seeds(G, Path("src/auth.py"))
+    assert seeds == ["n_login"]
+
+
+def test_focus_resolver_list_source_file_multi_seed(tmp_path):
+    """FOCUS-02 + D-01: resolver handles source_file as list[str] via _iter_sources and returns multi-seed union."""
+    from pathlib import Path
+    G = nx.Graph()
+    G.add_node("n_a", label="alpha", source_file=["src/auth.py", "src/helpers.py"],
+               source_location="L10", file_type="code", community=0)
+    G.add_node("n_b", label="beta", source_file=["src/auth.py"],
+               source_location="L20", file_type="code", community=0)
+    G.add_node("n_c", label="gamma", source_file="src/other.py",
+               source_location="L1", file_type="code", community=1)
+    seeds = _resolve_focus_seeds(G, Path("src/auth.py"))
+    assert set(seeds) == {"n_a", "n_b"}
+    assert "n_c" not in seeds
+
+
+def test_multi_seed_compose_all_matches_expected():
+    """FOCUS-06: multi-seed ego-graph uses nx.compose_all (not multi-seed nx.ego_graph which raises NodeNotFound)."""
+    G = nx.path_graph(5)  # 0-1-2-3-4
+    for n in G.nodes:
+        G.nodes[n]["label"] = str(n)
+    # Expected: ego(0, r=1) = {0, 1}; ego(2, r=1) = {1, 2, 3}; union = {0, 1, 2, 3}
+    subgraph = _multi_seed_ego(G, [0, 2], radius=1)
+    assert set(subgraph.nodes) == {0, 1, 2, 3}
+    # Attributes preserved from originals
+    assert subgraph.nodes[0]["label"] == "0"
+    # Empty seeds -> empty graph (defensive)
+    empty = _multi_seed_ego(G, [], radius=1)
+    assert len(empty.nodes) == 0
+    # Seeds not in graph -> filter, do NOT raise NodeNotFound
+    partial = _multi_seed_ego(G, [0, "nonexistent"], radius=1)
+    assert set(partial.nodes) == {0, 1}
