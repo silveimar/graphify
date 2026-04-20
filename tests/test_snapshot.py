@@ -195,7 +195,7 @@ def test_auto_snapshot_and_delta_first_run(tmp_path):
 
     G = _make_graph()
     comms = _make_communities()
-    snap_path, delta_path = auto_snapshot_and_delta(G, comms, root=tmp_path)
+    snap_path, delta_path = auto_snapshot_and_delta(G, comms, project_root=tmp_path)
     assert snap_path.exists()
     assert delta_path is not None
     assert delta_path.exists()
@@ -209,7 +209,7 @@ def test_auto_snapshot_and_delta_second_run(tmp_path):
 
     G1 = _make_graph()
     comms1 = _make_communities()
-    auto_snapshot_and_delta(G1, comms1, root=tmp_path)
+    auto_snapshot_and_delta(G1, comms1, project_root=tmp_path)
 
     time.sleep(0.05)
 
@@ -218,7 +218,7 @@ def test_auto_snapshot_and_delta_second_run(tmp_path):
     G2.add_node("d", label="Delta", file_type="code", source_file="d.py")
     G2.add_edge("c", "d", relation="calls", confidence="EXTRACTED")
     comms2 = {0: ["a", "b"], 1: ["c", "d"]}
-    snap_path, delta_path = auto_snapshot_and_delta(G2, comms2, root=tmp_path)
+    snap_path, delta_path = auto_snapshot_and_delta(G2, comms2, project_root=tmp_path)
 
     assert snap_path.exists()
     assert delta_path is not None
@@ -234,7 +234,7 @@ def test_auto_snapshot_and_delta_writes_to_graphify_out(tmp_path):
 
     G = _make_graph()
     comms = _make_communities()
-    _, delta_path = auto_snapshot_and_delta(G, comms, root=tmp_path)
+    _, delta_path = auto_snapshot_and_delta(G, comms, project_root=tmp_path)
     assert delta_path == tmp_path / "graphify-out" / "GRAPH_DELTA.md"
 
 

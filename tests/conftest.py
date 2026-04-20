@@ -103,8 +103,11 @@ def make_snapshot_chain(tmp_path):
     import networkx as nx
     from graphify.snapshot import save_snapshot
 
-    def _make(n: int = 3, root: "Path | None" = None) -> "list[Path]":
-        base = Path(root) if root is not None else tmp_path
+    def _make(n: int = 3, project_root: "Path | None" = None, root: "Path | None" = None) -> "list[Path]":
+        # Backwards-compat: accept legacy `root=` kwarg alongside `project_root=`.
+        # Existing callers in tests use `root=` — both names land at the same base Path.
+        effective = project_root if project_root is not None else root
+        base = Path(effective) if effective is not None else tmp_path
         paths = []
         for i in range(n):
             G = nx.Graph()

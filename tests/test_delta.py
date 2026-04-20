@@ -284,12 +284,12 @@ def test_cli_snapshot_from_to(tmp_path):
 
     G1 = _make_graph(["a", "b"], [("a", "b")])
     comms1 = {0: ["a", "b"]}
-    snap1 = save_snapshot(G1, comms1, root=tmp_path, name="snap1")
+    snap1 = save_snapshot(G1, comms1, project_root=tmp_path, name="snap1")
     time.sleep(0.05)
 
     G2 = _make_graph(["a", "b", "c"], [("a", "b"), ("b", "c")])
     comms2 = {0: ["a", "b"], 1: ["c"]}
-    snap2 = save_snapshot(G2, comms2, root=tmp_path, name="snap2")
+    snap2 = save_snapshot(G2, comms2, project_root=tmp_path, name="snap2")
 
     result = subprocess.run(
         [sys.executable, "-m", "graphify", "snapshot", "--from", str(snap1), "--to", str(snap2)],

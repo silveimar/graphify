@@ -501,7 +501,7 @@ if _tel_path.exists():
     _save_telemetry(Path('graphify-out'), _tel_data)
 from graphify.snapshot import auto_snapshot_and_delta
 _pre_snap_count = len(list(Path('graphify-out/snapshots').glob('*.json'))) if Path('graphify-out/snapshots').exists() else 0
-_snap_path, _delta_path = auto_snapshot_and_delta(G, communities, root=Path('.'))
+_snap_path, _delta_path = auto_snapshot_and_delta(G, communities, project_root=Path('.'))
 if _pre_snap_count > 0:
     print(f'Snapshot saved ({G.number_of_nodes()} nodes). Delta: see GRAPH_DELTA.md')
 else:
@@ -1061,7 +1061,7 @@ if _tel_path.exists():
     _save_telemetry(Path('graphify-out'), _tel_data)
 from graphify.snapshot import auto_snapshot_and_delta
 _pre_snap_count = len(list(Path('graphify-out/snapshots').glob('*.json'))) if Path('graphify-out/snapshots').exists() else 0
-_snap_path, _delta_path = auto_snapshot_and_delta(G, communities, root=Path('.'))
+_snap_path, _delta_path = auto_snapshot_and_delta(G, communities, project_root=Path('.'))
 if _pre_snap_count > 0:
     print(f'Snapshot saved ({G.number_of_nodes()} nodes). Delta: see GRAPH_DELTA.md')
 else:

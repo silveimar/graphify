@@ -1693,7 +1693,7 @@ def test_graph_summary_snapshot_root_not_double_nested(tmp_path):
 
     Simulates the production path: graph_path = "graphify-out/graph.json"
     so _out_dir = tmp_path / "graphify-out".
-    save_snapshot(..., root=tmp_path) writes to tmp_path/graphify-out/snapshots/.
+    save_snapshot(..., project_root=tmp_path) writes to tmp_path/graphify-out/snapshots/.
     If _run_graph_summary receives _out_dir instead of _out_dir.parent, list_snapshots()
     would scan _out_dir/graphify-out/snapshots/ (double-nested, non-existent), returning []
     and forcing delta == {'status': 'no_prior_snapshot'} even after a real snapshot was saved.
@@ -1708,7 +1708,7 @@ def test_graph_summary_snapshot_root_not_double_nested(tmp_path):
     communities = _communities_from_graph(G)
 
     # Save a snapshot to tmp_path/graphify-out/snapshots/ (what save_snapshot does by default)
-    save_snapshot(G, communities, root=tmp_path)
+    save_snapshot(G, communities, project_root=tmp_path)
 
     # Simulate a second (current) graph state
     G2 = _make_graph_for_phase11()
@@ -2135,7 +2135,7 @@ def test_newly_formed_clusters_no_change(tmp_path):
     G.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
     # Community structure is identical to what we'll load back.
     communities = {0: ["n0", "n2"], 1: ["n1"]}
-    save_snapshot(G, communities, root=tmp_path, name="snap_00")
+    save_snapshot(G, communities, project_root=tmp_path, name="snap_00")
 
     response = _run_newly_formed_clusters(G, communities, tmp_path, {})
     assert QUERY_GRAPH_META_SENTINEL in response
@@ -2157,7 +2157,7 @@ def test_newly_formed_clusters_new_cluster_detected(tmp_path):
                        source_location=f"L{j}", file_type="code", community=0)
     G_old.add_edge("n0", "n1", relation="calls", confidence="EXTRACTED", source_file="f0.py")
     comms_old = {0: ["n0", "n1", "n2"]}
-    save_snapshot(G_old, comms_old, root=tmp_path, name="snap_00")
+    save_snapshot(G_old, comms_old, project_root=tmp_path, name="snap_00")
 
     # Live graph has original nodes PLUS an isolated new cluster.
     G_live = nx.Graph()
@@ -2191,7 +2191,7 @@ def test_newly_formed_clusters_envelope_structure(tmp_path):
     G_old = nx.Graph()
     G_old.add_node("n0", label="n0", source_file="f0.py",
                    source_location="L0", file_type="code", community=0)
-    save_snapshot(G_old, {0: ["n0"]}, root=tmp_path, name="snap_00")
+    save_snapshot(G_old, {0: ["n0"]}, project_root=tmp_path, name="snap_00")
 
     # Live graph adds a fully new community.
     G_live = nx.Graph()

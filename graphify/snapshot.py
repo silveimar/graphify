@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,16 +12,35 @@ import networkx as nx
 from networkx.readwrite import json_graph
 
 
-def snapshots_dir(root: Path = Path(".")) -> Path:
+@dataclass(frozen=True)
+class ProjectRoot:
+    """Sentinel wrapping a project root path.
+
+    Raises at construction time if given ``graphify-out/`` directly — codifies
+    v1.3 CR-01 (Pitfall 20) where ``_out_dir`` was passed as root, causing
+    ``list_snapshots()`` to scan ``graphify-out/graphify-out/snapshots/``.
+    """
+    path: Path
+
+    def __post_init__(self) -> None:
+        if self.path.name == "graphify-out":
+            raise ValueError(
+                f"ProjectRoot received {self.path!r} which has name 'graphify-out'. "
+                f"Pass the directory CONTAINING graphify-out/, not graphify-out/ itself. "
+                f"Try: ProjectRoot({self.path.parent!r})"
+            )
+
+
+def snapshots_dir(project_root: Path = Path(".")) -> Path:
     """Returns graphify-out/snapshots/ - creates it if needed."""
-    d = Path(root) / "graphify-out" / "snapshots"
+    d = Path(project_root) / "graphify-out" / "snapshots"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
-def list_snapshots(root: Path = Path(".")) -> list[Path]:
+def list_snapshots(project_root: Path = Path(".")) -> list[Path]:
     """Return sorted list of snapshot Paths (oldest first by mtime)."""
-    d = snapshots_dir(root)
+    d = snapshots_dir(project_root)
     snaps = list(d.glob("*.json"))
     snaps.sort(key=lambda p: p.stat().st_mtime)
     return snaps
@@ -29,7 +49,7 @@ def list_snapshots(root: Path = Path(".")) -> list[Path]:
 def save_snapshot(
     G: nx.Graph,
     communities: dict[int, list[str]],
-    root: Path = Path("."),
+    project_root: Path = Path("."),
     name: str | None = None,
     cap: int = 10,
 ) -> Path:
@@ -45,7 +65,7 @@ def save_snapshot(
     else:
         stem = ts
 
-    d = snapshots_dir(root)
+    d = snapshots_dir(project_root)
     target = d / f"{stem}.json"
 
     # Serialize graph (same fallback as export.py)
@@ -85,7 +105,7 @@ def save_snapshot(
 def auto_snapshot_and_delta(
     G: nx.Graph,
     communities: dict[int, list[str]],
-    root: Path = Path("."),
+    project_root: Path = Path("."),
     cap: int = 10,
 ) -> tuple[Path, Path | None]:
     """Save snapshot and generate GRAPH_DELTA.md if a previous snapshot exists.
@@ -94,10 +114,10 @@ def auto_snapshot_and_delta(
     Called by skill after cluster() returns (D-11, D-13).
     """
     # Get list of existing snapshots BEFORE saving the new one
-    existing = list_snapshots(root)
+    existing = list_snapshots(project_root)
 
     # Save current snapshot
-    snap_path = save_snapshot(G, communities, root=root, cap=cap)
+    snap_path = save_snapshot(G, communities, project_root=project_root, cap=cap)
 
     # Generate delta if there was a previous snapshot
     if existing:
@@ -112,7 +132,7 @@ def auto_snapshot_and_delta(
 
         md_content = render_delta_md({}, first_run=True)
 
-    out_dir = Path(root) / "graphify-out"
+    out_dir = Path(project_root) / "graphify-out"
     out_dir.mkdir(parents=True, exist_ok=True)
     delta_path = out_dir / "GRAPH_DELTA.md"
     delta_path.write_text(md_content, encoding="utf-8")
