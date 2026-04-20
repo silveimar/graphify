@@ -121,8 +121,8 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 - [x] **FOCUS-05**: Focus is **pull-model** via MCP arg — no filesystem watcher side-channel (Pitfall 6 + D-18 honored)
 - [x] **FOCUS-06**: Uses `nx.ego_graph` for bounded-depth neighborhood (no new algorithms — D-18 compose, not plumb)
 - [x] **FOCUS-07**: Snapshot-path-double-nesting regression guard — renames `snapshot.py` `root` → `project_root`; asserts `not path.name == "graphify-out"` at construction (Pitfall 20 codifies v1.3 CR-01)
-- [ ] **FOCUS-08** `[P2]`: 500 ms debounce on focus changes prevents cache thrash when agent reports focus every keystroke
-- [ ] **FOCUS-09** `[P2]`: `focus_hint.reported_at` freshness check (≤ 5 min) rejects stale focus-spoofing attempts after agent context resets
+- [x] **FOCUS-08** `[P2]`: 500 ms debounce on focus changes prevents cache thrash when agent reports focus every keystroke
+- [x] **FOCUS-09** `[P2]`: `focus_hint.reported_at` freshness check (≤ 5 min) rejects stale focus-spoofing attempts after agent context resets
 
 ## Requirement Quality Checklist
 
@@ -268,8 +268,8 @@ Priority tags: `[P2]` indicates the requirement is in v1.4 scope per user confir
 | FOCUS-05 | Phase 18 | `graphify/serve.py` (no watchdog/threading/asyncio.create_task in focus path; enforced by `test_no_watchdog_import_in_focus_path`) | complete | 2026-04-20 |
 | FOCUS-06 | Phase 18 | `graphify/serve.py::_multi_seed_ego` (nx.compose_all) | complete | 2026-04-20 |
 | FOCUS-07 | Phase 18 | `graphify/snapshot.py::ProjectRoot` (frozen-dataclass sentinel) + `root`→`project_root` rename across 4 signatures | complete | 2026-04-20 |
-| FOCUS-08 [P2] | Phase 18 | TBD | planned | — |
-| FOCUS-09 [P2] | Phase 18 | TBD | planned | — |
+| FOCUS-08 [P2] | Phase 18 | `graphify/serve.py::_FOCUS_DEBOUNCE_CACHE` + `_focus_debounce_key/_get/_put` (500ms monotonic LRU; bounded eviction at 256) | complete | 2026-04-20 |
+| FOCUS-09 [P2] | Phase 18 | `graphify/serve.py::_check_focus_freshness` (300s `reported_at` window; Py 3.10 `.replace("Z","+00:00")` compat shim before `datetime.fromisoformat`) | complete | 2026-04-20 |
 
 **Coverage summary:**
 - Phase 12 Heterogeneous Extraction Routing: 10 REQ-IDs (ROUTE-01..10)
