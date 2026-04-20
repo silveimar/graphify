@@ -128,10 +128,26 @@ def make_snapshot_chain(tmp_path):
                     source_file="f0.py",
                 )
             communities = {j % 2: [f"n{k}" for k in range(i + 2) if k % 2 == j % 2] for j in range(i + 2)}
-            p = save_snapshot(G, communities, root=base, name=f"snap_{i:02d}")
+            p = save_snapshot(G, communities, project_root=base, name=f"snap_{i:02d}")
             paths.append(p)
         # Return sorted oldest-first (matching list_snapshots output ordering)
         paths.sort(key=lambda p: p.stat().st_mtime)
         return paths
 
     return _make
+
+
+@pytest.fixture
+def nested_project_root(tmp_path):
+    """Lay out tmp_path/project/graphify-out/snapshots/ + tmp_path/project/src/auth.py.
+
+    Returns the project root (tmp_path/project) — NOT graphify-out/ — so path-confinement
+    semantics match production. Used by both test_serve.py (focus resolver integration)
+    and test_snapshot.py (CR-01 regression). Reproduces the nested-dir layout that would
+    have caught v1.3 CR-01 (Pitfall 20) had it existed.
+    """
+    project = tmp_path / "project"
+    (project / "graphify-out" / "snapshots").mkdir(parents=True)
+    (project / "src").mkdir()
+    (project / "src" / "auth.py").write_text("def login(): pass\n")
+    return project

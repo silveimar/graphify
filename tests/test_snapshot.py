@@ -283,3 +283,33 @@ def test_provenance_extracted_at_is_iso8601(tmp_path):
     for n in nodes:
         # Should not raise
         datetime.fromisoformat(n["extracted_at"])
+
+
+# --- Phase 18 FOCUS-07: ProjectRoot sentinel + nested-dir integration (CR-01 regression) ---
+
+def test_project_root_sentinel_rejects_graphify_out(tmp_path):
+    """FOCUS-07 + T-18-C: construction must fail fast when path.name == 'graphify-out' (CR-01 guard)."""
+    from graphify.snapshot import ProjectRoot
+    bad = tmp_path / "graphify-out"
+    bad.mkdir()
+    with pytest.raises(ValueError, match="graphify-out"):
+        ProjectRoot(path=bad)
+
+
+def test_project_root_sentinel_accepts_project_root(tmp_path):
+    """FOCUS-07: positive — normal project root constructs without raising."""
+    from graphify.snapshot import ProjectRoot
+    pr = ProjectRoot(path=tmp_path)
+    assert pr.path == tmp_path
+
+
+def test_nested_dir_fixture_list_snapshots(nested_project_root):
+    """FOCUS-07 integration: save + list snapshots under the nested-dir fixture layout."""
+    import networkx as nx
+    from graphify.snapshot import save_snapshot, list_snapshots
+    G = nx.Graph()
+    G.add_node("n1", label="one")
+    save_snapshot(G, {0: ["n1"]}, project_root=nested_project_root, name="one")
+    snaps = list_snapshots(nested_project_root)
+    assert len(snaps) == 1
+    assert "one" in snaps[0].name
