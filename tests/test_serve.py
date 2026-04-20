@@ -39,6 +39,7 @@ from graphify.serve import (
     _run_newly_formed_clusters,
     _resolve_focus_seeds,
     _multi_seed_ego,
+    _run_get_focus_context_core,
     QUERY_GRAPH_META_SENTINEL,
 )
 
@@ -2267,3 +2268,179 @@ def test_multi_seed_compose_all_matches_expected():
     # Seeds not in graph -> filter, do NOT raise NodeNotFound
     partial = _multi_seed_ego(G, [0, "nonexistent"], radius=1)
     assert set(partial.nodes) == {0, 1}
+
+
+# --- Phase 18 get_focus_context MCP tool (FOCUS-01, FOCUS-03, FOCUS-04, FOCUS-05, FOCUS-07) ---
+
+def _make_focus_graph():
+    """Synthetic graph with 4 nodes, 3 edges, source_file both str and list forms."""
+    G = nx.Graph()
+    G.add_node("n_login",  label="login",  source_file="src/auth.py",
+               source_location="L10", file_type="code", community=0)
+    G.add_node("n_verify", label="verify", source_file="src/auth.py",
+               source_location="L20", file_type="code", community=0)
+    G.add_node("n_hash",   label="hash",   source_file=["src/auth.py", "src/helpers.py"],
+               source_location="L30", file_type="code", community=0)
+    G.add_node("n_log",    label="log",    source_file="src/logger.py",
+               source_location="L5",  file_type="code", community=1)
+    G.add_edge("n_login",  "n_verify", relation="calls", confidence="EXTRACTED", source_file="src/auth.py")
+    G.add_edge("n_verify", "n_hash",   relation="calls", confidence="EXTRACTED", source_file="src/auth.py")
+    G.add_edge("n_login",  "n_log",    relation="calls", confidence="EXTRACTED", source_file="src/auth.py")
+    return G
+
+
+def _write_source_file(project_root, rel="src/auth.py"):
+    f = project_root / rel
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text("def login(): pass\n")
+    return f
+
+
+def test_get_focus_context_registered():
+    """FOCUS-01: tool is registered in mcp_tool_registry (MANIFEST-05 invariant ensures handler parity)."""
+    from graphify.mcp_tool_registry import build_mcp_tools
+    tool_names = {t.name for t in build_mcp_tools()}
+    assert "get_focus_context" in tool_names
+
+
+def test_get_focus_context_envelope_ok(tmp_path):
+    """FOCUS-03: happy path — D-02 envelope with meta.status == 'ok'."""
+    _write_source_file(tmp_path, "src/auth.py")
+    G = _make_focus_graph()
+    communities = _communities_from_graph(G)
+    args = {"focus_hint": {"file_path": "src/auth.py", "neighborhood_depth": 2}, "budget": 500}
+    response = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    assert QUERY_GRAPH_META_SENTINEL in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    assert len(parts) == 2
+    meta = json.loads(parts[1])
+    assert meta["status"] == "ok"
+    assert meta["node_count"] >= 1
+    assert meta["edge_count"] >= 0
+
+
+def test_get_focus_context_community_summary(tmp_path):
+    """FOCUS-03: include_community=True surfaces community info in the envelope."""
+    _write_source_file(tmp_path, "src/auth.py")
+    G = _make_focus_graph()
+    communities = _communities_from_graph(G)
+    args = {"focus_hint": {"file_path": "src/auth.py", "include_community": True}, "budget": 500}
+    response = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    meta = json.loads(parts[1])
+    has_summary = "community_summary" in meta or "community" in parts[0].lower()
+    assert has_summary, f"expected community info in meta or text_body; got meta={meta!r}"
+
+
+def test_get_focus_context_spoofed_path_silent(tmp_path):
+    """FOCUS-04 + T-18-A: /etc/passwd (outside project_root) returns no_context envelope."""
+    G = _make_focus_graph()
+    communities = _communities_from_graph(G)
+    args = {"focus_hint": {"file_path": "/etc/passwd"}, "budget": 500}
+    response = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    assert parts[0] == ""  # D-09 empty text_body
+    meta = json.loads(parts[1])
+    assert meta == {"status": "no_context", "node_count": 0, "edge_count": 0, "budget_used": 0}
+
+
+def test_get_focus_context_missing_file_silent(tmp_path):
+    """FOCUS-04 + T-18-B: file indexed in graph but missing on disk — silent no_context (FileNotFoundError caught)."""
+    # Do NOT create src/auth.py on disk. Graph references it; validate_graph_path raises FileNotFoundError.
+    G = _make_focus_graph()
+    communities = _communities_from_graph(G)
+    args = {"focus_hint": {"file_path": "src/auth.py"}, "budget": 500}
+    response = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    meta = json.loads(parts[1])
+    assert meta["status"] == "no_context"
+    assert parts[0] == ""
+
+
+def test_no_watchdog_import_in_focus_path():
+    """FOCUS-05: pull-model — no filesystem watcher import appears in serve.py focus path."""
+    import pathlib
+    src = pathlib.Path("graphify/serve.py").read_text()
+    assert "import watchdog" not in src
+    assert "from watchdog" not in src
+    # Scope to focus path region: from _resolve_focus_seeds through the _handlers dict
+    focus_start = src.find("_resolve_focus_seeds")
+    handler_end = src.find("_handlers = {", focus_start) if focus_start >= 0 else -1
+    if focus_start >= 0 and handler_end > focus_start:
+        region = src[focus_start:handler_end]
+        assert "threading.Thread" not in region
+        assert "asyncio.create_task" not in region
+
+
+def test_snapshot_callsites_use_project_root():
+    """FOCUS-07 smoke: the 4 _tool_* wrappers still pass _out_dir.parent (project root, not graphify-out)."""
+    import pathlib
+    src = pathlib.Path("graphify/serve.py").read_text()
+    for wrapper in ["_tool_entity_trace", "_tool_drift_nodes",
+                    "_tool_newly_formed_clusters", "_tool_graph_summary"]:
+        start = src.find(f"def {wrapper}(")
+        assert start >= 0, f"wrapper {wrapper} not found"
+        end = src.find("\n    def ", start + 1)
+        if end < 0:
+            end = src.find("\ndef ", start + 1)
+        body = src[start:end if end >= 0 else len(src)]
+        assert "_out_dir.parent" in body, f"{wrapper} should reference _out_dir.parent (project root)"
+
+
+def test_binary_status_invariant(tmp_path):
+    """D-03 + D-11: spoof / unindexed / missing all yield the SAME meta keys shape — binary status."""
+    G = _make_focus_graph()
+    communities = _communities_from_graph(G)
+    expected_keys = {"status", "node_count", "edge_count", "budget_used"}
+
+    # 1. Spoofed path (outside project_root)
+    r1 = _run_get_focus_context_core(G, communities, {}, tmp_path,
+                                     {"focus_hint": {"file_path": "/etc/passwd"}, "budget": 500})
+    # 2. Unindexed but valid path (file exists in project_root but no graph node)
+    (tmp_path / "src").mkdir(exist_ok=True)
+    (tmp_path / "src" / "unknown.py").write_text("pass\n")
+    r2 = _run_get_focus_context_core(G, communities, {}, tmp_path,
+                                     {"focus_hint": {"file_path": "src/unknown.py"}, "budget": 500})
+    # 3. Missing on disk (graph claims it but file absent)
+    r3 = _run_get_focus_context_core(G, communities, {}, tmp_path,
+                                     {"focus_hint": {"file_path": "src/auth.py"}, "budget": 500})
+
+    for resp in (r1, r2, r3):
+        parts = resp.split(QUERY_GRAPH_META_SENTINEL)
+        assert parts[0] == ""
+        meta = json.loads(parts[1])
+        assert set(meta.keys()) == expected_keys, f"meta shape leaked info: {meta!r}"
+        assert meta["status"] == "no_context"
+
+
+def test_budget_drop_outer_hop_first(tmp_path):
+    """D-08: when ego-graph + community summary > budget*3 chars, drop outer hop first."""
+    _write_source_file(tmp_path, "src/auth.py")
+    G = _make_focus_graph()
+    communities = _communities_from_graph(G)
+    small = _run_get_focus_context_core(G, communities, {}, tmp_path,
+                                        {"focus_hint": {"file_path": "src/auth.py", "neighborhood_depth": 2},
+                                         "budget": 50})
+    large = _run_get_focus_context_core(G, communities, {}, tmp_path,
+                                        {"focus_hint": {"file_path": "src/auth.py", "neighborhood_depth": 2},
+                                         "budget": 10000})
+    small_parts = small.split(QUERY_GRAPH_META_SENTINEL)
+    large_parts = large.split(QUERY_GRAPH_META_SENTINEL)
+    assert len(small_parts[0]) <= len(large_parts[0])
+    small_meta = json.loads(small_parts[1])
+    assert small_meta["status"] in ("ok", "no_context")
+
+
+def test_no_context_does_not_echo_focus_hint(tmp_path):
+    """D-12 + T-18-D: no_context envelope MUST NOT echo file_path / function_name / line."""
+    G = _make_focus_graph()
+    communities = _communities_from_graph(G)
+    args = {"focus_hint": {"file_path": "/etc/passwd", "function_name": "SECRET_FN",
+                           "line": 424242}, "budget": 500}
+    response = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
+    assert "/etc/passwd" not in response
+    assert "SECRET_FN" not in response
+    assert "424242" not in response
+    parts = response.split(QUERY_GRAPH_META_SENTINEL)
+    meta = json.loads(parts[1])
+    assert set(meta.keys()) == {"status", "node_count", "edge_count", "budget_used"}
