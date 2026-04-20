@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import math
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1842,6 +1843,70 @@ def _run_get_focus_context_core(
     return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
 
+# --- Phase 18 FOCUS-08 debounce cache (D-14 suppress-duplicate-within-window) ---
+# Module-level cache keyed on focus-hint tuple; value = (monotonic_ts, envelope_str).
+# time.monotonic() is used (not time.time()) because it is guaranteed non-decreasing
+# even under NTP adjustments / system suspend-resume (RESEARCH Pitfall 6 / D-14).
+_FOCUS_DEBOUNCE_CACHE: "dict[tuple, tuple[float, str]]" = {}
+_FOCUS_DEBOUNCE_WINDOW = 0.5  # seconds; D-14
+
+
+def _focus_debounce_key(focus_hint: dict) -> tuple:
+    """Derive the cache key from a focus_hint dict. Sentinel -1 for missing line."""
+    return (
+        focus_hint.get("file_path", ""),
+        focus_hint.get("function_name") or "",
+        focus_hint.get("line") if focus_hint.get("line") is not None else -1,
+        int(focus_hint.get("neighborhood_depth", 2)),
+        bool(focus_hint.get("include_community", True)),
+    )
+
+
+def _focus_debounce_get(key: tuple) -> "str | None":
+    """Return the cached envelope if within the debounce window; None otherwise."""
+    entry = _FOCUS_DEBOUNCE_CACHE.get(key)
+    if not entry:
+        return None
+    ts, envelope = entry
+    if time.monotonic() - ts < _FOCUS_DEBOUNCE_WINDOW:
+        return envelope
+    return None
+
+
+def _focus_debounce_put(key: tuple, envelope: str) -> None:
+    """Store an envelope under key; evict oldest quarter when cache >256 (Pitfall 6 DoS cap)."""
+    if len(_FOCUS_DEBOUNCE_CACHE) > 256:
+        oldest = sorted(_FOCUS_DEBOUNCE_CACHE.items(), key=lambda kv: kv[1][0])[:64]
+        for k, _ in oldest:
+            _FOCUS_DEBOUNCE_CACHE.pop(k, None)
+    _FOCUS_DEBOUNCE_CACHE[key] = (time.monotonic(), envelope)
+
+
+# --- Phase 18 FOCUS-09 freshness (D-15 reported_at window, Py 3.10 Z-suffix shim) ---
+def _check_focus_freshness(
+    reported_at: "str | None",
+    now: "datetime | None" = None,
+) -> bool:
+    """Return True if focus is fresh (or reported_at is absent). Per D-15.
+
+    Absent reported_at returns True (backward compatible — no freshness enforcement).
+    Present reported_at is parsed via datetime.fromisoformat with the Py 3.10
+    compat shim `.replace("Z", "+00:00")` (RESEARCH Pitfall 2). Parse failure
+    OR `now - reported_at > 300s` returns False (caller collapses to no_context
+    per D-11).
+    """
+    if not reported_at:
+        return True
+    try:
+        ts = datetime.fromisoformat(reported_at.replace("Z", "+00:00"))
+    except (ValueError, TypeError, AttributeError):
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    current = now or datetime.now(timezone.utc)
+    return (current - ts).total_seconds() <= 300
+
+
 def serve(graph_path: str = "graphify-out/graph.json") -> None:
     """Start the MCP server. Requires pip install mcp."""
     try:
@@ -2179,18 +2244,48 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         return _run_entity_trace(G, _out_dir.parent, _alias_map, arguments)
 
     def _tool_get_focus_context(arguments: dict) -> str:
-        """Phase 18 FOCUS-01: pull-model focus -> D-02 envelope with scoped subgraph + community summary."""
+        """Phase 18 FOCUS-01: pull-model focus -> D-02 envelope with scoped subgraph + community summary.
+
+        Plan 18-03 wraps the core with two P2 guards:
+          * FOCUS-09 freshness gate (D-15): reject stale reported_at BEFORE traversal.
+          * FOCUS-08 debounce (D-14): suppress duplicate-within-500ms calls.
+        Both guards honor the D-03/D-11 binary-status invariant — rejection emits the
+        same 4-key no_context envelope as any other failure.
+        """
         _reload_if_stale()
+
+        def _no_context_envelope() -> str:
+            meta_nc: dict = {"status": "no_context", "node_count": 0, "edge_count": 0, "budget_used": 0}
+            return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta_nc, ensure_ascii=False)
+
         if not Path(graph_path).exists():
             # D-11 binary: missing graph collapses to no_context (NOT a separate no_graph status).
             # Emitting anything else would break the T-18-A/B/C invariant tested by
             # test_binary_status_invariant — no_context is the one-and-only non-ok shape.
-            meta_nc: dict = {"status": "no_context", "node_count": 0, "edge_count": 0, "budget_used": 0}
-            return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta_nc, ensure_ascii=False)
+            return _no_context_envelope()
+
+        focus_hint = (arguments or {}).get("focus_hint") or {}
+
+        # FOCUS-09 + D-15: freshness gate — fail fast before any resolver/traversal work.
+        # Malformed or stale reported_at collapses to no_context (indistinguishable from spoof).
+        if not _check_focus_freshness(focus_hint.get("reported_at")):
+            return _no_context_envelope()
+
+        # FOCUS-08 + D-14: debounce — suppress duplicate-within-window.
+        # Caches the output of _run_get_focus_context_core (pre-manifest-merge) per
+        # RESEARCH Pitfall 7. _merge_manifest_meta runs AFTER this function in
+        # call_tool(), so caching the core output stays byte-identical on replay.
+        key = _focus_debounce_key(focus_hint)
+        cached = _focus_debounce_get(key)
+        if cached is not None:
+            return cached
+
         # CR-01 invariant: pass _out_dir.parent (project root), NOT _out_dir (graphify-out).
         # The ProjectRoot sentinel in snapshot.py guards against accidental regression,
         # but this call-site is the Phase 18 production entry point.
-        return _run_get_focus_context_core(G, communities, _alias_map, _out_dir.parent, arguments)
+        envelope = _run_get_focus_context_core(G, communities, _alias_map, _out_dir.parent, arguments)
+        _focus_debounce_put(key, envelope)
+        return envelope
 
     def _tool_drift_nodes(arguments: dict) -> str:
         """Phase 11 SLASH-04: per-node trend vectors across snapshot chain."""
