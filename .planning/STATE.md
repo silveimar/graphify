@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: Phase 13 complete (4/4 plans, 18/18 REQ-IDs — MANIFEST-01..10 + HARNESS-01..08; 1295 tests passing). Phases 14, 15, 16, 17, 18 planned but not started.
-stopped_at: Plan 13-04 executed on main — 1296f43 (HARNESS-07 secret scanner + HARNESS-08 round-trip fidelity). SEED-002 hardening layer shipped; `graphify harness export --include-annotations --secrets-mode {redact,error}` + `graphify-out/harness/fidelity.json` with `round_trip` status (first-export / byte-equal / drift). Phase 13 closes — ready for /gsd-discuss-phase 18 or 15 next per build order.
-last_updated: "2026-04-18T04:30:00.000Z"
-last_activity: 2026-04-17
+status: completed
+stopped_at: Phase 18 context gathered
+last_updated: "2026-04-20T18:37:29.210Z"
+last_activity: 2026-04-17 — commit 1296f43 closed HARNESS-07+08 atomically on main, completing Phase 13.
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 11
-  completed_plans: 11
-  percent: 29
+  total_plans: 10
+  completed_plans: 10
+  percent: 100
 ---
 
 # Project State
@@ -35,6 +35,7 @@ Last activity: 2026-04-17 — commit 1296f43 closed HARNESS-07+08 atomically on 
 Progress: [███░░░░░░░] 29% (2/7 phases complete — 12 ✅, 13 ✅)
 
 **Build order (locked in SUMMARY.md):**
+
 1. Phase 12 Routing — HARD gates `cache.py` key format — ✅ COMPLETE
 2. Phase 18 Focus — parallel with 12, no code overlap — ⏳ next candidate
 3. Phase 13 Wave A — plumbing (manifest generator + CLI + `capability_describe` tool) — ✅ COMPLETE
@@ -46,9 +47,11 @@ Progress: [███░░░░░░░] 29% (2/7 phases complete — 12 ✅, 
 9. SEED-002 hardening — ✅ COMPLETE (shipped with Phase 13 Plan 03 + Plan 04)
 
 **Seeds activated in v1.4:**
+
 - SEED-002 Harness Memory Export — bundled under Phase 13 Wave B (claude.yaml only; export-only)
 
 **Seeds still planted:**
+
 - SEED-001 Tacit Elicitation Engine — re-evaluate at v1.5 if onboarding/discovery becomes the milestone theme
 
 ## Performance Metrics
@@ -129,6 +132,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-18T04:30:00.000Z
-Stopped at: Phase 13 Plan 04 executed (`pytest`: 1295 passed; +15 new harness tests). SEED-002 hardening layer shipped — HARNESS-07 secret scanner (7 regex families inline in `harness_export.py`) + HARNESS-08 round-trip fidelity manifest (`graphify-out/harness/fidelity.json` with per-file SHA-256 + byte-length + `round_trip` status). CLI surfaces `--include-annotations` and `--secrets-mode {redact,error}` with exit code 3 on secret-scan failures. Module-level `set_clock` joins Plan 03's `_clock` kwarg for byte-equality pinning. Commit 1296f43 on main. Phase 13 closes: all 4 plans + 18 REQ-IDs shipped.
+Last session: 2026-04-20T18:37:29.200Z
+Stopped at: Phase 18 context gathered
 Next action: `/gsd-discuss-phase 18` (Focus-Aware Graph Context — parallel, no dependency) or `/gsd-discuss-phase 15` (Async Background Enrichment — soft-depends on 12 routing.json). Build order recommends 18 next since it unlocks Phase 14 + 17. `gsd-sdk` still unavailable in local env — STATE.md / ROADMAP.md / REQUIREMENTS.md updated by hand.
