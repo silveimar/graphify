@@ -313,3 +313,47 @@ def test_nested_dir_fixture_list_snapshots(nested_project_root):
     snaps = list_snapshots(nested_project_root)
     assert len(snaps) == 1
     assert "one" in snaps[0].name
+
+
+# --- Plan 18-04 WR-01 / SC4 gap closure: production-callsite sentinel tests ---
+
+def test_snapshots_dir_rejects_graphify_out_as_project_root(tmp_path):
+    """FOCUS-07 + SC4 + WR-01: production callsite guard — snapshots_dir must reject graphify-out/ itself."""
+    from graphify.snapshot import snapshots_dir
+    bad = tmp_path / "graphify-out"
+    bad.mkdir()
+    with pytest.raises(ValueError, match="graphify-out"):
+        snapshots_dir(bad)
+
+
+def test_list_snapshots_rejects_graphify_out_as_project_root(tmp_path):
+    """FOCUS-07 + SC4 + WR-01: production callsite guard — list_snapshots must reject graphify-out/ itself."""
+    from graphify.snapshot import list_snapshots
+    bad = tmp_path / "graphify-out"
+    bad.mkdir()
+    with pytest.raises(ValueError, match="graphify-out"):
+        list_snapshots(bad)
+
+
+def test_save_snapshot_rejects_graphify_out_as_project_root(tmp_path):
+    """FOCUS-07 + SC4 + WR-01: production callsite guard — save_snapshot must reject graphify-out/ itself."""
+    import networkx as nx
+    from graphify.snapshot import save_snapshot
+    G = nx.Graph()
+    G.add_node("n1", label="one")
+    bad = tmp_path / "graphify-out"
+    bad.mkdir()
+    with pytest.raises(ValueError, match="graphify-out"):
+        save_snapshot(G, {}, project_root=bad)
+
+
+def test_auto_snapshot_and_delta_rejects_graphify_out_as_project_root(tmp_path):
+    """FOCUS-07 + SC4 + WR-01: production callsite guard — auto_snapshot_and_delta must reject graphify-out/ itself."""
+    import networkx as nx
+    from graphify.snapshot import auto_snapshot_and_delta
+    G = nx.Graph()
+    G.add_node("n1", label="one")
+    bad = tmp_path / "graphify-out"
+    bad.mkdir()
+    with pytest.raises(ValueError, match="graphify-out"):
+        auto_snapshot_and_delta(G, {}, project_root=bad)

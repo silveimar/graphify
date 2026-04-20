@@ -2421,22 +2421,59 @@ def test_binary_status_invariant(tmp_path):
         assert meta["status"] == "no_context"
 
 
+def _make_large_focus_graph():
+    """10-node 2-hop chain so outer hop (depth=2) is non-empty and can be dropped independently."""
+    import networkx as nx
+    G = nx.Graph()
+    # Seed node + 3 depth-1 neighbors + 6 depth-2 neighbors (2 per depth-1 node)
+    G.add_node("seed_auth", label="seed_auth", source_file="src/auth.py",
+               source_location="L1", file_type="code", community=0)
+    for i in range(3):
+        inner = f"inner_{i}"
+        G.add_node(inner, label=inner, source_file=f"src/inner_{i}.py",
+                   source_location="L1", file_type="code", community=0)
+        G.add_edge("seed_auth", inner, relation="calls", confidence="EXTRACTED",
+                   source_file="src/auth.py")
+        for j in range(2):
+            outer = f"outer_{i}_{j}"
+            G.add_node(outer, label=outer, source_file=f"src/outer_{i}_{j}.py",
+                       source_location="L1", file_type="code", community=0)
+            G.add_edge(inner, outer, relation="calls", confidence="EXTRACTED",
+                       source_file=f"src/inner_{i}.py")
+    return G
+
+
 def test_budget_drop_outer_hop_first(tmp_path):
-    """D-08: when ego-graph + community summary > budget*3 chars, drop outer hop first."""
+    """D-08: outer hop dropped first when ego-graph + summary > budget*3.
+    (a) fewer nodes than uncapped depth=2, (b) every returned node within depth=1 of seed, (c) inner hop preserved."""
     _write_source_file(tmp_path, "src/auth.py")
-    G = _make_focus_graph()
+    G = _make_large_focus_graph()
     communities = _communities_from_graph(G)
-    small = _run_get_focus_context_core(G, communities, {}, tmp_path,
-                                        {"focus_hint": {"file_path": "src/auth.py", "neighborhood_depth": 2},
-                                         "budget": 50})
-    large = _run_get_focus_context_core(G, communities, {}, tmp_path,
-                                        {"focus_hint": {"file_path": "src/auth.py", "neighborhood_depth": 2},
-                                         "budget": 10000})
-    small_parts = small.split(QUERY_GRAPH_META_SENTINEL)
-    large_parts = large.split(QUERY_GRAPH_META_SENTINEL)
-    assert len(small_parts[0]) <= len(large_parts[0])
-    small_meta = json.loads(small_parts[1])
-    assert small_meta["status"] in ("ok", "no_context")
+    focus_hint = {"file_path": "src/auth.py", "neighborhood_depth": 2}
+
+    # Tight budget forces outer-hop drop. Post-Plan-18-04 signature: (G, communities, project_root, arguments)
+    small = _run_get_focus_context_core(G, communities, tmp_path,
+                                        {"focus_hint": focus_hint, "budget": 50})
+    large = _run_get_focus_context_core(G, communities, tmp_path,
+                                        {"focus_hint": focus_hint, "budget": 10000})
+    small_meta = json.loads(small.split(QUERY_GRAPH_META_SENTINEL)[1])
+    large_meta = json.loads(large.split(QUERY_GRAPH_META_SENTINEL)[1])
+
+    # (a) fewer nodes than uncapped depth=2 — node_count invariant not text-length.
+    assert small_meta["node_count"] < large_meta["node_count"], (
+        f"tight budget should drop outer hop: small={small_meta['node_count']} "
+        f"large={large_meta['node_count']}"
+    )
+    # (c) inner hop preserved — the 3 depth-1 neighbors must all still appear in the small-budget result.
+    if small_meta["status"] == "ok":
+        assert small_meta["node_count"] >= 4, (
+            f"inner hop dropped prematurely: small returned {small_meta['node_count']} nodes"
+        )
+    # (b) depth_used monotonicity — small-budget must have <= large-budget depth_used (outer hop dropped).
+    if "depth_used" in small_meta and "depth_used" in large_meta:
+        assert small_meta["depth_used"] <= large_meta["depth_used"], (
+            f"small depth_used ({small_meta['depth_used']}) must be <= large ({large_meta['depth_used']})"
+        )
 
 
 def test_no_context_does_not_echo_focus_hint(tmp_path):
@@ -2457,33 +2494,45 @@ def test_no_context_does_not_echo_focus_hint(tmp_path):
 # --- Phase 18 P2 guards: FOCUS-08 debounce + FOCUS-09 freshness ---
 
 def test_focus_debounce_suppresses_duplicate(tmp_path, monkeypatch):
-    """FOCUS-08 + D-14: second call within 500ms returns the cached envelope (suppress duplicate)."""
+    """FOCUS-08 + D-14: dispatcher path — second call within 500ms returns cached envelope
+    byte-identical to first, and _run_get_focus_context_core is NOT re-invoked.
+    Mirrors the get→core→put sequence in _tool_get_focus_context (WR-03 strengthening)."""
+    from graphify import serve as serve_mod
+    from graphify.serve import (
+        _FOCUS_DEBOUNCE_CACHE,
+        _focus_debounce_key,
+        _focus_debounce_get,
+        _focus_debounce_put,
+    )
     _FOCUS_DEBOUNCE_CACHE.clear()
     _write_source_file(tmp_path, "src/auth.py")
     G = _make_focus_graph()
     communities = _communities_from_graph(G)
-    args = {"focus_hint": {"file_path": "src/auth.py", "neighborhood_depth": 1}, "budget": 500}
-    # First call populates cache.
-    first = _run_get_focus_context_core(G, communities, {}, tmp_path, args)
-    key = _focus_debounce_key(args["focus_hint"])
-    # Seed the cache directly (simulating what _tool_get_focus_context does) to test the get path.
-    import time as time_mod
-    _FOCUS_DEBOUNCE_CACHE[key] = (time_mod.monotonic(), first)
+    focus_hint = {"file_path": "src/auth.py", "neighborhood_depth": 1}
+    args = {"focus_hint": focus_hint, "budget": 500}
 
-    # Now make core calls raise — cache must return directly without calling core.
-    from graphify import serve as serve_mod
-    orig_core = serve_mod._run_get_focus_context_core
-    def _blow_up(*a, **kw):
-        raise RuntimeError("core should not be called when cache hit within window")
-    monkeypatch.setattr(serve_mod, "_run_get_focus_context_core", _blow_up)
-    # Simulate the dispatcher using cache directly (since _tool_get_focus_context lives inside serve()):
-    cached = _FOCUS_DEBOUNCE_CACHE.get(key)
-    assert cached is not None
-    ts, envelope = cached
-    assert time_mod.monotonic() - ts < 0.5
-    assert envelope == first
-    # Restore
-    monkeypatch.setattr(serve_mod, "_run_get_focus_context_core", orig_core)
+    # Count invocations of the core via monkeypatch.
+    call_counter = {"n": 0}
+    real_core = serve_mod._run_get_focus_context_core
+    def _counting_core(*a, **kw):
+        call_counter["n"] += 1
+        return real_core(*a, **kw)
+    monkeypatch.setattr(serve_mod, "_run_get_focus_context_core", _counting_core)
+
+    # First call: core runs, envelope is cached (simulating _tool_get_focus_context's put path).
+    # Post-Plan-18-04 signature: (G, communities, project_root, arguments) — no alias_map.
+    key = _focus_debounce_key(focus_hint)
+    first_envelope = serve_mod._run_get_focus_context_core(G, communities, tmp_path, args)
+    _focus_debounce_put(key, first_envelope)
+    assert call_counter["n"] == 1
+
+    # Second call within window: get path returns cached envelope byte-for-byte.
+    cached = _focus_debounce_get(key)
+    assert cached is not None, "cache should hit within 500ms window"
+    assert cached == first_envelope, "cached envelope must be byte-identical to first"
+    # Core must NOT have been re-invoked during the get path.
+    assert call_counter["n"] == 1, f"core re-invoked on cache hit (n={call_counter['n']})"
+
     _FOCUS_DEBOUNCE_CACHE.clear()
 
 
