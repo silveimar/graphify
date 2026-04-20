@@ -2363,13 +2363,18 @@ def test_no_watchdog_import_in_focus_path():
     src = pathlib.Path("graphify/serve.py").read_text()
     assert "import watchdog" not in src
     assert "from watchdog" not in src
-    # Scope to focus path region: from _resolve_focus_seeds through the _handlers dict
-    focus_start = src.find("_resolve_focus_seeds")
-    handler_end = src.find("_handlers = {", focus_start) if focus_start >= 0 else -1
-    if focus_start >= 0 and handler_end > focus_start:
-        region = src[focus_start:handler_end]
-        assert "threading.Thread" not in region
-        assert "asyncio.create_task" not in region
+    # Scope to the focus-tool region: from _run_get_focus_context_core through the
+    # next top-level def. Broader scans pick up the unrelated _filter_blank_stdin
+    # helper (stdio blank-line filter, has legit threading.Thread) and false-trip.
+    focus_start = src.find("def _run_get_focus_context_core")
+    assert focus_start >= 0, "_run_get_focus_context_core must exist"
+    focus_end = src.find("\ndef ", focus_start + 1)
+    if focus_end < 0:
+        focus_end = len(src)
+    region = src[focus_start:focus_end]
+    assert "threading.Thread" not in region
+    assert "asyncio.create_task" not in region
+    assert "watchdog" not in region
 
 
 def test_snapshot_callsites_use_project_root():

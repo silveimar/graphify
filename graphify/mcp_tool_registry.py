@@ -228,6 +228,41 @@ def build_mcp_tools():
             }, "required": ["entity"]},
         ),
         types.Tool(
+            name="get_focus_context",
+            description=(
+                "Return a scoped ego-graph subgraph + community summary + citations for an "
+                "agent-reported focus (file path, optionally function_name / line). Pull-model: "
+                "focus is passed per-call. Spoofed or out-of-root paths silently return a "
+                "no_context envelope (no filesystem leak, no focus_hint echo)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "focus_hint": {
+                        "type": "object",
+                        "properties": {
+                            "file_path": {"type": "string"},
+                            "function_name": {"type": "string"},
+                            "line": {"type": "integer"},
+                            "neighborhood_depth": {
+                                "type": "integer", "default": 2, "minimum": 0, "maximum": 6,
+                            },
+                            "include_community": {"type": "boolean", "default": True},
+                            "reported_at": {
+                                "type": "string",
+                                "description": "ISO 8601 UTC timestamp; optional freshness hint (<=300s)",
+                            },
+                        },
+                        "required": ["file_path"],
+                    },
+                    "budget": {
+                        "type": "integer", "default": 2000, "minimum": 50, "maximum": 100000,
+                    },
+                },
+                "required": ["focus_hint"],
+            },
+        ),
+        types.Tool(
             name="drift_nodes",
             description="Return nodes whose community or centrality has trended consistently across recent snapshots. Used by the /drift slash command.",
             inputSchema={"type": "object", "properties": {

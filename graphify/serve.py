@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import networkx as nx
 from networkx.readwrite import json_graph
-from graphify.security import sanitize_label
+from graphify.security import sanitize_label, validate_graph_path
 from graphify.delta import classify_staleness
 from graphify.analyze import _iter_sources
 
@@ -1684,6 +1684,164 @@ def _run_newly_formed_clusters(
     return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
 
+def _render_focus_community_summary(G: "nx.Graph", focused: "nx.Graph", communities: dict) -> str:
+    """Minimal community summary for the focus envelope.
+
+    For each community represented by at least one node in `focused`, list:
+      - community_id
+      - member_count (in the full graph)
+      - top-3 member labels ranked by degree in the full graph G
+
+    Returns a markdown block. Empty string when no community attrs are available.
+    Phase 18 D-06 / Claude's Discretion: minimal shape; v1.5 may gate this behind
+    a community_detail enum.
+    """
+    if not communities:
+        return ""
+    comm_to_members: dict = {}
+    for cid, members in communities.items():
+        try:
+            cid_int = int(cid)
+        except (TypeError, ValueError):
+            continue
+        comm_to_members[cid_int] = list(members)
+    touched: set = set()
+    for nid in focused.nodes:
+        c = G.nodes[nid].get("community") if nid in G else None
+        if c is None:
+            continue
+        try:
+            touched.add(int(c))
+        except (TypeError, ValueError):
+            continue
+    if not touched:
+        return ""
+    lines = ["## Communities in focus:"]
+    for cid in sorted(touched):
+        members = comm_to_members.get(cid, [])
+        if not members:
+            continue
+        ranked = sorted(members, key=lambda n: G.degree(n) if n in G else 0, reverse=True)[:3]
+        labels = [G.nodes[n].get("label", n) for n in ranked if n in G]
+        lines.append(f"- community {cid} (n={len(members)}): {', '.join(labels)}")
+    return "\n".join(lines) if len(lines) > 1 else ""
+
+
+def _run_get_focus_context_core(
+    G: "nx.Graph",
+    communities: dict,
+    alias_map: dict,
+    project_root: "Path",
+    arguments: dict,
+) -> str:
+    """Pure dispatch core for get_focus_context MCP tool (Phase 18 FOCUS-01/03/04/06).
+
+    Returns the D-02 envelope string (`text_body + SENTINEL + json.dumps(meta)`).
+    Never raises — all failure modes collapse to a no_context envelope per D-03 + D-11.
+
+    Binary status invariant (D-11): every non-ok return path emits an envelope with
+    exactly four meta keys: {status, node_count, edge_count, budget_used} and an empty
+    text_body. No focus_hint values leak into the response (D-12 / T-18-D).
+
+    Callers MUST pass `project_root` = the directory CONTAINING graphify-out/ (not
+    graphify-out/ itself) — enforced by Plan 18-02 FOCUS-07 sentinel when callers
+    go through `ProjectRoot(...)`. The Phase 11 MCP wrappers already pass
+    `_out_dir.parent` positionally; the new `_tool_get_focus_context` mirrors that.
+    """
+    focus_hint = arguments.get("focus_hint") or {}
+    budget = int(arguments.get("budget", 2000))
+    budget = max(50, min(budget, 100000))
+
+    file_path = str(focus_hint.get("file_path", ""))
+    function_name_raw = focus_hint.get("function_name")
+    function_name = sanitize_label(str(function_name_raw)) if function_name_raw else None
+    line = focus_hint.get("line")
+    depth = int(focus_hint.get("neighborhood_depth", 2))  # D-05
+    depth = max(0, min(depth, 6))
+    include_community = bool(focus_hint.get("include_community", True))  # D-06
+
+    def _no_context() -> str:
+        # D-09 empty text_body + D-10 4-key meta + D-11 binary status + D-12 no echo
+        meta_nc = {"status": "no_context", "node_count": 0, "edge_count": 0, "budget_used": 0}
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta_nc, ensure_ascii=False)
+
+    if not file_path:
+        return _no_context()
+
+    # FOCUS-04 + Pitfall 3: explicit base=project_root (default base is graphify-out/
+    # which would reject every legitimate focus source file — see RESEARCH.md Pitfall 3).
+    # Pitfall 4: catch BOTH ValueError (escape / base missing) AND FileNotFoundError
+    # (file deleted on disk) — a bare `except ValueError` leaks tracebacks on T-18-B.
+    #
+    # Relative file_paths are resolved AGAINST project_root (not CWD) before
+    # validation — otherwise `validate_graph_path` uses Path.resolve() which
+    # resolves relative paths against CWD, causing legitimate project-relative
+    # paths (e.g. "src/auth.py") to "escape" a tmp_path-based project_root.
+    try:
+        candidate = Path(file_path)
+        if not candidate.is_absolute():
+            candidate = Path(project_root) / candidate
+        validated = validate_graph_path(candidate, base=project_root)
+    except (ValueError, FileNotFoundError):
+        return _no_context()
+
+    # FOCUS-02 + D-01: resolve seeds. Stored `source_file` values on nodes are RELATIVE
+    # (e.g. "src/auth.py"), but `validated` is an absolute resolved path. Pass the
+    # project-root-relative form so `_resolve_focus_seeds` compares `target_raw` against
+    # the stored relative string directly. The absolute form is covered internally by
+    # the resolver's `target_abs` + `Path(s).resolve()` fallback.
+    try:
+        rel_target = Path(validated).relative_to(Path(project_root).resolve())
+    except (ValueError, RuntimeError, OSError):
+        rel_target = Path(validated)
+    seeds = _resolve_focus_seeds(G, rel_target, function_name=function_name, line=line)
+    if not seeds:
+        return _no_context()  # D-03: indistinguishable from spoof
+
+    char_budget = budget * 3
+    chosen_depth = depth
+    focused = _multi_seed_ego(G, seeds, radius=depth)
+
+    def _render(fg: "nx.Graph") -> tuple:
+        """Returns (text, community_payload) tuple."""
+        body = _subgraph_to_text(fg, set(fg.nodes), list(fg.edges),
+                                 token_budget=budget, layer=2)
+        comm = _render_focus_community_summary(G, fg, communities) if include_community else ""
+        if comm:
+            body = body + "\n\n" + comm
+        return body, comm
+
+    text_body, community_payload = _render(focused)
+
+    # D-08 outer-hop-first truncation: shrink radius before char-clipping
+    while len(text_body) > char_budget and chosen_depth > 0:
+        chosen_depth -= 1
+        focused = _multi_seed_ego(G, seeds, radius=chosen_depth)
+        text_body, community_payload = _render(focused)
+
+    # Final fallback: char-clip with truncation marker (matches _run_entity_trace pattern)
+    if len(text_body) > char_budget:
+        text_body = text_body[:char_budget] + f"\n... (truncated to ~{budget} token budget)"
+
+    node_count = focused.number_of_nodes() if focused is not None else 0
+    edge_count = focused.number_of_edges() if focused is not None else 0
+
+    if node_count == 0:
+        return _no_context()
+
+    meta = {
+        "status": "ok",
+        "node_count": node_count,
+        "edge_count": edge_count,
+        "budget_used": min(len(text_body) // 3, budget),
+        "seed_count": len(seeds),
+        "depth_used": chosen_depth,
+    }
+    if include_community and community_payload:
+        meta["community_summary"] = True
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
 def serve(graph_path: str = "graphify-out/graph.json") -> None:
     """Start the MCP server. Requires pip install mcp."""
     try:
@@ -2020,6 +2178,20 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
         return _run_entity_trace(G, _out_dir.parent, _alias_map, arguments)
 
+    def _tool_get_focus_context(arguments: dict) -> str:
+        """Phase 18 FOCUS-01: pull-model focus -> D-02 envelope with scoped subgraph + community summary."""
+        _reload_if_stale()
+        if not Path(graph_path).exists():
+            # D-11 binary: missing graph collapses to no_context (NOT a separate no_graph status).
+            # Emitting anything else would break the T-18-A/B/C invariant tested by
+            # test_binary_status_invariant — no_context is the one-and-only non-ok shape.
+            meta_nc: dict = {"status": "no_context", "node_count": 0, "edge_count": 0, "budget_used": 0}
+            return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta_nc, ensure_ascii=False)
+        # CR-01 invariant: pass _out_dir.parent (project root), NOT _out_dir (graphify-out).
+        # The ProjectRoot sentinel in snapshot.py guards against accidental regression,
+        # but this call-site is the Phase 18 production entry point.
+        return _run_get_focus_context_core(G, communities, _alias_map, _out_dir.parent, arguments)
+
     def _tool_drift_nodes(arguments: dict) -> str:
         """Phase 11 SLASH-04: per-node trend vectors across snapshot chain."""
         _reload_if_stale()
@@ -2135,6 +2307,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "graph_summary": _tool_graph_summary,
         "connect_topics": _tool_connect_topics,
         "entity_trace": _tool_entity_trace,
+        "get_focus_context": _tool_get_focus_context,
         "drift_nodes": _tool_drift_nodes,
         "newly_formed_clusters": _tool_newly_formed_clusters,
         "capability_describe": _tool_capability_describe,
