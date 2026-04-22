@@ -2965,3 +2965,70 @@ def test_chat_truncate_helper_unit():
     out = _truncate_to_token_cap(long)
     assert len(out) <= 2000
     assert out.endswith("…")
+
+
+# ============================================================
+# Phase 17 Plan 03 — CHAT-07 alias threading + CHAT-03 zero-LLM invariant
+# ============================================================
+
+def test_chat_alias_redirect_canonical(_reset_chat_sessions, monkeypatch):
+    """CHAT-07 / D-16 / T-17-05: node_ids in citations are canonical, not aliases."""
+    G = _make_graph()
+    communities = _communities_from_graph(G)
+    # Pick a real node and invent an alias that maps to it.
+    real_nid = next(iter(G.nodes))
+    real_label = G.nodes[real_nid].get("label", real_nid)
+    alias_id = f"alias_of_{real_nid}"
+    alias_map = {alias_id: real_nid}
+
+    import graphify.serve as _svc
+    original_score = _svc._score_nodes
+
+    def _alias_aware_score(G_, terms_):
+        base = original_score(G_, terms_)
+        # prepend alias tuple so alias appears in seed_ids before resolution
+        return [(10.0, alias_id)] + list(base)
+
+    monkeypatch.setattr("graphify.serve._score_nodes", _alias_aware_score)
+    response = _run_chat_core(
+        G, communities, alias_map,
+        {"query": f"tell me about {real_label}"}
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    # No citation node_id should equal the alias
+    citation_ids = [c["node_id"] for c in meta["citations"]]
+    assert alias_id not in citation_ids, "alias leaked through to meta.citations"
+    # resolved_from_alias should document the redirect
+    assert real_nid in meta["resolved_from_alias"]
+    assert alias_id in meta["resolved_from_alias"][real_nid]
+
+
+def test_chat_no_alias_empty_redirect_map(_reset_chat_sessions):
+    """When alias_map has no applicable redirects, meta.resolved_from_alias is empty dict."""
+    G = _make_graph()
+    communities = _communities_from_graph(G)
+    response = _run_chat_core(
+        G, communities, {}, {"query": "what is extract?"}
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["resolved_from_alias"] == {}
+
+
+def test_serve_makes_zero_llm_calls():
+    """CHAT-03 SC4: serve.py source must not import any LLM client."""
+    from pathlib import Path
+    src = Path("graphify/serve.py").read_text()
+    forbidden = (
+        "import anthropic",
+        "from anthropic",
+        "import openai",
+        "from openai",
+        "from graphify.llm",
+        "import graphify.llm",
+        "import langchain",
+        "from langchain",
+    )
+    for needle in forbidden:
+        assert needle not in src, f"serve.py introduced LLM dependency: {needle!r}"

@@ -1220,6 +1220,19 @@ def _run_chat_core(
     now = time.time()
     _chat_evict_stale(now)
 
+    # --- Phase 17 CHAT-07 / D-16: alias redirect closure (verbatim copy of _run_connect_topics:1245) ---
+    _resolved_aliases: dict[str, list[str]] = {}
+    _effective_alias_map: dict[str, str] = alias_map or {}
+
+    def _resolve_alias(node_id: str) -> str:
+        canonical = _effective_alias_map.get(node_id)
+        if canonical and canonical != node_id:
+            aliases = _resolved_aliases.setdefault(canonical, [])
+            if node_id not in aliases:
+                aliases.append(node_id)
+            return canonical
+        return node_id
+
     # --- Stage 1: entity terms + intent + history augmentation ---
     terms = _extract_entity_terms(query_raw)
     terms = _augment_terms_from_history(session_id, query_raw, terms)
@@ -1227,7 +1240,7 @@ def _run_chat_core(
 
     # --- Stage 1: primitive dispatch (D-02 three intents) ---
     scored = _score_nodes(G, terms) if terms else []
-    seed_ids = [nid for _, nid in scored[:5]]
+    seed_ids = [_resolve_alias(nid) for _, nid in scored[:5]]
     visited: set[str] = set(seed_ids)
     edges: list[tuple] = []
     status = "ok" if seed_ids else "no_results"
@@ -1260,12 +1273,12 @@ def _run_chat_core(
                     members = communities.get(int(cid), [])
                     visited.update(members)
 
-    # --- Stage 2: citations from traversal ---
+    # --- Stage 2: citations from traversal (with alias redirect — CHAT-07 / T-17-05) ---
     citations = [
         {
-            "node_id": nid,
-            "label": G.nodes[nid].get("label", nid),
-            "source_file": G.nodes[nid].get("source_file", ""),
+            "node_id": _resolve_alias(nid),
+            "label": G.nodes[nid].get("label", nid) if nid in G.nodes else nid,
+            "source_file": G.nodes[nid].get("source_file", "") if nid in G.nodes else "",
         }
         for nid in list(visited)[:20]
     ]
@@ -1302,7 +1315,7 @@ def _run_chat_core(
         "findings": [],
         "suggestions": suggestions,  # graph-sourced only (T-17-02)
         "session_id": session_id,
-        "resolved_from_alias": {},  # Plan 17-03 threads aliases
+        "resolved_from_alias": _resolved_aliases,  # CHAT-07 / T-17-05
     }
 
     # --- D-06 session write (skip if session_id is None — Pitfall 5) ---
