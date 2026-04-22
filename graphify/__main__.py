@@ -2002,6 +2002,33 @@ def main() -> None:
             )
             sys.exit(2)
         sys.exit(1 if result.aborted else 0)
+    elif cmd == "watch":
+        # graphify watch [path] [--debounce N] [--enrich]
+        # Inline argparse per __main__.py convention (see `enrich` command above).
+        import argparse as _ap
+
+        p_watch = _ap.ArgumentParser(
+            prog="graphify watch",
+            description="Watch a folder and auto-update the graphify graph on file changes",
+        )
+        p_watch.add_argument(
+            "path",
+            nargs="?",
+            default=".",
+            help="Folder to watch (default: .)",
+        )
+        p_watch.add_argument(
+            "--debounce",
+            type=float,
+            default=3.0,
+            help="Seconds to wait after last change before updating (default: 3)",
+        )
+        p_watch.add_argument("--enrich", action="store_true",
+            help="After each rebuild, trigger `graphify enrich` in the background "
+                 "(opt-in per ENRICH-06; default: no auto-enrichment)")
+        opts = p_watch.parse_args(sys.argv[2:])
+        from graphify.watch import watch as _watch_run
+        _watch_run(Path(opts.path), debounce=opts.debounce, enrich=opts.enrich)
     elif cmd == "benchmark":
         from graphify.benchmark import run_benchmark, print_benchmark
         graph_path = sys.argv[2] if len(sys.argv) > 2 else "graphify-out/graph.json"

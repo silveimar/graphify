@@ -1,6 +1,9 @@
 # monitor a folder and auto-trigger --update when files change
 from __future__ import annotations
+import atexit
 import json
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -9,6 +12,81 @@ from graphify.detect import CODE_EXTENSIONS, DOC_EXTENSIONS, PAPER_EXTENSIONS, I
 
 _WATCHED_EXTENSIONS = CODE_EXTENSIONS | DOC_EXTENSIONS | PAPER_EXTENSIONS | IMAGE_EXTENSIONS
 _CODE_EXTENSIONS = CODE_EXTENSIONS
+
+
+# ---------------------------------------------------------------------------
+# Plan 15-05: opt-in post-rebuild enrichment trigger (ENRICH-06) + Pitfall 4
+# ---------------------------------------------------------------------------
+# A module-level handle to the most recently spawned enrichment child so that
+# (a) the atexit handler can SIGTERM it on watcher shutdown (no zombies), and
+# (b) a still-running prior child suppresses new spawns per rebuild burst.
+_active_enrichment_child: "subprocess.Popen | None" = None
+
+
+def _cleanup_on_exit() -> None:
+    """Pitfall 4: terminate any running enrichment child on watcher shutdown.
+
+    Invoked via ``atexit.register`` — fires on normal exit, Ctrl-C, or
+    shell-close. No zombies survive. First SIGTERM (soft); after a 5s grace
+    window, SIGKILL as last resort.
+    """
+    global _active_enrichment_child
+    child = _active_enrichment_child
+    if child is None:
+        return
+    try:
+        if child.poll() is not None:
+            return  # already exited
+    except Exception:
+        return
+    try:
+        child.terminate()  # SIGTERM — enrichment's handler cleans its lock + pid
+        try:
+            child.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            child.kill()  # SIGKILL last resort
+    except OSError:
+        pass
+
+
+atexit.register(_cleanup_on_exit)
+
+
+def _maybe_trigger_enrichment(out_dir: Path, enabled: bool) -> None:
+    """ENRICH-06: opt-in post-rebuild enrichment trigger.
+
+    If a prior child is still running, do NOT spawn a new one (Pitfall 4:
+    no process cascade). On success, updates ``_active_enrichment_child`` so
+    the atexit handler can signal it at shutdown.
+    """
+    global _active_enrichment_child
+    if not enabled:
+        return
+    if _active_enrichment_child is not None:
+        try:
+            if _active_enrichment_child.poll() is None:
+                print(
+                    f"[graphify] watch: prior enrichment pid="
+                    f"{_active_enrichment_child.pid} still running; skipping trigger",
+                    file=sys.stderr,
+                )
+                return
+        except Exception:
+            pass
+    try:
+        _active_enrichment_child = subprocess.Popen(
+            [sys.executable, "-m", "graphify", "enrich",
+             "--graph", str(out_dir / "graph.json")],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=False,  # keep in same session so SIGTERM propagates
+        )
+        print(
+            f"[graphify] watch: triggered enrichment pid={_active_enrichment_child.pid}",
+            file=sys.stderr,
+        )
+    except OSError as exc:
+        print(f"[graphify] watch: failed to spawn enrichment: {exc}", file=sys.stderr)
 
 
 def _rebuild_code(watch_path: Path, *, follow_symlinks: bool = False) -> bool:
@@ -107,7 +185,7 @@ def _has_non_code(changed_paths: list[Path]) -> bool:
     return any(p.suffix.lower() not in _CODE_EXTENSIONS for p in changed_paths)
 
 
-def watch(watch_path: Path, debounce: float = 3.0) -> None:
+def watch(watch_path: Path, debounce: float = 3.0, *, enrich: bool = False) -> None:
     """
     Watch watch_path for new or modified files and auto-update the graph.
 
@@ -165,7 +243,9 @@ def watch(watch_path: Path, debounce: float = 3.0) -> None:
                 if _has_non_code(batch):
                     _notify_only(watch_path)
                 else:
-                    _rebuild_code(watch_path)
+                    if _rebuild_code(watch_path):
+                        # ENRICH-06: opt-in post-rebuild enrichment trigger
+                        _maybe_trigger_enrichment(watch_path / "graphify-out", enrich)
     except KeyboardInterrupt:
         print("\n[graphify watch] Stopped.")
     finally:
@@ -179,5 +259,8 @@ if __name__ == "__main__":
     parser.add_argument("path", nargs="?", default=".", help="Folder to watch (default: .)")
     parser.add_argument("--debounce", type=float, default=3.0,
                         help="Seconds to wait after last change before updating (default: 3)")
+    parser.add_argument("--enrich", action="store_true",
+                        help="After each rebuild, trigger `graphify enrich` in the background "
+                             "(opt-in per ENRICH-06; default: no auto-enrichment)")
     args = parser.parse_args()
-    watch(Path(args.path), debounce=args.debounce)
+    watch(Path(args.path), debounce=args.debounce, enrich=args.enrich)
