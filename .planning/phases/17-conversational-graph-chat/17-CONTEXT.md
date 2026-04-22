@@ -61,6 +61,13 @@ Decisions not locked in this phase — planner/executor has flexibility within t
 
 No pending todos matched Phase 17 (todo.match-phase returned 0).
 
+### Clarifications (2026-04-22, post-research)
+
+Two points from D-08 were refined against codebase evidence surfaced by the researcher:
+
+- **D-08 correction:** the citation-alias meta key is **`resolved_from_alias`** (matches existing convention in `serve.py` at lines 1016, 1091, 1276, 1300 and 6+ other tools) — NOT `alias_redirects` as originally written. Every `meta` returned by `_run_chat_core` must use `meta["resolved_from_alias"] = {canonical_id: [original_alias, ...]}`.
+- **CHAT-06 correction:** `graphify/commands/ask.md` uses the **existing command-file frontmatter convention** (same shape as `connect.md` / `trace.md` — `description:` + `disable-model-invocation: true` + `allowed-tools:` list). The `target: both` field from the earlier CONTEXT.md draft is dropped — no existing command file has it and introducing it unilaterally would create a second convention.
+
 </decisions>
 
 <canonical_refs>
