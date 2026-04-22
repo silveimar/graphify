@@ -1006,6 +1006,89 @@ def _load_dedup_yaml_config(path: Path) -> dict:
     return data
 
 
+# ---------------------------------------------------------------------------
+# Phase 15 Plan 05 — foreground-lock acquisition (ENRICH-07)
+# ---------------------------------------------------------------------------
+# Foreground ALWAYS wins. When a user invokes `graphify run`, we must acquire
+# ``graphify-out/.enrichment.lock`` BEFORE writing graph.json. If a background
+# `graphify enrich` process is currently holding the lock, we SIGTERM its PID
+# (read from ``graphify-out/.enrichment.pid``) and block on ``LOCK_EX`` until
+# the enrichment handler releases it cleanly. No torn enrichment.json possible.
+
+def _foreground_acquire_enrichment_lock(out_dir: Path, timeout_seconds: float = 30.0) -> int | None:
+    """Acquire .enrichment.lock for a foreground rebuild. Foreground ALWAYS WINS.
+
+    - If lock free: acquire (LOCK_EX) immediately and return fd.
+    - If lock held: read .enrichment.pid, SIGTERM the PID, then block on LOCK_EX.
+    - If pid unreadable or process already gone: fall through to blocking LOCK_EX.
+    - If out_dir does not exist: return None (first-run, no enrichment possible).
+
+    Caller is responsible for releasing via ``_foreground_release_enrichment_lock``.
+    """
+    import fcntl as _fcntl
+    import os as _os
+    import signal as _signal
+    import time as _time
+    import json as _json
+
+    from graphify.enrich import LOCK_FILENAME, PID_FILENAME
+
+    if not out_dir.exists():
+        return None
+    lock_path = out_dir / LOCK_FILENAME
+    fd = _os.open(str(lock_path), _os.O_RDWR | _os.O_CREAT, 0o644)
+    try:
+        _fcntl.flock(fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+        return fd  # free — acquired immediately
+    except BlockingIOError:
+        pass  # held by enrichment — SIGTERM it below
+
+    # Read heartbeat PID; SIGTERM if process alive
+    pid_path = out_dir / PID_FILENAME
+    try:
+        heartbeat = _json.loads(pid_path.read_text(encoding="utf-8"))
+        pid = int(heartbeat.get("pid", 0))
+        if pid > 0:
+            try:
+                _os.kill(pid, _signal.SIGTERM)
+                print(
+                    f"[graphify] foreground rebuild: sent SIGTERM to enrichment pid={pid}",
+                    file=sys.stderr,
+                )
+            except ProcessLookupError:
+                pass  # already gone — lock will free on its own
+    except (OSError, _json.JSONDecodeError, ValueError):
+        pass  # no readable heartbeat — fall through to blocking wait
+
+    # Block (polling) until enrichment's SIGTERM handler releases the lock.
+    deadline = _time.time() + timeout_seconds
+    while _time.time() < deadline:
+        try:
+            _fcntl.flock(fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+            return fd
+        except BlockingIOError:
+            _time.sleep(0.1)
+    # Timeout escape: force-block (still bounded by outer caller's shell timeout).
+    _fcntl.flock(fd, _fcntl.LOCK_EX)
+    return fd
+
+
+def _foreground_release_enrichment_lock(fd: int | None) -> None:
+    """Unlock + close. Safe to call with None."""
+    import fcntl as _fcntl
+    import os as _os
+    if fd is None:
+        return
+    try:
+        _fcntl.flock(fd, _fcntl.LOCK_UN)
+    except OSError:
+        pass
+    try:
+        _os.close(fd)
+    except OSError:
+        pass
+
+
 def main() -> None:
     # Check all known skill install locations for a stale version stamp.
     # Skip during install/uninstall (hook writes trigger a fresh check anyway).
@@ -1832,6 +1915,9 @@ def main() -> None:
         sys.exit(0)
     elif cmd == "run":
         # graphify run [path] [--router]
+        # ENRICH-07: foreground always wins. Acquire .enrichment.lock before
+        # the graph write path; SIGTERM any active enrichment PID; block until
+        # the lock releases cleanly. See _foreground_acquire_enrichment_lock.
         from graphify.pipeline import run_corpus
 
         rest = list(sys.argv[2:])
@@ -1842,7 +1928,12 @@ def main() -> None:
         if not target.exists():
             print(f"error: path not found: {target}", file=sys.stderr)
             sys.exit(2)
-        run_corpus(target, use_router=use_router)
+        out_dir = target / "graphify-out" if target.is_dir() else target.parent / "graphify-out"
+        lock_fd = _foreground_acquire_enrichment_lock(out_dir, timeout_seconds=30.0)
+        try:
+            run_corpus(target, use_router=use_router)
+        finally:
+            _foreground_release_enrichment_lock(lock_fd)
     elif cmd == "enrich":
         # graphify enrich [--graph PATH] [--budget N] [--pass NAME] [--dry-run] [--snapshot-id ID]
         # Inline argparse equivalent of: sub.add_parser("enrich", ...) — follows __main__.py convention
