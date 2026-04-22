@@ -130,7 +130,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - [ ] Phase 14: Obsidian Thinking Commands — Vault-scoped `/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind` slash commands (plus P2 `/graphify-bridge`, `/graphify-voice`, `/graphify-drift-notes`) with `target: obsidian|code|both` frontmatter filtering, mandatory `propose_vault_note + approve` trust boundary, and a Plan 00 refactor migrating `_uninstall_commands()` from hardcoded whitelist to directory-scan.
 - [x] Phase 15: Async Background Enrichment — Four-pass background enricher (description, patterns, community summaries, staleness) writing overlay-only `enrichment.json`; event-driven via `watch.py` post-rebuild hook; `fcntl.flock`-coordinated with foreground `/graphify`; snapshot-pinned at process start for determinism. (completed 2026-04-22)
 - [ ] Phase 16: Graph Argumentation Mode — `graphify/argue.py` substrate populates a SPAR-Kit-style `ArgumentPackage` from a graph subgraph; `skill.md` orchestrates the LLM debate (Phase 9 blind-label harness reused); mandatory `{claim, cites: [node_id]}` schema rejects fabricated node IDs; round cap 6; `dissent`/`inconclusive` valid outputs; `GRAPH_ARGUMENT.md` advisory-only artifact.
-- [ ] Phase 17: Conversational Graph Chat — Two-stage structurally-enforced `chat(query, session_id)` MCP tool (Stage 1 tool-call only, Stage 2 compose from results only); every claim cited to `{node_id, label, source_file}`; empty results return templated fuzzy suggestions; session-scoped history; `/graphify-ask` slash command.
+- [x] Phase 17: Conversational Graph Chat — Two-stage structurally-enforced `chat(query, session_id)` MCP tool (Stage 1 tool-call only, Stage 2 compose from results only); every claim cited to `{node_id, label, source_file}`; empty results return templated fuzzy suggestions; session-scoped history; `/graphify-ask` slash command. (completed 2026-04-22)
 - [x] Phase 18: Focus-Aware Graph Context — `get_focus_context(focus_hint)` MCP tool returns BFS ego-graph + community summary for a structured focus hint (`file_path`, optional `function_name`/`line`/`neighborhood_depth`/`include_community`); pull-model (no filesystem watcher); codifies v1.3 CR-01 snapshot-root fix; silently ignores spoofed paths. ✅ 2026-04-20
 
 **Deferred to v1.4.x (not v1.4 scope):**
@@ -233,7 +233,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 **Plans**: 3 plans (planned 2026-04-22 — P1 only; CHAT-10/11/12 deferred to v1.4.x backlog).
 - [x] 17-01-core-dispatch-sessions-PLAN.md — `_run_chat_core` shell, intent classifier + entity-term extractor, D-02 primitive dispatch (explore/connect/summarize), `_CHAT_SESSIONS` + lazy TTL + follow-up augmentation, `_tool_chat` wrapper, registry entry. (CHAT-01, CHAT-02, CHAT-08)
 - [x] 17-02-validator-composer-cap-PLAN.md — narrative composer (explore/connect/summarize templates), citation validator with bounded re-validate, fuzzy-suggestion fallback with echo guard, 500-token sentence-boundary cap. (CHAT-03, CHAT-04, CHAT-05, CHAT-09)
-- [ ] 17-03-command-alias-integration-PLAN.md — `_resolve_alias` closure threaded through citations + `meta.resolved_from_alias`, `graphify/commands/ask.md` (connect.md-style frontmatter, no `target:` field), zero-LLM architectural test. (CHAT-03, CHAT-06, CHAT-07)
+- [x] 17-03-command-alias-integration-PLAN.md — `_resolve_alias` closure threaded through citations + `meta.resolved_from_alias`, `graphify/commands/ask.md` (connect.md-style frontmatter, no `target:` field), zero-LLM architectural test. (CHAT-03, CHAT-06, CHAT-07)
 
 **Deferred to v1.4.x backlog** (P2, not planned in this phase):
 - CHAT-10 [P2]: Auto-suggest follow-up questions derived from surprising-connections neighbors
@@ -282,7 +282,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
 | 15. Async Background Enrichment | v1.4 | 6/6 | Complete    | 2026-04-22 |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
-| 17. Conversational Graph Chat | v1.4 | 2/3 | In Progress|  |
+| 17. Conversational Graph Chat | v1.4 | 3/3 | Complete   | 2026-04-22 |
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
 
 ---

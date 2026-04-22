@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: executing
-stopped_at: Phase 17 context gathered
-last_updated: "2026-04-22T22:36:50.981Z"
+status: verifying
+stopped_at: Phase 17 complete — 3/3 plans shipped
+last_updated: "2026-04-22T22:45:00.000Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 23
-  completed_plans: 22
-  percent: 96
+  completed_plans: 23
+  percent: 100
 ---
 
 # Project State
@@ -29,7 +29,7 @@ Phase: 17 (conversational-graph-chat) — EXECUTING
 Plan: 3 of 3
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 3/7 phases complete (12 ✅ + 13 ✅ + 18 ✅), Phase 15 next.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-22
 
 Progress: [██████░░░░] 43% (3/7 phases complete — 12 ✅, 13 ✅, 18 ✅)
@@ -129,6 +129,9 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 - [Phase ?]: Plan 17-02: Composer is template slot-fill only (zero LLM)
 - [Phase ?]: Plan 17-02: Fuzzy suggestions restricted to graph candidate pool (T-17-02 anti-echo)
 - [Phase ?]: Plan 17-02: 500-token cap via char/4 heuristic with sentence-boundary ellipsis
+- [Phase 17]: Plan 17-03: Chat citations canonical-post-dedup via `_resolve_alias` threading (CHAT-07 / D-16 / T-17-05)
+- [Phase 17]: Plan 17-03: `/graphify-ask` follows connect.md frontmatter convention — no `target:` field (CONTEXT.md Clarification)
+- [Phase 17]: Plan 17-03: Zero-LLM invariant enforced structurally via grep-on-source (CHAT-03 SC4 architectural test)
 
 ### Blockers/Concerns
 
@@ -145,9 +148,10 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | Phase 15 P06 | 15 | 2 tasks | 5 files (3 new tests + enrich.py + test_enrich.py) |
 | Phase 17 P01 | 15m | 2 tasks | 4 files |
 | Phase 17 P02 | 10 | 2 tasks | 2 files |
+| Phase 17 P03 | 12m | 2 tasks | 4 files (ask.md + serve.py + 2 test files) |
 
 ## Session Continuity
 
-Last session: 2026-04-22T22:36:37.933Z
-Stopped at: Phase 17 context gathered
-Next action: Pick next phase from v1.4 build order. Per locked sequence (12 ✅ → 18 ✅ → 13A ✅ → 15 ✅ → 17 → 16 → 14 → 13B + SEED-002), **Phase 17 Conversational Graph Chat** is the recommended candidate (soft-depends on 18 ✅ + 15 ✅). Alternative: Phase 14 Obsidian Commands (HARD-depends on 18 ✅ + Plan 00 whitelist refactor). Start with `/gsd-discuss-phase 17` or `/gsd-plan-phase 17`.
+Last session: 2026-04-22T22:43:30.487Z
+Stopped at: Phase 17 complete — all 3 plans shipped (17-01, 17-02, 17-03). Ready for `/gsd-verify-work`.
+Next action: Run `/gsd-verify-work` on Phase 17. After verification, per locked v1.4 build order (12 ✅ → 18 ✅ → 13A ✅ → 15 ✅ → 17 ✅ → 16 → 14 → 13B + SEED-002), **Phase 16 SPAR-Kit Argumentation** is the next candidate (soft-depends on 17 citation format ✅; MUST NOT call 17). Start with `/gsd-discuss-phase 16` or `/gsd-plan-phase 16`.

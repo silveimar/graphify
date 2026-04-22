@@ -104,8 +104,8 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 - [x] **CHAT-03**: Stage 2 composes a structured narrative packet from the tool results; `serve.py` makes zero LLM calls (skill or calling agent renders the human-facing narrative)
 - [x] **CHAT-04**: Every claim paired with `{node_id, label, source_file}` in `meta["citations"]`; empty or fabricated cites rejected by post-process grep (Pitfall 5 mitigation)
 - [x] **CHAT-05**: Empty graph-query results return templated fuzzy suggestions ("did you mean X, Y?") — NEVER fabricate node names
-- [ ] **CHAT-06**: `/graphify-ask <question>` command file in `graphify/commands/` (target: both) invokes `chat` MCP tool
-- [ ] **CHAT-07**: D-16 alias redirect threaded through `_run_chat` handler so chat-cited node_ids resolve to canonical after dedup
+- [x] **CHAT-06**: `/graphify-ask <question>` command file in `graphify/commands/` (target: both) invokes `chat` MCP tool
+- [x] **CHAT-07**: D-16 alias redirect threaded through `_run_chat` handler so chat-cited node_ids resolve to canonical after dedup
 - [x] **CHAT-08**: Session history scoped per `session_id`; no cross-session memory (privacy by default)
 - [x] **CHAT-09**: D-02 MCP envelope + response size cap (≤ 500 tokens narrative, meta envelope unlimited)
 - [ ] **CHAT-10** `[P2]`: Auto-suggest follow-up questions derived from surprising-connections neighbors of the answered subgraph
