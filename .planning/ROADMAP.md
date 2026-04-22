@@ -230,7 +230,15 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   3. User asks about an entity not in the graph and receives templated fuzzy suggestions ("did you mean X, Y?") — the handler never fabricates a plausible-but-nonexistent node name.
   4. A two-stage architectural test asserts `serve.py` makes zero LLM calls — Stage 1 emits only tool-call sequences, Stage 2 composes from tool results only; narrative rendering is the skill or calling agent's responsibility.
   5. D-16 alias redirect is threaded through every citation — a node merged into an alias during dedup resolves to its canonical ID in chat output without breaking the user's prior callsite.
-**Plans**: TBD (planner will refine; 4–5 plans expected, including `chat` MCP tool + two-stage pipeline, citation validator + fuzzy suggestion templates, session history scoping, `/graphify-ask` command, alias-redirect threading).
+**Plans**: 3 plans (planned 2026-04-22 — P1 only; CHAT-10/11/12 deferred to v1.4.x backlog).
+- [ ] 17-01-core-dispatch-sessions-PLAN.md — `_run_chat_core` shell, intent classifier + entity-term extractor, D-02 primitive dispatch (explore/connect/summarize), `_CHAT_SESSIONS` + lazy TTL + follow-up augmentation, `_tool_chat` wrapper, registry entry. (CHAT-01, CHAT-02, CHAT-08)
+- [ ] 17-02-validator-composer-cap-PLAN.md — narrative composer (explore/connect/summarize templates), citation validator with bounded re-validate, fuzzy-suggestion fallback with echo guard, 500-token sentence-boundary cap. (CHAT-03, CHAT-04, CHAT-05, CHAT-09)
+- [ ] 17-03-command-alias-integration-PLAN.md — `_resolve_alias` closure threaded through citations + `meta.resolved_from_alias`, `graphify/commands/ask.md` (connect.md-style frontmatter, no `target:` field), zero-LLM architectural test. (CHAT-03, CHAT-06, CHAT-07)
+
+**Deferred to v1.4.x backlog** (P2, not planned in this phase):
+- CHAT-10 [P2]: Auto-suggest follow-up questions derived from surprising-connections neighbors
+- CHAT-11 [P2]: Save-chat-as-vault-note via `propose_vault_note` round-trip
+- CHAT-12 [P2]: Chat-to-argue handoff (decision-shaped queries suggest `/graphify-argue`)
 
 ### Phase 18: Focus-Aware Graph Context
 **Goal**: An agent reports what the user is currently focused on (a file path, optionally a function or line) and graphify returns a scoped subgraph — neighbors, community, and citations — so downstream tools can reason about the local neighborhood without loading the full graph.
