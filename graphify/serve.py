@@ -127,6 +127,79 @@ def _load_dedup_report(out_dir: Path) -> dict[str, str]:
     return {str(k): str(v) for k, v in alias_map.items() if isinstance(k, str) and isinstance(v, str)}
 
 
+def _load_enrichment_overlay(G: nx.Graph, out_dir: Path) -> None:
+    """Merge enrichment.json overlay onto G in-place (ENRICH-08 + D-06 augmentation).
+
+    Reads ``<out_dir>/enrichment.json`` and applies derived attributes to nodes
+    WITHOUT overwriting existing base fields set by ``_load_graph``:
+
+      - ``passes.description`` → ``G.nodes[canonical]["enriched_description"]``
+      - ``passes.community``  → ``G.nodes[nid]["community_summary"]`` for every
+        node whose ``community`` attribute matches the keyed community id
+      - ``passes.staleness``  → ``G.nodes[canonical]["staleness_override"]``
+        (never overwrites any base ``staleness`` attribute)
+      - ``passes.patterns``   → ``G.graph["patterns"]`` (graph-level list)
+
+    D-16 / ENRICH-12: every ``node_id`` read from the envelope is routed through
+    the dedup alias_map (``_load_dedup_report``) before ``G.nodes`` lookup. Unknown
+    / phantom ids are silently dropped — they never create new nodes.
+
+    Never raises: missing file → no-op; malformed envelope → logged to stderr
+    via ``_validate_enrichment_envelope`` + no-op. Idempotent.
+    """
+    from graphify.enrich import _validate_enrichment_envelope
+
+    p = out_dir / "enrichment.json"
+    if not p.exists():
+        return
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"[graphify] serve: enrichment.json unreadable: {exc}", file=sys.stderr)
+        return
+    if not _validate_enrichment_envelope(data):
+        # _validate_enrichment_envelope already logged the reason when relevant
+        return
+
+    alias_map = _load_dedup_report(out_dir)  # {eliminated_id: canonical_id}
+    passes = data.get("passes", {})
+
+    # passes.description → enriched_description (base description preserved — D-06)
+    for nid, text in passes.get("description", {}).items():
+        canonical = alias_map.get(nid, nid)
+        if canonical in G.nodes:
+            G.nodes[canonical]["enriched_description"] = text
+
+    # passes.community → per-community summary fanned out to member nodes
+    communities_map = passes.get("community", {})
+    if communities_map:
+        for _nid, nattrs in G.nodes(data=True):
+            cid = nattrs.get("community")
+            if cid is None:
+                continue
+            summary = communities_map.get(str(cid))
+            if summary:
+                nattrs["community_summary"] = summary
+
+    # passes.staleness → staleness_override (base `staleness` NEVER overwritten)
+    for nid, label in passes.get("staleness", {}).items():
+        canonical = alias_map.get(nid, nid)
+        if canonical in G.nodes:
+            G.nodes[canonical]["staleness_override"] = label
+
+    # passes.patterns → graph-level attribute; resolve any referenced node_ids via alias_map
+    patterns = passes.get("patterns", [])
+    if patterns:
+        resolved: list[dict] = []
+        for p_entry in patterns:
+            if not isinstance(p_entry, dict):
+                continue
+            nodes_list = p_entry.get("nodes", []) or []
+            resolved_nodes = [alias_map.get(n, n) for n in nodes_list]
+            resolved.append({**p_entry, "nodes": resolved_nodes})
+        G.graph["patterns"] = resolved
+
+
 def _save_telemetry(out_dir: Path, data: dict) -> None:
     """Atomically write telemetry.json to out_dir using os.replace."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1927,6 +2000,12 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
     _agent_edges: list[dict] = _load_agent_edges(_out_dir / "agent-edges.json")
     _telemetry: dict = _load_telemetry(_out_dir / "telemetry.json")
     _alias_map: dict[str, str] = _load_dedup_report(_out_dir)  # Phase 10 D-16
+    # ENRICH-08: apply enrichment overlay in-place after base graph loads
+    _load_enrichment_overlay(G, _out_dir)
+    try:
+        _enrichment_mtime: float = os.stat(_out_dir / "enrichment.json").st_mtime
+    except OSError:
+        _enrichment_mtime = 0.0
     _session_id = str(uuid.uuid4())
     _dedup_mtime: float = -1.0
     _manifest_sig: tuple[float, ...] | None = None
@@ -1942,9 +2021,11 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         """Reload G and communities if graph.json mtime has changed (D-13).
 
         Also refreshes the Phase 9.2 branching-factor cache so the cardinality
-        estimator reflects the post-rebuild graph topology.
+        estimator reflects the post-rebuild graph topology. ENRICH-09: when
+        ``enrichment.json`` mtime changes independently of ``graph.json``, the
+        overlay is re-applied in-place on ``G`` without reloading the base graph.
         """
-        nonlocal G, communities, _graph_mtime, _branching_factor
+        nonlocal G, communities, _graph_mtime, _branching_factor, _enrichment_mtime
         try:
             mtime = os.stat(graph_path).st_mtime
         except OSError:
@@ -1954,6 +2035,21 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             communities = _communities_from_graph(G)
             _branching_factor = _compute_branching_factor(G)
             _graph_mtime = mtime
+            # ENRICH-08: always re-apply overlay after graph reload
+            _load_enrichment_overlay(G, _out_dir)
+            try:
+                _enrichment_mtime = os.stat(_out_dir / "enrichment.json").st_mtime
+            except OSError:
+                _enrichment_mtime = 0.0
+            return
+        # ENRICH-09: enrichment.json changed independently of graph.json
+        try:
+            emtime = os.stat(_out_dir / "enrichment.json").st_mtime
+        except OSError:
+            return
+        if emtime != _enrichment_mtime:
+            _load_enrichment_overlay(G, _out_dir)
+            _enrichment_mtime = emtime
 
     def _maybe_reload_dedup() -> None:
         nonlocal _alias_map, _dedup_mtime
