@@ -425,3 +425,347 @@ def test_pass_output_sanitized(enrich_out_dir: Path, monkeypatch) -> None:
     assert "<script>" not in result["n0"], (
         f"raw HTML must be sanitized, got: {result['n0']!r}"
     )
+
+
+# ===========================================================================
+# Plan 15-03 tests — staleness pass + D-07 resume + D-05 schema guard
+# ===========================================================================
+
+def _pre_write_envelope(out_dir: Path, snapshot_id: str, passes: dict) -> None:
+    """Helper: seed an enrichment.json envelope for resume tests."""
+    envelope = {
+        "version": 1,
+        "snapshot_id": snapshot_id,
+        "generated_at": "2026-04-20T16:00:00Z",
+        "passes": passes,
+    }
+    (out_dir / "enrichment.json").write_text(json.dumps(envelope, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Test: staleness pass performs zero LLM calls (D-03 compute-only)
+# ---------------------------------------------------------------------------
+
+def test_staleness_pass_no_llm_calls(enrich_out_dir: Path, monkeypatch) -> None:
+    """_run_staleness_pass must never call _call_llm; tokens_used == 0; llm_calls == 0."""
+    from graphify.enrich import _run_staleness_pass
+
+    G = _make_graph([
+        ("n0", {"label": "N0", "source_file": "", "file_type": "code"}),
+        ("n1", {"label": "N1", "source_file": "", "file_type": "code"}),
+    ])
+
+    llm_calls = {"n": 0}
+
+    def boom_llm(prompt: str, max_tokens: int) -> tuple[str, int]:
+        llm_calls["n"] += 1
+        raise AssertionError("_call_llm must NOT be invoked by staleness pass (D-03)")
+    monkeypatch.setattr("graphify.enrich._call_llm", boom_llm)
+
+    result, tokens, calls = _run_staleness_pass(
+        G, enrich_out_dir, "snap-x", alias_map={}, dry_run=False,
+    )
+    assert tokens == 0, f"tokens must be 0 (compute-only), got {tokens}"
+    assert calls == 0, f"llm_calls must be 0 (compute-only), got {calls}"
+    assert llm_calls["n"] == 0, "_call_llm was invoked — D-03 violation"
+    # Every node should be classified (no source_file ⇒ FRESH per delta.classify_staleness)
+    assert set(result.keys()) == {"n0", "n1"}
+
+
+# ---------------------------------------------------------------------------
+# Test: staleness pass correctly labels FRESH / STALE / GHOST
+# ---------------------------------------------------------------------------
+
+def test_staleness_pass_classifies_fresh_stale_ghost(
+    tmp_path: Path, enrich_out_dir: Path,
+) -> None:
+    """Staleness pass wraps delta.classify_staleness — labels match file state."""
+    import networkx as nx
+    from graphify.cache import file_hash
+    from graphify.enrich import _run_staleness_pass
+
+    src_fresh = tmp_path / "fresh.py"
+    src_fresh.write_text("x = 1\n")
+    src_stale = tmp_path / "stale.py"
+    src_stale.write_text("y = 2\n")
+    # classify_staleness uses graphify.cache.file_hash (which includes resolved path)
+    fresh_hash = file_hash(src_fresh)
+
+    G = nx.Graph()
+    G.add_node(
+        "N1", label="n1", file_type="code",
+        source_file=str(src_fresh), source_hash=fresh_hash,
+        source_mtime=src_fresh.stat().st_mtime,
+    )
+    G.add_node(
+        "N2", label="n2", file_type="code",
+        source_file=str(src_stale),
+        source_hash="deadbeef" * 8,  # wrong hash → STALE
+        source_mtime=src_stale.stat().st_mtime - 10,  # mtime differs too
+    )
+    G.add_node(
+        "N3", label="n3", file_type="code",
+        source_file=str(tmp_path / "missing.py"),
+        source_hash="x", source_mtime=0.0,
+    )
+
+    result, tokens, calls = _run_staleness_pass(
+        G, enrich_out_dir, "snap-x", alias_map={}, dry_run=False,
+    )
+    assert tokens == 0 and calls == 0
+    assert result["N1"] == "FRESH", f"N1 expected FRESH, got {result.get('N1')!r}"
+    assert result["N2"] == "STALE", f"N2 expected STALE, got {result.get('N2')!r}"
+    assert result["N3"] == "GHOST", f"N3 expected GHOST, got {result.get('N3')!r}"
+
+
+# ---------------------------------------------------------------------------
+# Test: D-07 resume — matching snapshot_id skips completed passes
+# ---------------------------------------------------------------------------
+
+def test_resume_same_snapshot_skips_completed_passes(
+    enrich_out_dir: Path, monkeypatch,
+) -> None:
+    """Re-running with matching snapshot_id must skip passes already in enrichment.json."""
+    import graphify.enrich as enrich_mod
+    from graphify.enrich import EnrichmentResult
+
+    _write_min_graph_json(enrich_out_dir)
+    # Pre-seed envelope: description already complete
+    _pre_write_envelope(enrich_out_dir, "snap-x", {"description": {"N1": "done"}})
+
+    # Stub all three LLM pass runners — track which got called
+    calls: list[str] = []
+
+    def fake_desc(*a, **kw):
+        calls.append("description")
+        return {"N_new": "newdesc"}, 0, 0
+
+    def fake_patterns(*a, **kw):
+        calls.append("patterns")
+        return [], 0, 0
+
+    def fake_community(*a, **kw):
+        calls.append("community")
+        return {}, 0, 0
+
+    def fake_staleness(*a, **kw):
+        calls.append("staleness")
+        return {}, 0, 0
+
+    monkeypatch.setattr(enrich_mod, "_run_description_pass", fake_desc)
+    monkeypatch.setattr(enrich_mod, "_run_patterns_pass", fake_patterns)
+    monkeypatch.setattr(enrich_mod, "_run_community_pass", fake_community)
+    monkeypatch.setattr(enrich_mod, "_run_staleness_pass", fake_staleness)
+
+    import networkx as nx
+    monkeypatch.setattr(
+        "graphify.snapshot.load_snapshot",
+        lambda p: (nx.Graph(), {}, {}),
+    )
+    monkeypatch.setattr("graphify.serve._load_dedup_report", lambda od: {})
+
+    result = EnrichmentResult(snapshot_id="snap-x")
+    enrich_mod._run_passes(
+        enrich_out_dir, "snap-x",
+        enrich_out_dir / "snapshots" / "2026-04-20T14-30-00.json",
+        ["description", "patterns", "community", "staleness"],
+        budget=None, dry_run=False, resume=True, result=result,
+    )
+
+    assert "description" not in calls, (
+        f"description should be skipped on resume, but got calls={calls}"
+    )
+    assert result.passes_skipped == ["description"], (
+        f"expected passes_skipped=['description'], got {result.passes_skipped}"
+    )
+    assert set(result.passes_run) == {"patterns", "community", "staleness"}, (
+        f"expected remaining 3 passes to run, got {result.passes_run}"
+    )
+
+    # The pre-written description value must survive (not overwritten)
+    data = json.loads((enrich_out_dir / "enrichment.json").read_text())
+    assert data["passes"]["description"] == {"N1": "done"}, (
+        f"resume must preserve prior description; got {data['passes']['description']!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test: D-07 different snapshot_id → fresh run (envelope discarded)
+# ---------------------------------------------------------------------------
+
+def test_resume_diff_snapshot_fresh(enrich_out_dir: Path, monkeypatch) -> None:
+    """Pre-existing envelope with a different snapshot_id must be discarded → all 4 passes run."""
+    import graphify.enrich as enrich_mod
+    from graphify.enrich import (
+        EnrichmentResult,
+        _load_existing_enrichment,
+    )
+
+    _write_min_graph_json(enrich_out_dir)
+    _pre_write_envelope(enrich_out_dir, "s_old", {"description": {"Nold": "x"}})
+
+    # _load_existing_enrichment must return {} for mismatched snapshot_id
+    assert _load_existing_enrichment(enrich_out_dir, "s_new") == {}
+
+    def fake_desc(*a, **kw):
+        return {"Nnew": "d"}, 0, 0
+
+    def fake_patterns(*a, **kw):
+        return [{"pattern_id": "p1", "nodes": ["Nnew"], "summary": "s"}], 0, 0
+
+    def fake_community(*a, **kw):
+        return {"0": "c"}, 0, 0
+
+    def fake_staleness(*a, **kw):
+        return {"Nnew": "FRESH"}, 0, 0
+
+    monkeypatch.setattr(enrich_mod, "_run_description_pass", fake_desc)
+    monkeypatch.setattr(enrich_mod, "_run_patterns_pass", fake_patterns)
+    monkeypatch.setattr(enrich_mod, "_run_community_pass", fake_community)
+    monkeypatch.setattr(enrich_mod, "_run_staleness_pass", fake_staleness)
+
+    import networkx as nx
+    monkeypatch.setattr(
+        "graphify.snapshot.load_snapshot",
+        lambda p: (nx.Graph(), {}, {}),
+    )
+    monkeypatch.setattr("graphify.serve._load_dedup_report", lambda od: {})
+
+    result = EnrichmentResult(snapshot_id="s_new")
+    enrich_mod._run_passes(
+        enrich_out_dir, "s_new",
+        enrich_out_dir / "snapshots" / "2026-04-20T14-30-00.json",
+        ["description", "patterns", "community", "staleness"],
+        budget=None, dry_run=False, resume=True, result=result,
+    )
+
+    assert result.passes_skipped == [], (
+        f"expected empty passes_skipped on fresh snapshot, got {result.passes_skipped}"
+    )
+    assert len(result.passes_run) == 4, (
+        f"expected all 4 passes to run, got {result.passes_run}"
+    )
+
+    data = json.loads((enrich_out_dir / "enrichment.json").read_text())
+    assert data["snapshot_id"] == "s_new", (
+        f"envelope snapshot_id must be overwritten with new id; got {data['snapshot_id']!r}"
+    )
+    # Prior description value must be gone (discarded because snapshot mismatched)
+    assert "Nold" not in data["passes"].get("description", {}), (
+        "prior snapshot's description entries must be discarded"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test: envelope schema v1 + _validate_enrichment_envelope
+# ---------------------------------------------------------------------------
+
+def test_enrichment_envelope_version_one(enrich_out_dir: Path, monkeypatch) -> None:
+    """After a full 4-pass run, enrichment.json has version=1 and all 4 pass keys."""
+    import graphify.enrich as enrich_mod
+    from graphify.enrich import (
+        EnrichmentResult,
+        _validate_enrichment_envelope,
+    )
+
+    _write_min_graph_json(enrich_out_dir)
+
+    def fake_desc(*a, **kw):
+        return {"N1": "d"}, 0, 0
+
+    def fake_patterns(*a, **kw):
+        return [{"pattern_id": "p1", "nodes": ["N1"], "summary": "s"}], 0, 0
+
+    def fake_community(*a, **kw):
+        return {"0": "summary"}, 0, 0
+
+    def fake_staleness(*a, **kw):
+        return {"N1": "FRESH"}, 0, 0
+
+    monkeypatch.setattr(enrich_mod, "_run_description_pass", fake_desc)
+    monkeypatch.setattr(enrich_mod, "_run_patterns_pass", fake_patterns)
+    monkeypatch.setattr(enrich_mod, "_run_community_pass", fake_community)
+    monkeypatch.setattr(enrich_mod, "_run_staleness_pass", fake_staleness)
+
+    import networkx as nx
+    monkeypatch.setattr(
+        "graphify.snapshot.load_snapshot",
+        lambda p: (nx.Graph(), {}, {}),
+    )
+    monkeypatch.setattr("graphify.serve._load_dedup_report", lambda od: {})
+
+    result = EnrichmentResult(snapshot_id="snap-x")
+    enrich_mod._run_passes(
+        enrich_out_dir, "snap-x",
+        enrich_out_dir / "snapshots" / "2026-04-20T14-30-00.json",
+        ["description", "patterns", "community", "staleness"],
+        budget=None, dry_run=False, resume=False, result=result,
+    )
+
+    data = json.loads((enrich_out_dir / "enrichment.json").read_text())
+    assert data["version"] == 1
+    assert set(data["passes"].keys()) == {
+        "description", "patterns", "community", "staleness",
+    }
+    assert isinstance(data.get("snapshot_id"), str) and data["snapshot_id"]
+    assert "generated_at" in data
+    assert _validate_enrichment_envelope(data) is True
+
+
+# ---------------------------------------------------------------------------
+# Test: malformed / wrong-version envelope is discarded on load
+# ---------------------------------------------------------------------------
+
+def test_malformed_envelope_discarded(
+    enrich_out_dir: Path, capsys,
+) -> None:
+    """Wrong version or wrong shape → _load_existing_enrichment returns {}."""
+    from graphify.enrich import (
+        _load_existing_enrichment,
+        _validate_enrichment_envelope,
+    )
+
+    # Case 1: wrong version
+    (enrich_out_dir / "enrichment.json").write_text(
+        json.dumps({"version": 2, "snapshot_id": "s1", "passes": {}})
+    )
+    assert _load_existing_enrichment(enrich_out_dir, "s1") == {}
+    captured = capsys.readouterr()
+    assert "[graphify]" in captured.err, (
+        f"expected stderr warning starting with [graphify]; got {captured.err!r}"
+    )
+
+    # Case 2: completely wrong shape
+    (enrich_out_dir / "enrichment.json").write_text(
+        json.dumps({"completely": "wrong-shape"})
+    )
+    assert _validate_enrichment_envelope({"completely": "wrong-shape"}) is False
+    assert _load_existing_enrichment(enrich_out_dir, "s1") == {}
+
+    # Case 3: not even JSON
+    (enrich_out_dir / "enrichment.json").write_text("{{{ not json")
+    assert _load_existing_enrichment(enrich_out_dir, "s1") == {}
+
+    # Case 4: valid v1 envelope with mismatched snapshot_id still returns {}
+    (enrich_out_dir / "enrichment.json").write_text(
+        json.dumps({
+            "version": 1,
+            "snapshot_id": "s_other",
+            "generated_at": "2026-04-20T16:00:00Z",
+            "passes": {},
+        })
+    )
+    assert _load_existing_enrichment(enrich_out_dir, "s1") == {}
+
+    # Positive control: a valid matching envelope returns the full dict
+    (enrich_out_dir / "enrichment.json").write_text(
+        json.dumps({
+            "version": 1,
+            "snapshot_id": "s1",
+            "generated_at": "2026-04-20T16:00:00Z",
+            "passes": {"description": {"n0": "desc"}},
+        })
+    )
+    loaded = _load_existing_enrichment(enrich_out_dir, "s1")
+    assert loaded.get("snapshot_id") == "s1"
+    assert loaded.get("passes", {}).get("description") == {"n0": "desc"}
