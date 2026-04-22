@@ -69,8 +69,8 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 ### Async Background Enrichment (Phase 15)
 
 - [ ] **ENRICH-01**: New module `graphify/enrich.py` + CLI subcommand `graphify enrich [--pass description|patterns|community|staleness] [--budget TOKENS] [--graph PATH]` (default runs all 4 passes)
-- [ ] **ENRICH-02**: Four built-in derivation passes — (a) `description` enriches node descriptions from docstrings/comments, (b) `patterns` detects emerging cross-snapshot patterns, (c) `community` generates per-community natural-language summaries, (d) `staleness` refreshes FRESH/STALE/GHOST overrides
-- [ ] **ENRICH-03**: Enrichment writes **overlay sidecar only** (`graphify-out/enrichment.json`) — `graph.json` is never mutated (v1.1 invariant preserved; Pitfall 3 critical mitigation)
+- [x] **ENRICH-02**: Four built-in derivation passes — (a) `description` enriches node descriptions from docstrings/comments, (b) `patterns` detects emerging cross-snapshot patterns, (c) `community` generates per-community natural-language summaries, (d) `staleness` refreshes FRESH/STALE/GHOST overrides
+- [x] **ENRICH-03**: Enrichment writes **overlay sidecar only** (`graphify-out/enrichment.json`) — `graph.json` is never mutated (v1.1 invariant preserved; Pitfall 3 critical mitigation)
 - [ ] **ENRICH-04**: Atomic `.tmp` + `os.replace` write on `enrichment.json`; a shared `fcntl.flock` on `.enrichment.lock` coordinates with foreground `/graphify` to prevent write races
 - [ ] **ENRICH-05**: Enrichment pins `--snapshot-id` at process start and runs against that snapshot for the whole run — does NOT follow new snapshots mid-run (determinism + race-free delta machinery)
 - [ ] **ENRICH-06**: Event-driven trigger via `watch.py` post-rebuild hook (opt-in `--enrich` flag); **no `apscheduler` dependency** per OQ-1 resolution — manual + event-driven is sufficient for v1.4
@@ -78,8 +78,8 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 - [ ] **ENRICH-08**: `serve.py::_load_enrichment_overlay(out_dir)` merges enrichment at read time (post-load, not inside `_load_graph`) so tests mocking `_load_graph` remain unaffected
 - [ ] **ENRICH-09**: `serve.py::_reload_if_stale()` adds mtime watch for `enrichment.json` alongside existing `graph.json` watch
 - [ ] **ENRICH-10** `[P2]`: `graphify enrich --dry-run` emits cost preview (estimated tokens per pass, per-node budget breakdown) without calling LLMs
-- [ ] **ENRICH-11** `[P2]`: Soft-dependency on Phase 12 `routing.json` — description pass skips files already extracted by expensive model (no double-LLM cost)
-- [ ] **ENRICH-12** `[P2]`: Alias redirect (D-16) threaded through enrichment writes — derived content keys by canonical node_id
+- [x] **ENRICH-11** `[P2]`: Soft-dependency on Phase 12 `routing.json` — description pass skips files already extracted by expensive model (no double-LLM cost)
+- [x] **ENRICH-12** `[P2]`: Alias redirect (D-16) threaded through enrichment writes — derived content keys by canonical node_id
 
 ### Graph Argumentation Mode (Phase 16)
 
