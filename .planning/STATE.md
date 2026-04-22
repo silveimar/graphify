@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
-status: verifying
-stopped_at: Phase 17 complete — 3/3 plans shipped
-last_updated: "2026-04-22T22:45:00.000Z"
+status: phase_complete
+stopped_at: Phase 17 verified — 3/3 plans shipped, 1384/1384 tests green
+last_updated: "2026-04-22T22:53:00.000Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 7
@@ -25,14 +25,14 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 ## Current Position
 
-Phase: 17 (conversational-graph-chat) — EXECUTING
-Plan: 3 of 3
-Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 3/7 phases complete (12 ✅ + 13 ✅ + 18 ✅), Phase 15 next.
+Phase: 17 (conversational-graph-chat) — ✅ COMPLETE
+Plan: 3 of 3 shipped
+Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 5/7 phases complete (12 ✅ + 13 ✅ + 15 ✅ + 17 ✅ + 18 ✅), Phase 16 next candidate.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Phase complete — ready for verification
+Status: Phase 17 verified (passed) — 1384/1384 tests, 4 non-blocking WR- warnings in 17-REVIEW.md
 Last activity: 2026-04-22
 
-Progress: [██████░░░░] 43% (3/7 phases complete — 12 ✅, 13 ✅, 18 ✅)
+Progress: [███████░░░] 71% (5/7 phases complete — 12 ✅, 13 ✅, 15 ✅, 17 ✅, 18 ✅)
 
 **Build order (locked in SUMMARY.md):**
 
