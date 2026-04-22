@@ -2,7 +2,7 @@
 name: graphify
 description: any input (code, docs, papers, images) → knowledge graph → clustered communities → HTML + JSON + audit report
 trigger: /graphify
-capability_manifest: graphify-out/manifest.json
+capability_manifest: graphify-out/capability.json
 ---
 
 # /graphify

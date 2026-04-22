@@ -306,7 +306,7 @@ def to_json(G: nx.Graph, communities: dict[int, list[str]], output_path: str) ->
         write_runtime_manifest(Path(output_path).parent)
     except Exception as exc:
         raise RuntimeError(
-            "graphify-out/manifest.json could not be written; install graphify with [mcp] extras "
+            "graphify-out/capability.json could not be written; install graphify with [mcp] extras "
             "(jsonschema, PyYAML) or see prior exception"
         ) from exc
 

@@ -225,9 +225,15 @@ def validate_manifest(manifest_dict: dict[str, Any]) -> None:
 
 
 def write_manifest_atomic(out_dir: Path, data: dict[str, Any]) -> Path:
-    """Write graphify-out/manifest.json via .tmp + os.replace."""
+    """Write graphify-out/capability.json via .tmp + os.replace.
+
+    Renamed from manifest.json in quick-260422-jdj to eliminate the path
+    collision with detect.py's incremental mtime manifest at
+    graphify-out/manifest.json. Atomic write semantics (``.tmp`` + os.replace)
+    and schema shape are preserved.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
-    target = out_dir / "manifest.json"
+    target = out_dir / "capability.json"
     tmp = target.with_suffix(".tmp")
     payload = json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
     tmp.write_text(payload, encoding="utf-8")
@@ -236,7 +242,7 @@ def write_manifest_atomic(out_dir: Path, data: dict[str, Any]) -> Path:
 
 
 def write_runtime_manifest(out_dir: Path) -> Path:
-    """Build and write manifest.json (MANIFEST-02 hook after graph export)."""
+    """Build and write capability.json (MANIFEST-02 hook after graph export)."""
     data = build_manifest_dict()
     validate_manifest(data)
     return write_manifest_atomic(out_dir, data)
