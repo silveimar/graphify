@@ -73,8 +73,8 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 - [x] **ENRICH-03**: Enrichment writes **overlay sidecar only** (`graphify-out/enrichment.json`) — `graph.json` is never mutated (v1.1 invariant preserved; Pitfall 3 critical mitigation)
 - [ ] **ENRICH-04**: Atomic `.tmp` + `os.replace` write on `enrichment.json`; a shared `fcntl.flock` on `.enrichment.lock` coordinates with foreground `/graphify` to prevent write races
 - [x] **ENRICH-05**: Enrichment pins `--snapshot-id` at process start and runs against that snapshot for the whole run — does NOT follow new snapshots mid-run (determinism + race-free delta machinery)
-- [ ] **ENRICH-06**: Event-driven trigger via `watch.py` post-rebuild hook (opt-in `--enrich` flag); **no `apscheduler` dependency** per OQ-1 resolution — manual + event-driven is sufficient for v1.4
-- [ ] **ENRICH-07**: Foreground `/graphify` rebuild grabs the `.enrichment.lock` and enrichment SIGTERM-aborts cleanly without corrupting partial writes
+- [x] **ENRICH-06**: Event-driven trigger via `watch.py` post-rebuild hook (opt-in `--enrich` flag); **no `apscheduler` dependency** per OQ-1 resolution — manual + event-driven is sufficient for v1.4
+- [x] **ENRICH-07**: Foreground `/graphify` rebuild grabs the `.enrichment.lock` and enrichment SIGTERM-aborts cleanly without corrupting partial writes
 - [x] **ENRICH-08**: `serve.py::_load_enrichment_overlay(out_dir)` merges enrichment at read time (post-load, not inside `_load_graph`) so tests mocking `_load_graph` remain unaffected
 - [x] **ENRICH-09**: `serve.py::_reload_if_stale()` adds mtime watch for `enrichment.json` alongside existing `graph.json` watch
 - [ ] **ENRICH-10** `[P2]`: `graphify enrich --dry-run` emits cost preview (estimated tokens per pass, per-node budget breakdown) without calling LLMs
