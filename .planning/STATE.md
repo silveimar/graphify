@@ -4,8 +4,8 @@ milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
 status: executing
 stopped_at: Phase 15 context gathered
-last_updated: "2026-04-20T23:25:01.910Z"
-last_activity: 2026-04-20 -- Phase 15 planning complete
+last_updated: "2026-04-22T15:28:36.359Z"
+last_activity: 2026-04-22 -- Phase 15 execution started
 progress:
   total_phases: 7
   completed_phases: 3
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis and usage-weighted self-improvement, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, now being extended in v1.4 to agent discoverability (MCP capability manifest + SEED-002 harness export), Obsidian thinking-command depth, and graph-quality-over-time via heterogeneous routing + async enrichment + focus-aware zoom + grounded chat + SPAR-Kit argumentation.
-**Current focus:** Phases 12 + 13 + 18 shipped (Phase 18 awaiting `/gsd-verify-work` sign-off). v1.4 build order next candidate: **Phase 15** (Async Background Enrichment, soft-depends on 12 routing.json) — see Build order list below.
+**Current focus:** Phase 15 — async-background-enrichment
 
 ## Current Position
 
-Phase: 18 Focus-Aware Graph Context — ✅ COMPLETE 2026-04-20. All 4 plans shipped; verifier re-run post gap closure flipped `gaps_found → passed`. 5/5 SCs VERIFIED (SC4 closure: inline `Path(project_root).name == "graphify-out"` guard wired into all 4 production snapshot helpers). 9/9 FOCUS REQ-IDs complete. Code review 0 critical / 0 warning / 3 info (cosmetic).
-Plan: No active plan — Phase 18 done. Next candidate: Phase 15 Async Background Enrichment (plans TBD; soft-depends on Phase 12 routing.json).
+Phase: 15 (async-background-enrichment) — EXECUTING
+Plan: 1 of 6
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 3/7 phases complete (12 ✅ + 13 ✅ + 18 ✅), Phase 15 next.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
-Status: Ready to execute
-Last activity: 2026-04-20 -- Phase 15 planning complete
+Status: Executing Phase 15
+Last activity: 2026-04-22 -- Phase 15 execution started
 
 Progress: [██████░░░░] 43% (3/7 phases complete — 12 ✅, 13 ✅, 18 ✅)
 

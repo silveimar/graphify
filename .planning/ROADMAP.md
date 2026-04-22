@@ -200,7 +200,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   4. User invokes `graphify enrich --dry-run` and receives a per-pass cost preview (estimated tokens, per-node budget breakdown) without any LLM calls firing.
   5. A grep-CI test asserts only `build.py` and `__main__.py` call `_write_graph_json` — enrichment writes are structurally prevented from touching the pipeline artifact.
 **Plans**: 6 plans in 4 waves.
-- [ ] 15-01-PLAN.md — Module scaffold: `enrich.py` + `graphify enrich` CLI + fcntl.flock lifecycle + snapshot pinning + SIGTERM handler (Wave 1; ENRICH-01, 04, 05, 07)
+- [x] 15-01-PLAN.md — Module scaffold: `enrich.py` + `graphify enrich` CLI + fcntl.flock lifecycle + snapshot pinning + SIGTERM handler (Wave 1; ENRICH-01, 04, 05, 07)
 - [ ] 15-02-PLAN.md — Three LLM passes (description, patterns, community) + priority-drain budget + alias redirect + routing skip-list + atomic per-pass commit (Wave 2; ENRICH-02, 03, 11, 12)
 - [ ] 15-03-PLAN.md — Staleness pass (compute-only) + D-07 resume-by-default + D-05 schema versioning guard (Wave 2; ENRICH-02, 03, 05)
 - [ ] 15-04-PLAN.md — `serve.py::_load_enrichment_overlay` merge-on-read + `_reload_if_stale` enrichment.json mtime watcher + alias-on-read (Wave 3; ENRICH-08, 09, 12)
@@ -272,7 +272,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 12. Heterogeneous Extraction Routing | v1.4 | 6/6 | Complete | 2026-04-17 |
 | 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 4/4 | Complete | 2026-04-17 |
 | 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
-| 15. Async Background Enrichment | v1.4 | 0/6 | Planned | — |
+| 15. Async Background Enrichment | v1.4 | 1/6 | In Progress|  |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
 | 17. Conversational Graph Chat | v1.4 | 0/TBD | Planned | — |
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
