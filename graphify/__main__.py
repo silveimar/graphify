@@ -1053,6 +1053,13 @@ def main() -> None:
         print("    --from <path>          compare FROM this snapshot (for delta generation)")
         print("    --to <path>            compare TO this snapshot (for delta generation)")
         print("    --delta                also generate GRAPH_DELTA.md comparing against previous snapshot")
+        print("  enrich                 run background derivation passes over an existing graph (overlay only)")
+        print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
+        print("    --budget N              token budget cap (description → patterns → community; staleness compute-only)")
+        print("    --pass {description,patterns,community,staleness}")
+        print("                            run only the specified pass(es). Repeatable. Default: all 4.")
+        print("    --dry-run               preview tokens/calls/$est per pass; no LLM invocations (ENRICH-10)")
+        print("    --snapshot-id ID        pin to a specific snapshot_id (default: latest at process start)")
         print("  benchmark [graph.json]  measure token reduction vs naive full-corpus approach")
         print("  capability [--stdout|--validate]  MCP capability manifest JSON / drift gate (Phase 13)")
         print("  harness export [--target claude]  Emit SOUL/HEARTBEAT/USER harness files (Phase 13 / SEED-002)")
@@ -1836,6 +1843,74 @@ def main() -> None:
             print(f"error: path not found: {target}", file=sys.stderr)
             sys.exit(2)
         run_corpus(target, use_router=use_router)
+    elif cmd == "enrich":
+        # graphify enrich [--graph PATH] [--budget N] [--pass NAME] [--dry-run] [--snapshot-id ID]
+        # Inline argparse equivalent of: sub.add_parser("enrich", ...) — follows __main__.py convention
+        import argparse as _ap
+
+        p_enrich = _ap.ArgumentParser(
+            prog="graphify enrich",
+            description="Run background derivation passes over an existing graph (overlay only — graph.json is never mutated)",
+        )
+        p_enrich.add_argument(
+            "--graph",
+            default="graphify-out/graph.json",
+            help="Path to graph.json (default: graphify-out/graph.json)",
+        )
+        p_enrich.add_argument(
+            "--budget",
+            type=int,
+            default=None,
+            help="Token budget cap applied in priority-drain order per D-03 "
+                 "(description -> patterns -> community; staleness is compute-only)",
+        )
+        p_enrich.add_argument(
+            "--pass",
+            dest="pass_name",
+            action="append",
+            choices=["description", "patterns", "community", "staleness"],
+            default=None,
+            help="Run only the specified pass(es). Repeatable. Default: all 4 in D-01 order.",
+        )
+        p_enrich.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Preview tokens/calls/$est per pass; no LLM invocations (ENRICH-10 P2)",
+        )
+        p_enrich.add_argument(
+            "--snapshot-id",
+            default=None,
+            help="Pin to a specific snapshot_id (advanced; default: latest at process start per ENRICH-05)",
+        )
+        from graphify.enrich import run_enrichment
+        opts = p_enrich.parse_args(sys.argv[2:])
+        graph_path = Path(opts.graph).resolve()
+        out_dir = graph_path.parent
+        try:
+            result = run_enrichment(
+                out_dir=out_dir,
+                budget=opts.budget,
+                passes=opts.pass_name,  # None → all 4 in D-01 order
+                dry_run=opts.dry_run,
+                snapshot_id_override=opts.snapshot_id,
+                project_root=out_dir.parent,
+            )
+        except BlockingIOError:
+            print(
+                "[graphify] enrichment: another enrichment is already running "
+                "(see .enrichment.pid); exiting",
+                file=sys.stderr,
+            )
+            sys.exit(3)
+        except OSError as exc:
+            # Read-only filesystem, permission denied, invalid path, etc.
+            # SystemExit(2) from run_enrichment's own guards propagates untouched.
+            print(
+                f"[graphify] enrichment: cannot access {graph_path}: {exc}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        sys.exit(1 if result.aborted else 0)
     elif cmd == "benchmark":
         from graphify.benchmark import run_benchmark, print_benchmark
         graph_path = sys.argv[2] if len(sys.argv) > 2 else "graphify-out/graph.json"

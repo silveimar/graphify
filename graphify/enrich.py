@@ -195,9 +195,10 @@ def run_enrichment(
     global _lock_fd
 
     project_root = project_root or out_dir.parent
-    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Guard: graph.json must exist (ENRICH-01)
+    # Guard: graph.json must exist (ENRICH-01). Checked BEFORE any directory writes
+    # so a missing / unwritable out_dir surfaces as a clean exit 2 instead of an
+    # unhandled OSError from mkdir on a read-only filesystem.
     graph_path = out_dir / "graph.json"
     if not graph_path.exists():
         print(
@@ -205,6 +206,9 @@ def run_enrichment(
             file=sys.stderr,
         )
         raise SystemExit(2)
+
+    # graph.json exists ⇒ out_dir exists; mkdir is a no-op but keeps intent explicit.
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     # Pin snapshot (ENRICH-05) — done BEFORE acquiring the lock so failures are fast
     if snapshot_id_override:
