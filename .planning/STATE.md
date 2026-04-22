@@ -30,7 +30,7 @@ Plan: Not started
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 3/7 phases complete (12 ✅ + 13 ✅ + 18 ✅), Phase 15 next.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
 Status: Ready to execute
-Last activity: 2026-04-22
+Last activity: 2026-04-22 - Completed quick task 260422-jdj: Fix manifest.json path collision between capability.py and detect.py
 
 Progress: [██████░░░░] 43% (3/7 phases complete — 12 ✅, 13 ✅, 18 ✅)
 
@@ -136,6 +136,7 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260416-okg | Add /graphify analyze entries to Usage cheat-sheet in all skill variants | 2026-04-16 | 058152b | [260416-okg-add-graphify-analyze-entries-to-usage-ch](./quick/260416-okg-add-graphify-analyze-entries-to-usage-ch/) |
+| 260422-jdj | Fix manifest.json path collision between capability.py and detect.py | 2026-04-22 | 9a52fa7 | [260422-jdj-fix-manifest-json-path-collision-between](./quick/260422-jdj-fix-manifest-json-path-collision-between/) |
 | Phase 15 P04 | 18 | 2 tasks | 2 files |
 | Phase 15 P05 | 15 | 2 tasks | 4 files |
 | Phase 15 P06 | 15 | 2 tasks | 5 files (3 new tests + enrich.py + test_enrich.py) |
