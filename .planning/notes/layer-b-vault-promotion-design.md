@@ -66,9 +66,51 @@ Cluster MOCs start with `stateMaps: 🟥` (auto-generated, not yet reviewed).
 - `Master Key (Graphify Node)` — `graph/*` namespace (entity type + confidence)
 - `Master Key (Graphify Meta)` — `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold` properties
 
+## Hybrid tag taxonomy (VAULT-07)
+
+Tag taxonomy follows the same 3-layer deep-merge pattern as folder_mapping:
+
+```
+Layer 1 — _DEFAULT_PROFILE in profile.py (hardcoded baseline)
+  tag_taxonomy:
+    garden: [plant, cultivate, probe, repot, revitalize, revisit, question]
+    graph:  [component, domain, workflow, decision, concept, integration,
+             service, dataset, team, extracted, inferred, ambiguous]
+    source: [confluence, readme, doc, code, paper, pdf, jira, slack, github,
+             notion, obsidian, web]
+    tech:   [python, typescript, javascript, go, rust, java, sql, graphql,
+             docker, k8s]
+
+Layer 2 — .graphify/profile.yaml user overrides (deep-merged over defaults)
+  tag_taxonomy:
+    tech:
+      - elixir       # project-specific additions
+
+Layer 3 — Auto-detected per run, written back to profile.yaml (VAULT-06)
+  tag_taxonomy:
+    tech:
+      - python       # inferred from graph.json source_file extensions
+```
+
+`_VALID_TOP_LEVEL_KEYS` in `profile.py` gains `tag_taxonomy` and `profile_sync`.
+
+## Profile write-back (VAULT-06)
+
+After each promotion run, `vault_promote.py` union-merges into `.graphify/profile.yaml`:
+- Detected `tech/*` tags (from `source_file` extensions in `graph.json`)
+- Detected `source/*` tags (from `file_type` field)
+- Folder paths actually written this run (confirms folder_mapping is live)
+
+**Write-back rules:**
+- Union-only — never removes an existing entry
+- Deduplicated and sorted alphabetically within each namespace
+- Gated by `profile_sync.auto_update: true` (default) — user can opt out
+- Safe write: reads profile → merges → rewrites atomically (temp file + rename)
+
 ## Script I/O
 
 **Input:** `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md`
+**Config:** `.graphify/profile.yaml` (read + write-back)
 
 **Output:**
 - `Atlas/Dots/Things/<slug>.md`
@@ -78,4 +120,5 @@ Cluster MOCs start with `stateMaps: 🟥` (auto-generated, not yet reviewed).
 - `Atlas/Dots/People/<slug>.md`
 - `Atlas/Maps/<cluster-slug>.md`
 - `Atlas/Sources/Clippings/<slug>.md`
+- `.graphify/profile.yaml` (write-back: detected tags + used folders)
 - `graphify-out/import-log.md` (run provenance)

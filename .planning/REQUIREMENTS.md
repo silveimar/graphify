@@ -279,8 +279,8 @@ Priority tags: `[P2]` indicates the requirement is in v1.4 scope per user confir
 - Phase 16 Graph Argumentation Mode: 13 REQ-IDs (ARGUE-01..13)
 - Phase 17 Conversational Graph Chat: 12 REQ-IDs (CHAT-01..12)
 - Phase 18 Focus-Aware Graph Context: 9 REQ-IDs (FOCUS-01..09)
-- Phase 19 Vault Promotion Script: 5 REQ-IDs (VAULT-01..05)
-- **Total: 91/91 REQ-IDs mapped (100% coverage, no orphans, no duplicates).**
+- Phase 19 Vault Promotion Script: 7 REQ-IDs (VAULT-01..07)
+- **Total: 93/93 REQ-IDs mapped (100% coverage, no orphans, no duplicates).**
 
 ---
 
@@ -293,3 +293,5 @@ Priority tags: `[P2]` indicates the requirement is in v1.4 scope per user confir
 | VAULT-03 | Phase 19 | Every promoted note must include: `up`, `related` (EXTRACTED-confidence edges only), `created`, `collections` (cluster MOC), `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold`, and tags from `garden/plant` + `source/*` + `tech/*` + `graph/*` namespaces | planned | — |
 | VAULT-04 | Phase 19 | Promotion threshold: promote if `degree >= N` (CLI flag, default 3) OR node in god-nodes list OR node type is decision/question/quote; below threshold → referenced as backlink evidence only | planned | — |
 | VAULT-05 | Phase 19 | `graphify-out/import-log.md` written after each run with: vault path, run timestamp, nodes promoted count by type, threshold used, nodes skipped count | planned | — |
+| VAULT-06 | Phase 19 | After each run, `vault_promote.py` union-merges detected tags (`tech/*` from `source_file` extensions, `source/*` from `file_type`) and folders actually written into `.graphify/profile.yaml`; write-back is union-only (never removes), sorted+deduped, atomic (temp file + rename), gated by `profile_sync.auto_update` (default: true) | planned | — |
+| VAULT-07 | Phase 19 | `profile.py::_DEFAULT_PROFILE` gains `tag_taxonomy` section (garden/graph/source/tech namespaces with baseline values) and `profile_sync` section; `_VALID_TOP_LEVEL_KEYS` updated to include both; `validate_profile` extended to validate `tag_taxonomy` shape (dict of str→list[str]) and `profile_sync.auto_update` (bool) | planned | — |
