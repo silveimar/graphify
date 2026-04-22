@@ -1073,7 +1073,11 @@ def _fuzzy_suggest(
 
 
 def _truncate_to_token_cap(narrative: str, cap: int = _CHAT_NARRATIVE_TOKEN_CAP) -> str:
-    """D-09: sentence-boundary truncation at 500 tokens (chars/4 heuristic)."""
+    """D-09: sentence-boundary truncation at 500 tokens (chars/4 heuristic).
+
+    Prefers sentence boundaries. If the first sentence alone exceeds char_cap,
+    falls back to a word-boundary cut (WR-02) rather than a raw character slice.
+    """
     char_cap = cap * 4
     if len(narrative) <= char_cap:
         return narrative
@@ -1086,7 +1090,10 @@ def _truncate_to_token_cap(narrative: str, cap: int = _CHAT_NARRATIVE_TOKEN_CAP)
         out.append(s)
         total += len(s) + 1
     if not out:
-        return narrative[:char_cap].rstrip() + "…"
+        # WR-02: word-boundary cut instead of mid-sentence char slice.
+        head = sentences[0] if sentences else narrative
+        trimmed = head[:char_cap].rsplit(" ", 1)[0].rstrip(".!?,; ")
+        return trimmed + "…"
     truncated = " ".join(out)
     if len(out) < len(sentences):
         truncated = truncated.rstrip(".!?") + "…"
