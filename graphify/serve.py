@@ -1216,8 +1216,8 @@ def _run_chat_core(
         if not isinstance(session_id, str) or len(session_id) > _CHAT_SESSION_ID_MAX_LEN:
             session_id = None  # silent-ignore malformed (Pitfall 5 + T-17-03)
 
-    # --- Lazy TTL eviction ---
-    now = time.time()
+    # --- Lazy TTL eviction (WR-01: monotonic clock for elapsed-time checks) ---
+    now = time.monotonic()
     _chat_evict_stale(now)
 
     # --- Phase 17 CHAT-07 / D-16: alias redirect closure (verbatim copy of _run_connect_topics:1245) ---

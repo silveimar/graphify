@@ -2854,7 +2854,7 @@ def test_chat_ttl_eviction(_reset_chat_sessions):
     G = _make_graph()
     communities = _communities_from_graph(G)
     _CHAT_SESSIONS["old"] = deque(
-        [{"query": "x", "citations": [], "narrative_hash": "", "ts": time.time() - 2000}],
+        [{"query": "x", "citations": [], "narrative_hash": "", "ts": time.monotonic() - 2000}],
         maxlen=10,
     )
     _run_chat_core(G, communities, {}, {"query": "what is extract?", "session_id": "fresh"})
