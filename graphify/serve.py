@@ -1232,13 +1232,21 @@ def _run_chat_core(
     _effective_alias_map: dict[str, str] = alias_map or {}
 
     def _resolve_alias(node_id: str) -> str:
-        canonical = _effective_alias_map.get(node_id)
-        if canonical and canonical != node_id:
-            aliases = _resolved_aliases.setdefault(canonical, [])
+        # WR-03: transitive resolution with cycle guard, in case dedup_report.json
+        # ever contains chained entries (e.g. {"a": "b", "b": "c"}).
+        seen: set[str] = set()
+        current = node_id
+        while current in _effective_alias_map and current not in seen:
+            seen.add(current)
+            nxt = _effective_alias_map[current]
+            if nxt == current:
+                break
+            current = nxt
+        if current != node_id:
+            aliases = _resolved_aliases.setdefault(current, [])
             if node_id not in aliases:
                 aliases.append(node_id)
-            return canonical
-        return node_id
+        return current
 
     # --- Stage 1: entity terms + intent + history augmentation ---
     terms = _extract_entity_terms(query_raw)
