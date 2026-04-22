@@ -43,8 +43,15 @@ from graphify.serve import (
     _FOCUS_DEBOUNCE_CACHE,
     _check_focus_freshness,
     _focus_debounce_key,
+    _run_chat_core,
+    _CHAT_SESSIONS,
+    _classify_intent,
+    _extract_entity_terms,
     QUERY_GRAPH_META_SENTINEL,
 )
+from collections import deque
+import time
+from unittest.mock import MagicMock
 
 
 def _make_graph() -> nx.Graph:
@@ -2762,3 +2769,87 @@ def test_overlay_missing_file_noop(tmp_path):
     assert G.nodes["N1"]["description"] == "base"
     assert "enriched_description" not in G.nodes["N1"]
     assert G.graph.get("patterns") is None
+
+
+# ============================================================
+# Phase 17 CHAT-01/02/08 — conversational chat tool
+# ============================================================
+
+@pytest.fixture
+def _reset_chat_sessions():
+    """Clear the module-level chat session store around each chat test."""
+    _CHAT_SESSIONS.clear()
+    yield
+    _CHAT_SESSIONS.clear()
+
+
+def test_chat_tool_registered():
+    """CHAT-01 registry surface: chat tool discoverable via build_mcp_tools()."""
+    from graphify import mcp_tool_registry
+    tools = (
+        getattr(mcp_tool_registry, "TOOLS", None)
+        or getattr(mcp_tool_registry, "tools", None)
+        or mcp_tool_registry.build_mcp_tools()
+    )
+    assert tools is not None, "mcp_tool_registry must expose a tool list"
+    chat_tool = next((t for t in tools if getattr(t, "name", None) == "chat"), None)
+    assert chat_tool is not None, "chat tool missing from registry"
+    schema = chat_tool.inputSchema
+    assert "query" in schema["required"]
+    assert "query" in schema["properties"]
+    assert "session_id" in schema["properties"]
+
+
+def test_chat_envelope_ok(_reset_chat_sessions):
+    """CHAT-01 / CHAT-09: _run_chat_core emits a valid D-02 sentinel envelope."""
+    G = _make_graph()
+    communities = _communities_from_graph(G)
+    response = _run_chat_core(G, communities, {}, {"query": "what is extract?"})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["intent"] in ("explore", "connect", "summarize")
+    assert meta["session_id"] is None
+    assert "resolved_from_alias" in meta
+    assert "citations" in meta and isinstance(meta["citations"], list)
+
+
+def test_chat_intent_connect_calls_bi_bfs(_reset_chat_sessions, monkeypatch):
+    """CHAT-02 connect intent dispatches _bidirectional_bfs when 2+ seeds resolve."""
+    G = _make_graph()
+    communities = _communities_from_graph(G)
+    spy = MagicMock(return_value=(set(G.nodes), [], "ok"))
+    monkeypatch.setattr("graphify.serve._bidirectional_bfs", spy)
+    response = _run_chat_core(
+        G, communities, {}, {"query": "how does extract connect to build"}
+    )
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["intent"] == "connect"
+    assert spy.called, "connect intent must invoke _bidirectional_bfs when 2+ seeds resolve"
+
+
+def test_chat_session_isolation(_reset_chat_sessions):
+    """CHAT-08 session_id scoping + session_id=None never writes to shared state."""
+    G = _make_graph()
+    communities = _communities_from_graph(G)
+    _run_chat_core(G, communities, {}, {"query": "what is extract?", "session_id": "s1"})
+    _run_chat_core(G, communities, {}, {"query": "what is extract?", "session_id": "s2"})
+    _run_chat_core(G, communities, {}, {"query": "what is extract?", "session_id": None})
+    assert "s1" in _CHAT_SESSIONS
+    assert "s2" in _CHAT_SESSIONS
+    assert None not in _CHAT_SESSIONS
+    assert len(_CHAT_SESSIONS["s1"]) >= 1
+    assert len(_CHAT_SESSIONS["s2"]) >= 1
+
+
+def test_chat_ttl_eviction(_reset_chat_sessions):
+    """CHAT-08 30-min idle TTL evicts stale sessions lazily on next call."""
+    G = _make_graph()
+    communities = _communities_from_graph(G)
+    _CHAT_SESSIONS["old"] = deque(
+        [{"query": "x", "citations": [], "narrative_hash": "", "ts": time.time() - 2000}],
+        maxlen=10,
+    )
+    _run_chat_core(G, communities, {}, {"query": "what is extract?", "session_id": "fresh"})
+    assert "old" not in _CHAT_SESSIONS, "stale session should have been evicted"
