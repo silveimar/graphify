@@ -2584,3 +2584,181 @@ def test_focus_malformed_reported_at():
     assert _check_focus_freshness("2026-99-99T99:99:99Z") is False
     assert _check_focus_freshness("") is True  # empty = absent = backward compatible (D-15)
     assert _check_focus_freshness(None) is True  # None = absent
+
+
+# ============================================================================
+# Phase 15 Plan 04: _load_enrichment_overlay (ENRICH-08/09/12, D-06, D-16)
+# ============================================================================
+
+def _write_enrichment_graph_json(tmp_path, G):
+    """Helper: serialize G to graphify-out/graph.json and return (out_dir, graph_path)."""
+    out_dir = tmp_path / "graphify-out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    graph_path = out_dir / "graph.json"
+    data = json_graph.node_link_data(G, edges="links")
+    graph_path.write_text(json.dumps(data), encoding="utf-8")
+    return out_dir, graph_path
+
+
+def test_load_enrichment_overlay(tmp_path):
+    """ENRICH-08 + D-06: overlay adds enriched_description without overwriting base description."""
+    from graphify.serve import _load_enrichment_overlay
+    G = nx.Graph()
+    G.add_node("N1", label="n1", description="base", source_file="a.py", community=0)
+    G.add_node("N2", label="n2", source_file="b.py", community=0)
+    out_dir, gp = _write_enrichment_graph_json(tmp_path, G)
+    envelope = {
+        "version": 1,
+        "snapshot_id": "snap-abc",
+        "passes": {
+            "description": {"N1": "enriched text A", "N2": "enriched text B"},
+        },
+    }
+    (out_dir / "enrichment.json").write_text(json.dumps(envelope), encoding="utf-8")
+
+    G2 = _load_graph(str(gp))
+    _load_enrichment_overlay(G2, out_dir)
+
+    assert G2.nodes["N1"]["description"] == "base"  # base preserved — D-06
+    assert G2.nodes["N1"]["enriched_description"] == "enriched text A"
+    assert G2.nodes["N2"]["enriched_description"] == "enriched text B"
+    # N2 had no base description — overlay must not synthesize one
+    assert G2.nodes["N2"].get("description") in (None, "")
+
+
+def test_overlay_augments_not_overwrites(tmp_path):
+    """D-06: staleness_override / community_summary / patterns augment — never clobber base fields."""
+    from graphify.serve import _load_enrichment_overlay
+    G = nx.Graph()
+    G.add_node("N1", label="n1", staleness="FRESH", community=0)
+    G.add_node("N2", label="n2", community=0)
+    G.add_node("N3", label="n3", community=1)
+    out_dir, gp = _write_enrichment_graph_json(tmp_path, G)
+    envelope = {
+        "version": 1,
+        "snapshot_id": "snap-xyz",
+        "passes": {
+            "community": {"0": "cluster 0 summary", "1": "cluster 1 summary"},
+            "staleness": {"N1": "GHOST", "N2": "STALE", "N3": "FRESH"},
+            "patterns": [{"name": "god_node", "nodes": ["N1"]}],
+        },
+    }
+    (out_dir / "enrichment.json").write_text(json.dumps(envelope), encoding="utf-8")
+
+    G2 = _load_graph(str(gp))
+    _load_enrichment_overlay(G2, out_dir)
+
+    # staleness_override set; base staleness not overwritten (N1 retains FRESH)
+    assert G2.nodes["N1"]["staleness_override"] == "GHOST"
+    assert G2.nodes["N1"]["staleness"] == "FRESH"
+    assert G2.nodes["N2"]["staleness_override"] == "STALE"
+    assert G2.nodes["N3"]["staleness_override"] == "FRESH"
+
+    # community_summary threaded to all nodes in that community
+    assert G2.nodes["N1"]["community_summary"] == "cluster 0 summary"
+    assert G2.nodes["N2"]["community_summary"] == "cluster 0 summary"
+    assert G2.nodes["N3"]["community_summary"] == "cluster 1 summary"
+
+    # patterns live at graph-level
+    patterns = G2.graph.get("patterns")
+    assert isinstance(patterns, list) and len(patterns) == 1
+    assert patterns[0]["name"] == "god_node"
+    assert patterns[0]["nodes"] == ["N1"]
+
+
+def test_reload_if_stale_enrichment(tmp_path):
+    """ENRICH-09: re-apply overlay when enrichment.json mtime changes. graph.json must NOT be mutated."""
+    import os
+    import time
+    from graphify.serve import _load_enrichment_overlay
+    G = nx.Graph()
+    G.add_node("N1", label="n1", description="base", community=0)
+    out_dir, gp = _write_enrichment_graph_json(tmp_path, G)
+    graph_mtime_before = os.stat(gp).st_mtime
+
+    # v1 overlay
+    env1 = {
+        "version": 1,
+        "snapshot_id": "s1",
+        "passes": {"description": {"N1": "first"}},
+    }
+    ep = out_dir / "enrichment.json"
+    ep.write_text(json.dumps(env1), encoding="utf-8")
+
+    G2 = _load_graph(str(gp))
+    _load_enrichment_overlay(G2, out_dir)
+    assert G2.nodes["N1"]["enriched_description"] == "first"
+
+    # v2 overlay — rewrite and bump mtime
+    env2 = {
+        "version": 1,
+        "snapshot_id": "s2",
+        "passes": {"description": {"N1": "second"}},
+    }
+    ep.write_text(json.dumps(env2), encoding="utf-8")
+    new_ts = time.time() + 5
+    os.utime(ep, (new_ts, new_ts))
+
+    _load_enrichment_overlay(G2, out_dir)
+    assert G2.nodes["N1"]["enriched_description"] == "second"
+
+    # graph.json untouched — mtime unchanged (T-15-02)
+    assert os.stat(gp).st_mtime == graph_mtime_before
+
+
+def test_overlay_alias_redirect_on_read(tmp_path):
+    """D-16 / ENRICH-12: overlay node_ids routed through dedup alias_map before G.nodes lookup."""
+    from graphify.serve import _load_enrichment_overlay
+    G = nx.Graph()
+    G.add_node("canonical_new", label="c", community=0)
+    out_dir, gp = _write_enrichment_graph_json(tmp_path, G)
+
+    # Write dedup report mapping old_alias → canonical_new
+    dedup = {
+        "version": "1",
+        "alias_map": {"old_alias": "canonical_new"},
+        "merges": [],
+    }
+    (out_dir / "dedup_report.json").write_text(json.dumps(dedup), encoding="utf-8")
+
+    # Envelope keyed by old_alias + one genuinely-missing id
+    env = {
+        "version": 1,
+        "snapshot_id": "sid",
+        "passes": {
+            "description": {
+                "old_alias": "enriched via alias",
+                "ghost_id": "should be silently skipped",
+            },
+            "staleness": {"old_alias": "STALE"},
+        },
+    }
+    (out_dir / "enrichment.json").write_text(json.dumps(env), encoding="utf-8")
+
+    G2 = _load_graph(str(gp))
+    _load_enrichment_overlay(G2, out_dir)
+
+    # Alias redirected to canonical
+    assert G2.nodes["canonical_new"]["enriched_description"] == "enriched via alias"
+    assert G2.nodes["canonical_new"]["staleness_override"] == "STALE"
+
+    # No phantom nodes created for alias or ghost
+    assert "old_alias" not in G2.nodes
+    assert "ghost_id" not in G2.nodes
+
+
+def test_overlay_missing_file_noop(tmp_path):
+    """Missing enrichment.json → no-op. Preserves existing tests that mock _load_graph."""
+    from graphify.serve import _load_enrichment_overlay
+    G = nx.Graph()
+    G.add_node("N1", label="n1", description="base")
+    out_dir = tmp_path / "graphify-out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # No enrichment.json written
+    _load_enrichment_overlay(G, out_dir)
+
+    # Unchanged
+    assert G.nodes["N1"]["description"] == "base"
+    assert "enriched_description" not in G.nodes["N1"]
+    assert G.graph.get("patterns") is None
