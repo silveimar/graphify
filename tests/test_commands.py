@@ -173,3 +173,37 @@ def test_challenge_md_has_evidence_sections():
 
 def test_challenge_md_has_anti_fabrication_guard():
     assert "do NOT fabricate" in _read("challenge"), "challenge.md must include anti-fabrication guard"
+
+
+# ============================================================
+# Phase 17 CHAT-06 — /graphify-ask slash command
+# ============================================================
+
+def _parse_frontmatter(path: Path) -> dict[str, str]:
+    text = path.read_text()
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
+    assert m, f"{path} missing YAML frontmatter"
+    block = m.group(1)
+    out: dict[str, str] = {}
+    for line in block.splitlines():
+        if ":" in line:
+            k, v = line.split(":", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def test_ask_md_frontmatter():
+    """CHAT-06: /graphify-ask command file exists with connect.md-style frontmatter."""
+    path = _commands_dir() / "ask.md"
+    assert path.exists(), "graphify/commands/ask.md missing"
+    fm = _parse_frontmatter(path)
+    assert fm.get("name") == "graphify-ask"
+    assert fm.get("description"), "description field required"
+    assert fm.get("argument-hint"), "argument-hint field required"
+    assert fm.get("disable-model-invocation") == "true"
+    # Per CONTEXT.md Clarification: no `target:` field
+    assert "target" not in fm, "ask.md must NOT have a target: field per CONTEXT.md Clarification"
+    # Body must reference the chat MCP tool
+    body = path.read_text()
+    assert "chat" in body, "ask.md body must invoke the chat MCP tool"
+    assert "$ARGUMENTS" in body, "ask.md must pass $ARGUMENTS to query"
