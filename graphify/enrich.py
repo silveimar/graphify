@@ -316,16 +316,28 @@ def run_enrichment(
     result = EnrichmentResult(snapshot_id=snapshot_id, dry_run=dry_run)
 
     try:
+        requested_passes = passes or list(PASS_NAMES)
         _run_passes(
             out_dir,
             snapshot_id,
             snapshot_path,
-            passes or list(PASS_NAMES),
+            requested_passes,
             budget=budget,
             dry_run=dry_run,
             resume=resume,
             result=result,
         )
+        # ENRICH-10 P2 / SC-4: dry-run emits a D-02 envelope and leaves disk untouched.
+        if dry_run:
+            from graphify.snapshot import load_snapshot
+            G_loaded, communities_loaded, _meta = load_snapshot(snapshot_path)
+            per_pass: dict[str, dict] = {}
+            for pass_name in requested_passes:
+                per_pass[pass_name] = _estimate_pass_cost(
+                    pass_name, G_loaded, communities_loaded,
+                    budget_cap=budget,
+                )
+            _emit_dry_run_envelope(result, per_pass, budget_cap=budget)
     finally:
         # Always cancel the watchdog alarm on normal exit (Pitfall 4)
         signal.alarm(0)
@@ -798,3 +810,179 @@ def _run_staleness_pass(
             continue
         results[canonical] = label
     return results, 0, 0  # D-03 compute-only invariant
+
+
+# ---------------------------------------------------------------------------
+# Plan 15-06: dry-run D-02 envelope (ENRICH-10 P2, SC-4)
+# ---------------------------------------------------------------------------
+
+def _lookup_price_per_1k(model_id: str) -> float | None:
+    """Return the USD price per 1k tokens for ``model_id`` if declared.
+
+    Reads ``graphify/routing_models.yaml`` using ``yaml.safe_load`` only
+    (T-10-04 compliance). Returns ``None`` when:
+      - the YAML file is missing
+      - PyYAML is unavailable
+      - the file lacks a ``pricing.per_1k_tokens`` section
+      - ``model_id`` is not in the pricing dict
+      - the value cannot be coerced to ``float``
+    """
+    yaml_path = Path(__file__).parent / "routing_models.yaml"
+    if not yaml_path.exists():
+        return None
+    try:
+        import yaml  # type: ignore[import-untyped]
+        data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return None
+    pricing = (data.get("pricing") or {}).get("per_1k_tokens") or {}
+    price = pricing.get(model_id)
+    if price is None:
+        return None
+    try:
+        return float(price)
+    except (TypeError, ValueError):
+        return None
+
+
+def _estimate_pass_cost(
+    pass_name: str,
+    G: Any,
+    communities: dict[int, list[str]],
+    *,
+    budget_cap: int | None,
+) -> dict:
+    """Dry-run cost estimator — invokes the real pass with ``dry_run=True``.
+
+    Mirrors production behavior exactly (no separate estimation path): each
+    ``_run_<pass>_pass`` returns ``(partial, tokens_estimate, calls_estimate)``
+    when called with ``dry_run=True``. We capture those counts and add
+    optional $-estimates drawn from ``routing_models.yaml``.
+
+    Returns a dict with keys:
+      - tokens_estimate (int)
+      - llm_calls_estimate (int)
+      - cost_usd_estimate (float | None)
+      - skipped (bool)          — True if dispatch failed / pass unknown
+      - compute_only (bool)     — True only for staleness
+    """
+    remaining = budget_cap if budget_cap is not None else sys.maxsize
+    out_dir = Path(".")
+    try:
+        if pass_name == "staleness":
+            _r, t, c = _run_staleness_pass(
+                G, out_dir, "dry",
+                alias_map={}, dry_run=True,
+            )
+            return {
+                "tokens_estimate": int(t),
+                "llm_calls_estimate": int(c),
+                "cost_usd_estimate": 0.0,
+                "skipped": False,
+                "compute_only": True,
+            }
+        if pass_name == "description":
+            _r, t, c = _run_description_pass(
+                G, out_dir, "dry",
+                budget_remaining=remaining, dry_run=True,
+                alias_map={}, routing_skip=set(),
+            )
+        elif pass_name == "patterns":
+            _r, t, c = _run_patterns_pass(
+                G, out_dir, "dry",
+                budget_remaining=remaining, dry_run=True, alias_map={},
+            )
+        elif pass_name == "community":
+            _r, t, c = _run_community_pass(
+                G, communities, out_dir, "dry",
+                budget_remaining=remaining, dry_run=True, alias_map={},
+            )
+        else:
+            return {
+                "tokens_estimate": 0, "llm_calls_estimate": 0,
+                "cost_usd_estimate": None,
+                "skipped": True, "compute_only": False,
+            }
+    except Exception:
+        t, c = 0, 0
+    # Pricing is best-effort: default tier model id, may be absent from YAML.
+    price_per_1k = _lookup_price_per_1k("anthropic/claude-3-5-sonnet-latest")
+    cost_usd: float | None
+    if price_per_1k is not None:
+        cost_usd = round((t / 1000.0) * price_per_1k, 4)
+    else:
+        cost_usd = None
+    return {
+        "tokens_estimate": int(t),
+        "llm_calls_estimate": int(c),
+        "cost_usd_estimate": cost_usd,
+        "skipped": False,
+        "compute_only": False,
+    }
+
+
+def _emit_dry_run_envelope(
+    result: "EnrichmentResult",
+    per_pass: dict[str, dict],
+    budget_cap: int | None,
+) -> None:
+    """Print the D-02 dry-run envelope: table + separator + JSON meta.
+
+    Format matches Phase 13 ``capability_describe`` and Phase 18
+    ``get_focus_context`` — agents can partition on ``---GRAPHIFY-META---``
+    and ``json.loads`` the trailing blob.
+    """
+    # ---- Human-readable table ----
+    print("graphify enrich --dry-run preview")
+    print(f"snapshot_id: {result.snapshot_id}")
+    print(f"budget cap:  {budget_cap if budget_cap is not None else '(unlimited)'}")
+    print()
+    header = f"  {'Pass':<12}  {'Tokens':>7}  {'Calls':>5}  {'$est':>6}  Status"
+    print(header)
+    print(f"  {'-'*12}  {'-'*7}  {'-'*5}  {'-'*6}  {'-'*12}")
+    totals_t = totals_c = 0
+    totals_cost = 0.0
+    any_cost = False
+    for name in ("description", "patterns", "community", "staleness"):
+        info = per_pass.get(name, {})
+        if not info:
+            continue
+        t = int(info.get("tokens_estimate", 0) or 0)
+        c = int(info.get("llm_calls_estimate", 0) or 0)
+        cost = info.get("cost_usd_estimate")
+        cost_s = f"{cost:.3f}" if cost is not None else "  —  "
+        if info.get("compute_only"):
+            status = "compute-only"
+        elif info.get("skipped"):
+            status = "skipped"
+        else:
+            status = "planned"
+        print(f"  {name:<12}  {t:>7}  {c:>5}  {cost_s:>6}  {status}")
+        totals_t += t
+        totals_c += c
+        if cost is not None:
+            totals_cost += cost
+            any_cost = True
+    print(f"  {'-'*12}  {'-'*7}  {'-'*5}  {'-'*6}  {'-'*12}")
+    within = budget_cap is None or totals_t <= budget_cap
+    total_cost_s = f"{totals_cost:.3f}" if any_cost else "  —  "
+    print(
+        f"  {'TOTAL':<12}  {totals_t:>7}  {totals_c:>5}  "
+        f"{total_cost_s:>6}  {'within budget' if within else 'OVER BUDGET'}"
+    )
+    # ---- D-02 separator + JSON meta ----
+    meta = {
+        "status": "preview",
+        "snapshot_id": result.snapshot_id,
+        "passes": per_pass,
+        "totals": {
+            "tokens_estimate": totals_t,
+            "llm_calls_estimate": totals_c,
+            "cost_usd_estimate": round(totals_cost, 4) if any_cost else None,
+        },
+        "budget_cap": budget_cap,
+        "within_budget": within,
+        "dry_run": True,
+    }
+    print("\n---GRAPHIFY-META---")
+    print(json.dumps(meta, indent=2, sort_keys=True, ensure_ascii=False))
