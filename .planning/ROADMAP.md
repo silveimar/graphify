@@ -257,6 +257,18 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - [x] 18-03-PLAN.md — P2 Debounce + Freshness: 500ms debounce cache + `reported_at` freshness with Py 3.10 Z-suffix shim (FOCUS-08 [P2], FOCUS-09 [P2]) — ✅ 2026-04-20 (commits 2309a57 + 0f06629)
 - [x] 18-04-PLAN.md — Gap closure: CR-01 sentinel wiring + WR-02/03/04 cleanups (SC4 PARTIAL → VERIFIED; inline `Path(project_root).name == "graphify-out"` guard in 4 snapshot helpers; dead `alias_map` param removed from `_run_get_focus_context_core`; WR-03 dispatcher-exercising test + WR-04 D-08 strict-depth invariants) — ✅ 2026-04-20 (commits 81d904a + 28b0f34 + edf793a + docs commit)
 
+### Phase 19: Vault Promotion Script (Layer B)
+**Goal**: A Python script (`graphify/vault_promote.py`) that reads `graphify-out/graph.json` and `GRAPH_REPORT.md`, classifies and scores nodes, then writes promoted Obsidian markdown notes directly into the user's vault at the correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy.
+**Depends on**: Phase 12 (graph.json schema stable), Phase 18 (graph.json read patterns established). No `serve.py` changes — pure file I/O.
+**Requirements**: VAULT-01, VAULT-02, VAULT-03, VAULT-04, VAULT-05 — 5 REQ-IDs.
+**Success Criteria** (what must be TRUE):
+  1. Running `graphify vault-promote --vault /path/to/vault --threshold 3` reads `graphify-out/graph.json` and writes notes to correct Ideaverse folders without touching any existing vault file it did not create.
+  2. Every promoted note has valid Ideaverse frontmatter: `up`, `related`, `created`, `collections`, `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold`, and at minimum one tag from each of: `garden/*`, `source/*`, `graph/*`.
+  3. Node type dispatch is correct: a god-node domain concept lands in `Atlas/Dots/Things/`, a knowledge gap lands in `Atlas/Dots/Questions/`, a cluster becomes `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
+  4. `related:` links are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted from wikilinks.
+  5. `graphify-out/import-log.md` is written after each run with vault path, run timestamp, promoted-count by type, threshold, and skipped-count.
+**Plans**: TBD (not yet planned).
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -284,6 +296,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
 | 17. Conversational Graph Chat | v1.4 | 3/3 | Complete   | 2026-04-22 |
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
+| 19. Vault Promotion Script (Layer B) | v1.4 | 0/TBD | Planned | — |
 
 ---
-*Last updated: 2026-04-20 — Phase 18 ✅ COMPLETE. Verifier re-run post gap closure flipped status `gaps_found → passed`: 5/5 SCs VERIFIED (including SC4 via inline `Path(project_root).name == "graphify-out"` guard in all 4 snapshot helpers), 9/9 FOCUS REQ-IDs satisfied, 1329 tests passing, code review 0 critical / 0 warning / 3 info (cosmetic). v1.4 progress: 3/7 phases complete (12 + 13 + 18). Build order: 12 ✅ → 13 ✅ → 18 ✅ → 15 (next candidate) → 17 → 16 → 14 → final manifest regen.*
+*Last updated: 2026-04-22 — Phase 19 added: Vault Promotion Script (Layer B), 5 REQ-IDs (VAULT-01..05). Design captured in `.planning/notes/layer-b-vault-promotion-design.md`. v1.4 progress: 3/8 phases complete.*
