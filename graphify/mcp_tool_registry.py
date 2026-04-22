@@ -211,6 +211,23 @@ def build_mcp_tools():
             }},
         ),
         types.Tool(
+            name="chat",
+            description=(
+                "Answer a natural-language question about the codebase with a graph-grounded "
+                "narrative. Every claim cites a real node (node_id, label, source_file). "
+                "Empty results return fuzzy suggestions. Deterministic, zero LLM in serve.py. "
+                "Used by the /graphify-ask slash command."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "session_id": {"type": "string"},
+                },
+                "required": ["query"],
+            },
+        ),
+        types.Tool(
             name="connect_topics",
             description="Return the shortest path between two topics PLUS a separate block of globally surprising cross-community bridges (NOT filtered to the A-B path). Used by the /connect slash command.",
             inputSchema={"type": "object", "properties": {

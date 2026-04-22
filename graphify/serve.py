@@ -6,8 +6,10 @@ import json
 import os
 import sys
 import math
+import re
 import time
 import uuid
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 import networkx as nx
@@ -899,6 +901,197 @@ def _resolve_focus_seeds(
 # Appears on its own line (preceded + followed by \n) so naive clients see it
 # as visually-separated text rather than a parse error (Pitfall 4).
 QUERY_GRAPH_META_SENTINEL = "\n---GRAPHIFY-META---\n"
+
+
+# ----------------------------------------------------------------------------
+# Phase 17 CHAT-01/02/08: conversational `chat` tool — Stage 1 shell.
+# Narrative composition + citation validation are stubbed here; Plan 17-02 fills
+# text_body and adds the real composer/validator/cap.
+# ----------------------------------------------------------------------------
+# D-06: conversational session store. Process-lifetime; evicted lazily.
+_CHAT_SESSIONS: dict[str, deque] = {}
+_CHAT_SESSION_TTL_SECONDS = 1800  # 30 min
+_CHAT_SESSION_MAXLEN = 10
+_CHAT_SESSION_ID_MAX_LEN = 128  # T-17-03 cap
+
+# D-03 stopwords (intent verbs + common English function words; ASCII-only)
+_CHAT_STOPWORDS: frozenset[str] = frozenset({
+    "what", "how", "is", "are", "was", "were", "be", "been", "being",
+    "the", "a", "an", "this", "that", "these", "those", "it",
+    "between", "connect", "connects", "relate", "relates", "show", "explain",
+    "tell", "me", "about", "of", "in", "for", "with", "and", "or", "but",
+    "to", "from", "across", "among", "on", "at", "by", "as", "do", "does",
+    "did", "can", "could", "would", "should", "which", "who", "whom", "why",
+    "when", "where", "there", "here", "summarize", "overview",
+})
+
+# D-02 intent trigger patterns
+_CONNECT_VERBS_RE = re.compile(
+    r"\b(connect|connects|relate|relates|between|path|from\s+.+\s+to)\b",
+    re.IGNORECASE,
+)
+_SUMMARIZE_TRIGGERS_RE = re.compile(
+    r"\b(what'?s in|overview of|summarize)\b",
+    re.IGNORECASE,
+)
+_EXPLORE_COMMUNITY_HINTS_RE = re.compile(r"\b(about|overview)\b", re.IGNORECASE)
+
+# D-07 follow-up detectors (anchored at START of query only — Pitfall 4)
+_FOLLOWUP_RE = re.compile(r"^(and|but|what about|tell me more|more|why|how come)\b", re.IGNORECASE)
+_PRONOUN_RE = re.compile(r"^(it|that)\b", re.IGNORECASE)
+
+
+def _chat_evict_stale(now: float) -> None:
+    """D-06 lazy TTL eviction. Drop sessions whose newest turn is older than TTL."""
+    stale = [
+        sid for sid, turns in _CHAT_SESSIONS.items()
+        if not turns or (now - turns[-1]["ts"] > _CHAT_SESSION_TTL_SECONDS)
+    ]
+    for sid in stale:
+        del _CHAT_SESSIONS[sid]
+
+
+def _extract_entity_terms(query: str) -> list[str]:
+    """D-03: lowercase tokenize + stopword filter.
+
+    ASCII-only; drop tokens <=2 chars or in stopword list.
+    """
+    tokens = re.findall(r"[A-Za-z0-9_]+", query.lower())
+    return [t for t in tokens if len(t) > 2 and t not in _CHAT_STOPWORDS]
+
+
+def _classify_intent(query: str, terms: list[str]) -> str:
+    """D-02: return one of 'explore', 'connect', 'summarize'. Order-sensitive."""
+    if _SUMMARIZE_TRIGGERS_RE.search(query):
+        return "summarize"
+    if _CONNECT_VERBS_RE.search(query):
+        return "connect"
+    return "explore"
+
+
+def _augment_terms_from_history(
+    session_id: str | None, query: str, terms: list[str]
+) -> list[str]:
+    """D-07: if query is a follow-up, prepend prior turn's cited node_ids to terms."""
+    if session_id is None or session_id not in _CHAT_SESSIONS:
+        return terms
+    q = query.strip()
+    if not (_FOLLOWUP_RE.match(q) or _PRONOUN_RE.match(q)):
+        return terms
+    prior = _CHAT_SESSIONS[session_id]
+    if not prior:
+        return terms
+    last_turn = prior[-1]
+    prior_node_ids = [c["node_id"] for c in last_turn.get("citations", [])]
+    return prior_node_ids + terms
+
+
+def _run_chat_core(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    alias_map: dict[str, str] | None,
+    arguments: dict,
+) -> str:
+    """Phase 17: deterministic chat tool. Zero LLM. D-02 envelope.
+
+    Stage 1 shell — narrative composition and citation validation are stubbed
+    (text_body=""). Plan 17-02 wires the real composer + validator + cap.
+    """
+    # --- Input validation (T-17-03 + silent-ignore) ---
+    query_raw = arguments.get("query", "")
+    session_id = arguments.get("session_id")
+    if not isinstance(query_raw, str) or not query_raw.strip():
+        meta = {
+            "status": "no_results",
+            "citations": [],
+            "findings": [],
+            "suggestions": [],
+            "session_id": None,
+            "intent": None,
+            "resolved_from_alias": {},
+        }
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+    if session_id is not None:
+        if not isinstance(session_id, str) or len(session_id) > _CHAT_SESSION_ID_MAX_LEN:
+            session_id = None  # silent-ignore malformed (Pitfall 5 + T-17-03)
+
+    # --- Lazy TTL eviction ---
+    now = time.time()
+    _chat_evict_stale(now)
+
+    # --- Stage 1: entity terms + intent + history augmentation ---
+    terms = _extract_entity_terms(query_raw)
+    terms = _augment_terms_from_history(session_id, query_raw, terms)
+    intent = _classify_intent(query_raw, terms)
+
+    # --- Stage 1: primitive dispatch (D-02 three intents) ---
+    scored = _score_nodes(G, terms) if terms else []
+    seed_ids = [nid for _, nid in scored[:5]]
+    visited: set[str] = set(seed_ids)
+    edges: list[tuple] = []
+    status = "ok" if seed_ids else "no_results"
+
+    if intent == "connect" and len(seed_ids) >= 2:
+        mid = len(seed_ids) // 2 or 1
+        a_ids, b_ids = seed_ids[:mid], seed_ids[mid:]
+        visited, edges, bi_status = _bidirectional_bfs(
+            G, a_ids, b_ids, depth=3, max_visited=1000,
+        )
+        if bi_status != "ok":
+            status = "no_results"
+    elif intent == "summarize":
+        community_ids = {
+            G.nodes[nid].get("community") for nid in seed_ids if nid in G.nodes
+        }
+        community_ids.discard(None)
+        for cid in community_ids:
+            members = communities.get(int(cid), [])
+            visited.update(members)
+    else:  # explore (default/fallback)
+        if seed_ids:
+            visited, edges = _bfs(G, seed_ids, depth=2)
+            if _EXPLORE_COMMUNITY_HINTS_RE.search(query_raw):
+                community_ids = {
+                    G.nodes[nid].get("community") for nid in seed_ids if nid in G.nodes
+                }
+                community_ids.discard(None)
+                for cid in community_ids:
+                    members = communities.get(int(cid), [])
+                    visited.update(members)
+
+    # --- Stage 2 shell (Plan 17-02 replaces with real composer + validator + cap) ---
+    citations = [
+        {
+            "node_id": nid,
+            "label": G.nodes[nid].get("label", nid),
+            "source_file": G.nodes[nid].get("source_file", ""),
+        }
+        for nid in list(visited)[:20]
+    ]
+    text_body = ""  # Plan 17-02 populates
+    meta = {
+        "status": status,
+        "intent": intent,
+        "citations": citations,
+        "findings": [],
+        "suggestions": [],
+        "session_id": session_id,
+        "resolved_from_alias": {},  # Plan 17-03 threads aliases
+    }
+
+    # --- D-06 session write (skip if session_id is None — Pitfall 5) ---
+    if session_id is not None and status == "ok":
+        turn = {
+            "query": query_raw,
+            "citations": citations,
+            "narrative_hash": "",  # Plan 17-02 fills after composition
+            "ts": now,
+        }
+        _CHAT_SESSIONS.setdefault(
+            session_id, deque(maxlen=_CHAT_SESSION_MAXLEN)
+        ).append(turn)
+
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
 
 def _run_query_graph(
@@ -2308,6 +2501,27 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
         return _run_graph_summary(G, communities, _out_dir.parent, arguments)
 
+    def _tool_chat(arguments: dict) -> str:
+        """Phase 17 CHAT-01: conversational graph chat. Deterministic, zero LLM.
+
+        Stage 1 shell — dispatches to _bfs / _bidirectional_bfs / community lookup
+        per intent classification, emits D-02 envelope. Plan 17-02 wires the real
+        narrative composer + citation validator + budget cap.
+        """
+        _reload_if_stale()
+        if not Path(graph_path).exists():
+            meta: dict = {
+                "status": "no_graph",
+                "citations": [],
+                "findings": [],
+                "suggestions": [],
+                "session_id": None,
+                "intent": None,
+                "resolved_from_alias": {},
+            }
+            return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+        return _run_chat_core(G, communities, _alias_map, arguments)
+
     def _tool_connect_topics(arguments: dict) -> str:
         """Phase 11 SLASH-03: shortest path + globally surprising bridges between two topics."""
         _reload_if_stale()
@@ -2495,6 +2709,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "get_annotations": _tool_get_annotations,
         "get_agent_edges": _tool_get_agent_edges,
         "graph_summary": _tool_graph_summary,
+        "chat": _tool_chat,
         "connect_topics": _tool_connect_topics,
         "entity_trace": _tool_entity_trace,
         "get_focus_context": _tool_get_focus_context,
