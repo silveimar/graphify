@@ -986,6 +986,207 @@ def _augment_terms_from_history(
     return prior_node_ids + terms
 
 
+# --- Phase 17 Stage-2 helpers (Plan 17-02) ---
+
+_WORD_RE = re.compile(r"[A-Za-z0-9_]+")
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
+_CHAT_NARRATIVE_TOKEN_CAP = 500
+_CHAT_VALIDATOR_MAX_PASSES = 3  # Pitfall 7 re-validate bound
+
+
+def _tokenize_narrative(text: str) -> list[str]:
+    """ASCII-only tokens, lowercased. Matches D-03 tokenizer shape."""
+    return [t.lower() for t in _WORD_RE.findall(text)]
+
+
+def _split_sentences(narrative: str) -> list[str]:
+    """Regex sentence split. Safe because Phase 17 narratives are templated (no embedded 'e.g.')."""
+    return [s.strip() for s in _SENTENCE_RE.split(narrative) if s.strip()]
+
+
+def _build_label_token_index(G: nx.Graph) -> dict[str, set[str]]:
+    """{label_token_lowercased: {node_id, ...}}. Skip tokens <= 2 chars (Pitfall 2 false-positive cap)."""
+    index: dict[str, set[str]] = {}
+    for nid, data in G.nodes(data=True):
+        label = (data.get("label") or "").lower()
+        for tok in _WORD_RE.findall(label):
+            if len(tok) <= 2:
+                continue
+            index.setdefault(tok, set()).add(nid)
+    return index
+
+
+def _validate_citations(
+    narrative: str,
+    cited_ids: set[str],
+    label_index: dict[str, set[str]],
+) -> tuple[str, list[str]]:
+    """D-04/D-05: strip sentences whose token matches a real label not in cited_ids. Bounded re-validate."""
+    current = narrative
+    all_dropped: list[str] = []
+    for _ in range(_CHAT_VALIDATOR_MAX_PASSES):
+        kept, dropped = [], []
+        for sentence in _split_sentences(current):
+            violated = False
+            for tok in _tokenize_narrative(sentence):
+                owners = label_index.get(tok)
+                if owners and not (owners & cited_ids):
+                    violated = True
+                    break
+            (dropped if violated else kept).append(sentence)
+        all_dropped.extend(dropped)
+        current = " ".join(kept)
+        if not dropped or not kept:
+            break
+    return current, all_dropped
+
+
+def _fuzzy_suggest(
+    terms: list[str],
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    k: int = 3,
+) -> list[str]:
+    """CHAT-05 candidate pool: top-degree (god-node surrogate) + top-3 communities' top members.
+    Returns label strings ONLY from the graph — never echoes user tokens (Pitfall 1)."""
+    import difflib
+    if not G.nodes:
+        return []
+    degree_sorted = sorted(G.nodes(), key=lambda n: G.degree(n), reverse=True)
+    god_labels = [sanitize_label(G.nodes[n].get("label", n)) for n in degree_sorted[:20]]
+    top_comms = sorted(communities.items(), key=lambda kv: -len(kv[1]))[:3]
+    comm_labels = [
+        sanitize_label(G.nodes[nid].get("label", nid))
+        for _, members in top_comms
+        for nid in members[:5]
+        if nid in G.nodes
+    ]
+    candidates = list(dict.fromkeys(god_labels + comm_labels))  # dedup preserving order
+    suggestions: list[str] = []
+    for term in terms[:3]:  # bound search
+        matches = difflib.get_close_matches(term, candidates, n=k, cutoff=0.6)
+        for m in matches:
+            if m not in suggestions:
+                suggestions.append(m)
+    # Hard guard: return only strings from candidates (never from terms).
+    return [s for s in suggestions if s in candidates][:k]
+
+
+def _truncate_to_token_cap(narrative: str, cap: int = _CHAT_NARRATIVE_TOKEN_CAP) -> str:
+    """D-09: sentence-boundary truncation at 500 tokens (chars/4 heuristic)."""
+    char_cap = cap * 4
+    if len(narrative) <= char_cap:
+        return narrative
+    sentences = _split_sentences(narrative)
+    out: list[str] = []
+    total = 0
+    for s in sentences:
+        if total + len(s) + 1 > char_cap:
+            break
+        out.append(s)
+        total += len(s) + 1
+    if not out:
+        return narrative[:char_cap].rstrip() + "…"
+    truncated = " ".join(out)
+    if len(out) < len(sentences):
+        truncated = truncated.rstrip(".!?") + "…"
+    return truncated
+
+
+def _first_enrichment_sentence(G: nx.Graph, nid: str) -> str | None:
+    """Return first sentence of enriched_description or description, if present (Phase 15 D-04/D-05)."""
+    desc = G.nodes[nid].get("enriched_description") or G.nodes[nid].get("description")
+    if not desc:
+        return None
+    parts = _split_sentences(str(desc))
+    return parts[0] if parts else None
+
+
+def _compose_explore_narrative(
+    G: nx.Graph, visited: set[str], edges: list[tuple], cited_ids: set[str],
+) -> str:
+    """Template slot-fill for explore intent. Zero LLM."""
+    if not visited:
+        return ""
+    ranked = sorted(visited, key=lambda n: G.degree(n), reverse=True)[:3]
+    labels = [sanitize_label(G.nodes[n].get("label", n)) for n in ranked if n in G.nodes]
+    if not labels:
+        return ""
+    edge_count = sum(1 for u, v in edges if u in visited and v in visited)
+    desc_line = ""
+    for nid in ranked:
+        if nid not in cited_ids:
+            continue
+        s = _first_enrichment_sentence(G, nid)
+        if s:
+            lbl = sanitize_label(G.nodes[nid].get("label", nid))
+            # Lowercase first letter of s for grammatical flow.
+            s_low = s[0].lower() + s[1:] if s else s
+            desc_line = f" Notably, {lbl} {s_low}"
+            break
+    return (
+        f"The query touches {', '.join(labels)} — "
+        f"connected through {edge_count} edges in the current graph."
+        f"{desc_line}"
+    )
+
+
+def _compose_connect_narrative(
+    G: nx.Graph, visited: set[str], edges: list[tuple], cited_ids: set[str],
+    status: str,
+) -> str:
+    """Template slot-fill for connect intent."""
+    if status != "ok" or not visited:
+        return ""
+    ranked = sorted(visited, key=lambda n: G.degree(n), reverse=True)[:4]
+    labels = [sanitize_label(G.nodes[n].get("label", n)) for n in ranked if n in G.nodes]
+    if not labels:
+        return ""
+    hop_count = len(edges)
+    return (
+        f"A path links {labels[0]} to {labels[-1]} via "
+        f"{', '.join(labels[1:-1]) if len(labels) > 2 else 'direct edges'} — "
+        f"{hop_count} hops in the current graph."
+    )
+
+
+def _compose_summarize_narrative(
+    G: nx.Graph, visited: set[str], communities: dict[int, list[str]], cited_ids: set[str],
+) -> str:
+    """Template slot-fill for summarize intent. Surfaces community_summary when present."""
+    if not visited:
+        return ""
+    # Find community with the most visited members
+    community_counts: dict[int, int] = {}
+    for nid in visited:
+        if nid not in G.nodes:
+            continue
+        cid = G.nodes[nid].get("community")
+        if cid is not None:
+            community_counts[int(cid)] = community_counts.get(int(cid), 0) + 1
+    if not community_counts:
+        return ""
+    top_cid = max(community_counts, key=lambda k: community_counts[k])
+    members = communities.get(top_cid, [])
+    member_labels = [
+        sanitize_label(G.nodes[m].get("label", m))
+        for m in members[:5] if m in G.nodes
+    ]
+    # Surface community_summary from any cited member
+    summary_line = ""
+    for nid in visited:
+        if nid in cited_ids and nid in G.nodes:
+            cs = G.nodes[nid].get("community_summary")
+            if cs:
+                first = _split_sentences(str(cs))
+                if first:
+                    summary_line = f" {first[0]}"
+                    break
+    return (
+        f"Community {top_cid} groups {', '.join(member_labels)}.{summary_line}"
+    )
+
+
 def _run_chat_core(
     G: nx.Graph,
     communities: dict[int, list[str]],
@@ -1059,7 +1260,7 @@ def _run_chat_core(
                     members = communities.get(int(cid), [])
                     visited.update(members)
 
-    # --- Stage 2 shell (Plan 17-02 replaces with real composer + validator + cap) ---
+    # --- Stage 2: citations from traversal ---
     citations = [
         {
             "node_id": nid,
@@ -1068,23 +1269,48 @@ def _run_chat_core(
         }
         for nid in list(visited)[:20]
     ]
-    text_body = ""  # Plan 17-02 populates
+
+    # --- Stage 2: compose narrative per intent ---
+    cited_ids_set: set[str] = {c["node_id"] for c in citations}
+    if intent == "connect":
+        narrative = _compose_connect_narrative(G, visited, edges, cited_ids_set, status)
+    elif intent == "summarize":
+        narrative = _compose_summarize_narrative(G, visited, communities, cited_ids_set)
+    else:
+        narrative = _compose_explore_narrative(G, visited, edges, cited_ids_set)
+
+    # --- Stage 2: citation validator (D-04/D-05) ---
+    if narrative:
+        label_index = _build_label_token_index(G)
+        cleaned, _dropped = _validate_citations(narrative, cited_ids_set, label_index)
+        narrative = cleaned
+
+    # --- Stage 2: no_context fallback with fuzzy suggestions (CHAT-05 + echo guard) ---
+    suggestions: list[str] = []
+    if not narrative or status == "no_results":
+        narrative = ""
+        status = "no_results"
+        suggestions = _fuzzy_suggest(terms, G, communities, k=3)
+
+    # --- Stage 2: 500-token cap (D-09 / CHAT-09) ---
+    text_body = _truncate_to_token_cap(narrative) if narrative else ""
+
     meta = {
         "status": status,
         "intent": intent,
-        "citations": citations,
+        "citations": citations if status == "ok" else [],
         "findings": [],
-        "suggestions": [],
+        "suggestions": suggestions,  # graph-sourced only (T-17-02)
         "session_id": session_id,
         "resolved_from_alias": {},  # Plan 17-03 threads aliases
     }
 
     # --- D-06 session write (skip if session_id is None — Pitfall 5) ---
-    if session_id is not None and status == "ok":
+    if session_id is not None and status == "ok" and text_body:
         turn = {
             "query": query_raw,
             "citations": citations,
-            "narrative_hash": "",  # Plan 17-02 fills after composition
+            "narrative_hash": hashlib.sha256(text_body.encode("utf-8")).hexdigest()[:16],
             "ts": now,
         }
         _CHAT_SESSIONS.setdefault(
