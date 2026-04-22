@@ -847,3 +847,145 @@ def test_foreground_lock_preempts_enrichment(tmp_path: Path, enrich_out_dir: Pat
         if proc.poll() is None:
             proc.kill()
             proc.wait(timeout=2.0)
+
+
+# ===========================================================================
+# Plan 15-06 tests — dry-run D-02 envelope (ENRICH-10 P2, SC-4)
+# ===========================================================================
+
+def _write_fixture_for_dry_run(out_dir: Path) -> None:
+    """Seed graph.json + a matching snapshot so run_enrichment can pin."""
+    graph_payload = {
+        "directed": False, "multigraph": False, "graph": {},
+        "nodes": [
+            {"id": "N1", "label": "n1", "description": "",
+             "source_file": "x.py", "source_hash": "h1",
+             "source_mtime": 0.0, "file_type": "code"},
+            {"id": "N2", "label": "n2", "description": "",
+             "source_file": "y.py", "source_hash": "h2",
+             "source_mtime": 0.0, "file_type": "code"},
+        ],
+        "links": [],
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "graph.json").write_text(json.dumps(graph_payload))
+    snap_payload = {
+        "graph": graph_payload,
+        "communities": {"0": ["N1", "N2"]},
+        "metadata": {},
+    }
+    (out_dir / "snapshots").mkdir(exist_ok=True)
+    (out_dir / "snapshots" / "2026-04-20T14-30-00.json").write_text(
+        json.dumps(snap_payload)
+    )
+
+
+def test_dry_run_emits_d02_envelope(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ENRICH-10 P2: --dry-run emits a D-02 envelope (table + separator + JSON)."""
+    out_dir = tmp_path / "graphify-out"
+    _write_fixture_for_dry_run(out_dir)
+
+    # Any LLM invocation during dry-run is a hard failure.
+    def forbidden_llm(prompt: str, max_tokens: int) -> tuple[str, int]:
+        raise AssertionError("LLM called during dry-run")
+    monkeypatch.setattr("graphify.enrich._call_llm", forbidden_llm)
+
+    from graphify.enrich import run_enrichment
+    result = run_enrichment(
+        out_dir,
+        budget=10000,
+        passes=None,
+        dry_run=True,
+        project_root=tmp_path,
+    )
+    assert result.dry_run is True
+
+    out = capsys.readouterr().out
+    # Human-readable table header
+    assert "graphify enrich --dry-run preview" in out
+    assert "snapshot_id:" in out
+    assert "budget cap:" in out
+    for pass_name in ("description", "patterns", "community", "staleness"):
+        assert pass_name in out, f"pass {pass_name!r} missing from table"
+    # D-02 separator marker (exact literal)
+    assert "---GRAPHIFY-META---" in out, "D-02 separator missing"
+
+    # Everything AFTER the separator must be valid JSON with expected shape.
+    _, _, meta_blob = out.partition("---GRAPHIFY-META---")
+    meta = json.loads(meta_blob.strip())
+    assert meta["dry_run"] is True
+    assert meta["status"] == "preview"
+    assert meta["snapshot_id"] == "2026-04-20T14-30-00"
+    assert set(meta["passes"].keys()) >= {
+        "description", "patterns", "community", "staleness",
+    }
+    for pname, info in meta["passes"].items():
+        assert "tokens_estimate" in info
+        assert "llm_calls_estimate" in info
+    assert "totals" in meta
+    assert "tokens_estimate" in meta["totals"]
+    assert "llm_calls_estimate" in meta["totals"]
+    assert meta["budget_cap"] == 10000
+    assert "within_budget" in meta
+
+
+def test_dry_run_no_llm_calls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ENRICH-10 P2 / SC-4: dry-run guarantees zero LLM invocations and no disk writes."""
+    out_dir = tmp_path / "graphify-out"
+    _write_fixture_for_dry_run(out_dir)
+
+    call_counter = {"n": 0}
+
+    def forbidden_llm(prompt: str, max_tokens: int) -> tuple[str, int]:
+        call_counter["n"] += 1
+        raise AssertionError("LLM called during dry-run")
+
+    monkeypatch.setattr("graphify.enrich._call_llm", forbidden_llm)
+
+    from graphify.enrich import run_enrichment
+    run_enrichment(
+        out_dir,
+        budget=10000,
+        passes=None,
+        dry_run=True,
+        project_root=tmp_path,
+    )
+    assert call_counter["n"] == 0, (
+        f"dry-run invoked LLM {call_counter['n']} time(s)"
+    )
+    # Dry-run never touches disk — no enrichment.json should appear.
+    assert not (out_dir / "enrichment.json").exists(), (
+        "dry-run must not produce enrichment.json"
+    )
+
+
+def test_dry_run_envelope_within_budget_flag(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Dry-run envelope flips within_budget=False when totals exceed cap."""
+    out_dir = tmp_path / "graphify-out"
+    _write_fixture_for_dry_run(out_dir)
+
+    def forbidden_llm(prompt: str, max_tokens: int) -> tuple[str, int]:
+        raise AssertionError("LLM called during dry-run")
+    monkeypatch.setattr("graphify.enrich._call_llm", forbidden_llm)
+
+    from graphify.enrich import run_enrichment
+    # Tiny budget: each pass's dry-run estimate is 300 tokens per item, so
+    # a budget of 100 must produce within_budget=False in the meta.
+    run_enrichment(
+        out_dir,
+        budget=100,
+        passes=None,
+        dry_run=True,
+        project_root=tmp_path,
+    )
+    out = capsys.readouterr().out
+    _, _, meta_blob = out.partition("---GRAPHIFY-META---")
+    meta = json.loads(meta_blob.strip())
+    assert meta["budget_cap"] == 100
+    assert meta["within_budget"] is False
