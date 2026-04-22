@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
 status: executing
 stopped_at: Phase 17 context gathered
-last_updated: "2026-04-22T21:17:25.258Z"
-last_activity: 2026-04-22 -- Phase 17 planning complete
+last_updated: "2026-04-22T22:29:34.303Z"
+last_activity: 2026-04-22
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 23
-  completed_plans: 20
-  percent: 87
+  completed_plans: 21
+  percent: 91
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis and usage-weighted self-improvement, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, now being extended in v1.4 to agent discoverability (MCP capability manifest + SEED-002 harness export), Obsidian thinking-command depth, and graph-quality-over-time via heterogeneous routing + async enrichment + focus-aware zoom + grounded chat + SPAR-Kit argumentation.
-**Current focus:** Phase 15 — async-background-enrichment
+**Current focus:** Phase 17 — conversational-graph-chat
 
 ## Current Position
 
-Phase: 18
-Plan: Not started
+Phase: 17 (conversational-graph-chat) — EXECUTING
+Plan: 2 of 3
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 3/7 phases complete (12 ✅ + 13 ✅ + 18 ✅), Phase 15 next.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
 Status: Ready to execute
-Last activity: 2026-04-22 -- Phase 17 planning complete
+Last activity: 2026-04-22
 
 Progress: [██████░░░░] 43% (3/7 phases complete — 12 ✅, 13 ✅, 18 ✅)
 
@@ -140,9 +140,10 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | Phase 15 P04 | 18 | 2 tasks | 2 files |
 | Phase 15 P05 | 15 | 2 tasks | 4 files |
 | Phase 15 P06 | 15 | 2 tasks | 5 files (3 new tests + enrich.py + test_enrich.py) |
+| Phase 17 P01 | 15m | 2 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-04-22T19:39:43.281Z
+Last session: 2026-04-22T22:29:34.300Z
 Stopped at: Phase 17 context gathered
 Next action: Pick next phase from v1.4 build order. Per locked sequence (12 ✅ → 18 ✅ → 13A ✅ → 15 ✅ → 17 → 16 → 14 → 13B + SEED-002), **Phase 17 Conversational Graph Chat** is the recommended candidate (soft-depends on 18 ✅ + 15 ✅). Alternative: Phase 14 Obsidian Commands (HARD-depends on 18 ✅ + Plan 00 whitelist refactor). Start with `/gsd-discuss-phase 17` or `/gsd-plan-phase 17`.

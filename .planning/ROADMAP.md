@@ -231,7 +231,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   4. A two-stage architectural test asserts `serve.py` makes zero LLM calls — Stage 1 emits only tool-call sequences, Stage 2 composes from tool results only; narrative rendering is the skill or calling agent's responsibility.
   5. D-16 alias redirect is threaded through every citation — a node merged into an alias during dedup resolves to its canonical ID in chat output without breaking the user's prior callsite.
 **Plans**: 3 plans (planned 2026-04-22 — P1 only; CHAT-10/11/12 deferred to v1.4.x backlog).
-- [ ] 17-01-core-dispatch-sessions-PLAN.md — `_run_chat_core` shell, intent classifier + entity-term extractor, D-02 primitive dispatch (explore/connect/summarize), `_CHAT_SESSIONS` + lazy TTL + follow-up augmentation, `_tool_chat` wrapper, registry entry. (CHAT-01, CHAT-02, CHAT-08)
+- [x] 17-01-core-dispatch-sessions-PLAN.md — `_run_chat_core` shell, intent classifier + entity-term extractor, D-02 primitive dispatch (explore/connect/summarize), `_CHAT_SESSIONS` + lazy TTL + follow-up augmentation, `_tool_chat` wrapper, registry entry. (CHAT-01, CHAT-02, CHAT-08)
 - [ ] 17-02-validator-composer-cap-PLAN.md — narrative composer (explore/connect/summarize templates), citation validator with bounded re-validate, fuzzy-suggestion fallback with echo guard, 500-token sentence-boundary cap. (CHAT-03, CHAT-04, CHAT-05, CHAT-09)
 - [ ] 17-03-command-alias-integration-PLAN.md — `_resolve_alias` closure threaded through citations + `meta.resolved_from_alias`, `graphify/commands/ask.md` (connect.md-style frontmatter, no `target:` field), zero-LLM architectural test. (CHAT-03, CHAT-06, CHAT-07)
 
@@ -282,7 +282,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
 | 15. Async Background Enrichment | v1.4 | 6/6 | Complete    | 2026-04-22 |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
-| 17. Conversational Graph Chat | v1.4 | 0/TBD | Planned | — |
+| 17. Conversational Graph Chat | v1.4 | 1/3 | In Progress|  |
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
 
 ---
