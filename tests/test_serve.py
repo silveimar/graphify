@@ -47,6 +47,12 @@ from graphify.serve import (
     _CHAT_SESSIONS,
     _classify_intent,
     _extract_entity_terms,
+    _validate_citations,
+    _fuzzy_suggest,
+    _truncate_to_token_cap,
+    _build_label_token_index,
+    _compose_explore_narrative,
+    _WORD_RE,
     QUERY_GRAPH_META_SENTINEL,
 )
 from collections import deque
@@ -2853,3 +2859,109 @@ def test_chat_ttl_eviction(_reset_chat_sessions):
     )
     _run_chat_core(G, communities, {}, {"query": "what is extract?", "session_id": "fresh"})
     assert "old" not in _CHAT_SESSIONS, "stale session should have been evicted"
+
+
+# ============================================================
+# Phase 17 Plan 17-02 — composer / validator / fuzzy / cap
+# ============================================================
+
+
+def test_chat_validator_strips_uncited():
+    """CHAT-04 D-04: sentence containing uncited label-token is dropped."""
+    G = _make_graph()
+    label_index = _build_label_token_index(G)
+    # Pick any node in the graph whose label has a >2-char token.
+    sample_nid = None
+    sample_token = None
+    for nid in G.nodes:
+        lbl = G.nodes[nid].get("label", nid).lower()
+        toks = [t for t in _WORD_RE.findall(lbl) if len(t) > 2]
+        if toks:
+            sample_nid, sample_token = nid, toks[0]
+            break
+    assert sample_nid is not None, "fixture invariant: graph must have a >2-char label token"
+
+    # With empty cited set, any sentence containing sample_token must be dropped.
+    narrative = f"Totally unrelated sentence. The {sample_token} appears here."
+    cleaned, dropped = _validate_citations(
+        narrative, cited_ids=set(), label_index=label_index
+    )
+    assert sample_token not in cleaned.lower()
+    assert len(dropped) >= 1
+
+    # When cited_ids contains sample_nid, the sentence survives.
+    cleaned2, _ = _validate_citations(
+        narrative, cited_ids={sample_nid}, label_index=label_index
+    )
+    assert sample_token in cleaned2.lower()
+
+
+def test_chat_no_match_returns_suggestions(_reset_chat_sessions):
+    """CHAT-05: empty-match query returns fuzzy suggestions from graph candidate pool."""
+    G = _make_graph()
+    communities = _communities_from_graph(G)
+    response = _run_chat_core(
+        G, communities, {}, {"query": "xyznonexistentblah"}
+    )
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "no_results"
+    assert text_body == ""
+    # Suggestions (if any) must be drawn strictly from graph labels.
+    graph_labels = {G.nodes[n].get("label", n) for n in G.nodes}
+    for s in meta["suggestions"]:
+        assert s in graph_labels or any(s in lbl for lbl in graph_labels), (
+            f"suggestion {s!r} is not sourced from graph labels"
+        )
+
+
+def test_chat_suggestions_no_echo(_reset_chat_sessions):
+    """CHAT-05 echo-leak guard (T-17-02 / Pitfall 1 / Phase 18 D-12)."""
+    G = _make_graph()
+    communities = _communities_from_graph(G)
+    leak_marker = "xyznonexistentblah"
+    response = _run_chat_core(
+        G, communities, {}, {"query": leak_marker}
+    )
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert leak_marker not in text_body
+    assert leak_marker not in json.dumps(meta["suggestions"])
+    for s in meta["suggestions"]:
+        assert leak_marker not in s
+
+
+def test_chat_narrative_under_cap(_reset_chat_sessions, monkeypatch):
+    """CHAT-09 / D-09: 500-token cap enforced; overflow truncates at sentence boundary with ellipsis."""
+    G = _make_graph()
+    communities = _communities_from_graph(G)
+    # Force composer to emit a long narrative using only a real cited label
+    # so the citation validator does not strip it.
+    # Use a node label token guaranteed to appear in the graph.
+    sample_label = G.nodes["n1"].get("label", "n1")
+    long_narrative = (f"The query touches {sample_label}. " * 200)
+    def _fake_compose(G_, visited, edges, cited_ids):
+        return long_narrative
+    monkeypatch.setattr("graphify.serve._compose_explore_narrative", _fake_compose)
+    response = _run_chat_core(G, communities, {}, {"query": "what is extract?"})
+    text_body, _meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    assert len(text_body) <= 2000, (
+        f"text_body {len(text_body)} chars exceeds 500-token cap"
+    )
+    # When truncation occurred (original > cap), expect ellipsis marker
+    # (or empty string if validator stripped everything).
+    if len(long_narrative) > 2000:
+        assert text_body.endswith("…") or text_body == "", (
+            "truncated narrative must end with ellipsis (or be empty if validator stripped it)"
+        )
+
+
+def test_chat_truncate_helper_unit():
+    """Unit test for _truncate_to_token_cap — sentence boundary behavior."""
+    short = "Hello world."
+    assert _truncate_to_token_cap(short) == short
+    # 2500+ chars → must truncate and end with ellipsis.
+    long = ("This is a sentence. " * 200)
+    out = _truncate_to_token_cap(long)
+    assert len(out) <= 2000
+    assert out.endswith("…")
