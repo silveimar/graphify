@@ -1289,14 +1289,20 @@ def _run_chat_core(
                     visited.update(members)
 
     # --- Stage 2: citations from traversal (with alias redirect — CHAT-07 / T-17-05) ---
-    citations = [
-        {
-            "node_id": _resolve_alias(nid),
-            "label": G.nodes[nid].get("label", nid) if nid in G.nodes else nid,
-            "source_file": G.nodes[nid].get("source_file", "") if nid in G.nodes else "",
-        }
-        for nid in list(visited)[:20]
-    ]
+    # WR-04: filter to real graph nodes; if all are resolved to missing canonicals,
+    # downgrade status so the fuzzy fallback renders.
+    citations = []
+    for nid in list(visited)[:20]:
+        canonical = _resolve_alias(nid)
+        if canonical not in G.nodes:
+            continue
+        citations.append({
+            "node_id": canonical,
+            "label": G.nodes[canonical].get("label", canonical),
+            "source_file": G.nodes[canonical].get("source_file", ""),
+        })
+    if not citations and status == "ok":
+        status = "no_results"
 
     # --- Stage 2: compose narrative per intent ---
     cited_ids_set: set[str] = {c["node_id"] for c in citations}
