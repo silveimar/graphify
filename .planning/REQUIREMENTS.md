@@ -279,4 +279,17 @@ Priority tags: `[P2]` indicates the requirement is in v1.4 scope per user confir
 - Phase 16 Graph Argumentation Mode: 13 REQ-IDs (ARGUE-01..13)
 - Phase 17 Conversational Graph Chat: 12 REQ-IDs (CHAT-01..12)
 - Phase 18 Focus-Aware Graph Context: 9 REQ-IDs (FOCUS-01..09)
-- **Total: 86/86 REQ-IDs mapped (100% coverage, no orphans, no duplicates).**
+- Phase 19 Vault Promotion Script: 5 REQ-IDs (VAULT-01..05)
+- **Total: 91/91 REQ-IDs mapped (100% coverage, no orphans, no duplicates).**
+
+---
+
+## Phase 19: Vault Promotion Script (Layer B)
+
+| REQ-ID | Phase | Implementation target | Status | Completed |
+|--------|-------|-----------------------|--------|-----------|
+| VAULT-01 | Phase 19 | `graphify/vault_promote.py` — reads `graphify-out/graph.json` + `GRAPH_REPORT.md`, classifies nodes by type, scores by degree/god-node/confidence, writes promoted notes with full Ideaverse frontmatter | planned | — |
+| VAULT-02 | Phase 19 | Node→destination mapping: domain/component/workflow/concept → `Atlas/Dots/Things/`; decision → `Atlas/Dots/Statements/`; knowledge gap → `Atlas/Dots/Questions/`; quote → `Atlas/Dots/Quotes/`; person → `Atlas/Dots/People/`; cluster → `Atlas/Maps/`; source doc → `Atlas/Sources/Clippings/` | planned | — |
+| VAULT-03 | Phase 19 | Every promoted note must include: `up`, `related` (EXTRACTED-confidence edges only), `created`, `collections` (cluster MOC), `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold`, and tags from `garden/plant` + `source/*` + `tech/*` + `graph/*` namespaces | planned | — |
+| VAULT-04 | Phase 19 | Promotion threshold: promote if `degree >= N` (CLI flag, default 3) OR node in god-nodes list OR node type is decision/question/quote; below threshold → referenced as backlink evidence only | planned | — |
+| VAULT-05 | Phase 19 | `graphify-out/import-log.md` written after each run with: vault path, run timestamp, nodes promoted count by type, threshold used, nodes skipped count | planned | — |
