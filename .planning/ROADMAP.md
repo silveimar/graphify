@@ -202,7 +202,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 **Plans**: 6 plans in 4 waves.
 - [x] 15-01-PLAN.md — Module scaffold: `enrich.py` + `graphify enrich` CLI + fcntl.flock lifecycle + snapshot pinning + SIGTERM handler (Wave 1; ENRICH-01, 04, 05, 07)
 - [x] 15-02-PLAN.md — Three LLM passes (description, patterns, community) + priority-drain budget + alias redirect + routing skip-list + atomic per-pass commit (Wave 2; ENRICH-02, 03, 11, 12)
-- [ ] 15-03-PLAN.md — Staleness pass (compute-only) + D-07 resume-by-default + D-05 schema versioning guard (Wave 2; ENRICH-02, 03, 05)
+- [x] 15-03-PLAN.md — Staleness pass (compute-only) + D-07 resume-by-default + D-05 schema versioning guard (Wave 2; ENRICH-02, 03, 05)
 - [ ] 15-04-PLAN.md — `serve.py::_load_enrichment_overlay` merge-on-read + `_reload_if_stale` enrichment.json mtime watcher + alias-on-read (Wave 3; ENRICH-08, 09, 12)
 - [ ] 15-05-PLAN.md — Foreground-lock acquisition in `__main__.py` `run` + opt-in `--enrich` flag + atexit cleanup in `watch.py` (Wave 3; ENRICH-06, 07)
 - [ ] 15-06-PLAN.md — `--dry-run` D-02 envelope + grep-CI `_write_graph_json` whitelist (SC-5) + graph.json byte-equality invariant (SC-1, SC-3) + lifecycle integration tests (SC-2) (Wave 4; ENRICH-03, 10)
@@ -272,7 +272,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 12. Heterogeneous Extraction Routing | v1.4 | 6/6 | Complete | 2026-04-17 |
 | 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 4/4 | Complete | 2026-04-17 |
 | 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
-| 15. Async Background Enrichment | v1.4 | 2/6 | In Progress|  |
+| 15. Async Background Enrichment | v1.4 | 3/6 | In Progress|  |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
 | 17. Conversational Graph Chat | v1.4 | 0/TBD | Planned | — |
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
