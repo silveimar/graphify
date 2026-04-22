@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
 status: executing
 stopped_at: Phase 17 context gathered
-last_updated: "2026-04-22T22:29:34.303Z"
+last_updated: "2026-04-22T22:36:50.981Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 23
-  completed_plans: 21
-  percent: 91
+  completed_plans: 22
+  percent: 96
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 ## Current Position
 
 Phase: 17 (conversational-graph-chat) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 3/7 phases complete (12 ✅ + 13 ✅ + 18 ✅), Phase 15 next.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
 Status: Ready to execute
@@ -126,6 +126,9 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 - [Phase ?]: Plan 15-03: D-05 envelope schema strict-check; D-07 resume-by-default with per-pass skip gate; staleness exempt from D-03 budget
 - [Phase ?]: 15-04: overlay in-memory; graph.json never mutated
 - [Phase ?]: Plan 15-05: Foreground always wins; watch --enrich is strictly opt-in; atexit+running-child guard prevents zombies
+- [Phase ?]: Plan 17-02: Composer is template slot-fill only (zero LLM)
+- [Phase ?]: Plan 17-02: Fuzzy suggestions restricted to graph candidate pool (T-17-02 anti-echo)
+- [Phase ?]: Plan 17-02: 500-token cap via char/4 heuristic with sentence-boundary ellipsis
 
 ### Blockers/Concerns
 
@@ -141,9 +144,10 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | Phase 15 P05 | 15 | 2 tasks | 4 files |
 | Phase 15 P06 | 15 | 2 tasks | 5 files (3 new tests + enrich.py + test_enrich.py) |
 | Phase 17 P01 | 15m | 2 tasks | 4 files |
+| Phase 17 P02 | 10 | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-04-22T22:29:34.300Z
+Last session: 2026-04-22T22:36:37.933Z
 Stopped at: Phase 17 context gathered
 Next action: Pick next phase from v1.4 build order. Per locked sequence (12 ✅ → 18 ✅ → 13A ✅ → 15 ✅ → 17 → 16 → 14 → 13B + SEED-002), **Phase 17 Conversational Graph Chat** is the recommended candidate (soft-depends on 18 ✅ + 15 ✅). Alternative: Phase 14 Obsidian Commands (HARD-depends on 18 ✅ + Plan 00 whitelist refactor). Start with `/gsd-discuss-phase 17` or `/gsd-plan-phase 17`.
