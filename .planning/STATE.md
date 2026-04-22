@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
 status: executing
-stopped_at: Phase 15 context gathered
-last_updated: "2026-04-22T16:54:57.507Z"
+stopped_at: Completed 15-04-PLAN.md
+last_updated: "2026-04-22T17:03:53.103Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 20
-  completed_plans: 17
-  percent: 85
+  completed_plans: 18
+  percent: 90
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 ## Current Position
 
 Phase: 15 (async-background-enrichment) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 3/7 phases complete (12 ✅ + 13 ✅ + 18 ✅), Phase 15 next.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
 Status: Ready to execute
@@ -124,6 +124,7 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 - **OQ-6 resolved**: Phase 16 INTERROGATE + persona memory are P2 in v1.4 scope (not deferred — user confirmed P1+P2 complete 2026-04-17).
 - **OQ-7 resolved**: Phase 14 `/graphify-voice`, `/graphify-bridge`, `/graphify-drift-notes` are P2 in v1.4 scope (not deferred — user confirmed P1+P2 complete 2026-04-17).
 - [Phase ?]: Plan 15-03: D-05 envelope schema strict-check; D-07 resume-by-default with per-pass skip gate; staleness exempt from D-03 budget
+- [Phase ?]: 15-04: overlay in-memory; graph.json never mutated
 
 ### Blockers/Concerns
 
@@ -134,9 +135,10 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260416-okg | Add /graphify analyze entries to Usage cheat-sheet in all skill variants | 2026-04-16 | 058152b | [260416-okg-add-graphify-analyze-entries-to-usage-ch](./quick/260416-okg-add-graphify-analyze-entries-to-usage-ch/) |
+| Phase 15 P04 | 18 | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-04-22T16:54:54.137Z
-Stopped at: Phase 15 context gathered
+Last session: 2026-04-22T17:03:53.100Z
+Stopped at: Completed 15-04-PLAN.md
 Next action: Pick next phase from v1.4 build order — **Phase 15 Async Background Enrichment** is the recommended candidate (soft-depends on Phase 12 routing.json). Start with `/gsd-discuss-phase 15` to lock decisions, or `/gsd-plan-phase 15` if design is already clear. Alternative candidates: Phase 14 (Obsidian Commands, HARD-depends on 18 ✅ + Plan 00 whitelist refactor) or Phase 17 (Conversational Graph Chat, soft-depends on 18 ✅ + 15).
