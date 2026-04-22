@@ -169,12 +169,14 @@ def _run_passes(
     existing = _load_existing_enrichment(out_dir, snapshot_id) if resume else {}
     existing_passes = existing.get("passes", {}) if isinstance(existing, dict) else {}
 
-    requested = [
-        p for p in ("description", "patterns", "community")
-        if p in passes and p not in existing_passes
-    ]
-
-    for pass_name in requested:
+    # D-07 resume gate: skip passes already present in existing envelope (per-pass).
+    # Iterate the three LLM passes in D-01 order; staleness appended below.
+    for pass_name in ("description", "patterns", "community"):
+        if pass_name not in passes:
+            continue
+        if pass_name in existing_passes:
+            result.passes_skipped.append(pass_name)
+            continue
         rem = _budget_remaining(budget, result.tokens_used)
         try:
             if pass_name == "description":
@@ -188,13 +190,11 @@ def _run_passes(
                     G, out_dir, snapshot_id,
                     budget_remaining=rem, dry_run=dry_run, alias_map=alias_map,
                 )
-            elif pass_name == "community":
+            else:  # pass_name == "community"
                 data, t, c = _run_community_pass(
                     G, communities, out_dir, snapshot_id,
                     budget_remaining=rem, dry_run=dry_run, alias_map=alias_map,
                 )
-            else:
-                continue  # 'staleness' handled by Plan 03
         except Exception as exc:
             print(
                 f"[graphify] enrichment: pass {pass_name!r} failed: {exc}",
@@ -210,6 +210,32 @@ def _run_passes(
             result.passes_run.append(pass_name)
         else:
             result.passes_skipped.append(pass_name)
+
+    # ---- D-01 pass 4: staleness (D-03 compute-only — exempt from budget) ----
+    if "staleness" in passes:
+        if "staleness" in existing_passes:
+            result.passes_skipped.append("staleness")
+        else:
+            try:
+                data, t, c = _run_staleness_pass(
+                    G, out_dir, snapshot_id,
+                    alias_map=alias_map, dry_run=dry_run,
+                )
+            except Exception as exc:
+                print(
+                    f"[graphify] enrichment: staleness pass failed: {exc}",
+                    file=sys.stderr,
+                )
+                result.passes_failed.append("staleness")
+                raise SystemExit(1) from exc
+            assert t == 0 and c == 0, (
+                "staleness pass must be compute-only (D-03 invariant)"
+            )
+            if not dry_run:
+                _commit_pass(out_dir, snapshot_id, "staleness", data)
+                result.passes_run.append("staleness")
+            else:
+                result.passes_skipped.append("staleness")
 
 
 # ---------------------------------------------------------------------------
@@ -416,22 +442,90 @@ def _commit_pass(
         raise
 
 
-def _load_existing_enrichment(out_dir: Path, snapshot_id: str) -> dict:
-    """Return the current enrichment.json envelope iff snapshot_id matches; else {}.
+def _validate_enrichment_envelope(data: object) -> bool:
+    """D-05 schema strict-check for the enrichment.json envelope.
 
-    Used by D-07 resume logic. Mismatched snapshot_id returns empty so the
-    dispatcher starts a fresh envelope for the pinned snapshot.
+    Returns True only when ``data`` has the v1 shape:
+      - dict
+      - version == 1
+      - snapshot_id: non-empty str
+      - passes: dict whose keys are a subset of ``PASS_NAMES``
+      - per-pass container shape matches (description/community/staleness → dict,
+        patterns → list, staleness values ∈ {FRESH, STALE, GHOST})
+
+    Returns False on ANY deviation. Warnings about version mismatches are
+    logged to stderr so users can diagnose discarded envelopes; other shape
+    failures return False silently (the caller falls through to a fresh run).
+    """
+    if not isinstance(data, dict):
+        return False
+    version = data.get("version")
+    if version != 1:
+        print(
+            f"[graphify] enrichment: envelope version != 1 (got {version!r}); "
+            f"discarding",
+            file=sys.stderr,
+        )
+        return False
+    snapshot_id = data.get("snapshot_id")
+    if not isinstance(snapshot_id, str) or not snapshot_id:
+        return False
+    passes = data.get("passes")
+    if not isinstance(passes, dict):
+        return False
+    for pass_name in passes:
+        if pass_name not in PASS_NAMES:
+            print(
+                f"[graphify] enrichment: unexpected pass key {pass_name!r} in v1 "
+                f"envelope; discarding",
+                file=sys.stderr,
+            )
+            return False
+    if "description" in passes and not isinstance(passes["description"], dict):
+        return False
+    if "patterns" in passes and not isinstance(passes["patterns"], list):
+        return False
+    if "community" in passes and not isinstance(passes["community"], dict):
+        return False
+    if "staleness" in passes:
+        stal = passes["staleness"]
+        if not isinstance(stal, dict):
+            return False
+        valid_labels = {"FRESH", "STALE", "GHOST"}
+        for _nid, label in stal.items():
+            if label not in valid_labels:
+                return False
+    return True
+
+
+def _load_existing_enrichment(out_dir: Path, snapshot_id: str) -> dict:
+    """D-07: return the current enrichment.json envelope iff it's v1 AND matches.
+
+    Returns {} to signal "fresh run" when:
+      - The file is absent
+      - It can't be read / parsed
+      - ``_validate_enrichment_envelope`` rejects its shape
+      - ``snapshot_id`` mismatches the caller-pinned id
+
+    Never raises — all errors collapse to empty-return. On shape rejection
+    the envelope is left on disk; the next successful ``_commit_pass`` will
+    overwrite it with a fresh v1 envelope for the pinned snapshot.
     """
     p = out_dir / "enrichment.json"
     if not p.exists():
         return {}
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"[graphify] enrichment: existing enrichment.json unreadable: {exc}; "
+            f"starting fresh",
+            file=sys.stderr,
+        )
         return {}
-    if not isinstance(data, dict):
+    if not _validate_enrichment_envelope(data):
         return {}
-    if data.get("version") != 1 or data.get("snapshot_id") != snapshot_id:
+    if data.get("snapshot_id") != snapshot_id:
         return {}
     return data
 
@@ -664,3 +758,43 @@ def _run_community_pass(
         llm_calls += 1
 
     return summaries, tokens_used, llm_calls
+
+
+# ---- Pass 4: staleness (compute-only, reuses delta.classify_staleness) ----
+
+def _run_staleness_pass(
+    G,
+    out_dir: Path,
+    snapshot_id: str,
+    *,
+    alias_map: dict[str, str],
+    dry_run: bool = False,
+) -> tuple[dict[str, str], int, int]:
+    """D-01 pass 4 — compute-only staleness classification.
+
+    Wraps ``delta.classify_staleness(node_data)`` for every node; ALWAYS
+    returns ``(result, 0, 0)`` so the orchestrator's D-03 budget accounting
+    stays untouched by this pass. Keys are threaded through ``alias_map``
+    (D-16) so only canonical node_ids appear in the output dict.
+
+    ``dry_run`` is accepted for signature uniformity with the LLM passes but
+    has no effect here — the classification is cheap, and Plan 06's
+    ``--dry-run`` preview still benefits from an accurate staleness snapshot.
+    """
+    from graphify.delta import classify_staleness
+
+    results: dict[str, str] = {}
+    valid_labels = {"FRESH", "STALE", "GHOST"}
+    for nid, data in G.nodes(data=True):
+        canonical = alias_map.get(nid, nid)  # D-16
+        label = classify_staleness(data)
+        if label not in valid_labels:
+            # Defense-in-depth (T-15-05): only persist the expected enum.
+            print(
+                f"[graphify] enrichment: unexpected staleness label {label!r} "
+                f"for node {nid!r}; skipping",
+                file=sys.stderr,
+            )
+            continue
+        results[canonical] = label
+    return results, 0, 0  # D-03 compute-only invariant
