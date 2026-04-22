@@ -769,3 +769,81 @@ def test_malformed_envelope_discarded(
     loaded = _load_existing_enrichment(enrich_out_dir, "s1")
     assert loaded.get("snapshot_id") == "s1"
     assert loaded.get("passes", {}).get("description") == {"n0": "desc"}
+
+
+# ---------------------------------------------------------------------------
+# Plan 15-05 Task 1: foreground-lock contention (ENRICH-07)
+# ---------------------------------------------------------------------------
+
+def test_foreground_acquire_returns_none_when_out_dir_missing(tmp_path: Path) -> None:
+    """_foreground_acquire_enrichment_lock on a non-existent out_dir returns None (no lock needed)."""
+    from graphify.__main__ import _foreground_acquire_enrichment_lock
+    result = _foreground_acquire_enrichment_lock(tmp_path / "nonexistent_out_dir")
+    assert result is None
+
+
+def test_foreground_lock_preempts_enrichment(tmp_path: Path, enrich_out_dir: Path) -> None:
+    """ENRICH-07: foreground rebuild SIGTERMs running enrichment and wins the lock.
+
+    Spawns a helper child process that:
+      - acquires .enrichment.lock (LOCK_EX)
+      - writes .enrichment.pid
+      - installs a SIGTERM handler that unlocks + removes pid + exits(1)
+      - sleeps indefinitely
+
+    Then foreground calls _foreground_acquire_enrichment_lock; it must
+    SIGTERM the child, block briefly on LOCK_EX, and return a valid fd.
+    """
+    import subprocess
+    import time
+
+    from graphify.enrich import LOCK_FILENAME, PID_FILENAME
+
+    enrich_script = tmp_path / "fake_enrich.py"
+    enrich_script.write_text(
+        "import fcntl, os, time, json, signal, sys\n"
+        f"out_dir = {str(enrich_out_dir)!r}\n"
+        f"lock_path = os.path.join(out_dir, {LOCK_FILENAME!r})\n"
+        f"pid_path = os.path.join(out_dir, {PID_FILENAME!r})\n"
+        "fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)\n"
+        "fcntl.flock(fd, fcntl.LOCK_EX)\n"
+        "with open(pid_path, 'w') as f:\n"
+        "    json.dump({'pid': os.getpid(), 'started_at': 'now', 'expires_at': 'later'}, f)\n"
+        "def handler(s, fr):\n"
+        "    try: fcntl.flock(fd, fcntl.LOCK_UN)\n"
+        "    except Exception: pass\n"
+        "    try: os.unlink(pid_path)\n"
+        "    except Exception: pass\n"
+        "    sys.exit(1)\n"
+        "signal.signal(signal.SIGTERM, handler)\n"
+        "time.sleep(60)\n",
+        encoding="utf-8",
+    )
+    proc = subprocess.Popen([sys.executable, str(enrich_script)])
+    try:
+        pid_file = enrich_out_dir / PID_FILENAME
+        deadline = time.time() + 5.0
+        while not pid_file.exists() and time.time() < deadline:
+            time.sleep(0.05)
+        assert pid_file.exists(), "fake enrichment failed to write .enrichment.pid"
+
+        from graphify.__main__ import (
+            _foreground_acquire_enrichment_lock,
+            _foreground_release_enrichment_lock,
+        )
+        t0 = time.time()
+        lock_fd = _foreground_acquire_enrichment_lock(enrich_out_dir, timeout_seconds=10.0)
+        elapsed = time.time() - t0
+        assert lock_fd is not None, "foreground failed to acquire lock"
+        assert elapsed < 5.0, (
+            f"foreground took {elapsed:.2f}s (should be ~instant after SIGTERM)"
+        )
+        proc.wait(timeout=5.0)
+        assert proc.returncode == 1, (
+            f"child should have SIGTERM-exited with 1 (got {proc.returncode})"
+        )
+        _foreground_release_enrichment_lock(lock_fd)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait(timeout=2.0)
