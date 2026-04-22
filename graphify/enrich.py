@@ -149,17 +149,67 @@ def _run_passes(
     resume: bool,
     result: EnrichmentResult,
 ) -> None:
-    """Placeholder pass dispatcher — Plans 02 and 03 will replace this body.
+    """D-01 serial pass dispatcher: description → patterns → community (→ staleness in Plan 03).
 
-    Plan 01 implementation: log the no-op and append all requested passes to
-    result.passes_skipped. No LLM calls, no file writes (other than heartbeat).
-    This function is the single extension point for downstream plans.
+    Per D-03: budget drains in priority order. Per D-16: alias_map applied at every write.
+    Per D-02: each pass commits atomically via `_commit_pass`; a mid-pass failure leaves
+    prior passes intact and aborts the run with SystemExit(1).
     """
-    print(
-        "[graphify] enrichment: placeholder _run_passes — Plans 02/03 will populate",
-        file=sys.stderr,
-    )
-    result.passes_skipped.extend(passes)
+    from graphify.snapshot import load_snapshot
+    from graphify.serve import _load_dedup_report
+
+    G, communities, _meta = load_snapshot(snapshot_path)
+    alias_map = _load_dedup_report(out_dir)
+    routing_skip_files = _load_routing_skip_set(out_dir)
+    routing_skip_nids = {
+        nid for nid, d in G.nodes(data=True)
+        if d.get("source_file") in routing_skip_files
+    }
+
+    existing = _load_existing_enrichment(out_dir, snapshot_id) if resume else {}
+    existing_passes = existing.get("passes", {}) if isinstance(existing, dict) else {}
+
+    requested = [
+        p for p in ("description", "patterns", "community")
+        if p in passes and p not in existing_passes
+    ]
+
+    for pass_name in requested:
+        rem = _budget_remaining(budget, result.tokens_used)
+        try:
+            if pass_name == "description":
+                data, t, c = _run_description_pass(
+                    G, out_dir, snapshot_id,
+                    budget_remaining=rem, dry_run=dry_run,
+                    alias_map=alias_map, routing_skip=routing_skip_nids,
+                )
+            elif pass_name == "patterns":
+                data, t, c = _run_patterns_pass(
+                    G, out_dir, snapshot_id,
+                    budget_remaining=rem, dry_run=dry_run, alias_map=alias_map,
+                )
+            elif pass_name == "community":
+                data, t, c = _run_community_pass(
+                    G, communities, out_dir, snapshot_id,
+                    budget_remaining=rem, dry_run=dry_run, alias_map=alias_map,
+                )
+            else:
+                continue  # 'staleness' handled by Plan 03
+        except Exception as exc:
+            print(
+                f"[graphify] enrichment: pass {pass_name!r} failed: {exc}",
+                file=sys.stderr,
+            )
+            result.passes_failed.append(pass_name)
+            raise SystemExit(1) from exc
+
+        result.tokens_used += t
+        result.llm_calls += c
+        if not dry_run:
+            _commit_pass(out_dir, snapshot_id, pass_name, data)
+            result.passes_run.append(pass_name)
+        else:
+            result.passes_skipped.append(pass_name)
 
 
 # ---------------------------------------------------------------------------
@@ -304,3 +354,313 @@ def _write_pid_file(out_dir: Path, snapshot_id: str) -> None:
     except Exception:
         tmp.unlink(missing_ok=True)
         raise
+
+
+# ---------------------------------------------------------------------------
+# Plan 15-02: atomic per-pass commit + LLM passes
+# ---------------------------------------------------------------------------
+
+def _commit_pass(
+    out_dir: Path,
+    snapshot_id: str,
+    pass_name: str,
+    result_data: object,
+) -> None:
+    """Atomically merge one pass result into ``enrichment.json`` (D-02).
+
+    Read-modify-write on the envelope's ``passes`` dict, then atomic
+    ``.tmp`` + ``os.replace``. On any exception during write: unlink the
+    ``.tmp`` and re-raise — prior passes stay intact. Caller (``_run_passes``)
+    catches the re-raised exception, logs, and aborts the run.
+    """
+    # Validate the base directory (the dest may not exist yet — gate on base).
+    validate_graph_path(out_dir, base=out_dir.parent)
+
+    dest = out_dir / "enrichment.json"
+    existing: dict[str, Any] | None = None
+    if dest.exists():
+        try:
+            existing = json.loads(dest.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            existing = None
+
+    if (
+        not existing
+        or not isinstance(existing, dict)
+        or existing.get("version") != 1
+        or existing.get("snapshot_id") != snapshot_id
+    ):
+        existing = {
+            "version": 1,
+            "snapshot_id": snapshot_id,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "passes": {},
+        }
+
+    existing["generated_at"] = datetime.now(timezone.utc).isoformat()
+    passes = existing.setdefault("passes", {})
+    passes[pass_name] = result_data
+
+    tmp = dest.with_suffix(".json.tmp")
+    try:
+        tmp.write_text(
+            json.dumps(existing, indent=2, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        os.replace(tmp, dest)
+    except Exception:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+
+
+def _load_existing_enrichment(out_dir: Path, snapshot_id: str) -> dict:
+    """Return the current enrichment.json envelope iff snapshot_id matches; else {}.
+
+    Used by D-07 resume logic. Mismatched snapshot_id returns empty so the
+    dispatcher starts a fresh envelope for the pinned snapshot.
+    """
+    p = out_dir / "enrichment.json"
+    if not p.exists():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    if data.get("version") != 1 or data.get("snapshot_id") != snapshot_id:
+        return {}
+    return data
+
+
+def _sanitize_pass_output(text: str) -> str:
+    """T-15-03 mitigation: never write raw LLM output to ``enrichment.json``.
+
+    Thin wrapper around ``graphify.security.sanitize_label_md`` so the three
+    pass runners route every text token through a single sanitization point.
+    """
+    from graphify.security import sanitize_label_md
+    if not isinstance(text, str):
+        text = str(text)
+    return sanitize_label_md(text)
+
+
+def _budget_remaining(budget: int | None, spent: int) -> int:
+    """Return remaining tokens for D-03 priority-drain accounting.
+
+    ``budget=None`` → unlimited (``sys.maxsize``).
+    Returns 0 when spent exceeds budget (never negative).
+    """
+    if budget is None:
+        return sys.maxsize
+    return max(0, budget - spent)
+
+
+def _load_routing_skip_set(out_dir: Path) -> set[str]:
+    """ENRICH-11 P2: return source_file paths routed to the ``complex`` tier.
+
+    Reads ``graphify-out/routing.json`` (Phase 12 audit). Returns the set of
+    file paths whose class is ``complex`` — the caller intersects these with
+    node ``source_file`` attrs to decide which nodes to skip. Empty set when
+    routing.json is missing or malformed (soft dependency).
+    """
+    p = out_dir / "routing.json"
+    if not p.exists():
+        return set()
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    skip_files: set[str] = set()
+    files = data.get("files", {}) if isinstance(data, dict) else {}
+    if not isinstance(files, dict):
+        return set()
+    for fpath, entry in files.items():
+        if not isinstance(entry, dict):
+            continue
+        # Phase 12 RoutingAudit writes the tier at top-level ``class``;
+        # RESEARCH.md also documents a nested ``info.class``. Accept both.
+        cls = entry.get("class")
+        if cls != "complex":
+            info = entry.get("info", {})
+            if isinstance(info, dict):
+                cls = info.get("class")
+        if cls == "complex":
+            skip_files.add(str(fpath))
+    return skip_files
+
+
+def _call_llm(prompt: str, max_tokens: int) -> tuple[str, int]:
+    """Single private LLM caller — tests monkeypatch this.
+
+    Production wiring (routing.resolve_model + batch executor) is deferred.
+    Returns ``(text, tokens_used_including_output)``.
+    """
+    raise NotImplementedError(
+        "enrich._call_llm must be monkeypatched in tests; production wiring deferred"
+    )
+
+
+# ---- Pass 1: description ----------------------------------------------------
+
+def _run_description_pass(
+    G,
+    out_dir: Path,
+    snapshot_id: str,
+    *,
+    budget_remaining: int,
+    dry_run: bool,
+    alias_map: dict[str, str],
+    routing_skip: set[str],
+) -> tuple[dict[str, str], int, int]:
+    """Pass 1 — enrich per-node descriptions from label + codebase context.
+
+    D-03: stops when ``tokens_used`` reaches ``budget_remaining``.
+    D-16: every key is resolved through ``alias_map`` before insertion.
+    ENRICH-11 P2: nodes whose id is in ``routing_skip`` are skipped silently.
+    T-15-03: LLM output piped through ``_sanitize_pass_output``.
+    """
+    results: dict[str, str] = {}
+    tokens_used = 0
+    llm_calls = 0
+
+    for nid, data in G.nodes(data=True):
+        if nid in routing_skip:
+            continue
+        # D-03 priority-drain
+        if not dry_run and tokens_used >= budget_remaining:
+            break
+        canonical = alias_map.get(nid, nid)  # D-16 ENRICH-12
+        if dry_run:
+            tokens_used += 300  # rough per-node estimate (prompt + output)
+            llm_calls += 1
+            continue
+        prompt = (
+            f"Describe the role of {data.get('label', nid)!r} in its codebase "
+            f"context. Be concise."
+        )
+        try:
+            text, cost = _call_llm(prompt, max_tokens=200)
+        except Exception as exc:
+            raise RuntimeError(
+                f"description pass LLM call failed on {nid}: {exc}"
+            ) from exc
+        results[canonical] = _sanitize_pass_output(text)
+        tokens_used += cost
+        llm_calls += 1
+
+    return results, tokens_used, llm_calls
+
+
+# ---- Pass 2: patterns -------------------------------------------------------
+
+def _run_patterns_pass(
+    G,
+    out_dir: Path,
+    snapshot_id: str,
+    *,
+    budget_remaining: int,
+    dry_run: bool,
+    alias_map: dict[str, str],
+    history_depth: int = 5,
+) -> tuple[list[dict], int, int]:
+    """Pass 2 — cross-snapshot pattern detection.
+
+    Looks at up to ``history_depth`` prior snapshots for nodes with rising
+    degree centrality (simple heuristic; Claude's Discretion per 15-CONTEXT).
+    Each pattern's ``nodes`` list is threaded through ``alias_map`` (D-16).
+    """
+    patterns: list[dict] = []
+    tokens_used = 0
+    llm_calls = 0
+
+    # Candidate surface: top-degree nodes in the current tip graph. We leave
+    # full cross-snapshot correlation for Plan 06 integration; the pattern
+    # surface here is small and deterministic so tests don't need a chain.
+    try:
+        from graphify.analyze import god_nodes
+        gods = god_nodes(G, top_n=min(5, G.number_of_nodes() or 1))
+    except Exception:
+        gods = []
+
+    for i, g in enumerate(gods):
+        if not dry_run and tokens_used >= budget_remaining:
+            break
+        raw_nid = g.get("id", "")
+        canonical = alias_map.get(raw_nid, raw_nid)  # D-16
+        if dry_run:
+            tokens_used += 300
+            llm_calls += 1
+            continue
+        prompt = (
+            f"Given the recurring high-degree node {g.get('label', raw_nid)!r}, "
+            f"summarize the architectural pattern it anchors."
+        )
+        try:
+            text, cost = _call_llm(prompt, max_tokens=200)
+        except Exception as exc:
+            raise RuntimeError(
+                f"patterns pass LLM call failed on {raw_nid}: {exc}"
+            ) from exc
+        patterns.append({
+            "pattern_id": f"p{i+1}",
+            "nodes": [canonical],
+            "summary": _sanitize_pass_output(text),
+        })
+        tokens_used += cost
+        llm_calls += 1
+
+    return patterns, tokens_used, llm_calls
+
+
+# ---- Pass 3: community ------------------------------------------------------
+
+def _run_community_pass(
+    G,
+    communities: dict[int, list[str]],
+    out_dir: Path,
+    snapshot_id: str,
+    *,
+    budget_remaining: int,
+    dry_run: bool,
+    alias_map: dict[str, str],
+) -> tuple[dict[str, str], int, int]:
+    """Pass 3 — per-community natural-language summary.
+
+    Keys are ``str(community_id)`` to preserve JSON round-trip semantics.
+    Per-community prompt context includes the top members (god-node-style
+    degree ranking) — all node_ids referenced internally run through
+    ``alias_map`` (D-16) even though they do not appear in output keys.
+    """
+    summaries: dict[str, str] = {}
+    tokens_used = 0
+    llm_calls = 0
+
+    for cid, members in communities.items():
+        if not dry_run and tokens_used >= budget_remaining:
+            break
+        # Compose top-members context: canonicalize ids via alias_map (D-16).
+        top_members = [alias_map.get(m, m) for m in members[:5]]
+        labels = [G.nodes[m].get("label", m) for m in members[:5] if m in G.nodes]
+        if dry_run:
+            tokens_used += 300
+            llm_calls += 1
+            continue
+        prompt = (
+            f"Summarize community {cid} with members {labels!r} "
+            f"(ids: {top_members!r}) in one sentence."
+        )
+        try:
+            text, cost = _call_llm(prompt, max_tokens=200)
+        except Exception as exc:
+            raise RuntimeError(
+                f"community pass LLM call failed on community {cid}: {exc}"
+            ) from exc
+        summaries[str(cid)] = _sanitize_pass_output(text)
+        tokens_used += cost
+        llm_calls += 1
+
+    return summaries, tokens_used, llm_calls
