@@ -128,7 +128,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - [x] Phase 12: Heterogeneous Extraction Routing — Per-file complexity classifier (AST metrics) routes extraction to cheap/mid/expensive model classes with parallel fan-out, cost ceiling enforcement, model-isolated cache keys, and a `routing.json` sidecar audit trail. (6/6 plans, completed 2026-04-17)
 - [x] Phase 13: Agent Capability Manifest (+ SEED-002 Harness Memory Export) — Static `server.json` + runtime `manifest.json` with MCP `capability_describe` tool, CLI `graphify capability`, introspection-driven generation (never hand-maintained), manifest-hash drift detection, and bundled SEED-002 `graphify harness export` producing SOUL/HEARTBEAT/USER triplet for Claude harness. Shipped 2026-04-17 (4/4 plans, 18/18 REQ-IDs).
 - [ ] Phase 14: Obsidian Thinking Commands — Vault-scoped `/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind` slash commands (plus P2 `/graphify-bridge`, `/graphify-voice`, `/graphify-drift-notes`) with `target: obsidian|code|both` frontmatter filtering, mandatory `propose_vault_note + approve` trust boundary, and a Plan 00 refactor migrating `_uninstall_commands()` from hardcoded whitelist to directory-scan.
-- [ ] Phase 15: Async Background Enrichment — Four-pass background enricher (description, patterns, community summaries, staleness) writing overlay-only `enrichment.json`; event-driven via `watch.py` post-rebuild hook; `fcntl.flock`-coordinated with foreground `/graphify`; snapshot-pinned at process start for determinism.
+- [x] Phase 15: Async Background Enrichment — Four-pass background enricher (description, patterns, community summaries, staleness) writing overlay-only `enrichment.json`; event-driven via `watch.py` post-rebuild hook; `fcntl.flock`-coordinated with foreground `/graphify`; snapshot-pinned at process start for determinism. (completed 2026-04-22)
 - [ ] Phase 16: Graph Argumentation Mode — `graphify/argue.py` substrate populates a SPAR-Kit-style `ArgumentPackage` from a graph subgraph; `skill.md` orchestrates the LLM debate (Phase 9 blind-label harness reused); mandatory `{claim, cites: [node_id]}` schema rejects fabricated node IDs; round cap 6; `dissent`/`inconclusive` valid outputs; `GRAPH_ARGUMENT.md` advisory-only artifact.
 - [ ] Phase 17: Conversational Graph Chat — Two-stage structurally-enforced `chat(query, session_id)` MCP tool (Stage 1 tool-call only, Stage 2 compose from results only); every claim cited to `{node_id, label, source_file}`; empty results return templated fuzzy suggestions; session-scoped history; `/graphify-ask` slash command.
 - [x] Phase 18: Focus-Aware Graph Context — `get_focus_context(focus_hint)` MCP tool returns BFS ego-graph + community summary for a structured focus hint (`file_path`, optional `function_name`/`line`/`neighborhood_depth`/`include_community`); pull-model (no filesystem watcher); codifies v1.3 CR-01 snapshot-root fix; silently ignores spoofed paths. ✅ 2026-04-20
@@ -205,7 +205,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - [x] 15-03-PLAN.md — Staleness pass (compute-only) + D-07 resume-by-default + D-05 schema versioning guard (Wave 2; ENRICH-02, 03, 05)
 - [x] 15-04-PLAN.md — `serve.py::_load_enrichment_overlay` merge-on-read + `_reload_if_stale` enrichment.json mtime watcher + alias-on-read (Wave 3; ENRICH-08, 09, 12)
 - [x] 15-05-PLAN.md — Foreground-lock acquisition in `__main__.py` `run` + opt-in `--enrich` flag + atexit cleanup in `watch.py` (Wave 3; ENRICH-06, 07)
-- [ ] 15-06-PLAN.md — `--dry-run` D-02 envelope + grep-CI `_write_graph_json` whitelist (SC-5) + graph.json byte-equality invariant (SC-1, SC-3) + lifecycle integration tests (SC-2) (Wave 4; ENRICH-03, 10)
+- [x] 15-06-PLAN.md — `--dry-run` D-02 envelope + grep-CI `_write_graph_json` whitelist (SC-5) + graph.json byte-equality invariant (SC-1, SC-3) + lifecycle integration tests (SC-2) (Wave 4; ENRICH-03, 10)
 
 ### Phase 16: Graph Argumentation Mode
 **Goal**: User poses a decision-shaped question about the codebase and graphify orchestrates a structurally-enforced multi-perspective debate grounded in the knowledge graph, producing a cited advisory transcript with no fabricated nodes.
@@ -272,7 +272,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 12. Heterogeneous Extraction Routing | v1.4 | 6/6 | Complete | 2026-04-17 |
 | 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 4/4 | Complete | 2026-04-17 |
 | 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
-| 15. Async Background Enrichment | v1.4 | 5/6 | In Progress|  |
+| 15. Async Background Enrichment | v1.4 | 6/6 | Complete   | 2026-04-22 |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
 | 17. Conversational Graph Chat | v1.4 | 0/TBD | Planned | — |
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |

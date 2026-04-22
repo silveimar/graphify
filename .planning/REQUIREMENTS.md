@@ -77,7 +77,7 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 - [x] **ENRICH-07**: Foreground `/graphify` rebuild grabs the `.enrichment.lock` and enrichment SIGTERM-aborts cleanly without corrupting partial writes
 - [x] **ENRICH-08**: `serve.py::_load_enrichment_overlay(out_dir)` merges enrichment at read time (post-load, not inside `_load_graph`) so tests mocking `_load_graph` remain unaffected
 - [x] **ENRICH-09**: `serve.py::_reload_if_stale()` adds mtime watch for `enrichment.json` alongside existing `graph.json` watch
-- [ ] **ENRICH-10** `[P2]`: `graphify enrich --dry-run` emits cost preview (estimated tokens per pass, per-node budget breakdown) without calling LLMs
+- [x] **ENRICH-10** `[P2]`: `graphify enrich --dry-run` emits cost preview (estimated tokens per pass, per-node budget breakdown) without calling LLMs
 - [x] **ENRICH-11** `[P2]`: Soft-dependency on Phase 12 `routing.json` — description pass skips files already extracted by expensive model (no double-LLM cost)
 - [x] **ENRICH-12** `[P2]`: Alias redirect (D-16) threaded through enrichment writes — derived content keys by canonical node_id
 
