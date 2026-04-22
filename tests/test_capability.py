@@ -54,18 +54,36 @@ def test_atomic_manifest_roundtrip(tmp_path: Path) -> None:
     assert canonical_manifest_hash(roundtrip) == canonical_manifest_hash(m)
 
 
-def test_pipeline_writes_manifest_json(tmp_path: Path) -> None:
-    """MANIFEST-02: export.to_json triggers manifest.json (uses same deps as CI [mcp])."""
+def test_pipeline_writes_capability_json(tmp_path: Path) -> None:
+    """MANIFEST-02: export.to_json triggers capability.json (uses same deps as CI [mcp]).
+
+    Regression (quick-260422-jdj): the capability manifest was previously written
+    to graphify-out/manifest.json, colliding with detect.py's incremental mtime
+    manifest at the same path. The capability writer now targets capability.json;
+    the detect incremental manifest remains at manifest.json.
+    """
     from networkx import Graph
     from graphify.export import to_json
 
     G = Graph()
     G.add_node("a", label="a", source_file="x", source_location="", file_type="py", community=0)
     to_json(G, {0: ["a"]}, str(tmp_path / "graph.json"))
-    man = tmp_path / "manifest.json"
-    assert man.exists()
-    data = json.loads(man.read_text(encoding="utf-8"))
+    cap = tmp_path / "capability.json"
+    assert cap.exists()
+    data = json.loads(cap.read_text(encoding="utf-8"))
     validate_manifest(data)
+    # Negative assertion: the capability writer MUST NOT clobber manifest.json
+    # (owned by detect.py for incremental mtime tracking).
+    assert not (tmp_path / "manifest.json").exists()
+
+
+def test_capability_writer_basename_is_not_manifest_json(tmp_path: Path) -> None:
+    """Regression (quick-260422-jdj): capability writer MUST NOT target 'manifest.json'
+    (collides with detect incremental manifest at graphify-out/manifest.json)."""
+    target = write_manifest_atomic(tmp_path, {"CAPABILITY_TOOLS": []})
+    assert target.name == "capability.json"
+    assert target.name != "manifest.json"
+    assert not (tmp_path / "manifest.json").exists()
 
 
 # -------------------------------------------------------------------------
