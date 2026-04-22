@@ -272,7 +272,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 12. Heterogeneous Extraction Routing | v1.4 | 6/6 | Complete | 2026-04-17 |
 | 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 4/4 | Complete | 2026-04-17 |
 | 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
-| 15. Async Background Enrichment | v1.4 | 6/6 | Complete   | 2026-04-22 |
+| 15. Async Background Enrichment | v1.4 | 6/6 | Complete    | 2026-04-22 |
 | 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
 | 17. Conversational Graph Chat | v1.4 | 0/TBD | Planned | — |
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
