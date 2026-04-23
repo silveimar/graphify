@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+from pathlib import Path
 import pytest
 import networkx as nx
 from networkx.readwrite import json_graph
@@ -610,3 +611,211 @@ def test_cli_subcommand_help_works():
     assert result.returncode == 0, f"--help must exit 0, got {result.returncode}. stderr: {result.stderr}"
     assert "--vault" in result.stdout, f"--vault must appear in help output: {result.stdout}"
     assert "--threshold" in result.stdout, f"--threshold must appear in help output: {result.stdout}"
+
+
+# ---------------------------------------------------------------------------
+# Task 4.1 — Integration + heuristic tests (Plan 19-04)
+# ---------------------------------------------------------------------------
+
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "vault_promote_graph.json"
+
+
+def _make_graph_json_from_fixture(tmp_path: Path) -> Path:
+    """Copy the synthetic fixture into a graphify-out/ dir for promote() calls."""
+    import json as _json
+    from networkx.readwrite import json_graph as _jg
+
+    fixture_data = _json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    out = tmp_path / "graphify-out"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "graph.json").write_text(_json.dumps(fixture_data), encoding="utf-8")
+    return out / "graph.json"
+
+
+def test_end_to_end_all_seven_folders(tmp_path):
+    """Full promote() run on synthetic fixture: at least one file in each of 7 target folders."""
+    from graphify.vault_promote import promote
+
+    graph_path = _make_graph_json_from_fixture(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    # threshold=1 so degree-1 People/Quotes/Statements nodes qualify
+    promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+    # 7 folder prefixes must each have at least one .md file
+    expected_folders = [
+        vault / "Atlas" / "Dots" / "Things",
+        vault / "Atlas" / "Dots" / "Questions",
+        vault / "Atlas" / "Maps",
+        vault / "Atlas" / "Sources" / "Clippings",
+        vault / "Atlas" / "Dots" / "People",
+        vault / "Atlas" / "Dots" / "Quotes",
+        vault / "Atlas" / "Dots" / "Statements",
+    ]
+    for folder in expected_folders:
+        md_files = list(folder.glob("*.md")) if folder.exists() else []
+        assert len(md_files) >= 1, (
+            f"Expected at least one .md in {folder.relative_to(tmp_path)}, found none. "
+            f"Vault tree: {[str(p.relative_to(tmp_path)) for p in vault.rglob('*.md')]}"
+        )
+
+
+def test_multi_run_drift_overwrite_self(tmp_path):
+    """Second identical promote() reports all prior notes as overwritten; import-log has 2 Run blocks."""
+    from graphify.vault_promote import promote
+
+    graph_path = _make_graph_json_from_fixture(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    # First run — all notes are written (threshold=1 so People/Quotes/Statements qualify)
+    promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+    # Second run — same graph, same threshold
+    summary2 = promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+    # No foreign skips
+    skipped = summary2.get("skipped", {})
+    assert "foreign" not in skipped or len(skipped.get("foreign", [])) == 0, (
+        f"Second run must not produce foreign skips; got: {skipped}"
+    )
+
+    # import-log must have exactly 2 Run blocks
+    log_path = tmp_path / "graphify-out" / "import-log.md"
+    log_content = log_path.read_text(encoding="utf-8")
+    run_count = log_content.count("## Run ")
+    assert run_count == 2, f"Expected 2 Run blocks in import-log, got {run_count}"
+
+    # Promoted count must come entirely from overwritten notes (or new gaps/maps)
+    promoted = summary2.get("promoted", {})
+    total_promoted = sum(promoted.values())
+    assert total_promoted >= 1, "Second run must still report promoted notes as overwritten"
+
+
+def test_multi_run_preserves_foreign_file(tmp_path):
+    """Foreign file created between runs must remain untouched and appear in skipped count."""
+    from graphify.vault_promote import promote
+
+    graph_path = _make_graph_json_from_fixture(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    # Do NOT run first promote() — create a foreign file at a path promote() WILL try to write.
+    # promote() treats a file as foreign when it exists on disk but is NOT in the manifest.
+    # Use "Atlas/Maps/Community 0.md" — promote() always generates Map MOCs for community 0.
+    foreign_dir = vault / "Atlas" / "Maps"
+    foreign_dir.mkdir(parents=True, exist_ok=True)
+    handmade = foreign_dir / "Community 0.md"
+    handmade.write_text("# Hand-written map\nUser created this manually.", encoding="utf-8")
+    original_bytes = handmade.read_bytes()
+
+    # promote() runs with an empty manifest — so Community 0.md is a foreign file
+    summary2 = promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+    # Handmade.md must be unchanged
+    assert handmade.read_bytes() == original_bytes, "Foreign file bytes must be identical after promote()"
+
+    # Summary must record the foreign skip
+    skipped = summary2.get("skipped", {})
+    foreign_paths = skipped.get("foreign", [])
+    assert any("Community 0.md" in p for p in foreign_paths), (
+        f"'Community 0.md' must appear in skipped[foreign]; got skipped: {skipped}"
+    )
+
+
+def test_multi_run_preserves_user_edit(tmp_path):
+    """User-edited promoted file must be preserved; appears as skipped_user_modified."""
+    from graphify.vault_promote import promote
+
+    graph_path = _make_graph_json_from_fixture(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+    # Locate one promoted file in Things and mutate it
+    things_dir = vault / "Atlas" / "Dots" / "Things"
+    assert things_dir.exists(), "Things folder must exist after first promote()"
+    promoted_files = list(things_dir.glob("*.md"))
+    assert promoted_files, "There must be at least one promoted file in Things"
+
+    target = promoted_files[0]
+    rel_path = str(target.relative_to(vault))
+    target.write_text("# User modified this note\nCustom content.", encoding="utf-8")
+    modified_bytes = target.read_bytes()
+
+    summary2 = promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+    # The file must be unchanged
+    assert target.read_bytes() == modified_bytes, "User-modified file must not be overwritten"
+
+    # Summary must record user_modified skip
+    skipped = summary2.get("skipped", {})
+    user_mod_paths = skipped.get("user_modified", [])
+    assert any(Path(p).name == target.name for p in user_mod_paths), (
+        f"User-modified file must appear in skipped[user_modified]; got skipped: {skipped}"
+    )
+
+
+def test_heuristic_people_regex(tmp_path):
+    """_is_person: True for First Last; False for lowercase, allcaps, single word, accented."""
+    from graphify.vault_promote import _is_person
+
+    assert _is_person("Alice Smith") is True, "Alice Smith must match"
+    assert _is_person("John Doe") is True, "John Doe must match"
+
+    assert _is_person("alice smith") is False, "lowercase must not match (ASCII-only per RESEARCH.md)"
+    assert _is_person("ALICE SMITH") is False, "all-caps must not match"
+    assert _is_person("Alice") is False, "single word must not match"
+    assert _is_person("José García") is False, "accented characters are ASCII-only limitation"
+
+
+def test_heuristic_quote_marks(tmp_path):
+    """_has_quote_marks: True for labels with smart/guillemet quotes; False for plain labels."""
+    from graphify.vault_promote import _has_quote_marks
+
+    assert _has_quote_marks('"Opening curly"') is True, "left double curly must match"
+    assert _has_quote_marks('"Closing curly"') is True, "right double curly must match"
+    assert _has_quote_marks('"Plain ascii double"') is True, "plain ASCII double quote must match"
+    assert _has_quote_marks("«guillemet open»") is True, "guillemet open must match"
+    assert _has_quote_marks("normal label no quotes") is False, "plain label must not match"
+    assert _has_quote_marks("") is False, "empty label must not match"
+
+
+def test_heuristic_defines_edge(tmp_path):
+    """_has_defines_edge: True when adjacent edge has relation=defines; False otherwise."""
+    from graphify.vault_promote import _has_defines_edge
+
+    G = nx.Graph()
+    G.add_node("a", label="A")
+    G.add_node("b", label="B")
+    G.add_node("c", label="C")
+
+    G.add_edge("a", "b", relation="defines", confidence="EXTRACTED", source_file="x.md", weight=1.0)
+    G.add_edge("b", "c", relation="references", confidence="EXTRACTED", source_file="x.md", weight=1.0)
+
+    assert _has_defines_edge(G, "a") is True, "Node a has a defines edge"
+    assert _has_defines_edge(G, "b") is True, "Node b has a defines edge (undirected)"
+    assert _has_defines_edge(G, "c") is False, "Node c only has references — no defines edge"
+
+
+def test_tech_layer3_detection_persists_via_writeback(tmp_path):
+    """After promote() on fixture with .py + .ts source_files, profile.yaml has tech/python and tech/typescript."""
+    pytest.importorskip("yaml")
+    import yaml
+    from graphify.vault_promote import promote
+
+    graph_path = _make_graph_json_from_fixture(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+    profile_path = vault / ".graphify" / "profile.yaml"
+    assert profile_path.exists(), ".graphify/profile.yaml must be written after promote()"
+
+    written = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+    tech_tags = written.get("tag_taxonomy", {}).get("tech", [])
+    assert "python" in tech_tags, f"tech/python must be in profile.yaml tech tags; got {tech_tags}"
+    assert "typescript" in tech_tags, f"tech/typescript must be in profile.yaml tech tags; got {tech_tags}"

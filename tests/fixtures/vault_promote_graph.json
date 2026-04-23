@@ -1,0 +1,304 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "DocumentHub",
+      "file_type": "document",
+      "source_file": "notes/hub.md",
+      "community": 0,
+      "id": "n_doc_hub"
+    },
+    {
+      "label": "Backbone0",
+      "file_type": "document",
+      "source_file": "notes/backbone0.md",
+      "community": 0,
+      "id": "n_backbone_0"
+    },
+    {
+      "label": "Backbone1",
+      "file_type": "document",
+      "source_file": "notes/backbone1.md",
+      "community": 0,
+      "id": "n_backbone_1"
+    },
+    {
+      "label": "Backbone2",
+      "file_type": "document",
+      "source_file": "notes/backbone2.md",
+      "community": 0,
+      "id": "n_backbone_2"
+    },
+    {
+      "label": "Backbone3",
+      "file_type": "document",
+      "source_file": "notes/backbone3.md",
+      "community": 0,
+      "id": "n_backbone_3"
+    },
+    {
+      "label": "Backbone4",
+      "file_type": "document",
+      "source_file": "notes/backbone4.md",
+      "community": 0,
+      "id": "n_backbone_4"
+    },
+    {
+      "label": "Backbone5",
+      "file_type": "document",
+      "source_file": "notes/backbone5.md",
+      "community": 0,
+      "id": "n_backbone_5"
+    },
+    {
+      "label": "Backbone6",
+      "file_type": "document",
+      "source_file": "notes/backbone6.md",
+      "community": 0,
+      "id": "n_backbone_6"
+    },
+    {
+      "label": "Backbone7",
+      "file_type": "document",
+      "source_file": "notes/backbone7.md",
+      "community": 0,
+      "id": "n_backbone_7"
+    },
+    {
+      "label": "Backbone8",
+      "file_type": "document",
+      "source_file": "notes/backbone8.md",
+      "community": 0,
+      "id": "n_backbone_8"
+    },
+    {
+      "label": "Backbone9",
+      "file_type": "document",
+      "source_file": "notes/backbone9.md",
+      "community": 0,
+      "id": "n_backbone_9"
+    },
+    {
+      "label": "CodeHub",
+      "file_type": "code",
+      "source_file": [
+        "src/core.py",
+        "src/utils.ts"
+      ],
+      "community": 0,
+      "id": "n_code_hub"
+    },
+    {
+      "label": "Gamma",
+      "file_type": "document",
+      "source_file": "notes/gamma.md",
+      "community": 1,
+      "id": "n_gamma"
+    },
+    {
+      "label": "Delta",
+      "file_type": "document",
+      "source_file": "notes/delta.md",
+      "community": 1,
+      "id": "n_delta"
+    },
+    {
+      "label": "Epsilon",
+      "file_type": "document",
+      "source_file": "notes/epsilon.md",
+      "community": 1,
+      "id": "n_epsilon"
+    },
+    {
+      "label": "CoreConcept",
+      "file_type": "document",
+      "source_file": "notes/concepts.md",
+      "community": 1,
+      "id": "n_stmt"
+    },
+    {
+      "label": "Alice Smith",
+      "file_type": "document",
+      "source_file": "notes/people.md",
+      "community": 2,
+      "id": "n_alice"
+    },
+    {
+      "label": "AlicePeer",
+      "file_type": "document",
+      "source_file": "notes/alice_peer.md",
+      "community": 2,
+      "id": "n_alice_peer"
+    },
+    {
+      "label": "“A remarkable verbatim quote”",
+      "file_type": "document",
+      "source_file": "notes/quotes.md",
+      "community": 2,
+      "id": "n_quote"
+    },
+    {
+      "label": "QuotePeer",
+      "file_type": "document",
+      "source_file": "notes/quote_peer.md",
+      "community": 2,
+      "id": "n_quote_peer"
+    },
+    {
+      "label": "OrphanIdea",
+      "file_type": "document",
+      "source_file": "notes/orphan.md",
+      "community": 3,
+      "id": "n_isolated"
+    }
+  ],
+  "links": [
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_backbone_0"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_backbone_1"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_backbone_2"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_backbone_3"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_backbone_4"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_backbone_5"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_backbone_6"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_backbone_7"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_backbone_8"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_backbone_9"
+    },
+    {
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/hub.md",
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_code_hub"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "source_file": "notes/hub.md",
+      "confidence_score": 0.8,
+      "weight": 1.0,
+      "source": "n_doc_hub",
+      "target": "n_gamma"
+    },
+    {
+      "relation": "related",
+      "confidence": "AMBIGUOUS",
+      "source_file": "src/core.py",
+      "weight": 1.0,
+      "source": "n_code_hub",
+      "target": "n_delta"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/gamma.md",
+      "weight": 1.0,
+      "source": "n_gamma",
+      "target": "n_delta"
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/concepts.md",
+      "weight": 1.0,
+      "source": "n_gamma",
+      "target": "n_stmt"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/delta.md",
+      "weight": 1.0,
+      "source": "n_delta",
+      "target": "n_epsilon"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/people.md",
+      "weight": 1.0,
+      "source": "n_alice",
+      "target": "n_alice_peer"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "notes/quotes.md",
+      "weight": 1.0,
+      "source": "n_quote",
+      "target": "n_quote_peer"
+    }
+  ]
+}
