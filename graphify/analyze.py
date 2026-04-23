@@ -682,3 +682,48 @@ def knowledge_gaps(
                         _push(n, "high_ambiguity_context")
 
     return results
+
+
+def detect_user_seeds(G: nx.Graph) -> dict[str, list[dict]]:
+    """Return diagram-seed candidates from node attributes.
+
+    D-18 invariant: the ONLY diagram-seed detection entrypoint that seed.py
+    (Plan 20-02) is allowed to call (alongside god_nodes). Composes, never
+    reimplements.
+
+    Reads:
+      - possible_diagram_seed (bool) set by god_nodes() /
+        _cross_community_surprises() during Plan 20-01 → auto_seeds.
+      - tags attribute, matching the literal "gen-diagram-seed" or
+        "gen-diagram-seed/<type>" prefix → user_seeds. The suffix after
+        the slash (if any, non-empty) is captured as layout_hint.
+
+    Returns:
+      {"auto_seeds": [{"id", "label", "layout_hint": None}, ...],
+       "user_seeds": [{"id", "label", "layout_hint": str | None}, ...]}
+
+    Malformed tags attributes (None, non-list, non-string elements) are
+    silently skipped — this function never raises. Tag write-back (SEED-03)
+    is NOT performed here: it goes exclusively through
+    graphify.merge.compute_merge_plan (merge.py:70, tags='union' policy),
+    triggered from the Plan 20-02 --vault path.
+    """
+    auto_seeds: list[dict] = []
+    user_seeds: list[dict] = []
+    for node_id, data in G.nodes(data=True):
+        label = data.get("label", node_id)
+        if data.get("possible_diagram_seed"):
+            auto_seeds.append({"id": node_id, "label": label, "layout_hint": None})
+        tags = data.get("tags")
+        if not isinstance(tags, list):
+            continue
+        for tag in tags:
+            if not isinstance(tag, str):
+                continue
+            if tag == "gen-diagram-seed":
+                user_seeds.append({"id": node_id, "label": label, "layout_hint": None})
+            elif tag.startswith("gen-diagram-seed/"):
+                suffix = tag.split("/", 1)[1]
+                layout_hint = suffix if suffix else None
+                user_seeds.append({"id": node_id, "label": label, "layout_hint": layout_hint})
+    return {"auto_seeds": auto_seeds, "user_seeds": user_seeds}
