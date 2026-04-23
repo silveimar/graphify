@@ -21,10 +21,13 @@ Questions are additive: a node in Things can ALSO appear in Questions.
 from __future__ import annotations
 
 import datetime
+import hashlib
 import importlib.resources as ilr
 import json
+import os
 import re
 import string
+import sys
 from copy import deepcopy
 from pathlib import Path
 
@@ -39,6 +42,7 @@ from graphify.profile import (
     safe_filename,
     safe_frontmatter_value,
     safe_tag,
+    validate_vault_path,
 )
 
 
@@ -609,3 +613,186 @@ def _build_frontmatter_fields_for_source(
         "tags": tags,
     }
     return fields
+
+
+# ---------------------------------------------------------------------------
+# Write phase — Plan 03 (atomic writer, manifest, import-log)
+# ---------------------------------------------------------------------------
+
+def _hash_bytes(path: Path) -> str:
+    """SHA-256 of raw file bytes — matches merge.py::_content_hash idiom."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _write_atomic(target: Path, content: str) -> None:
+    """Write *content* to *target* atomically via .tmp + os.replace (with fsync).
+
+    Lifted verbatim from merge.py::_write_atomic. Raises OSError on failure;
+    best-effort unlinks the .tmp file if the sequence aborts mid-flight.
+    """
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(content)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, target)
+    except OSError:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        raise
+
+
+def _load_manifest(graphify_out: Path) -> dict[str, str]:
+    """Load vault-manifest.json from graphify_out/, returning {} if missing or corrupt."""
+    manifest_path = graphify_out / "vault-manifest.json"
+    if not manifest_path.exists():
+        return {}
+    try:
+        return json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        print(
+            "[graphify] vault-manifest.json corrupted or unreadable — treating all notes as new",
+            file=sys.stderr,
+        )
+        return {}
+
+
+def _save_manifest(manifest: dict[str, str], graphify_out: Path) -> None:
+    """Write vault-manifest.json atomically with indent=2, sort_keys=True."""
+    manifest_path = graphify_out / "vault-manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = manifest_path.with_suffix(".json.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(manifest, indent=2, sort_keys=True))
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, manifest_path)
+    except OSError:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        raise
+
+
+def write_note(vault_dir: Path, rel_path: str, content: str, manifest: dict[str, str]) -> str:
+    """Write a rendered note to vault_dir/rel_path according to D-13 decision table.
+
+    Decision table:
+      - rel_path absent from manifest AND no disk file  → write ("written")
+      - rel_path in manifest AND disk hash == manifest hash → overwrite ("overwritten")
+      - rel_path in manifest AND disk hash != manifest hash → skip ("skipped_user_modified")
+      - rel_path absent from manifest AND file exists on disk → skip ("skipped_foreign")
+
+    Calls validate_vault_path before any filesystem operation; raises ValueError on path escape.
+    Updates manifest[rel_path] in-place on write or overwrite.
+    """
+    # Security: validate before any I/O
+    abs_target = validate_vault_path(vault_dir / rel_path, vault_dir)
+
+    disk_hash = _hash_bytes(abs_target) if abs_target.exists() else None
+    prior = manifest.get(rel_path)
+
+    if prior is None and disk_hash is None:
+        # Fresh write
+        _write_atomic(abs_target, content)
+        manifest[rel_path] = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        return "written"
+
+    if prior is None and disk_hash is not None:
+        # File exists but was never written by graphify — foreign file
+        return "skipped_foreign"
+
+    if prior == disk_hash:
+        # Manifest matches disk — graphify owns this file, safe to overwrite
+        _write_atomic(abs_target, content)
+        manifest[rel_path] = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        return "overwritten"
+
+    # Manifest entry exists but disk hash differs — user has edited the file
+    return "skipped_user_modified"
+
+
+def _append_import_log(graphify_out: Path, run_block: str) -> None:
+    """Prepend a run block to import-log.md (latest-first); creates the file if absent.
+
+    Structure:
+      # Graphify Vault-Promote Import Log
+      <blank line>
+      ## Run <most-recent>
+      ...
+      ## Run <older>
+      ...
+    """
+    log_path = graphify_out / "import-log.md"
+    title_line = "# Graphify Vault-Promote Import Log\n"
+
+    if log_path.exists():
+        existing = log_path.read_text(encoding="utf-8")
+    else:
+        existing = title_line + "\n"
+
+    # Split off the title header (everything up to and including first blank line after it)
+    if "\n\n" in existing:
+        header, body = existing.split("\n\n", 1)
+        header = header + "\n\n"
+    else:
+        header = existing if existing else title_line + "\n"
+        body = ""
+
+    new_content = header + run_block.rstrip() + "\n\n" + body
+    _write_atomic(log_path, new_content)
+
+
+def _format_run_block(
+    run_meta: dict,
+    counts_by_type: dict[str, int],
+    skipped_entries: list[tuple[str, str]],
+) -> str:
+    """Emit the D-15 import-log run block.
+
+    Parameters
+    ----------
+    run_meta        : {"project": str, "run_id": ISO str, "threshold": int, "vault": str}
+    counts_by_type  : {"things": N, "questions": N, ...}
+    skipped_entries : list of (rel_path, reason) tuples
+    """
+    run_id = run_meta.get("run_id", datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M"))
+    # Trim to minute precision for readability
+    run_ts = run_id[:16] if len(run_id) >= 16 else run_id
+    vault = run_meta.get("vault", "")
+    threshold = run_meta.get("threshold", 0)
+
+    type_order = ["things", "questions", "maps", "sources", "people", "quotes", "statements"]
+    promoted_parts = ", ".join(
+        f"{t}={counts_by_type.get(t, 0)}" for t in type_order
+    )
+
+    # Count skips by reason
+    reason_counts: dict[str, int] = {}
+    for _, reason in skipped_entries:
+        reason_counts[reason] = reason_counts.get(reason, 0) + 1
+    skipped_summary = ", ".join(f"{r}={c}" for r, c in sorted(reason_counts.items())) or "none"
+
+    lines = [
+        f"## Run {run_ts}",
+        f"- vault: {vault}",
+        f"- threshold: {threshold}",
+        f"- promoted: {promoted_parts}",
+        f"- skipped: {skipped_summary}",
+    ]
+
+    if skipped_entries:
+        lines.append("")
+        lines.append("### Skipped")
+        for rel_path, reason in skipped_entries:
+            lines.append(f"- {rel_path} — {reason}")
+
+    return "\n".join(lines) + "\n"

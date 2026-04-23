@@ -308,20 +308,136 @@ def test_vault_no_leftover_template_tokens(tmp_path):
 # Write-phase tests (Plan 03 / Plan 04) — remain skipped
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skip(reason="Plan 03 implements vault writes")
+# ---------------------------------------------------------------------------
+# Task 3.1 — Atomic writer + manifest decision table + import-log journal
+# ---------------------------------------------------------------------------
+
+def test_vault01_write_decision_table(tmp_path):
+    """D-13 decision table: written/overwritten/skipped_foreign/skipped_user_modified."""
+    from graphify.vault_promote import write_note, _hash_bytes
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    # Case 1: absent from manifest AND no disk file → "written"
+    manifest: dict[str, str] = {}
+    result = write_note(vault, "Atlas/Dots/Things/TestNote.md", "# Hello", manifest)
+    assert result == "written", f"Expected 'written', got {result!r}"
+    assert (vault / "Atlas/Dots/Things/TestNote.md").exists(), "File must be created"
+    assert "Atlas/Dots/Things/TestNote.md" in manifest, "Manifest must be updated"
+
+    # Case 2: manifest has hash matching current disk file → "overwritten"
+    content2 = "# Hello Updated"
+    # Simulate: manifest hash matches disk (i.e. we wrote it last time — set manifest to disk hash)
+    disk_path = vault / "Atlas/Dots/Things/TestNote.md"
+    manifest["Atlas/Dots/Things/TestNote.md"] = _hash_bytes(disk_path)
+    result2 = write_note(vault, "Atlas/Dots/Things/TestNote.md", content2, manifest)
+    assert result2 == "overwritten", f"Expected 'overwritten', got {result2!r}"
+    assert disk_path.read_text(encoding="utf-8") == content2
+
+    # Case 3: file exists on disk but NOT in manifest → "skipped_foreign"
+    foreign = vault / "Atlas/Docs/Foreign.md"
+    foreign.parent.mkdir(parents=True, exist_ok=True)
+    foreign.write_text("User content", encoding="utf-8")
+    result3 = write_note(vault, "Atlas/Docs/Foreign.md", "# Overwrite attempt", {})
+    assert result3 == "skipped_foreign", f"Expected 'skipped_foreign', got {result3!r}"
+    assert foreign.read_text(encoding="utf-8") == "User content", "Foreign file must be unchanged"
+
+    # Case 4: manifest has hash that does NOT match disk (user edited) → "skipped_user_modified"
+    user_modified = vault / "Atlas/Dots/Things/UserEdited.md"
+    user_modified.parent.mkdir(parents=True, exist_ok=True)
+    user_modified.write_text("# User wrote this", encoding="utf-8")
+    manifest_stale = {"Atlas/Dots/Things/UserEdited.md": "deadbeef" * 8}  # wrong hash
+    result4 = write_note(vault, "Atlas/Dots/Things/UserEdited.md", "# Graphify attempt", manifest_stale)
+    assert result4 == "skipped_user_modified", f"Expected 'skipped_user_modified', got {result4!r}"
+    assert user_modified.read_text(encoding="utf-8") == "# User wrote this", "User-modified file must be unchanged"
+
+
+def test_vault01_write_note_path_traversal(tmp_path):
+    """Path traversal rel_path='../escape.md' must raise, no file created outside vault."""
+    from graphify.vault_promote import write_note
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    escape_target = tmp_path / "escape.md"
+
+    import pytest as _pytest
+    with _pytest.raises((ValueError, OSError)):
+        write_note(vault, "../escape.md", "evil content", {})
+
+    assert not escape_target.exists(), "No file must be created outside vault"
+
+
+def test_vault05_import_log_written(tmp_path):
+    """_append_import_log creates import-log.md with a Run block."""
+    from graphify.vault_promote import _append_import_log
+
+    graphify_out = tmp_path / "graphify-out"
+    graphify_out.mkdir()
+
+    run_block = "## Run 2026-04-23T06:00\n- vault: /test/vault\n- threshold: 3\n- promoted: things=1\n- skipped: none\n"
+    _append_import_log(graphify_out, run_block)
+
+    log_path = graphify_out / "import-log.md"
+    assert log_path.exists(), "import-log.md must be created"
+    content = log_path.read_text(encoding="utf-8")
+    assert "## Run 2026-04-23T06:00" in content, "Run block must appear in log"
+    assert "things=1" in content
+
+
+def test_vault05_import_log_append_latest_first(tmp_path):
+    """Two sequential _append_import_log calls: second block must appear BEFORE first."""
+    from graphify.vault_promote import _append_import_log
+
+    graphify_out = tmp_path / "graphify-out"
+    graphify_out.mkdir()
+
+    block1 = "## Run 2026-04-23T06:00\n- promoted: things=1\n"
+    block2 = "## Run 2026-04-23T07:00\n- promoted: things=2\n"
+
+    _append_import_log(graphify_out, block1)
+    _append_import_log(graphify_out, block2)
+
+    content = (graphify_out / "import-log.md").read_text(encoding="utf-8")
+    pos_block1 = content.index("## Run 2026-04-23T06:00")
+    pos_block2 = content.index("## Run 2026-04-23T07:00")
+    assert pos_block2 < pos_block1, (
+        "Second (later) run block must appear before first (earlier) run block in file. "
+        f"block2 at {pos_block2}, block1 at {pos_block1}"
+    )
+
+
+def test_vault05_manifest_roundtrip(tmp_path):
+    """_save_manifest then _load_manifest round-trips the dict with sort_keys."""
+    from graphify.vault_promote import _save_manifest, _load_manifest
+
+    graphify_out = tmp_path / "graphify-out"
+    graphify_out.mkdir()
+
+    manifest = {
+        "Atlas/Dots/Things/Zeta.md": "abc123",
+        "Atlas/Maps/community-0.md": "def456",
+        "Atlas/Dots/Things/Alpha.md": "ghi789",
+    }
+    _save_manifest(manifest, graphify_out)
+    loaded = _load_manifest(graphify_out)
+
+    assert loaded == manifest, f"Round-trip mismatch: {loaded}"
+    # Verify sort_keys=True by reading raw JSON
+    raw = (graphify_out / "vault-manifest.json").read_text(encoding="utf-8")
+    keys_in_file = [line.strip().strip('"').rstrip('":') for line in raw.splitlines() if '": "' in line]
+    assert keys_in_file == sorted(keys_in_file), f"Keys not sorted in manifest: {keys_in_file}"
+
+
+# ---------------------------------------------------------------------------
+# Task 3.2 — promote() orchestrator + profile write-back (VAULT-06) + CLI
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skip(reason="Plan 03 Task 3.2 implements promote() orchestrator")
 def test_vault01_cli_does_not_overwrite_foreign(tmp_path): ...
 
-@pytest.mark.skip(reason="Plan 03 implements vault writes")
-def test_vault01_write_decision_table(tmp_path): ...
-
-@pytest.mark.skip(reason="Plan 03 implements vault writes")
-def test_vault05_import_log_written(tmp_path): ...
-
-@pytest.mark.skip(reason="Plan 03 implements vault writes")
-def test_vault05_import_log_append_latest_first(tmp_path): ...
-
-@pytest.mark.skip(reason="Plan 04 implements profile writeback")
+@pytest.mark.skip(reason="Plan 03 Task 3.2 implements profile write-back")
 def test_vault06_profile_writeback_union_merge(tmp_path): ...
 
-@pytest.mark.skip(reason="Plan 04 implements profile writeback")
+@pytest.mark.skip(reason="Plan 03 Task 3.2 implements profile write-back")
 def test_vault06_profile_writeback_opt_out(tmp_path): ...
