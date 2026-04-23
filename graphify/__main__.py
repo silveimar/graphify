@@ -54,6 +54,7 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": Path(".claude") / "commands",
         "commands_enabled": True,
+        "supports": ["code", "obsidian"],
     },
     "codex": {
         "skill_file": "skill-codex.md",
@@ -62,6 +63,7 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": None,
         "commands_enabled": False,
+        "supports": ["code"],
     },
     "opencode": {
         "skill_file": "skill-opencode.md",
@@ -70,6 +72,7 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": None,
         "commands_enabled": False,
+        "supports": ["code"],
     },
     "aider": {
         "skill_file": "skill-aider.md",
@@ -78,6 +81,7 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": None,
         "commands_enabled": False,
+        "supports": ["code"],
     },
     "copilot": {
         "skill_file": "skill-copilot.md",
@@ -86,6 +90,7 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": None,
         "commands_enabled": False,
+        "supports": ["code"],
     },
     "claw": {
         "skill_file": "skill-claw.md",
@@ -94,6 +99,7 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": None,
         "commands_enabled": False,
+        "supports": ["code"],
     },
     "droid": {
         "skill_file": "skill-droid.md",
@@ -102,6 +108,7 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": None,
         "commands_enabled": False,
+        "supports": ["code"],
     },
     "trae": {
         "skill_file": "skill-trae.md",
@@ -110,6 +117,7 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": None,
         "commands_enabled": False,
+        "supports": ["code"],
     },
     "trae-cn": {
         "skill_file": "skill-trae.md",
@@ -118,6 +126,7 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": None,
         "commands_enabled": False,
+        "supports": ["code"],
     },
     "antigravity": {
         "skill_file": "skill.md",
@@ -126,6 +135,7 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": None,
         "commands_enabled": False,
+        "supports": ["code"],
     },
     "windows": {
         "skill_file": "skill-windows.md",
@@ -134,12 +144,41 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_src_dir": "commands",
         "commands_dst": Path(".claude") / "commands",
         "commands_enabled": True,
+        "supports": ["code", "obsidian"],
     },
 }
 
 
+# Phase 14 Plan 01 (OBSCMD-02): parse `target:` frontmatter to filter commands
+# by platform capability. Head-only (first 1024 bytes) read for safety (T-14-01-01).
+_TARGET_RE = re.compile(r"^target:\s*(obsidian|code|both)\s*$", re.MULTILINE)
+
+
+def _read_command_target(src: Path) -> str:
+    """Parse `target:` from command frontmatter. Defaults to 'both' (back-compat).
+
+    Reads only the first 1024 bytes of the file (head-only) with errors="replace"
+    so malformed UTF-8 or missing files never crash the installer. Any file
+    without an explicit `target:` field is treated as `target: both` — this is
+    the Pitfall-1 mitigation from 14-RESEARCH.md and preserves behavior for
+    command files authored before Phase 14.
+    """
+    try:
+        head = src.read_text(encoding="utf-8", errors="replace")[:1024]
+    except OSError:
+        return "both"
+    m = _TARGET_RE.search(head)
+    return m.group(1) if m else "both"
+
+
 def _install_commands(cfg: dict, src_dir: Path, *, verbose: bool = True) -> None:
-    """Copy all command .md files from src_dir to cfg['commands_dst'] under Path.home()."""
+    """Copy all command .md files from src_dir to cfg['commands_dst'] under Path.home().
+
+    Phase 14 Plan 01 (OBSCMD-02): filter by per-file `target:` frontmatter against
+    the platform's `supports:` list. Files with `target: both` always install;
+    otherwise the target must appear in `cfg['supports']`. Missing `supports` key
+    defaults to the permissive set `["code", "obsidian"]` (back-compat).
+    """
     if not cfg.get("commands_enabled"):
         return
     dst_rel = cfg.get("commands_dst")
@@ -147,11 +186,17 @@ def _install_commands(cfg: dict, src_dir: Path, *, verbose: bool = True) -> None
         return
     dst_dir = Path.home() / dst_rel
     dst_dir.mkdir(parents=True, exist_ok=True)
+    supports = set(cfg.get("supports", ["code", "obsidian"]))  # permissive default
     for src in sorted(src_dir.glob("*.md")):
+        target = _read_command_target(src)
+        if target != "both" and target not in supports:
+            if verbose:
+                print(f"  command skipped    ->  {src.name} (target={target} not in supports)")
+            continue
         dst = dst_dir / src.name
         shutil.copy(src, dst)
         if verbose:
-            print(f"  command installed  ->  {dst}")
+            print(f"  command installed  ->  {dst} (target={target})")
 
 
 def _uninstall_commands(cfg: dict, *, verbose: bool = True) -> None:
@@ -182,7 +227,8 @@ def _uninstall_commands(cfg: dict, *, verbose: bool = True) -> None:
             print(f"  command removed    ->  {target}")
 
 
-def install(platform: str = "claude", no_commands: bool = False) -> None:
+def install(platform: str = "claude", no_commands: bool = False,
+            no_obsidian_commands: bool = False) -> None:
     if platform == "gemini":
         gemini_install()
         return
@@ -197,6 +243,11 @@ def install(platform: str = "claude", no_commands: bool = False) -> None:
         sys.exit(1)
 
     cfg = _PLATFORM_CONFIG[platform]
+    # Phase 14 Plan 01 (OBSCMD-02): --no-obsidian-commands strips "obsidian" from
+    # the platform's supports list for this install only. Do NOT mutate the
+    # module-level _PLATFORM_CONFIG dict — shallow-copy and filter.
+    if no_obsidian_commands:
+        cfg = {**cfg, "supports": [s for s in cfg.get("supports", []) if s != "obsidian"]}
     skill_src = Path(__file__).parent / cfg["skill_file"]
     if not skill_src.exists():
         print(f"error: {cfg['skill_file']} not found in package - reinstall graphify", file=sys.stderr)
@@ -1684,6 +1735,10 @@ def main() -> None:
         no_commands = "--no-commands" in sys.argv
         if no_commands:
             sys.argv.remove("--no-commands")
+        # --no-obsidian-commands flag (OBSCMD-02): skip target: obsidian files
+        no_obsidian_commands = "--no-obsidian-commands" in sys.argv
+        if no_obsidian_commands:
+            sys.argv.remove("--no-obsidian-commands")
         args = sys.argv[2:]
         i = 0
         while i < len(args):
@@ -1695,7 +1750,8 @@ def main() -> None:
                 i += 2
             else:
                 i += 1
-        install(platform=chosen_platform, no_commands=no_commands)
+        install(platform=chosen_platform, no_commands=no_commands,
+                no_obsidian_commands=no_obsidian_commands)
     elif cmd == "claude":
         subcmd = sys.argv[2] if len(sys.argv) > 2 else ""
         if subcmd == "install":

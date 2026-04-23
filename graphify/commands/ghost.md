@@ -3,6 +3,7 @@ name: ghost
 description: Answer in the user's voice, grounded in their graph contributions and annotations.
 argument-hint: <question or prompt>
 disable-model-invocation: true
+target: both
 ---
 
 Question or prompt to answer as the user: $ARGUMENTS

@@ -3,6 +3,7 @@ name: drift
 description: Surface nodes whose community, centrality, or edge density has trended consistently across recent snapshots.
 argument-hint:
 disable-model-invocation: true
+target: both
 ---
 
 Call the graphify MCP tool `drift_nodes` with:

@@ -3,6 +3,7 @@ name: emerge
 description: Surface newly-formed clusters that were not present in the previous graph snapshot.
 argument-hint:
 disable-model-invocation: true
+target: both
 ---
 
 Call the graphify MCP tool `newly_formed_clusters` with:

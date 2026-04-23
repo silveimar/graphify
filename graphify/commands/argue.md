@@ -3,6 +3,7 @@ name: graphify-argue
 description: Run a structurally-enforced multi-perspective graph debate on a decision question, grounded in the knowledge graph.
 argument-hint: <decision question>
 disable-model-invocation: true
+target: both
 ---
 
 Arguments: $ARGUMENTS

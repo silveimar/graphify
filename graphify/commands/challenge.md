@@ -3,6 +3,7 @@ name: challenge
 description: Pressure-test a stated belief against graph evidence — surface supporting vs contradicting edges.
 argument-hint: <belief>
 disable-model-invocation: true
+target: both
 ---
 
 Belief to pressure-test: $ARGUMENTS

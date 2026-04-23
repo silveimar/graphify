@@ -3,6 +3,7 @@ name: graphify-ask
 description: Ask a natural-language question about the codebase and receive a graph-grounded narrative answer with citations.
 argument-hint: <question>
 disable-model-invocation: true
+target: both
 ---
 
 Arguments: $ARGUMENTS

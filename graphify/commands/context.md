@@ -3,6 +3,7 @@ name: context
 description: Load a full graph-backed summary of the current knowledge graph — active god nodes, top communities, and recent changes.
 argument-hint:
 disable-model-invocation: true
+target: both
 ---
 
 Call the graphify MCP tool `graph_summary` with:

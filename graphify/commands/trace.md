@@ -3,6 +3,7 @@ name: trace
 description: Show how a named entity has evolved across graph snapshots — first-seen, community journey, centrality trend, current status.
 argument-hint: <entity-name>
 disable-model-invocation: true
+target: both
 ---
 
 The entity to trace is: $ARGUMENTS

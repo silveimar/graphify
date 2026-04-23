@@ -3,6 +3,7 @@ name: connect
 description: Find the shortest path and surprising bridge paths between two topics in the graph.
 argument-hint: <topic-a> <topic-b>
 disable-model-invocation: true
+target: both
 ---
 
 Arguments: $ARGUMENTS
