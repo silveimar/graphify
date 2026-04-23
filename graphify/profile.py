@@ -70,11 +70,32 @@ _DEFAULT_PROFILE: dict = {
         "tech": ["python", "typescript", "javascript", "go", "rust", "java", "sql", "graphql", "docker", "k8s"],
     },
     "profile_sync": {"auto_update": True},
+    # Phase 21 extensions (PROF-01..PROF-04): 6 built-in diagram type defaults
+    "diagram_types": [
+        {"name": "architecture", "template_path": "Excalidraw/Templates/architecture.excalidraw.md",
+         "trigger_node_types": ["module", "service"], "trigger_tags": ["architecture"],
+         "min_main_nodes": 3, "naming_pattern": "{topic}-architecture"},
+        {"name": "workflow", "template_path": "Excalidraw/Templates/workflow.excalidraw.md",
+         "trigger_node_types": ["function", "process"], "trigger_tags": ["workflow", "pipeline"],
+         "min_main_nodes": 3, "naming_pattern": "{topic}-workflow"},
+        {"name": "repository-components", "template_path": "Excalidraw/Templates/repository-components.excalidraw.md",
+         "trigger_node_types": ["module", "file"], "trigger_tags": ["repo", "components"],
+         "min_main_nodes": 3, "naming_pattern": "{topic}-repository-components"},
+        {"name": "mind-map", "template_path": "Excalidraw/Templates/mind-map.excalidraw.md",
+         "trigger_node_types": ["concept"], "trigger_tags": ["mind-map", "brainstorm"],
+         "min_main_nodes": 3, "naming_pattern": "{topic}-mind-map"},
+        {"name": "cuadro-sinoptico", "template_path": "Excalidraw/Templates/cuadro-sinoptico.excalidraw.md",
+         "trigger_node_types": ["concept", "category"], "trigger_tags": ["synoptic", "cuadro-sinoptico"],
+         "min_main_nodes": 3, "naming_pattern": "{topic}-cuadro-sinoptico"},
+        {"name": "glossary-graph", "template_path": "Excalidraw/Templates/glossary-graph.excalidraw.md",
+         "trigger_node_types": ["concept", "term"], "trigger_tags": ["glossary", "definitions"],
+         "min_main_nodes": 3, "naming_pattern": "{topic}-glossary-graph"},
+    ],
 }
 
 _VALID_TOP_LEVEL_KEYS = {
     "folder_mapping", "naming", "merge", "mapping_rules", "obsidian",
-    "topology", "mapping", "tag_taxonomy", "profile_sync",
+    "topology", "mapping", "tag_taxonomy", "profile_sync", "diagram_types",
 }
 
 _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
@@ -334,6 +355,37 @@ def validate_profile(profile: dict) -> list[str]:
                     errors.append(f"tag_taxonomy.{ns} must be a list of strings")
                 elif not all(isinstance(v, str) for v in values):
                     errors.append(f"tag_taxonomy.{ns} must contain only strings")
+
+    # diagram_types section (Phase 21, PROF-01..PROF-04)
+    diagram_types = profile.get("diagram_types")
+    if diagram_types is not None:
+        if not isinstance(diagram_types, list):
+            errors.append("diagram_types must be a list")
+        else:
+            _VALID_DT_KEYS = {"name", "template_path", "trigger_node_types",
+                              "trigger_tags", "min_main_nodes", "naming_pattern"}
+            for i, entry in enumerate(diagram_types):
+                if not isinstance(entry, dict):
+                    errors.append(f"diagram_types[{i}] must be a dict")
+                    continue
+                if "name" in entry and not isinstance(entry["name"], str):
+                    errors.append(f"diagram_types[{i}].name must be str")
+                if "template_path" in entry and not isinstance(entry["template_path"], str):
+                    errors.append(f"diagram_types[{i}].template_path must be str")
+                if "trigger_node_types" in entry and not isinstance(entry["trigger_node_types"], list):
+                    errors.append(f"diagram_types[{i}].trigger_node_types must be list")
+                if "trigger_tags" in entry and not isinstance(entry["trigger_tags"], list):
+                    errors.append(f"diagram_types[{i}].trigger_tags must be list")
+                if "min_main_nodes" in entry and (
+                    isinstance(entry["min_main_nodes"], bool)
+                    or not isinstance(entry["min_main_nodes"], int)
+                ):
+                    errors.append(f"diagram_types[{i}].min_main_nodes must be int")
+                if "naming_pattern" in entry and not isinstance(entry["naming_pattern"], str):
+                    errors.append(f"diagram_types[{i}].naming_pattern must be str")
+                for key in entry:
+                    if key not in _VALID_DT_KEYS:
+                        errors.append(f"diagram_types[{i}] unknown key '{key}'")
 
     # profile_sync section (Phase 19, D-18 — VAULT-06 opt-out)
     profile_sync = profile.get("profile_sync")

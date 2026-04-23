@@ -258,6 +258,34 @@ def build_seed(
 
     layout_type = _select_layout_type(subG, main_nodes, layout_hint)
 
+    # Phase 21 PROF-04 + D-06/D-07: profile.diagram_types recommender
+    # D-06: match iff (trigger_tags ∩ node_tags OR node_type ∈ trigger_node_types)
+    #       AND len(main_nodes) >= min_main_nodes
+    # D-07: tiebreak = highest min_main_nodes wins; ties fall back to
+    #       declaration order (stable max).
+    suggested_template = _TEMPLATE_MAP[layout_type]
+    try:
+        from graphify.profile import load_profile
+        _profile = load_profile(vault_dir=None)
+        _node_data = G.nodes[node_id]
+        node_tags = set(_node_data.get("tags", []) or [])
+        node_type = _node_data.get("file_type") or _node_data.get("node_type")
+        candidates = [
+            dt for dt in (_profile.get("diagram_types") or [])
+            if (
+                (set(dt.get("trigger_tags") or []) & node_tags)
+                or (node_type is not None and node_type in set(dt.get("trigger_node_types") or []))
+            )
+            and len(main_nodes) >= int(dt.get("min_main_nodes", 2))
+        ]
+        if candidates:
+            # max() is stable — ties fall back to declaration order (D-07)
+            chosen = max(candidates, key=lambda dt: int(dt.get("min_main_nodes", 2)))
+            if chosen.get("template_path"):
+                suggested_template = chosen["template_path"]
+    except Exception:
+        pass  # Never break seed build on profile errors
+
     return {
         "seed_id": node_id,
         "trigger": trigger,
@@ -267,7 +295,7 @@ def build_seed(
         "supporting_nodes": supporting_nodes,
         "relations": relations,
         "suggested_layout_type": layout_type,
-        "suggested_template": _TEMPLATE_MAP[layout_type],
+        "suggested_template": suggested_template,
         "version_nonce_seed": _version_nonce(node_id, 0.0, 0.0),
     }
 

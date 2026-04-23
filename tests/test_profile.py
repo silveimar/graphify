@@ -1102,3 +1102,66 @@ def test_load_profile_user_tag_taxonomy_deep_merge(tmp_path):
     assert p["tag_taxonomy"]["garden"] == ["custom"]
     # Other namespaces from defaults should still be present
     assert "python" in p["tag_taxonomy"]["tech"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 21: diagram_types section (PROF-01..PROF-04)
+# ---------------------------------------------------------------------------
+
+
+def test_profile_diagram_types_atomicity_guard():
+    """PROF-02 atomicity: all four required sites land together.
+
+    Guards against future splits: _VALID_TOP_LEVEL_KEYS, _DEFAULT_PROFILE,
+    and validate_profile must agree on diagram_types within the same import.
+    """
+    from graphify.profile import _VALID_TOP_LEVEL_KEYS, _DEFAULT_PROFILE, validate_profile
+    assert "diagram_types" in _VALID_TOP_LEVEL_KEYS
+    assert "diagram_types" in _DEFAULT_PROFILE
+    # The default profile itself must validate cleanly.
+    assert validate_profile(_DEFAULT_PROFILE) == []
+
+
+def test_profile_6_builtin_defaults():
+    """PROF-03: exactly 6 built-in diagram type entries with the named set."""
+    entries = _DEFAULT_PROFILE["diagram_types"]
+    assert len(entries) == 6
+    names = {e["name"] for e in entries}
+    assert names == {
+        "architecture", "workflow", "repository-components",
+        "mind-map", "cuadro-sinoptico", "glossary-graph",
+    }
+    # Every entry must have all required keys present.
+    required = {"name", "template_path", "trigger_node_types",
+                "trigger_tags", "min_main_nodes", "naming_pattern"}
+    for e in entries:
+        assert required <= set(e.keys()), f"{e['name']} missing: {required - set(e.keys())}"
+
+
+def test_profile_missing_diagram_types_section_ok():
+    """A profile without diagram_types must not trigger unknown-key or other errors."""
+    assert validate_profile({"naming": {"convention": "title_case"}}) == []
+
+
+def test_profile_diagram_types_missing_fields_graceful():
+    """Entries with only `name` must not raise — missing fields resolve to defaults."""
+    assert validate_profile({"diagram_types": [{"name": "x"}]}) == []
+
+
+def test_profile_diagram_types_malformed_rejected():
+    """Malformed entry (name must be str) yields non-empty errors."""
+    errors = validate_profile({"diagram_types": [{"name": 123}]})
+    assert errors
+    assert any("diagram_types[0].name" in e for e in errors)
+
+
+def test_profile_diagram_types_not_a_list_rejected():
+    errors = validate_profile({"diagram_types": {"name": "x"}})
+    assert errors
+    assert any("diagram_types must be a list" in e for e in errors)
+
+
+def test_profile_diagram_types_unknown_key_rejected():
+    errors = validate_profile({"diagram_types": [{"name": "x", "extra": 1}]})
+    assert errors
+    assert any("unknown key 'extra'" in e for e in errors)

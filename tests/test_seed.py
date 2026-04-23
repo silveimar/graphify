@@ -638,3 +638,111 @@ def test_cli_diagram_seeds_flag_smoke(tmp_path):
     assert result.returncode == 0, f"stderr: {result.stderr}\nstdout: {result.stdout}"
     assert "[graphify] diagram-seeds complete:" in result.stdout
     assert (out_dir / "seeds" / "seeds-manifest.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# Phase 21: diagram_types recommender (PROF-04, D-06, D-07)
+# ---------------------------------------------------------------------------
+
+
+def _make_tagged_hub(main_tags=None, file_type: str = "code", n_spokes: int = 4) -> nx.Graph:
+    """Hub-and-spokes with configurable tags and file_type on the hub."""
+    G = nx.Graph()
+    G.add_node(
+        "h", label="H", file_type=file_type, community=0, source_file="h.py",
+        tags=list(main_tags or []),
+    )
+    for i in range(n_spokes):
+        nid = f"n{i}"
+        G.add_node(nid, label=nid.upper(), file_type=file_type, community=0, source_file=f"{nid}.py")
+        G.add_edge("h", nid, relation="calls", confidence="EXTRACTED", source_file="h.py")
+    # extra edge so it's not a tree
+    G.add_edge("n0", "n1", relation="peer", confidence="EXTRACTED", source_file="h.py")
+    return G
+
+
+def test_seed_recommender_profile_match():
+    """PROF-04: node whose tags match a diagram_types entry gets that template_path."""
+    from graphify.seed import build_seed
+    G = _make_tagged_hub(main_tags=["workflow"], n_spokes=4)
+    seed = build_seed(G, "h", "auto")
+    assert seed["suggested_template"].endswith("workflow.excalidraw.md")
+    # Should be the profile path (under Excalidraw/Templates/), not the bare filename.
+    assert "Excalidraw/Templates/" in seed["suggested_template"]
+
+
+def test_seed_recommender_fallback_to_layout():
+    """No matching tags/types → falls back to _TEMPLATE_MAP[layout_type]."""
+    from graphify.seed import build_seed, _TEMPLATE_MAP
+    G = _make_tagged_hub(main_tags=[], file_type="code", n_spokes=4)
+    seed = build_seed(G, "h", "auto")
+    # file_type "code" is not in any default trigger_node_types → no match,
+    # fallback to layout-derived template.
+    layout_type = seed["suggested_layout_type"]
+    assert seed["suggested_template"] == _TEMPLATE_MAP[layout_type]
+
+
+def test_seed_recommender_gates_on_min_main_nodes():
+    """D-06: candidate's min_main_nodes gate excludes it when len(main_nodes) too small."""
+    from graphify.seed import build_seed, _TEMPLATE_MAP
+    # Only 1 spoke → main_nodes radius-1 = {h, n0} → len == 2 < 3
+    G = _make_tagged_hub(main_tags=["workflow"], n_spokes=1)
+    seed = build_seed(G, "h", "auto")
+    # Candidate fails min_main_nodes=3 gate → fall back to layout default.
+    layout_type = seed["suggested_layout_type"]
+    assert seed["suggested_template"] == _TEMPLATE_MAP[layout_type]
+
+
+def test_seed_recommender_tiebreak_highest_min_main_nodes_wins(monkeypatch):
+    """D-07: among matching candidates, highest min_main_nodes wins."""
+    from graphify import profile as profile_mod
+    from graphify.seed import build_seed
+
+    # Craft a profile with two candidates both matching on tag "shared",
+    # A declared first (min=2), B declared second (min=4).
+    custom = dict(profile_mod._DEFAULT_PROFILE)
+    custom["diagram_types"] = [
+        {"name": "A", "template_path": "tpl/A.md",
+         "trigger_node_types": [], "trigger_tags": ["shared"],
+         "min_main_nodes": 2, "naming_pattern": "{topic}-A"},
+        {"name": "B", "template_path": "tpl/B.md",
+         "trigger_node_types": [], "trigger_tags": ["shared"],
+         "min_main_nodes": 4, "naming_pattern": "{topic}-B"},
+    ]
+
+    def _fake_load(vault_dir=None):
+        return custom
+
+    monkeypatch.setattr(profile_mod, "load_profile", _fake_load)
+
+    # Hub with 4 spokes → main_nodes radius-1 = 5 (h + n0..n3), so both match.
+    G = _make_tagged_hub(main_tags=["shared"], n_spokes=4)
+    seed = build_seed(G, "h", "auto")
+    # B (min=4) beats A (min=2) on the tiebreak.
+    assert seed["suggested_template"] == "tpl/B.md"
+
+
+def test_seed_recommender_tiebreak_declaration_order_on_equal_min(monkeypatch):
+    """D-07 stable-max: when two candidates have equal min_main_nodes, the
+    one declared FIRST wins (max() is stable — returns the first maximum)."""
+    from graphify import profile as profile_mod
+    from graphify.seed import build_seed
+
+    custom = dict(profile_mod._DEFAULT_PROFILE)
+    custom["diagram_types"] = [
+        {"name": "A", "template_path": "tpl/A.md",
+         "trigger_node_types": [], "trigger_tags": ["shared"],
+         "min_main_nodes": 3, "naming_pattern": "{topic}-A"},
+        {"name": "B", "template_path": "tpl/B.md",
+         "trigger_node_types": [], "trigger_tags": ["shared"],
+         "min_main_nodes": 3, "naming_pattern": "{topic}-B"},
+    ]
+
+    def _fake_load(vault_dir=None):
+        return custom
+
+    monkeypatch.setattr(profile_mod, "load_profile", _fake_load)
+
+    G = _make_tagged_hub(main_tags=["shared"], n_spokes=4)
+    seed = build_seed(G, "h", "auto")
+    assert seed["suggested_template"] == "tpl/A.md"
