@@ -132,6 +132,8 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - [x] Phase 16: Graph Argumentation Mode — `graphify/argue.py` substrate populates a SPAR-Kit-style `ArgumentPackage` from a graph subgraph; `skill.md` orchestrates the LLM debate (Phase 9 blind-label harness reused); mandatory `{claim, cites: [node_id]}` schema rejects fabricated node IDs; round cap 6; `dissent`/`inconclusive` valid outputs; `GRAPH_ARGUMENT.md` advisory-only artifact. (completed 2026-04-23)
 - [x] Phase 17: Conversational Graph Chat — Two-stage structurally-enforced `chat(query, session_id)` MCP tool (Stage 1 tool-call only, Stage 2 compose from results only); every claim cited to `{node_id, label, source_file}`; empty results return templated fuzzy suggestions; session-scoped history; `/graphify-ask` slash command. (completed 2026-04-22)
 - [x] Phase 18: Focus-Aware Graph Context — `get_focus_context(focus_hint)` MCP tool returns BFS ego-graph + community summary for a structured focus hint (`file_path`, optional `function_name`/`line`/`neighborhood_depth`/`include_community`); pull-model (no filesystem watcher); codifies v1.3 CR-01 snapshot-root fix; silently ignores spoofed paths. ✅ 2026-04-20
+- [ ] Phase 18.1: v1.4 Gap Closure — Phase 13 Verification Artifacts — Produce the three missing artifacts (13-VERIFICATION.md, 13-SECURITY.md, 13-VALIDATION.md) for Phase 13's already-shipped 18 REQ-IDs (MANIFEST-01..10 + HARNESS-01..08). Unblocks milestone audit. **Added by /gsd-plan-milestone-gaps 2026-04-22 from v1.4-MILESTONE-AUDIT.md.**
+- [ ] Phase 18.2: v1.4 Gap Closure — Manifest Metadata + Tech Debt Cleanup — Add missing `chat` + `get_focus_context` entries to `capability_tool_meta.yaml` (MANIFEST-06 metadata gap); refresh stale 15/18 VALIDATION.md frontmatter; reconcile REQUIREMENTS.md traceability checkboxes for shipped-but-unchecked rows. **Added by /gsd-plan-milestone-gaps 2026-04-22 from v1.4-MILESTONE-AUDIT.md.**
 
 **Deferred to v1.4.x (not v1.4 scope):**
 
@@ -276,6 +278,37 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - [x] 18-02-PLAN.md — MCP Tool + Snapshot Sentinel: `get_focus_context` + `ProjectRoot` + `root`→`project_root` rename + nested-dir fixture (FOCUS-01, FOCUS-03, FOCUS-04, FOCUS-05, FOCUS-07) — ✅ 2026-04-20 (commits 6c63501 + 39a8236 + 1d0169c + b058d37 + 4da9efb)
 - [x] 18-03-PLAN.md — P2 Debounce + Freshness: 500ms debounce cache + `reported_at` freshness with Py 3.10 Z-suffix shim (FOCUS-08 [P2], FOCUS-09 [P2]) — ✅ 2026-04-20 (commits 2309a57 + 0f06629)
 - [x] 18-04-PLAN.md — Gap closure: CR-01 sentinel wiring + WR-02/03/04 cleanups (SC4 PARTIAL → VERIFIED; inline `Path(project_root).name == "graphify-out"` guard in 4 snapshot helpers; dead `alias_map` param removed from `_run_get_focus_context_core`; WR-03 dispatcher-exercising test + WR-04 D-08 strict-depth invariants) — ✅ 2026-04-20 (commits 81d904a + 28b0f34 + edf793a + docs commit)
+
+### Phase 18.1: v1.4 Gap Closure — Phase 13 Verification Artifacts
+**Goal**: Produce the three verification artifacts that Phase 13 (Agent Capability Manifest + SEED-002 Harness Memory Export) shipped without on 2026-04-17. All 18 REQ-IDs (MANIFEST-01..10 + HARNESS-01..08) are already in-tree per plan SUMMARYs; this phase re-verifies them against the live codebase and files the audit trail that `/gsd-audit-milestone` requires before v1.4 can close.
+**Depends on**: Nothing new — Phase 13 code shipped 2026-04-17 and is frozen.
+**Gap Closure**: Closes v1.4-MILESTONE-AUDIT.md blocker `phases[0]` (Phase 13 missing VERIFICATION.md, VALIDATION.md, 13-SECURITY.md).
+**Requirements**: Re-verifies MANIFEST-01..08, HARNESS-01..06 (P1) and MANIFEST-09/10, HARNESS-07/08 (P2) — 18 REQ-IDs. No new REQ-IDs added.
+**Success Criteria** (what must be TRUE):
+  1. `.planning/phases/13-agent-capability-manifest/13-VERIFICATION.md` exists and marks all 18 REQ-IDs verified against live `graphify/capability.py`, `graphify/mcp_tool_registry.py`, `graphify/harness_export.py`, and `server.json`.
+  2. `.planning/phases/13-agent-capability-manifest/13-SECURITY.md` exists with STRIDE mitigation record for Phase 13 threats (manifest injection, harness export secret leak, capability-describe info disclosure).
+  3. `.planning/phases/13-agent-capability-manifest/13-VALIDATION.md` exists with Nyquist-compliant test coverage audit (`status: approved`, `nyquist_compliant: true`).
+  4. Re-running `/gsd-audit-milestone v1.4` removes Phase 13 from the `gaps.phases` list.
+**Plans**: 3 tasks (one per verification workflow).
+- [ ] 18.1-01-PLAN.md — `/gsd-verify-work 13` produces 13-VERIFICATION.md (all 18 REQ-IDs verified)
+- [ ] 18.1-02-PLAN.md — `/gsd-secure-phase 13` produces 13-SECURITY.md (STRIDE record)
+- [ ] 18.1-03-PLAN.md — `/gsd-validate-phase 13` produces 13-VALIDATION.md (Nyquist audit)
+
+### Phase 18.2: v1.4 Gap Closure — Manifest Metadata + Tech Debt Cleanup
+**Goal**: Close the remaining non-blocking integration gap (MANIFEST-06 metadata fallback for `chat` + `get_focus_context`) and reconcile three REQUIREMENTS.md / VALIDATION.md tech-debt items so the v1.4 audit returns clean.
+**Depends on**: Phase 18.1 (task 3 checks off MANIFEST-01..08 post-verification).
+**Gap Closure**: Closes v1.4-MILESTONE-AUDIT.md `integration[0]` (MANIFEST-06 metadata defaults) + `tech_debt` items on requirements-tracking, Phase 15, and Phase 18.
+**Requirements**: Re-verifies MANIFEST-06 semantics (tool metadata correctness). No new REQ-IDs added.
+**Success Criteria** (what must be TRUE):
+  1. `graphify/capability_tool_meta.yaml` contains entries for `chat` (cost_class: expensive, deterministic: false, composable_from: []) and `get_focus_context` (cost_class: cheap, deterministic: true, composable_from: []). Repo-committed `server.json` regenerated via `graphify capability --stdout > server.json` reflects the new metadata.
+  2. A regression test in `tests/test_capability.py` asserts both tools emit their declared cost_class + deterministic values via the introspected manifest (guards against future drift).
+  3. `15-VALIDATION.md` and `18-VALIDATION.md` frontmatter updated to `status: approved`, `nyquist_compliant: true` matching each phase's PASSED VERIFICATION.md.
+  4. REQUIREMENTS.md checkboxes for ROUTE-01..07, MANIFEST-01..08, ENRICH-01, ENRICH-04 flipped from `[ ]` to `[x]`; coverage count updated at top of REQUIREMENTS.md.
+  5. Re-running `/gsd-audit-milestone v1.4` returns `status: passed` (no integration gaps, no tech-debt on requirements-tracking / 15 / 18 frontmatter).
+**Plans**: 3 tasks.
+- [ ] 18.2-01-PLAN.md — Add `chat` + `get_focus_context` entries to `capability_tool_meta.yaml`; regenerate `server.json`; add regression test in `tests/test_capability.py`.
+- [ ] 18.2-02-PLAN.md — Refresh stale frontmatter on `15-VALIDATION.md` + `18-VALIDATION.md` (metadata-only; VERIFICATION is PASSED for both).
+- [ ] 18.2-03-PLAN.md — Reconcile REQUIREMENTS.md traceability: check off ROUTE-01..07, MANIFEST-01..08, ENRICH-01, ENRICH-04; update coverage count.
 
 ### Phase 19: Vault Promotion Script (Layer B)
 **Goal**: A Python script (`graphify/vault_promote.py`) that reads `graphify-out/graph.json` and `GRAPH_REPORT.md`, classifies and scores nodes, then writes promoted Obsidian markdown notes directly into the user's vault at the correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy.
