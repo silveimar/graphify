@@ -351,3 +351,42 @@ def test_orphan_graceful_without_enrichment():
             or "no enrichment" in body.lower()), (
         "body must render a graceful banner when enrichment.json is missing"
     )
+
+
+# ============================================================
+# Phase 14 Plan 05 — OBSCMD-06 (/graphify-wayfind) + cross-command trust-boundary invariant
+# ============================================================
+
+
+def test_wayfind_contract():
+    """OBSCMD-06: /graphify-wayfind exists with connect_topics dispatch."""
+    path = _commands_dir() / "graphify-wayfind.md"
+    assert path.exists()
+    fm = _parse_frontmatter(path)
+    assert fm.get("name") == "graphify-wayfind"
+    assert fm.get("target") == "obsidian"
+    assert fm.get("argument-hint"), "argument-hint required"
+    assert fm.get("disable-model-invocation") == "true"
+    body = path.read_text()
+    assert "$ARGUMENTS" in body
+    assert "connect_topics" in body, "body must invoke connect_topics shortest-path"
+    assert "get_community" in body, "body must resolve MOC root via get_community"
+
+
+def test_trust_boundary_invariant_all_p1():
+    """OBSCMD-08 / D-06 / TM-14-01: every P1 write command routes through
+    propose_vault_note and never uses direct-write primitives."""
+    import re
+    P1_WRITE_COMMANDS = ["graphify-moc", "graphify-wayfind"]
+    FORBIDDEN = [r"Path\.write_text", r"write_note_directly", r"open\([^)]*['\"]w['\"]"]
+    for name in P1_WRITE_COMMANDS:
+        path = _commands_dir() / f"{name}.md"
+        assert path.exists(), f"{name}.md missing"
+        body = path.read_text()
+        assert "propose_vault_note" in body, (
+            f"{name}.md must route writes through propose_vault_note (OBSCMD-08)"
+        )
+        for pattern in FORBIDDEN:
+            assert not re.search(pattern, body), (
+                f"TM-14-01: {name}.md must not call direct-write pattern {pattern!r}"
+            )
