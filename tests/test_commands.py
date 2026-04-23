@@ -289,3 +289,29 @@ def test_moc_trust_boundary_and_contract():
         assert not _re.search(forbidden, body), (
             f"TM-14-01: graphify-moc.md must not call direct-write pattern {forbidden!r}"
         )
+
+
+def test_related_contract():
+    """OBSCMD-04: /graphify-related exists with correct frontmatter and tool dispatch."""
+    path = _commands_dir() / "graphify-related.md"
+    assert path.exists()
+    fm = _parse_frontmatter(path)
+    assert fm.get("name") == "graphify-related"
+    assert fm.get("target") == "obsidian"
+    assert fm.get("argument-hint"), "argument-hint required"
+    assert fm.get("disable-model-invocation") == "true"
+    body = path.read_text()
+    assert "$ARGUMENTS" in body, "must accept <note-path> as $ARGUMENTS"
+    assert "get_focus_context" in body, "body must invoke get_focus_context"
+    assert "source_file" in body, "body must read source_file from note frontmatter (D-02)"
+
+
+def test_related_handles_no_context():
+    """OBSCMD-04 + TM-14-03: /graphify-related explicitly handles status == no_context
+    (spoof-silent invariant from Phase 18 SC2 / CR-01)."""
+    path = _commands_dir() / "graphify-related.md"
+    body = path.read_text()
+    assert "no_context" in body, (
+        "body must explicitly branch on status == no_context so spoofed/outside-project "
+        "source_file values produce a user-visible explanation, not silence"
+    )
