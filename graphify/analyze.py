@@ -85,6 +85,10 @@ def god_nodes(G: nx.Graph, top_n: int = 10) -> list[dict]:
     for node_id, deg in sorted_nodes:
         if _is_file_node(G, node_id) or _is_concept_node(G, node_id):
             continue
+        # Phase 20-01 / D-18: tag selected god nodes as possible diagram seeds.
+        # This node attribute is the sole auto-detection signal consumed by
+        # graphify.seed (Plan 20-02). Do not reimplement detection elsewhere.
+        G.nodes[node_id]["possible_diagram_seed"] = True
         result.append({
             "id": node_id,
             "label": G.nodes[node_id].get("label", node_id),
@@ -359,6 +363,8 @@ def _cross_community_surprises(
             "relation": relation,
             "why": f"Bridges community {cid_u} → community {cid_v}",
             "_pair": tuple(sorted([cid_u, cid_v])),
+            "_src_id": src_id,
+            "_tgt_id": tgt_id,
         })
 
     # Sort: AMBIGUOUS first, then INFERRED, then EXTRACTED
@@ -371,8 +377,15 @@ def _cross_community_surprises(
     deduped = []
     for s in surprises:
         pair = s.pop("_pair")
+        src_id = s.pop("_src_id")
+        tgt_id = s.pop("_tgt_id")
         if pair not in seen_pairs:
             seen_pairs.add(pair)
+            # Phase 20-01 / D-18: tag both endpoints of each emitted
+            # cross-community bridge as a possible diagram seed. Consumed by
+            # graphify.seed (Plan 20-02) via detect_user_seeds().
+            G.nodes[src_id]["possible_diagram_seed"] = True
+            G.nodes[tgt_id]["possible_diagram_seed"] = True
             deduped.append(s)
     return deduped[:top_n]
 
