@@ -4,7 +4,7 @@ import networkx as nx
 from pathlib import Path
 from graphify.build import build_from_json
 from graphify.cluster import cluster
-from graphify.analyze import god_nodes, surprising_connections, _is_concept_node, graph_diff, _surprise_score, _file_category, render_analysis_context, _is_file_node, _top_level_dir
+from graphify.analyze import god_nodes, surprising_connections, _is_concept_node, graph_diff, _surprise_score, _file_category, render_analysis_context, _is_file_node, _top_level_dir, knowledge_gaps
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -392,3 +392,73 @@ def test_surprising_connections_list_source_file_no_crash():
         for sf in s.get("source_files", []):
             # Must be able to convert to str without TypeError
             _ = str(sf) if sf else ""
+
+
+# ---------------------------------------------------------------------------
+# Tests for knowledge_gaps() — Wave 0, Plan 19-01
+# ---------------------------------------------------------------------------
+
+def test_knowledge_gaps_empty_graph():
+    """Empty graph returns empty list."""
+    result = knowledge_gaps(nx.Graph(), {})
+    assert result == []
+
+
+def test_knowledge_gaps_isolated_node():
+    """A single non-file, non-concept node with degree 0 is returned with reason=isolated."""
+    G = nx.Graph()
+    G.add_node("lone", label="LoneWolf", file_type="document", source_file="doc.md", source_location="")
+    result = knowledge_gaps(G, {})
+    assert len(result) == 1
+    assert result[0]["id"] == "lone"
+    assert result[0]["label"] == "LoneWolf"
+    assert result[0]["reason"] == "isolated"
+
+
+def test_knowledge_gaps_thin_community():
+    """Nodes in a thin community (< 3 members) are returned with reason=thin_community."""
+    G = nx.Graph()
+    G.add_node("a", label="Alpha", file_type="document", source_file="a.md", source_location="")
+    G.add_node("b", label="Beta", file_type="document", source_file="b.md", source_location="")
+    G.add_edge("a", "b", relation="links", confidence="EXTRACTED", source_file="a.md", weight=1.0)
+    communities = {0: ["a", "b"]}
+    result = knowledge_gaps(G, communities)
+    ids = {r["id"] for r in result}
+    reasons = {r["reason"] for r in result}
+    # Both nodes in thin community (degree 1 — also isolated, but thin_community fires first in dedup)
+    assert ids == {"a", "b"}
+    assert reasons <= {"isolated", "thin_community"}
+
+
+def test_knowledge_gaps_high_ambiguity_context():
+    """Nodes adjacent to AMBIGUOUS edges, when ambiguity rate >= threshold, appear with high_ambiguity_context."""
+    G = nx.Graph()
+    G.add_node("x", label="X", file_type="document", source_file="x.md", source_location="")
+    G.add_node("y", label="Y", file_type="document", source_file="y.md", source_location="")
+    G.add_edge("x", "y", relation="relates", confidence="AMBIGUOUS", source_file="x.md", weight=1.0)
+    # 1 AMBIGUOUS edge / 1 total = 100% >= 0.20 threshold
+    result = knowledge_gaps(G, {}, ambiguity_threshold=0.20)
+    reasons = {r["reason"] for r in result}
+    # Nodes may be isolated AND high_ambiguity_context; first-seen wins in dedup
+    assert "high_ambiguity_context" in reasons or "isolated" in reasons
+
+
+def test_knowledge_gaps_deduped_by_id():
+    """A node that is both isolated and in a thin community appears only once (first reason wins)."""
+    G = nx.Graph()
+    G.add_node("z", label="Zeta", file_type="document", source_file="z.md", source_location="")
+    communities = {0: ["z"]}  # thin (1 node) — also isolated (degree 0)
+    result = knowledge_gaps(G, communities)
+    ids = [r["id"] for r in result]
+    # z must appear exactly once
+    assert ids.count("z") == 1
+
+
+def test_knowledge_gaps_return_shape():
+    """Every returned dict has exactly the keys id, label, reason."""
+    G = nx.Graph()
+    G.add_node("n1", label="NodeOne", file_type="document", source_file="f.md", source_location="")
+    result = knowledge_gaps(G, {})
+    assert len(result) >= 1
+    for item in result:
+        assert set(item.keys()) == {"id", "label", "reason"}

@@ -623,3 +623,49 @@ def graph_diff(G_old: nx.Graph, G_new: nx.Graph) -> dict:
         "removed_edges": removed_edges_list,
         "summary": summary,
     }
+
+
+def knowledge_gaps(
+    G: "nx.Graph",
+    communities: dict[int, list[str]],
+    ambiguity_threshold: float = 0.20,
+) -> list[dict]:
+    """Return nodes representing knowledge gaps.
+
+    Each result is {"id": str, "label": str, "reason": str} where reason is one of
+    "isolated", "thin_community", "high_ambiguity_context". Deduped by id (first reason wins).
+
+    These nodes are candidates for promotion to Questions/ folder regardless of degree threshold.
+    """
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    def _push(nid: str, reason: str) -> None:
+        if nid in seen:
+            return
+        seen.add(nid)
+        results.append({"id": nid, "label": G.nodes[nid].get("label", nid), "reason": reason})
+
+    # Isolated: degree <= 1, not a file/concept node
+    for n in G.nodes():
+        if G.degree(n) <= 1 and not _is_file_node(G, n) and not _is_concept_node(G, n):
+            _push(n, "isolated")
+
+    # Thin communities: fewer than 3 members
+    for cid, nodes in communities.items():
+        if len(nodes) < 3:
+            for n in nodes:
+                if not _is_file_node(G, n) and not _is_concept_node(G, n):
+                    _push(n, "thin_community")
+
+    # High ambiguity context: AMBIGUOUS edge rate >= threshold
+    total = G.number_of_edges()
+    if total:
+        ambiguous = [(u, v) for u, v, d in G.edges(data=True) if d.get("confidence") == "AMBIGUOUS"]
+        if len(ambiguous) / total >= ambiguity_threshold:
+            for u, v in ambiguous:
+                for n in (u, v):
+                    if not _is_file_node(G, n) and not _is_concept_node(G, n):
+                        _push(n, "high_ambiguity_context")
+
+    return results
