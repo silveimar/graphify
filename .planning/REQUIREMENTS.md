@@ -32,9 +32,9 @@ Derived from ROADMAP.md Phase 19 success criteria. Full requirement text and pla
 - [x] **SEED-06** Auto-detected seeds capped at `max_seeds=20` before any file I/O. User-tagged seeds (`gen-diagram-seed`) have no cap.
 - [x] **SEED-07** Layout type auto-selected by NetworkX heuristics: `is_tree → cuadro-sinoptico`; DAG + ≥3 topo generations → `workflow`; ≥4 communities → `architecture`; degree-concentrated single community → `mind-map`; concept/doc nodes with labeled relations → `glossary-graph`; code nodes → `repository-components`. `gen-diagram-seed/<type>` slash-type-hint overrides heuristic.
 - [x] **SEED-08** Element IDs derived as `sha256(node_id)[:16]`. `versionNonce` is deterministic: `int(sha256(node_id + str(x) + str(y))[:8], 16)`. Label-derived IDs are forbidden.
-- [ ] **SEED-09** `list_diagram_seeds` MCP tool reads `graphify-out/seeds/`, returns per-seed: `seed_id`, `main_node_label`, `suggested_layout_type`, `trigger`, `node_count`. Response follows D-02 envelope. Node IDs threaded through `_resolve_alias` per D-16.
-- [ ] **SEED-10** `get_diagram_seed(seed_id)` MCP tool returns full SeedDict for the requested seed. Response follows D-02 envelope (`text_body + "\n---GRAPHIFY-META---\n" + json(meta)`). Node IDs threaded through `_resolve_alias` per D-16.
-- [ ] **SEED-11** `mcp_tool_registry.py` and `serve.py` extensions for `list_diagram_seeds` / `get_diagram_seed` land in the same plan (MANIFEST-05 atomic pair invariant).
+- [x] **SEED-09** `list_diagram_seeds` MCP tool reads `graphify-out/seeds/`, returns per-seed: `seed_id`, `main_node_label`, `suggested_layout_type`, `trigger`, `node_count`. Response follows D-02 envelope. Node IDs threaded through `_resolve_alias` per D-16.
+- [x] **SEED-10** `get_diagram_seed(seed_id)` MCP tool returns full SeedDict for the requested seed. Response follows D-02 envelope (`text_body + "\n---GRAPHIFY-META---\n" + json(meta)`). Node IDs threaded through `_resolve_alias` per D-16.
+- [x] **SEED-11** `mcp_tool_registry.py` and `serve.py` extensions for `list_diagram_seeds` / `get_diagram_seed` land in the same plan (MANIFEST-05 atomic pair invariant).
 
 ---
 

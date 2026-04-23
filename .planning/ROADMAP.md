@@ -202,7 +202,7 @@ rank, confidence tags) and enforce naming conventions across all vault output.
 **Phases:**
 
 - [x] Phase 19: Vault Promotion Script (Layer B) — `graphify/vault_promote.py` reads `graph.json` + `GRAPH_REPORT.md`, classifies/scores nodes, writes promoted Obsidian markdown notes directly to the user's vault at correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy. Scope expanded to VAULT-01..07 (adds VAULT-06 profile write-back + VAULT-07 hybrid 3-layer tag taxonomy). Pulled in from v1.4 scope-reconciliation 2026-04-23. (4 plans) (completed 2026-04-23)
-- [ ] Phase 20: Diagram Seed Engine — `analyze.py` auto-tagging + `detect_user_seeds(G)`; new `seed.py` module with `build_seed` / `build_all_seeds` / layout heuristics / >60% overlap dedup / max_seeds=20 cap; `--diagram-seeds` CLI; `list_diagram_seeds` + `get_diagram_seed` MCP tools. (3 plans)
+- [x] Phase 20: Diagram Seed Engine — `analyze.py` auto-tagging + `detect_user_seeds(G)`; new `seed.py` module with `build_seed` / `build_all_seeds` / layout heuristics / >60% overlap dedup / max_seeds=20 cap; `--diagram-seeds` CLI; `list_diagram_seeds` + `get_diagram_seed` MCP tools. (3 plans) (completed 2026-04-23)
 - [ ] Phase 21: Profile Extension & Template Bootstrap — `profile.yaml` `diagram_types:` section (ATOMIC with first reader); 6 built-in diagram type defaults; `--init-diagram-templates` CLI command writing real `.excalidraw.md` JSON stubs; `gen-diagram-seed` tag write-back via vault adapter. (2 plans)
 - [ ] Phase 22: Excalidraw Skill & Vault Bridge — `skill-excalidraw.md` full orchestration (list seeds → get seed → read template → mcp_excalidraw → vault); `graphify install --excalidraw`; pure-Python `.excalidraw.md` fallback path complete before mcp_excalidraw integration. (2 plans)
 
@@ -241,7 +241,7 @@ Plans:
 **Plans**: 3 plans.
 - [x] 20-01-PLAN.md — `analyze.py` extension: `god_nodes()` + `_cross_community_surprises()` emit `possible_diagram_seed: true` node attribute; new `detect_user_seeds(G)` reads `tags` attribute for `gen-diagram-seed` / `gen-diagram-seed/<type>` patterns, returns `auto_seeds` + `user_seeds` lists with extracted type hints. Tag write-back via `graphify.merge.compute_merge_plan` (CONTEXT.md vault_adapter.py reference is stale — confirmed in PATTERNS.md) with `tags: "union"` policy at merge.py:70. (SEED-02, SEED-03)
 - [x] 20-02-PLAN.md — New `graphify/seed.py` module: `build_seed(G, node_id, trigger, layout_hint=None) → SeedDict`; `build_all_seeds(G, analysis, profile)`; layout heuristic (6 NetworkX predicates: `is_tree`, DAG topo-gens, community count, degree distribution, edge directionality, node file_types); >60% overlap dedup (single-pass, degree-sorted, union merge); `max_seeds=20` cap before file I/O; element IDs `sha256(node_id)[:16]`; deterministic `versionNonce`; file output to `graphify-out/seeds/{node_id}-seed.json`; `graphify --diagram-seeds` CLI flag in `__main__.py`. (SEED-01, SEED-04, SEED-05, SEED-06, SEED-07, SEED-08)
-- [ ] 20-03-PLAN.md — MCP exposure (ATOMIC PAIR per MANIFEST-05): `list_diagram_seeds` + `get_diagram_seed` tools in `mcp_tool_registry.py` + `serve.py` (`_tool_list_diagram_seeds`, `_tool_get_diagram_seed`, `_run_list_diagram_seeds_core`, `_run_get_diagram_seed_core`); D-02 envelope on both; D-16 `_resolve_alias` threading on both; `tests/test_serve.py` additions (8+ cases). (SEED-09, SEED-10, SEED-11)
+- [x] 20-03-PLAN.md — MCP exposure (ATOMIC PAIR per MANIFEST-05): `list_diagram_seeds` + `get_diagram_seed` tools in `mcp_tool_registry.py` + `serve.py` (`_tool_list_diagram_seeds`, `_tool_get_diagram_seed`, `_run_list_diagram_seeds_core`, `_run_get_diagram_seed_core`); D-02 envelope on both; D-16 `_resolve_alias` threading on both; `tests/test_serve.py` additions (8+ cases). (SEED-09, SEED-10, SEED-11)
 **UI hint**: no
 
 ### Phase 21: Profile Extension & Template Bootstrap
@@ -307,7 +307,7 @@ Plans:
 | 18.1 v1.4 Gap Closure — Phase 13 Verification Artifacts | v1.4 | 0/3 | Not started | — |
 | 18.2 v1.4 Gap Closure — Manifest Metadata + Tech Debt Cleanup | v1.4 | 0/3 | Not started | — |
 | 19. Vault Promotion Script (Layer B) | v1.5 | 4/4 | Complete   | 2026-04-23 |
-| 20. Diagram Seed Engine | v1.5 | 2/3 | In Progress|  |
+| 20. Diagram Seed Engine | v1.5 | 3/3 | Complete   | 2026-04-23 |
 | 21. Profile Extension & Template Bootstrap | v1.5 | 0/2 | Not started | — |
 | 22. Excalidraw Skill & Vault Bridge | v1.5 | 0/2 | Not started | — |
 
