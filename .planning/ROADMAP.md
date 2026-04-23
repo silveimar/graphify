@@ -108,208 +108,40 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 
 </details>
 
-### ✅ v1.4 Agent Discoverability & Obsidian Workflows
+<details>
+<summary>✅ v1.4 Agent Discoverability & Obsidian Workflows (Phases 12, 13, 14, 15, 16, 17, 18, 18.1, 18.2) — SHIPPED 2026-04-22</summary>
 
-**Theme:** Turn graphify from a tool you run into a tool that agents find, trust, compose with, and improve in the background. Agent discoverability via MCP capability manifest + harness-memory export (SEED-002), Obsidian workflow depth via vault-scoped thinking commands, and graph quality over time via heterogeneous routing, async enrichment, focus-aware zoom, grounded chat, and SPAR-Kit graph-argumentation. Phase 12 (Heterogeneous Extraction Routing) pulled forward from v1.3 deferral.
-
-**Origin:** 4-dimension research synthesized 2026-04-17 (`.planning/research/{STACK,FEATURES,ARCHITECTURE,PITFALLS,SUMMARY}.md`). 86 atomic REQ-IDs across 7 phases committed 2026-04-17 (19488ef). User locked P1 + P2 as the full v1.4 scope — no stretch deferrals beyond documented v1.4.x carve-outs (`.planning/REQUIREMENTS.md`). Research anchors: Obsidian-Claude Codebook (12 commands pattern), Honcho async derivers, Letta sleep-time compute, SPAR-Kit POPULATE→ABSTRACT→RUMBLE→KNIT protocol, MCP Spec 2025-11-25 servers-registry format.
-
-**Milestone-level invariants carried forward from v1.0–v1.3 that every v1.4 phase MUST preserve:**
-
-- **D-02 MCP envelope** — every new MCP tool emits `text_body + "\n---GRAPHIFY-META---\n" + json(meta)` with status codes. Applies to Phase 13 manifest, Phase 16 `argue_topic`, Phase 17 `chat`, Phase 18 `get_focus_context`.
-- **D-16 alias redirect** — every new handler threads IDs through `_resolve_alias` so dedup-merged aliases stay transparent to agent callsites. Applies to Phases 15, 16, 17, 18.
-- **D-18 compose don't plumb** — new MCP tools compose existing `analyze.py` / `delta.py` / `snapshot.py` primitives; new analysis algorithms earn their own module (Phase 15 `enrich.py`, Phase 16 `argue.py`, Phase 18 `serve.py` handler). No new pure plumbing modules.
-- **`graph.json` read-only** — all new state lives in atomic `.tmp` + `os.replace` sidecars (`routing.json`, `manifest.json`, `enrichment.json`, `GRAPH_ARGUMENT.md`, `harness/*.md`). Grep-CI guard: only `build.py` + `__main__.py` may call `_write_graph_json`.
-- **`peer_id="anonymous"` default** — never derived from `os.environ`, `socket.gethostname()`, or `platform.node()`.
-- **`security.py` gate** — all new file I/O routes through `validate_graph_path(base=...)`; all label renders go through `sanitize_label` / `sanitize_label_md`; `yaml.safe_load` only.
-- **Snapshot double-nesting regression guard (Pitfall 20 / v1.3 CR-01)** — Phase 18 codifies this by renaming `snapshot.py::root` → `project_root` with a sentinel dataclass asserting `not path.name == "graphify-out"`. Phases 12, 15, 17 inherit this guard automatically.
+Agent discoverability via MCP capability manifest + harness-memory export (SEED-002), Obsidian workflow depth via vault-scoped thinking commands, and graph quality over time via heterogeneous routing, async enrichment, focus-aware zoom, grounded chat, and SPAR-Kit graph-argumentation. Phase 12 (Heterogeneous Extraction Routing) pulled forward from v1.3 deferral. Milestone audit passed after Phase 18.1 (Phase 13 verification artifact retrofill) and Phase 18.2 (MANIFEST-06 metadata closure + VALIDATION frontmatter refresh).
 
 **Phases:**
 
-- [x] Phase 12: Heterogeneous Extraction Routing — Per-file complexity classifier (AST metrics) routes extraction to cheap/mid/expensive model classes with parallel fan-out, cost ceiling enforcement, model-isolated cache keys, and a `routing.json` sidecar audit trail. (6/6 plans, completed 2026-04-17)
-- [x] Phase 13: Agent Capability Manifest (+ SEED-002 Harness Memory Export) — Static `server.json` + runtime `manifest.json` with MCP `capability_describe` tool, CLI `graphify capability`, introspection-driven generation (never hand-maintained), manifest-hash drift detection, and bundled SEED-002 `graphify harness export` producing SOUL/HEARTBEAT/USER triplet for Claude harness. Shipped 2026-04-17 (4/4 plans, 18/18 REQ-IDs).
-- [x] Phase 14: Obsidian Thinking Commands — Vault-scoped `/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind` slash commands (plus P2 `/graphify-bridge`, `/graphify-voice`, `/graphify-drift-notes`) with `target: obsidian|code|both` frontmatter filtering, mandatory `propose_vault_note + approve` trust boundary, and a Plan 00 refactor migrating `_uninstall_commands()` from hardcoded whitelist to directory-scan. (completed 2026-04-23)
-- [x] Phase 15: Async Background Enrichment — Four-pass background enricher (description, patterns, community summaries, staleness) writing overlay-only `enrichment.json`; event-driven via `watch.py` post-rebuild hook; `fcntl.flock`-coordinated with foreground `/graphify`; snapshot-pinned at process start for determinism. (completed 2026-04-22)
-- [x] Phase 16: Graph Argumentation Mode — `graphify/argue.py` substrate populates a SPAR-Kit-style `ArgumentPackage` from a graph subgraph; `skill.md` orchestrates the LLM debate (Phase 9 blind-label harness reused); mandatory `{claim, cites: [node_id]}` schema rejects fabricated node IDs; round cap 6; `dissent`/`inconclusive` valid outputs; `GRAPH_ARGUMENT.md` advisory-only artifact. (completed 2026-04-23)
-- [x] Phase 17: Conversational Graph Chat — Two-stage structurally-enforced `chat(query, session_id)` MCP tool (Stage 1 tool-call only, Stage 2 compose from results only); every claim cited to `{node_id, label, source_file}`; empty results return templated fuzzy suggestions; session-scoped history; `/graphify-ask` slash command. (completed 2026-04-22)
-- [x] Phase 18: Focus-Aware Graph Context — `get_focus_context(focus_hint)` MCP tool returns BFS ego-graph + community summary for a structured focus hint (`file_path`, optional `function_name`/`line`/`neighborhood_depth`/`include_community`); pull-model (no filesystem watcher); codifies v1.3 CR-01 snapshot-root fix; silently ignores spoofed paths. ✅ 2026-04-20
-- [ ] Phase 18.1: v1.4 Gap Closure — Phase 13 Verification Artifacts — Produce the three missing artifacts (13-VERIFICATION.md, 13-SECURITY.md, 13-VALIDATION.md) for Phase 13's already-shipped 18 REQ-IDs (MANIFEST-01..10 + HARNESS-01..08). Unblocks milestone audit. **Added by /gsd-plan-milestone-gaps 2026-04-22 from v1.4-MILESTONE-AUDIT.md.**
-- [ ] Phase 18.2: v1.4 Gap Closure — Manifest Metadata + Tech Debt Cleanup — Add missing `chat` + `get_focus_context` entries to `capability_tool_meta.yaml` (MANIFEST-06 metadata gap); refresh stale 15/18 VALIDATION.md frontmatter; reconcile REQUIREMENTS.md traceability checkboxes for shipped-but-unchecked rows. **Added by /gsd-plan-milestone-gaps 2026-04-22 from v1.4-MILESTONE-AUDIT.md.**
+- [x] Phase 12: Heterogeneous Extraction Routing — AST-complexity-classified routing to cheap/mid/expensive model classes with parallel fan-out, cost ceiling, model-isolated cache keys, `routing.json` sidecar. (6/6 plans, completed 2026-04-17)
+- [x] Phase 13: Agent Capability Manifest (+ SEED-002 Harness Memory Export) — Static `server.json` + runtime `manifest.json`, MCP `capability_describe`, manifest-hash drift detection, `graphify harness export` producing SOUL/HEARTBEAT/USER triplet. (4/4 plans, 18/18 REQ-IDs, completed 2026-04-17; verification retrofitted via Phase 18.1)
+- [x] Phase 14: Obsidian Thinking Commands — Vault-scoped `/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind` slash commands with `target:` frontmatter filtering + `propose_vault_note + approve` trust boundary. (6/6 plans, completed 2026-04-23)
+- [x] Phase 15: Async Background Enrichment — Four-pass background enricher writing overlay-only `enrichment.json`; event-driven via `watch.py`; `fcntl.flock`-coordinated; snapshot-pinned for determinism. (6/6 plans, completed 2026-04-22)
+- [x] Phase 16: Graph Argumentation Mode — `argue.py` SPAR-Kit-style `ArgumentPackage` + `argue_topic` MCP tool; `{claim, cites: [node_id]}` schema rejecting fabricated IDs; round cap 6; advisory-only `GRAPH_ARGUMENT.md`. (3/3 plans, completed 2026-04-23)
+- [x] Phase 17: Conversational Graph Chat — Two-stage structurally-enforced `chat(query, session_id)` MCP tool; every claim cited; templated fuzzy suggestions on empty; `/graphify-ask` slash command. (3/3 plans, completed 2026-04-22)
+- [x] Phase 18: Focus-Aware Graph Context — `get_focus_context(focus_hint)` MCP tool returning BFS ego-graph + community summary; codifies v1.3 CR-01 snapshot-root fix via `snapshot.py::root` → `project_root` rename. (4/4 plans, completed 2026-04-20)
+- [x] Phase 18.1: v1.4 Gap Closure — Produced retrofitted `13-VERIFICATION.md`, `13-SECURITY.md`, `13-VALIDATION.md` for Phase 13's shipped 18 REQ-IDs. (commits `33f9f84`, `63d2480`, `1eda4be`)
+- [x] Phase 18.2: v1.4 Gap Closure — Added `chat` + `get_focus_context` to `capability_tool_meta.yaml` closing MANIFEST-06; refreshed 15/18 VALIDATION frontmatter; audit re-stamped `passed`. (commits `59298c8`, `37aad87`, `012a90b`)
 
-**Deferred to v1.4.x (not v1.4 scope):**
+**Totals:** 9 phase directories (7 core + 2 gap closure), 32 plans, 72/86 P1+P2 requirements satisfied, 14 P2 carve-outs intentionally deferred. 155 files changed, +35,754 / −2,481 lines across 165 commits over 2026-04-17 → 2026-04-22.
 
-- **SEED-002 inverse-import** (CLAUDE.md → graph) — requires quarantine + prompt-injection defenses; v1.4 is export-only (OQ-4).
-- **SEED-002 multi-harness schemas** (codex.yaml, letta.yaml, honcho.yaml, AGENTS.md) — prove canonical pattern on `claude.yaml` first (OQ-5).
+**Deferred to v1.4.x / v1.5:**
+- SEED-002 inverse-import (CLAUDE.md → graph) — requires quarantine + prompt-injection defenses (OQ-4)
+- SEED-002 multi-harness schemas (codex.yaml, letta.yaml, honcho.yaml, AGENTS.md) — prove canonical on claude.yaml first (OQ-5)
+- SEED-001 Tacit-to-Explicit Elicitation Engine — revisit if onboarding/discovery becomes the theme
+- Phase 19 Vault Promotion Script Layer B — moved to v1.5 via scope reconciliation 2026-04-23 (commit `0f6304b`)
 
-**Deferred to v1.5+:**
+**Archives:**
+- Full phase detail: `.planning/milestones/v1.4-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.4-REQUIREMENTS.md`
+- Milestone audit: `.planning/milestones/v1.4-MILESTONE-AUDIT.md`
+- Per-phase artifacts: `.planning/milestones/v1.4-phases/`
 
-- **SEED-001 Tacit-to-Explicit Elicitation Engine** — revisit if onboarding/discovery becomes the milestone theme.
+</details>
 
 ## Phase Details
-
-### Phase 12: Heterogeneous Extraction Routing
-**Goal**: User can route an extraction run across multiple model classes so cheap files get cheap models and complex files get expensive ones, with full cost visibility and cache isolation per model choice.
-**Depends on**: Nothing new (builds on v1.0–v1.3 `extract.py` + `cache.py`). HARD-gates `cache.py::file_hash()` key format for all downstream phases.
-**Requirements**: ROUTE-01, ROUTE-02, ROUTE-03, ROUTE-04, ROUTE-05, ROUTE-06, ROUTE-07, ROUTE-08 [P2], ROUTE-09 [P2], ROUTE-10 [P2] — 10 REQ-IDs.
-**Success Criteria** (what must be TRUE):
-  1. User runs `graphify run --router` on a mixed codebase and a `graphify-out/routing.json` sidecar records a per-file `{class, model, endpoint, tokens_used, ms}` decision trail.
-  2. User edits `graphify/routing_models.yaml` to retarget a complexity class to a different model and the next extraction honors the new mapping without any code change.
-  3. Re-running extraction with a different model for the same file produces a distinct cache entry — no cross-contamination between routing decisions (model_id participates in the cache key).
-  4. User sets `GRAPHIFY_COST_CEILING` and extraction aborts with a clear pre-flight cost-overrun message before any expensive LLM call fires.
-  5. A pathological concurrency test (8 workers, 10 provider-429 responses) completes without thundering-herd retries — the central semaphore and global 429 `threading.Event` enforce polite backoff.
-**Plans**: 6/6 complete (12-01 routing + YAML, 12-02 cache keys, 12-03 extract + batch tier helper, 12-04 routing audit, 12-05 P2 cost/canary/vision, 12-06 CLI + skill). Summaries under `.planning/phases/12-heterogeneous-extraction-routing/12-*-SUMMARY.md`.
-
-### Phase 13: Agent Capability Manifest (+ SEED-002 Harness Memory Export)
-**Goal**: Agents that don't already know graphify exists can discover it via MCP registries, describe its surface before calling it, and export graphify's state into any supported agent harness without lock-in.
-**Depends on**: Nothing new for Wave A. Wave B depends on all of Phases 14, 15, 16, 17, 18 having landed (final manifest regeneration captures the full MCP surface).
-**Requirements**: MANIFEST-01, MANIFEST-02, MANIFEST-03, MANIFEST-04, MANIFEST-05, MANIFEST-06, MANIFEST-07, MANIFEST-08, MANIFEST-09 [P2], MANIFEST-10 [P2], HARNESS-01, HARNESS-02, HARNESS-03, HARNESS-04, HARNESS-05, HARNESS-06, HARNESS-07 [P2], HARNESS-08 [P2] — 18 REQ-IDs.
-**Bundled**: SEED-002 Harness Memory Export (HARNESS-01..08, claude.yaml-only in v1.4).
-**Success Criteria** (what must be TRUE):
-  1. User runs `graphify capability --stdout` and receives an MCP-compliant `server.json` document validated against JSON Schema draft 2020-12 without errors.
-  2. An external MCP agent connects to graphify, calls `capability_describe`, and receives a merged static+live manifest including graph stats, alias map size, sidecar freshness, and enrichment snapshot id.
-  3. Every MCP response envelope's `meta` includes a manifest content-hash; an agent can detect drift between what was advertised at connect time and what the live server is responding.
-  4. Developer adds a new MCP tool to `serve.py::list_tools()` and the next manifest regeneration picks it up automatically — CI `graphify capability --validate` fails if the manifest drifts from the live registry (no hand-maintenance possible).
-  5. User runs `graphify harness export --target claude` and receives `graphify-out/harness/claude-{SOUL,HEARTBEAT,USER}.md` rendered from `graph.json` + `annotations.jsonl` + `agent-edges.json` + `telemetry.json` with annotations excluded by default (allow-list enforced).
-
-**Execution waves** (single Phase 13 entry, not decimal-phase split):
-
-- **Wave A (plumbing — 3rd in build order):** Manifest generator + `graphify capability` CLI + runtime `capability_describe` MCP tool. Describes the surface present at this point (Phases 12 + 18 landed). Establishes the introspection pattern that Phases 14/15/16/17 auto-register into.
-- **Wave B (final regeneration — 8th in build order):** Manifest regenerates with all 14–18 tools present. SEED-002 `graphify harness export` bundles here — both waves advertise graphify externally, and Wave B captures the full SEED-002 + manifest surface together.
-
-**Plans**: 4/4 complete. 13-01 (MANIFEST-01..08 manifest generator + CLI + MCP tool + drift gate), 13-02 (MANIFEST-09..10 CI gate + examples), 13-03 (HARNESS-01..06 harness export core — SOUL/HEARTBEAT/USER), 13-04 (HARNESS-07..08 secret scanner + round-trip fidelity). Summaries under `.planning/phases/13-agent-capability-manifest/13-*-SUMMARY.md`.
-
-### Phase 14: Obsidian Thinking Commands
-**Goal**: Obsidian vault users invoke graphify-aware slash commands directly inside their vault to navigate, query, and expand their graphify-enriched notes, with every write routed through the v1.1 `propose_vault_note + approve` trust boundary.
-**Depends on**: HARD-depends on Phase 18 (commands consume `get_focus_context`) + Plan 00 commands-whitelist refactor. Soft-depends on Phase 17 (for `/graphify-voice` P2).
-**Requirements**: OBSCMD-01, OBSCMD-02, OBSCMD-03, OBSCMD-04, OBSCMD-05, OBSCMD-06, OBSCMD-07, OBSCMD-08, OBSCMD-09 [P2], OBSCMD-10 [P2], OBSCMD-11 [P2], OBSCMD-12 [P2] — 12 REQ-IDs.
-**Cross-phase rule**: **Plan 00 refactor required before any new command ships.** Migrate `_uninstall_commands()` in `__main__.py:153` from hardcoded filename whitelist to directory-scan (reads `graphify/commands/*.md` at runtime). Existing Phase-11 commands remain installed; refactor is transparent to end users.
-**Success Criteria** (what must be TRUE):
-  1. User runs `/graphify-moc <community_id>` inside an Obsidian vault and receives a proposed MOC note rendered via the vault's profile template — pending user `graphify approve` before any vault file is touched.
-  2. User invokes `/graphify-related` from a vault note and sees graph-connected notes scoped to that note's `source_file` neighborhood (community + 1-hop neighbors).
-  3. User runs `/graphify-orphan` and receives a list of nodes with zero community membership or `staleness=GHOST`, sourced from existing telemetry + community metadata.
-  4. User runs `/graphify-wayfind` and receives a breadcrumb path from the vault MOC to the current note using the existing `connect_topics` shortest-path machinery.
-  5. Installer filters commands by frontmatter `target: obsidian|code|both` — a `--no-obsidian-commands` flag suppresses vault-only commands on code-only platforms; `/graphify-*` prefix convention prevents collision with user-authored commands.
-**Plans**: 6 plans in 2 waves (planned 2026-04-22 — P1 only; OBSCMD-09/10/11/12 deferred to v1.4.x backlog per D-01).
-- [x] 14-00-PLAN.md — `_uninstall_commands` directory-scan refactor, symmetric with `_install_commands` (Wave 1; OBSCMD-01)
-- [x] 14-01-PLAN.md — `target: obsidian|code|both` frontmatter filter + `--no-obsidian-commands` CLI flag + `supports` per `_PLATFORM_CONFIG` entry + `target: both` backfill on 9 legacy commands + `/graphify-*` prefix enforcement (Wave 1; OBSCMD-02, OBSCMD-07)
-- [x] 14-02-PLAN.md — `/graphify-moc <community_id>` command with vault-profile-first render + `propose_vault_note` trust boundary (Wave 2; OBSCMD-03, OBSCMD-08)
-- [x] 14-03-PLAN.md — `/graphify-related <note-path>` read-only command consuming `get_focus_context`, explicit `no_context` handling (Wave 2; OBSCMD-04)
-- [x] 14-04-PLAN.md — `/graphify-orphan` parameter-less read-only command with dual-section render + graceful `enrichment.json` absence (Wave 2; OBSCMD-05)
-- [x] 14-05-PLAN.md — `/graphify-wayfind <topic>` command resolving MOC-root via largest-community heuristic + `connect_topics` shortest-path + `propose_vault_note` (Wave 2; OBSCMD-06, OBSCMD-08)
-
-**Deferred to v1.4.x backlog** (P2, not planned in this phase):
-- OBSCMD-09 [P2]: /graphify-bridge — surprising-connections Dataview embed
-- OBSCMD-10 [P2]: /graphify-voice — anti-impersonation guard design required
-- OBSCMD-11 [P2]: /graphify-drift-notes — Dataview embed of /drift output
-- OBSCMD-12 [P2]: trigger_pipeline frontmatter + cost-preview banner
-
-### Phase 15: Async Background Enrichment
-**Goal**: Graphify runs four derivation passes in the background after each rebuild, enriching node descriptions, detecting emerging cross-snapshot patterns, generating per-community summaries, and refreshing staleness — writing only an overlay sidecar, never mutating `graph.json`.
-**Depends on**: Nothing hard. Soft-depends on Phase 12 `routing.json` (description pass skip-list for files already extracted by expensive model).
-**Requirements**: ENRICH-01, ENRICH-02, ENRICH-03, ENRICH-04, ENRICH-05, ENRICH-06, ENRICH-07, ENRICH-08, ENRICH-09, ENRICH-10 [P2], ENRICH-11 [P2], ENRICH-12 [P2] — 12 REQ-IDs.
-**Cross-phase rule**: `graph.json` is **never mutated** by this phase (v1.1 D-invariant preserved; Pitfall 3 critical mitigation). Enrichment writes ONLY `graphify-out/enrichment.json` with atomic `.tmp` + `os.replace`. A single `fcntl.flock` on `.enrichment.lock` coordinates with foreground `/graphify` — foreground always wins, enrichment SIGTERM-aborts cleanly without corrupting partial writes.
-**Success Criteria** (what must be TRUE):
-  1. User runs `graphify enrich` on an existing graph and all four passes complete within their `--budget TOKENS` cap; `graphify-out/enrichment.json` contains derived content keyed by canonical node_id.
-  2. User triggers foreground `/graphify` while enrichment is running — enrichment releases its lock and aborts cleanly without corrupting `enrichment.json` or any other sidecar.
-  3. User opens MCP `get_node` on an enriched node and sees the overlay description merged into the response — `serve.py::_load_enrichment_overlay(out_dir)` reads post-load without mutating `graph.json`.
-  4. User invokes `graphify enrich --dry-run` and receives a per-pass cost preview (estimated tokens, per-node budget breakdown) without any LLM calls firing.
-  5. A grep-CI test asserts only `build.py` and `__main__.py` call `_write_graph_json` — enrichment writes are structurally prevented from touching the pipeline artifact.
-**Plans**: 6 plans in 4 waves.
-- [x] 15-01-PLAN.md — Module scaffold: `enrich.py` + `graphify enrich` CLI + fcntl.flock lifecycle + snapshot pinning + SIGTERM handler (Wave 1; ENRICH-01, 04, 05, 07)
-- [x] 15-02-PLAN.md — Three LLM passes (description, patterns, community) + priority-drain budget + alias redirect + routing skip-list + atomic per-pass commit (Wave 2; ENRICH-02, 03, 11, 12)
-- [x] 15-03-PLAN.md — Staleness pass (compute-only) + D-07 resume-by-default + D-05 schema versioning guard (Wave 2; ENRICH-02, 03, 05)
-- [x] 15-04-PLAN.md — `serve.py::_load_enrichment_overlay` merge-on-read + `_reload_if_stale` enrichment.json mtime watcher + alias-on-read (Wave 3; ENRICH-08, 09, 12)
-- [x] 15-05-PLAN.md — Foreground-lock acquisition in `__main__.py` `run` + opt-in `--enrich` flag + atexit cleanup in `watch.py` (Wave 3; ENRICH-06, 07)
-- [x] 15-06-PLAN.md — `--dry-run` D-02 envelope + grep-CI `_write_graph_json` whitelist (SC-5) + graph.json byte-equality invariant (SC-1, SC-3) + lifecycle integration tests (SC-2) (Wave 4; ENRICH-03, 10)
-
-### Phase 16: Graph Argumentation Mode
-**Goal**: User poses a decision-shaped question about the codebase and graphify orchestrates a structurally-enforced multi-perspective debate grounded in the knowledge graph, producing a cited advisory transcript with no fabricated nodes.
-**Depends on**: Soft-depends on Phase 17 citation packet format (shared schema). Reuses Phase 9 blind-label harness as-is.
-**Requirements**: ARGUE-01, ARGUE-02, ARGUE-03, ARGUE-04, ARGUE-05, ARGUE-06, ARGUE-07, ARGUE-08, ARGUE-09, ARGUE-10, ARGUE-11 [P2], ARGUE-12 [P2], ARGUE-13 [P2] — 13 REQ-IDs.
-**Cross-phase rule**: **Phase 16 MUST NOT invoke Phase 17 `chat` tool** (Pitfall 18 recursion + non-determinism guard). Manifest declares `composable_from: []` for `argue_topic`. Debate uses lower-level deterministic primitives (`graph_context(node_id)`, `get_community`) only. LLM orchestration lives in `skill.md` (D-73 honored); `argue.py` substrate contains zero LLM calls — parallels Phase 9 autoreason tournament structure.
-**Success Criteria** (what must be TRUE):
-  1. User runs `/graphify-argue <question>` and receives `graphify-out/GRAPH_ARGUMENT.md` with every persona claim cited to an existing `node_id` from the graph.
-  2. A persona invents a node that doesn't exist in the graph — the mandatory `{claim, cites: [node_id]}` validator flags it as `[FABRICATED]` and the orchestrator re-prompts without accepting the turn.
-  3. Debate runs end-to-end with `dissent` or `inconclusive` as valid final outcomes (no consensus-forcing); round cap = 6 is never exceeded; temperature ≤ 0.4 is enforced.
-  4. A regression test replays the Phase 9 blind-label bias suite against Phase 16 — blind A/B labels, stripped persona phrases, rotating judge identity all verified intact.
-  5. `GRAPH_ARGUMENT.md` is advisory-only — the file exists under `graphify-out/` and never triggers any code change or graph mutation.
-**Plans**: 3 plans (planned 2026-04-22 — P1 + documented P2 deferrals).
-- [x] 16-01-PLAN.md — `graphify/argue.py` zero-LLM substrate: `ArgumentPackage`, `PerspectiveSeed`, `NodeCitation` dataclasses; `populate()` composing serve.py primitives; `validate_turn()` fabrication guard; `compute_overlap()` Jaccard detector; `ROUND_CAP=6` + `MAX_TEMPERATURE=0.4` constants; tests/test_argue.py (18+ cases incl. zero-LLM grep + Phase 9 blind-harness regression anchor). (ARGUE-01, ARGUE-02, ARGUE-03, ARGUE-05, ARGUE-06, ARGUE-08)
-- [x] 16-02-PLAN.md — `argue_topic` MCP tool: `_run_argue_topic_core` + `_tool_argue_topic` in serve.py with D-02 envelope (`resolved_from_alias`, hardcoded `output_path`); mcp_tool_registry `argue_topic` Tool entry; `capability_tool_meta.yaml` entry with `composable_from: []`; tests/test_serve.py (5 cases) + tests/test_capability.py `test_argue_topic_not_composable`. (ARGUE-04, ARGUE-07, ARGUE-09)
-- [x] 16-03-PLAN.md — `graphify/commands/argue.md` slash command (mirrors ask.md frontmatter, no `target:`); skill.md SPAR-Kit `/graphify-argue` orchestration section (4 lenses × ≤6 rounds, per-round blind-label shuffle reusing Phase 9 harness at skill.md:1511, Jaccard early-stop D-06, advisory-only write to `graphify-out/GRAPH_ARGUMENT.md`); tests/test_commands.py::test_argue_md_frontmatter; P2 deferrals (ARGUE-11/12/13) explicitly documented as v1.4.x backlog. (ARGUE-06, ARGUE-09, ARGUE-10, ARGUE-11 [P2], ARGUE-12 [P2], ARGUE-13 [P2])
-
-**Deferred to v1.4.x backlog** (P2, documented in 16-03-PLAN.md but not implemented):
-- ARGUE-11 [P2]: SPAR-Kit INTERROGATE step — optional cross-examination turn, `--interrogate` flag.
-- ARGUE-12 [P2]: Persona memory across rounds — perspective identity retention.
-- ARGUE-13 [P2]: Clash/rumble/domain intensity scoring — conflict-density metrics on transcript.
-
-### Phase 17: Conversational Graph Chat
-**Goal**: User asks a natural-language question about the codebase and receives a graph-grounded narrative answer where every claim traces back to a real node — no fabricated entities, no hallucinated connections.
-**Depends on**: Soft-depends on Phase 18 (`focus_hint` in args) + Phase 15 (enrichment overlay used as citation source).
-**Requirements**: CHAT-01, CHAT-02, CHAT-03, CHAT-04, CHAT-05, CHAT-06, CHAT-07, CHAT-08, CHAT-09, CHAT-10 [P2], CHAT-11 [P2], CHAT-12 [P2] — 12 REQ-IDs.
-**Success Criteria** (what must be TRUE):
-  1. User runs `/graphify-ask "what connects module X to module Y?"` and receives a narrative answer paired with `meta.citations: [{node_id, label, source_file}]` resolving every claim to a real graph node.
-  2. A post-process grep over the narrative text finds no node IDs or labels that aren't in the citation list — uncited phrases are rejected before the response leaves `_run_chat`.
-  3. User asks about an entity not in the graph and receives templated fuzzy suggestions ("did you mean X, Y?") — the handler never fabricates a plausible-but-nonexistent node name.
-  4. A two-stage architectural test asserts `serve.py` makes zero LLM calls — Stage 1 emits only tool-call sequences, Stage 2 composes from tool results only; narrative rendering is the skill or calling agent's responsibility.
-  5. D-16 alias redirect is threaded through every citation — a node merged into an alias during dedup resolves to its canonical ID in chat output without breaking the user's prior callsite.
-**Plans**: 3 plans (planned 2026-04-22 — P1 only; CHAT-10/11/12 deferred to v1.4.x backlog).
-- [x] 17-01-core-dispatch-sessions-PLAN.md — `_run_chat_core` shell, intent classifier + entity-term extractor, D-02 primitive dispatch (explore/connect/summarize), `_CHAT_SESSIONS` + lazy TTL + follow-up augmentation, `_tool_chat` wrapper, registry entry. (CHAT-01, CHAT-02, CHAT-08)
-- [x] 17-02-validator-composer-cap-PLAN.md — narrative composer (explore/connect/summarize templates), citation validator with bounded re-validate, fuzzy-suggestion fallback with echo guard, 500-token sentence-boundary cap. (CHAT-03, CHAT-04, CHAT-05, CHAT-09)
-- [x] 17-03-command-alias-integration-PLAN.md — `_resolve_alias` closure threaded through citations + `meta.resolved_from_alias`, `graphify/commands/ask.md` (connect.md-style frontmatter, no `target:` field), zero-LLM architectural test. (CHAT-03, CHAT-06, CHAT-07)
-
-**Deferred to v1.4.x backlog** (P2, not planned in this phase):
-- CHAT-10 [P2]: Auto-suggest follow-up questions derived from surprising-connections neighbors
-- CHAT-11 [P2]: Save-chat-as-vault-note via `propose_vault_note` round-trip
-- CHAT-12 [P2]: Chat-to-argue handoff (decision-shaped queries suggest `/graphify-argue`)
-
-### Phase 18: Focus-Aware Graph Context
-**Goal**: An agent reports what the user is currently focused on (a file path, optionally a function or line) and graphify returns a scoped subgraph — neighbors, community, and citations — so downstream tools can reason about the local neighborhood without loading the full graph.
-**Depends on**: Nothing new (first v1.4 phase alongside Phase 12; no code overlap with Phase 12 — `serve.py` only).
-**Requirements**: FOCUS-01, FOCUS-02, FOCUS-03, FOCUS-04, FOCUS-05, FOCUS-06, FOCUS-07, FOCUS-08 [P2], FOCUS-09 [P2] — 9 REQ-IDs.
-**Cross-phase rule**: **Codifies v1.3 CR-01 snapshot-path double-nesting regression** (Pitfall 20). Renames `snapshot.py::root` → `project_root` with a sentinel dataclass asserting `not path.name == "graphify-out"` at construction. Phases 12, 15, 17 inherit this guard — any downstream reader that reintroduces double-nesting trips the sentinel at runtime. A nested-dir integration fixture replaces the tmp_path-only test coverage that allowed CR-01 to ship undetected.
-**Success Criteria** (what must be TRUE):
-  1. Agent calls `get_focus_context({"file_path": "...", "neighborhood_depth": 2, "include_community": true})` and receives a BFS ego-graph + community summary in the D-02 envelope with full citations.
-  2. Agent spoofs `focus_hint.file_path = "/etc/passwd"` — the handler silently ignores the request (no filesystem-structure leak, no error echo) via `security.py::validate_graph_path(path, base=project_root)`.
-  3. `source_file` as `str | list[str]` (v1.3 schema) resolves correctly — a node with multiple source files returns matching node_ids without crashing the focus resolver.
-  4. A regression test constructs `Snapshot(project_root=Path("graphify-out"))` and the sentinel raises before any path operation — the renamed field + assertion prevents Phase 12/15/17 from reintroducing CR-01. ✅ **VERIFIED 2026-04-20** via Plan 18-04 — inline `Path(project_root).name == "graphify-out"` guard wired into all 4 production snapshot helpers (`snapshots_dir`, `list_snapshots`, `save_snapshot`, `auto_snapshot_and_delta`); 4 production-callsite tests in `tests/test_snapshot.py` confirm rejection; structural SC4 check in 18-04-SUMMARY.md runs all 4 helpers against `graphify-out/` and each raises `ValueError`.
-  5. Focus is pull-model via MCP arg — no filesystem watcher thread exists; `nx.ego_graph` is reused (no new traversal algorithms) per D-18 compose-don't-plumb.
-**Plans**: 3 plans (locked 2026-04-20 per CONTEXT.md D-13).
-- [x] 18-01-PLAN.md — Focus Resolver: `_resolve_focus_seeds` + `_multi_seed_ego` (FOCUS-02, FOCUS-06) — ✅ 2026-04-20 (commits 529e4e9 + cb04973)
-- [x] 18-02-PLAN.md — MCP Tool + Snapshot Sentinel: `get_focus_context` + `ProjectRoot` + `root`→`project_root` rename + nested-dir fixture (FOCUS-01, FOCUS-03, FOCUS-04, FOCUS-05, FOCUS-07) — ✅ 2026-04-20 (commits 6c63501 + 39a8236 + 1d0169c + b058d37 + 4da9efb)
-- [x] 18-03-PLAN.md — P2 Debounce + Freshness: 500ms debounce cache + `reported_at` freshness with Py 3.10 Z-suffix shim (FOCUS-08 [P2], FOCUS-09 [P2]) — ✅ 2026-04-20 (commits 2309a57 + 0f06629)
-- [x] 18-04-PLAN.md — Gap closure: CR-01 sentinel wiring + WR-02/03/04 cleanups (SC4 PARTIAL → VERIFIED; inline `Path(project_root).name == "graphify-out"` guard in 4 snapshot helpers; dead `alias_map` param removed from `_run_get_focus_context_core`; WR-03 dispatcher-exercising test + WR-04 D-08 strict-depth invariants) — ✅ 2026-04-20 (commits 81d904a + 28b0f34 + edf793a + docs commit)
-
-### Phase 18.1: v1.4 Gap Closure — Phase 13 Verification Artifacts
-**Goal**: Produce the three verification artifacts that Phase 13 (Agent Capability Manifest + SEED-002 Harness Memory Export) shipped without on 2026-04-17. All 18 REQ-IDs (MANIFEST-01..10 + HARNESS-01..08) are already in-tree per plan SUMMARYs; this phase re-verifies them against the live codebase and files the audit trail that `/gsd-audit-milestone` requires before v1.4 can close.
-**Depends on**: Nothing new — Phase 13 code shipped 2026-04-17 and is frozen.
-**Gap Closure**: Closes v1.4-MILESTONE-AUDIT.md blocker `phases[0]` (Phase 13 missing VERIFICATION.md, VALIDATION.md, 13-SECURITY.md).
-**Requirements**: Re-verifies MANIFEST-01..08, HARNESS-01..06 (P1) and MANIFEST-09/10, HARNESS-07/08 (P2) — 18 REQ-IDs. No new REQ-IDs added.
-**Success Criteria** (what must be TRUE):
-  1. `.planning/phases/13-agent-capability-manifest/13-VERIFICATION.md` exists and marks all 18 REQ-IDs verified against live `graphify/capability.py`, `graphify/mcp_tool_registry.py`, `graphify/harness_export.py`, and `server.json`.
-  2. `.planning/phases/13-agent-capability-manifest/13-SECURITY.md` exists with STRIDE mitigation record for Phase 13 threats (manifest injection, harness export secret leak, capability-describe info disclosure).
-  3. `.planning/phases/13-agent-capability-manifest/13-VALIDATION.md` exists with Nyquist-compliant test coverage audit (`status: approved`, `nyquist_compliant: true`).
-  4. Re-running `/gsd-audit-milestone v1.4` removes Phase 13 from the `gaps.phases` list.
-**Plans**: 3 tasks (one per verification workflow).
-- [ ] 18.1-01-PLAN.md — `/gsd-verify-work 13` produces 13-VERIFICATION.md (all 18 REQ-IDs verified)
-- [ ] 18.1-02-PLAN.md — `/gsd-secure-phase 13` produces 13-SECURITY.md (STRIDE record)
-- [ ] 18.1-03-PLAN.md — `/gsd-validate-phase 13` produces 13-VALIDATION.md (Nyquist audit)
-
-### Phase 18.2: v1.4 Gap Closure — Manifest Metadata + Tech Debt Cleanup
-**Goal**: Close the remaining non-blocking integration gap (MANIFEST-06 metadata fallback for `chat` + `get_focus_context`) and reconcile three REQUIREMENTS.md / VALIDATION.md tech-debt items so the v1.4 audit returns clean.
-**Depends on**: Phase 18.1 (task 3 checks off MANIFEST-01..08 post-verification).
-**Gap Closure**: Closes v1.4-MILESTONE-AUDIT.md `integration[0]` (MANIFEST-06 metadata defaults) + `tech_debt` items on requirements-tracking, Phase 15, and Phase 18.
-**Requirements**: Re-verifies MANIFEST-06 semantics (tool metadata correctness). No new REQ-IDs added.
-**Success Criteria** (what must be TRUE):
-  1. `graphify/capability_tool_meta.yaml` contains entries for `chat` (cost_class: expensive, deterministic: false, composable_from: []) and `get_focus_context` (cost_class: cheap, deterministic: true, composable_from: []). Repo-committed `server.json` regenerated via `graphify capability --stdout > server.json` reflects the new metadata.
-  2. A regression test in `tests/test_capability.py` asserts both tools emit their declared cost_class + deterministic values via the introspected manifest (guards against future drift).
-  3. `15-VALIDATION.md` and `18-VALIDATION.md` frontmatter updated to `status: approved`, `nyquist_compliant: true` matching each phase's PASSED VERIFICATION.md.
-  4. REQUIREMENTS.md checkboxes for ROUTE-01..07, MANIFEST-01..08, ENRICH-01, ENRICH-04 flipped from `[ ]` to `[x]`; coverage count updated at top of REQUIREMENTS.md.
-  5. Re-running `/gsd-audit-milestone v1.4` returns `status: passed` (no integration gaps, no tech-debt on requirements-tracking / 15 / 18 frontmatter).
-**Plans**: 3 tasks.
-- [ ] 18.2-01-PLAN.md — Add `chat` + `get_focus_context` entries to `capability_tool_meta.yaml`; regenerate `server.json`; add regression test in `tests/test_capability.py`.
-- [ ] 18.2-02-PLAN.md — Refresh stale frontmatter on `15-VALIDATION.md` + `18-VALIDATION.md` (metadata-only; VERIFICATION is PASSED for both).
-- [ ] 18.2-03-PLAN.md — Reconcile REQUIREMENTS.md traceability: check off ROUTE-01..07, MANIFEST-01..08, ENRICH-01, ENRICH-04; update coverage count.
 
 ### 🌱 Candidate Phase: ACE-Aligned Vocabulary, Linking & Naming
 

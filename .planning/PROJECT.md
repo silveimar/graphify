@@ -88,6 +88,16 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - ✓ `/ghost` slash command (stretch, annotation-grounded with anti-impersonation guard) — SLASH-06
 - ✓ `/challenge <belief>` slash command (stretch, anti-fabrication guard + supporting/contradicting sections) — SLASH-07
 
+**v1.4 — Agent Discoverability & Obsidian Workflows:** *(Shipped 2026-04-22, phases 12 + 13 + 14 + 15 + 16 + 17 + 18 + 18.1 + 18.2; 72/86 P1+P2 REQ-IDs, 14 P2 carve-outs deferred)*
+- ✓ Per-file AST-complexity-classified extraction routing (cheap/mid/expensive model tiers) with parallel fan-out, `GRAPHIFY_COST_CEILING` pre-flight guard, model-isolated cache keys, `routing.json` sidecar audit — ROUTE-01..07
+- ✓ Introspection-driven MCP capability manifest (`server.json` + live `manifest.json`, drift detection via `meta.manifest_content_hash`, CI validation) — MANIFEST-01..08
+- ✓ SEED-002 harness memory export — `graphify harness export --target claude` produces SOUL/HEARTBEAT/USER with byte-equal round-trip fidelity — HARNESS-01..06
+- ✓ Vault-scoped Obsidian thinking commands (`/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind`) with `target:` filtering + `propose_vault_note + approve` trust boundary + directory-scan command registration — OBSCMD-00..08
+- ✓ Async background enrichment — four-pass overlay-only `enrichment.json`, `fcntl.flock`-coordinated with foreground runs, snapshot-pinned, atomic `.tmp` + `os.replace` commits — ENRICH-01..12
+- ✓ SPAR-Kit graph argumentation — `argue_topic` MCP tool, 4-lens × 6-round cap, blind-label shuffle, Jaccard early-stop, `{claim, cites: [node_id]}` schema rejecting fabricated IDs, `dissent`/`inconclusive` valid outputs — ARGUE-01..10
+- ✓ Two-stage structurally-enforced conversational chat — `chat(query, session_id)` Stage 1 tool-call only / Stage 2 compose-from-results with `{node_id, label, source_file}` citations, recursion guard, `/graphify-ask` command — CHAT-01..09
+- ✓ Focus-aware graph context — `get_focus_context(focus_hint)` BFS ego-graph + community summary, pull-model, codifies v1.3 CR-01 via `snapshot.py::root` → `project_root` rename — FOCUS-01..09
+
 ### Active
 
 Milestone **v1.5 Diagram Intelligence & Excalidraw Bridge** opened 2026-04-22; scope confirmed via `/gsd-new-milestone v1.5` on 2026-04-22. Three phases (20–22): Diagram Seed Engine, Profile Extension & Template Bootstrap, Excalidraw Skill & Vault Bridge. Requirements being defined.

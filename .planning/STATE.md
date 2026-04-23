@@ -7,7 +7,7 @@ stopped_at: Milestone v1.5 initialized — REQUIREMENTS.md + ROADMAP.md complete
 last_updated: "2026-04-23T03:35:00.000Z"
 last_activity: 2026-04-22
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 0
   total_plans: 7
   completed_plans: 0
@@ -18,10 +18,23 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
+See: .planning/PROJECT.md (updated 2026-04-23 at v1.4 milestone close)
 
-**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis and usage-weighted self-improvement, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, now being extended in v1.4 to agent discoverability (MCP capability manifest + SEED-002 harness export), Obsidian thinking-command depth, and graph-quality-over-time via heterogeneous routing + async enrichment + focus-aware zoom + grounded chat + SPAR-Kit argumentation.
-**Current focus:** Phase 14 — obsidian-thinking-commands
+**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, and in v1.4 (shipped 2026-04-22) with agent discoverability (MCP capability manifest + SEED-002 harness export), Obsidian thinking-command depth, and graph-quality-over-time via heterogeneous routing + async enrichment + focus-aware zoom + grounded chat + SPAR-Kit argumentation. v1.5 extends to vault promotion (Phase 19) and diagram intelligence (Phases 20–22).
+**Current focus:** v1.5 Phase 19/20 — requirements defined, planning pending
+
+## Deferred Items
+
+Items acknowledged and deferred at v1.4 milestone close on 2026-04-23:
+
+| Category | Item | Status |
+|----------|------|--------|
+| verification | 13-VALIDATION.md `nyquist_compliant: false` frontmatter | cosmetic — guard test exists (commit `59298c8`); rerun `/gsd-validate-phase 13` to flip flag |
+| quick_task | 260416-okg-add-graphify-analyze-entries-to-usage-ch | missing |
+| quick_task | 260422-jdj-fix-manifest-json-path-collision-between | missing |
+| todo | create-master-keys-work-vault.md | pending — files exist in vault; move to `completed/` when verified |
+| seed | SEED-001-tacit-knowledge-elicitation-engine | dormant — re-evaluate at v1.6 if onboarding/discovery becomes the theme |
+| seed | SEED-002-harness-memory-export | dormant — claude.yaml shipped in v1.4; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses |
 
 ## Current Position
 

@@ -231,6 +231,65 @@
 | v1.0 | 872 passing | 11,620 | 10,500 | 0 (PyYAML is optional `obsidian` extra only) |
 | v1.1 | 1,000 passing | 13,520 | ~12,400 | 0 (all stdlib additions) |
 | v1.2 | 1,023 passing | ~14,100 | ~13,000 | 0 (all stdlib — telemetry uses `json` + `os.replace`) |
+| v1.3 | 1,234 passing | ~16,481 | ~16,529 | 0 (`sentence-transformers` + `difflib` for dedup — optional extras) |
+| v1.4 | 1,428+ passing | ~22,900 | ~22,100 | 0 (all stdlib — `fcntl.flock`, `threading.Event`, `os.replace` throughout) |
+
+### Milestone: v1.4 — Agent Discoverability & Obsidian Workflows
+
+**Shipped:** 2026-04-22
+**Phases:** 9 (7 core + 2 gap closure) | **Plans:** 32 | **Timeline:** 6 days (2026-04-17 → 2026-04-22) | **Commits:** 165 | **Delta:** +35,754 / −2,481 across 155 files
+
+#### What Was Built
+
+Agent-discoverable MCP surface (introspection-driven capability manifest + harness export), vault-scoped thinking commands behind a `propose + approve` trust boundary, heterogeneous per-file routing with cost ceilings, async background enrichment coordinated via file locks, focus-aware BFS context, two-stage structurally-enforced chat with mandatory citations, and SPAR-Kit graph argumentation with fabrication-rejecting envelopes. See `.planning/milestones/v1.4-ROADMAP.md` for full phase detail.
+
+#### What Worked
+
+- **HARD-gate declaration at the milestone level.** Phase 12's `cache.py::file_hash()` key format change was declared a HARD-gate for all downstream v1.4 phases — anyone touching caching had to justify why. Prevented a whole category of cache-corruption regressions that v1.1/v1.2 would have absorbed silently.
+- **Decision-as-constraint (D-02, D-16, D-18).** Three cross-cutting invariants (MCP envelope format, alias threading, compose-don't-plumb) were locked at milestone start and checked in every phase's code review. The audit found all three held across 7 phases — no bespoke handler violated the envelope contract. Upgrade over v1.3's ad-hoc re-litigation.
+- **Atomic pair commits (MANIFEST-05).** `mcp_tool_registry.py` + `serve.py` extensions land together in the same plan. This pattern prevented the ship-now-wire-later failure mode that Phase 13's initial drop had for `13-VERIFICATION.md` (shipped but unverified for 5 days).
+- **Gap-closure sub-phases at audit time.** Phase 18.1 and 18.2 were planned out of the initial audit's `gaps_found` status as decimal-phase gap closure (following v1.2's 9.1.1 pattern). Audit → plan-gaps → execute → re-audit → close. Four-step loop is now the canonical v1.4 pattern.
+- **Recursion guards as manifest metadata.** ARGUE-07 (`composable_from: []` HARD CONSTRAINT) lived in `capability_tool_meta.yaml:72` as declarative data, not imperative logic. Agents reading the manifest before calling `argue_topic` see the constraint without executing code. Cheaper enforcement than runtime checks.
+
+#### What Was Inefficient
+
+- **Phase 13 shipped without any verification artifacts.** Ran all 18 REQ-IDs' plans through SUMMARYs on 2026-04-17, but `13-VERIFICATION.md`, `13-SECURITY.md`, `13-VALIDATION.md` were never produced. Milestone audit on 2026-04-22 caught it as a blocker, forcing Phase 18.1 as retrofit work. Lost ~2 hours to reconstruction. Same root cause as v1.0's Phase 01 verification gap — the pipeline can run green without the verification step running. Hook or gating needed.
+- **Stale `capability_tool_meta.yaml` for new MCP tools.** Phases 17 + 18 added `chat` and `get_focus_context` as MCP tools but did not update `capability_tool_meta.yaml`. MANIFEST-06 flagged PARTIAL at audit; `cost_class` defaults served agents wrong info (`chat` marked cheap instead of expensive). Closed via Phase 18.2-01 with a set-equality guard test. Should have been a MANIFEST-06-gated atomic pair from day one.
+- **REQUIREMENTS.md rollover timing.** `/gsd-new-milestone v1.5` ran 2026-04-22 before v1.4 was formally closed, rolling REQUIREMENTS.md forward to v1.5 scope. The v1.4 audit then had no REQUIREMENTS.md traceability table to check and had to reconstruct coverage from per-phase SUMMARY frontmatter. Worked, but lost the single-source-of-truth trace. Future: close milestone N before opening N+1, OR make `new-milestone` archive the previous REQUIREMENTS.md before overwriting.
+- **ACE Vocabulary candidate orphaned by merge bot.** Two branch merges (`4f3761b`, `e662a51`) landed an "ACE-Aligned Vocabulary, Linking & Naming" proposal into ROADMAP.md as a `🌱 Candidate Phase` block separate from numbered phases. Semantically overlaps with Phase 19. Pre-close scope reconciliation caught it but the duplication sat in-tree for a day.
+- **`/gsd-complete-milestone` default assumes in-order close.** v1.4's close after v1.5 had already been opened required deviating from the default workflow (skip `git rm REQUIREMENTS.md`, surgical archive construction from audit + SUMMARY frontmatter). If this pattern recurs, tooling should detect out-of-order close and offer a safe-mode branch.
+
+#### Patterns Established
+
+- **D-02 MCP envelope contract** — every new MCP tool emits `text_body + "\n---GRAPHIFY-META---\n" + json(meta)` with status codes. Inherited by v1.5+ automatically.
+- **Manifest-as-metadata-source-of-truth** — `capability_tool_meta.yaml` + set-equality guard test is the canonical pattern for per-tool config. No more scattered constants across handlers.
+- **Snapshot `project_root` sentinel dataclass** — codified v1.3 CR-01's snapshot-double-nesting fix so all downstream phases inherit the guard automatically.
+- **Audit-driven decimal-phase gap closure** — when milestone audit returns `gaps_found`, plan-milestone-gaps creates N.1, N.2 phases to close blockers without re-opening closed phases. v1.2 9.1.1 pioneered, v1.4 18.1/18.2 productionized.
+- **Out-of-order milestone close** — v1.4 closed after v1.5 opened required surgical archival (move audit file, reconstruct REQUIREMENTS from per-phase SUMMARYs, skip `git rm REQUIREMENTS.md`). Pattern now documented.
+
+#### Key Lessons
+
+1. **Make verification non-skippable.** Phase 13 shipping without VERIFICATION/VALIDATION/SECURITY is the third variant of this bug (v1.0 Phase 01, v1.2 `human_needed` rot, v1.4 Phase 13 total absence). Add a pipeline gate: `/gsd-execute-phase` fails to mark phase complete unless all three artifacts exist.
+2. **Set-equality guard tests are cheap and catch manifest drift.** `test_capability.py` set-equality between registered tools and `capability_tool_meta.yaml` entries would have caught MANIFEST-06 at phase 17 commit time, not milestone audit time. Apply to any "manifest + implementation" pair.
+3. **Close milestone N before opening N+1.** REQUIREMENTS.md rollover during an open milestone lost the traceability table for the closing milestone and forced per-phase reconstruction. Enforce one-at-a-time by workflow gate.
+4. **Merge-bot-introduced candidate phases need reconciliation before scope lock.** Branch merges that add speculative proposals to ROADMAP.md should be treated as planning inputs, not committed scope. Reconcile into numbered phases or backlog at the next milestone boundary.
+5. **Decimal-phase gap closure is a cheaper recovery pattern than re-opening closed phases.** v1.4's 18.1/18.2 extend the v1.2 9.1.1 pattern: keep the audit → plan-gaps → execute → re-audit loop tight. Don't retrofit verification inside already-complete phases.
+
+#### Cost Observations
+
+- Model mix: Opus 4.7 orchestrator on `yolo` quality profile with parallelization on; Sonnet executors per `.planning/config.json`.
+- Sessions: ~20+ across 6 days (multiple /gsd-execute-phase invocations per day during mid-milestone burst).
+- Notable: `/gsd-audit-milestone` re-audit loop (discover → plan-gaps → execute gap closure → re-audit) consumed less context than trying to retrofit verification inside already-completed phases. Re-audit loop = cheap.
+
+### Process Evolution
+
+| Milestone | Phases | Plans | Key Change |
+|-----------|--------|-------|------------|
+| v1.0 | 5 | 22 | First milestone using GSD end-to-end; retroactive VERIFICATION pattern pioneered; 3-source audit cross-reference established |
+| v1.1 | 5 | 12 | Decimal phase numbering for gap closure; module-level MCP testing pattern; sidecar persistence as canonical mutation approach |
+| v1.2 | 3 | 9 | Narrow-scope milestone close pattern; planning-only lifecycle-cleanup phase (9.1.1); atomic sidecar writes enforced across all agent state; blind Borda tournament with "no finding" as first-class option |
+| v1.3 | 3 | 19 | D-02 hybrid response envelope contract established; D-16 alias-redirect for dedup transparency; D-18 compose-don't-plumb design principle; cross-source ontology alignment; gsd-code-reviewer as critical-bug-catching gate |
+| v1.4 | 9 (7+2) | 32 | Milestone-level HARD-gates; cross-cutting decisions-as-constraints (D-02/D-16/D-18 checked every phase review); audit-driven decimal gap-closure (18.1, 18.2); manifest-as-metadata-source-of-truth; out-of-order milestone close pattern |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -244,4 +303,4 @@
 
 ---
 
-_Retrospective last updated: 2026-04-16 after v1.2 milestone completion._
+_Retrospective last updated: 2026-04-23 after v1.4 milestone completion (v1.3 backfilled alongside)._

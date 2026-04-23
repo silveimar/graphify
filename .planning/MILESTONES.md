@@ -1,5 +1,61 @@
 # Milestones
 
+## v1.4 Agent Discoverability & Obsidian Workflows (Shipped: 2026-04-22)
+
+**Delivered:** Graphify transitioned from a tool you run to a tool agents can find, trust, compose with, and improve in the background. Agent discoverability lands via an introspection-driven MCP capability manifest (static `server.json` + live `manifest.json` with drift detection) plus SEED-002 harness-memory export (SOUL/HEARTBEAT/USER triplet for the Claude harness). Obsidian workflow depth arrives through vault-scoped thinking commands (`/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind`) enforced behind a `propose_vault_note + approve` trust boundary. Graph quality over time comes from heterogeneous extraction routing (cheap/mid/expensive classes with cost ceiling), async background enrichment (four-pass overlay-only `enrichment.json` coordinated via `fcntl.flock`), focus-aware context zoom (`get_focus_context` BFS ego-graph), grounded two-stage chat with `{node_id, label, source_file}` citations, and SPAR-Kit graph-argumentation (4-lens rotation, blind-label shuffle, Jaccard early-stop).
+
+**Phases completed:** 9 phase directories (7 core: 12, 13, 14, 15, 16, 17, 18 + 2 gap closure: 18.1, 18.2), 32 plans
+**Timeline:** 2026-04-17 → 2026-04-22 (6 days)
+**Codebase delta:** 155 files changed, +35,754 / −2,481 lines across 165 commits
+**Requirements:** 72/86 P1+P2 shipped (14 P2 items intentionally deferred as documented carve-outs)
+**Audit:** `.planning/milestones/v1.4-MILESTONE-AUDIT.md` — status `passed` (7/7 phases, 7/7 integration seams, 4/4 E2E flows)
+
+### Key Accomplishments
+
+1. **Agent Capability Manifest + SEED-002 Harness Export** (Phase 13) — Introspection-driven MCP 2025-11-25-compliant `server.json` (validated against JSON Schema draft 2020-12) plus runtime `manifest.json` merging 22 tool definitions with live graph stats / alias-map size / sidecar freshness. Every MCP response envelope carries `meta.manifest_content_hash` so agents detect drift between advertised and live surface. CI `graphify capability --validate` fails if the manifest drifts from `serve.py::list_tools()`. SEED-002 `graphify harness export --target claude` produces `graphify-out/harness/claude-{SOUL,HEARTBEAT,USER}.md` with byte-equal round-trip fidelity and an annotations allow-list (excluded by default).
+
+2. **Heterogeneous Extraction Routing** (Phase 12) — Per-file AST-metric complexity classifier routes extraction across cheap/mid/expensive model tiers with parallel fan-out via a central semaphore + global 429 `threading.Event`. `GRAPHIFY_COST_CEILING` aborts pre-flight before any expensive LLM call; `model_id` participates in the cache key so re-running extraction with a different model produces a distinct cache entry. `routing.json` sidecar records a per-file `{class, model, endpoint, tokens_used, ms}` audit trail; `routing_models.yaml` is the single source of truth. HARD-gated `cache.py::file_hash()` key format for all downstream v1.4 phases.
+
+3. **Async Background Enrichment** (Phase 15) — Four-pass background enricher (description → patterns → community summaries → staleness) writes overlay-only `enrichment.json` so `graph.json` stays read-only to enrichment forever. Event-driven via `watch.py` post-rebuild hook; coordinates with foreground `/graphify` runs through `fcntl.flock`; snapshot-pinned at process start for deterministic output. Every pass threads node IDs through `_resolve_alias` (D-16) and commits via atomic `.tmp` + `os.replace`.
+
+4. **Obsidian Thinking Commands** (Phase 14) — Four vault-scoped slash commands (`/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind`) with `target: obsidian|code|both` frontmatter filtering. Write-path commands route through a mandatory `propose_vault_note` + `graphify approve` trust boundary. Plan 00 refactor migrated `_uninstall_commands()` from a hardcoded whitelist to a directory-scan, so future commands register automatically.
+
+5. **Conversational Graph Chat + Focus-Aware Context** (Phases 17, 18) — `chat(query, session_id)` is structurally two-stage: Stage 1 emits tool calls only, Stage 2 composes the answer from tool results only (no fabrication). Every claim is cited to `{node_id, label, source_file}`; empty results return templated fuzzy suggestions. `get_focus_context(focus_hint)` returns a BFS ego-graph + community summary for a structured hint; pull-model only. Phase 18 codified the v1.3 CR-01 snapshot-double-nesting fix by renaming `snapshot.py::root` → `project_root` with a sentinel dataclass.
+
+6. **Graph Argumentation Mode (SPAR-Kit)** (Phase 16) — `argue.py` populates a SPAR-Kit-style `ArgumentPackage`; `skill.md` orchestrates the LLM debate using the Phase 9 blind-label harness (per-round shuffle). Mandatory `{claim, cites: [node_id]}` schema rejects any fabricated node IDs at the envelope layer; round cap 6; `dissent` and `inconclusive` are valid outputs. `GRAPH_ARGUMENT.md` is advisory-only.
+
+### Architectural Decisions Locked
+
+- **D-02 MCP envelope** (Phase 13→all) — `text_body + "\n---GRAPHIFY-META---\n" + json(meta)` on every new MCP tool.
+- **D-16 alias threading** (Phase 9→all) — every new handler threads IDs through `_resolve_alias`.
+- **D-18 compose don't plumb** (Phase 11→all) — new tools compose `analyze.py` / `delta.py` / `snapshot.py`; only genuinely new algorithms earn modules (`enrich.py`, `argue.py`).
+- **`graph.json` read-only** — all new state in atomic `.tmp` + `os.replace` sidecars; grep-CI guards that only `build.py` + `__main__.py` call `_write_graph_json`.
+- **Snapshot double-nesting guard** (Phase 18) — `snapshot.py::root` → `project_root` rename with sentinel dataclass codifies v1.3 CR-01.
+- **Recursion guard** — `argue_topic` declares `composable_from: []` HARD CONSTRAINT; `chat` never calls `chat` (two-stage tool-call separation).
+
+### Known Deferred Items
+
+- **SEED-002 inverse-import** — requires quarantine + prompt-injection defenses; v1.4 is export-only (OQ-4).
+- **SEED-002 multi-harness schemas** — prove canonical pattern on `claude.yaml` first (OQ-5).
+- **SEED-001 Tacit-to-Explicit Elicitation Engine** — revisit if onboarding/discovery becomes the theme.
+- **Phase 19 Vault Promotion Script (Layer B)** — VAULT-01..05 moved to v1.5 via scope reconciliation 2026-04-23 (commit `0f6304b`).
+- **14 P2 carve-outs** — ROUTE-08..10, OBSCMD-09..12, ARGUE-11..13, CHAT-10..12; documented as `deferred:` in originating plan SUMMARYs.
+
+### Audit Trail
+
+Initial audit 2026-04-22 20:32 returned `gaps_found`: Phase 13 missing all three verification artifacts + MANIFEST-06 metadata PARTIAL (`chat` + `get_focus_context` absent from `capability_tool_meta.yaml`). Phase 18.1 produced Phase 13 retrofit artifacts (commits `33f9f84`, `63d2480`, `1eda4be`); Phase 18.2 added missing tools with set-equality guard test (commits `59298c8`, `37aad87`, `012a90b`). Re-audit 2026-04-22 21:45 upgraded status to `passed`. Full timeline in `.planning/milestones/v1.4-MILESTONE-AUDIT.md`.
+
+Known deferred items at close: 6 open artifacts (see STATE.md `## Deferred Items`).
+
+### Archives
+
+- Full phase detail: `.planning/milestones/v1.4-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.4-REQUIREMENTS.md`
+- Milestone audit: `.planning/milestones/v1.4-MILESTONE-AUDIT.md`
+- Per-phase artifacts: `.planning/milestones/v1.4-phases/`
+
+---
+
 ## v1.3 Intelligent Analysis Continuation (Shipped: 2026-04-17)
 
 **Delivered:** Graphify is production-viable on multi-source codebases — agents query it without blowing their token budget (Phase 9.2), extraction produces dramatically better graphs via cross-file semantic clustering + entity deduplication (Phase 10), and humans get a live thinking partner via seven MCP-backed slash commands (Phase 11). The static `GRAPH_TOUR.md` artifact concept was replaced with interactive `/context`, `/trace`, `/connect`, `/drift`, `/emerge`, `/ghost`, `/challenge` command files that ship via `graphify install`.
