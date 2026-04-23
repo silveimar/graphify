@@ -211,6 +211,48 @@ def build_mcp_tools():
             }},
         ),
         types.Tool(
+            name="argue_topic",
+            description=(
+                "Run a structurally-enforced multi-perspective debate about a decision question, "
+                "grounded in the knowledge graph. Every persona claim cites a real node_id. "
+                "Produces graphify-out/GRAPH_ARGUMENT.md (advisory only — never mutates code or graph). "
+                "Used by the /graphify-argue slash command. "
+                "Zero LLM calls in serve.py; debate orchestration lives in skill.md."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "description": "Decision-shaped question to debate.",
+                    },
+                    "scope": {
+                        "type": "string",
+                        "enum": ["topic", "subgraph", "community"],
+                        "default": "topic",
+                        "description": "Evidence-subgraph selection mode.",
+                    },
+                    "budget": {
+                        "type": "integer",
+                        "default": 2000,
+                        "minimum": 50,
+                        "maximum": 100000,
+                        "description": "Maximum subgraph nodes.",
+                    },
+                    "node_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Explicit seed node IDs (scope=\"subgraph\" only).",
+                    },
+                    "community_id": {
+                        "type": "integer",
+                        "description": "Community ID (scope=\"community\" only).",
+                    },
+                },
+                "required": ["topic"],
+            },
+        ),
+        types.Tool(
             name="chat",
             description=(
                 "Answer a natural-language question about the codebase with a graph-grounded "

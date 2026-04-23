@@ -69,6 +69,11 @@ graph_summary:
   deterministic: false
   cacheable_until: graph_mtime
   composable_from: [god_nodes, graph_stats]
+argue_topic:
+  cost_class: expensive
+  deterministic: false
+  cacheable_until: graph_mtime
+  composable_from: []   # HARD CONSTRAINT — recursion guard (ARGUE-07, D-15)
 connect_topics:
   cost_class: expensive
   deterministic: false

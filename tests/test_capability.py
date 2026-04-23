@@ -36,6 +36,16 @@ def test_manifest_tool_names_match_registry() -> None:
     assert reg == man
 
 
+def test_argue_topic_not_composable() -> None:
+    """ARGUE-07 D-15: argue_topic.composable_from must be [] — Phase 17 chat recursion guard."""
+    m = build_manifest_dict()
+    tool = next((t for t in m["CAPABILITY_TOOLS"] if t["name"] == "argue_topic"), None)
+    assert tool is not None, "argue_topic missing from manifest"
+    assert tool.get("composable_from") == [], (
+        "argue_topic.composable_from must be [] to prevent Phase 17 chat recursion"
+    )
+
+
 def test_validate_cli_zero(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     root = Path(__file__).resolve().parents[1]
