@@ -3142,3 +3142,242 @@ def test_argue_does_not_invoke_chat():
     assert "_run_chat_core" not in tool_body, (
         "_tool_argue_topic must not invoke _run_chat_core (ARGUE-07 recursion guard)"
     )
+
+
+# ============================================================================
+# Phase 20 Plan 03: list_diagram_seeds + get_diagram_seed MCP tools
+# ============================================================================
+
+def _make_seed_tree(tmp_path, seeds, manifest):
+    """Helper: build tmp_path/graphify-out/seeds/ with seed files + manifest.
+    Returns the project_root (i.e. tmp_path)."""
+    out = tmp_path / "graphify-out" / "seeds"
+    out.mkdir(parents=True)
+    for seed in seeds:
+        (out / f"{seed['seed_id']}-seed.json").write_text(
+            json.dumps(seed), encoding="utf-8"
+        )
+    (out / "seeds-manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    return tmp_path
+
+
+def _sample_seed(seed_id="transformer", trigger="auto", layout="architecture"):
+    return {
+        "seed_id": seed_id,
+        "trigger": trigger,
+        "main_node_id": seed_id,
+        "main_node_label": seed_id.title(),
+        "main_nodes": [
+            {"id": seed_id, "label": seed_id.title(), "file_type": "code", "element_id": "a" * 16},
+            {"id": f"{seed_id}_helper", "label": "Helper", "file_type": "code", "element_id": "b" * 16},
+        ],
+        "supporting_nodes": [
+            {"id": "support1", "label": "S1", "file_type": "code", "element_id": "c" * 16},
+        ],
+        "relations": [
+            {"source": seed_id, "target": f"{seed_id}_helper", "relation": "calls", "confidence": "EXTRACTED"},
+            {"source": seed_id, "target": "support1", "relation": "references", "confidence": "INFERRED"},
+        ],
+        "suggested_layout_type": layout,
+        "suggested_template": f"{layout}.excalidraw.md",
+        "version_nonce_seed": 123456,
+    }
+
+
+def _manifest_entry(seed_id, trigger="auto", layout="architecture", dropped=False, rank=None):
+    return {
+        "node_id": seed_id,
+        "seed_file": f"{seed_id}-seed.json",
+        "trigger": trigger,
+        "layout_type": layout,
+        "dedup_merged_from": [],
+        "dropped_due_to_cap": dropped,
+        "rank_at_drop": rank,
+        "written_at": "2026-04-23T13:50:00Z",
+    }
+
+
+def test_list_diagram_seeds_tool_registered():
+    """SEED-09/SEED-11: list_diagram_seeds + get_diagram_seed registered via MANIFEST-05 parity."""
+    from graphify.mcp_tool_registry import build_mcp_tools
+    tools = build_mcp_tools()
+    names = {t.name for t in tools}
+    assert "list_diagram_seeds" in names
+    assert "get_diagram_seed" in names
+    # get_diagram_seed requires seed_id
+    gds = [t for t in tools if t.name == "get_diagram_seed"][0]
+    assert "seed_id" in gds.inputSchema.get("required", [])
+
+
+def test_list_diagram_seeds_envelope_ok(tmp_path):
+    """SEED-09: D-02 envelope with status=ok, seed_count=2, tab-separated lines."""
+    from graphify.serve import _run_list_diagram_seeds_core
+    seeds = [_sample_seed("transformer"), _sample_seed("attention", layout="mind-map")]
+    manifest = [_manifest_entry("transformer"), _manifest_entry("attention", layout="mind-map")]
+    root = _make_seed_tree(tmp_path, seeds, manifest)
+    G = nx.Graph()
+    response = _run_list_diagram_seeds_core(G, root, {}, alias_map=None)
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "ok"
+    assert meta["seed_count"] == 2
+    lines = text_body.split("\n")
+    assert len(lines) == 2
+    for line in lines:
+        assert len(line.split("\t")) == 5
+
+
+def test_list_diagram_seeds_envelope_no_seeds_missing_dir(tmp_path):
+    """SEED-09: missing seeds/ dir -> status=no_seeds, empty text_body."""
+    from graphify.serve import _run_list_diagram_seeds_core
+    G = nx.Graph()
+    response = _run_list_diagram_seeds_core(G, tmp_path, {}, alias_map=None)
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "no_seeds"
+    assert meta["seed_count"] == 0
+    assert text_body == ""
+
+
+def test_list_diagram_seeds_envelope_no_seeds_empty_manifest(tmp_path):
+    """SEED-09: empty-list manifest -> status=no_seeds."""
+    from graphify.serve import _run_list_diagram_seeds_core
+    root = _make_seed_tree(tmp_path, [], [])
+    G = nx.Graph()
+    response = _run_list_diagram_seeds_core(G, root, {}, alias_map=None)
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "no_seeds"
+    assert text_body == ""
+
+
+def test_list_diagram_seeds_skips_dropped_by_cap_entries(tmp_path):
+    """SEED-09: manifest entries with dropped_due_to_cap=True are omitted."""
+    from graphify.serve import _run_list_diagram_seeds_core
+    seeds = [_sample_seed("a"), _sample_seed("b"), _sample_seed("c")]
+    manifest = [
+        _manifest_entry("a"),
+        _manifest_entry("b"),
+        _manifest_entry("c", dropped=True, rank=21),
+    ]
+    root = _make_seed_tree(tmp_path, seeds, manifest)
+    G = nx.Graph()
+    response = _run_list_diagram_seeds_core(G, root, {}, alias_map=None)
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["seed_count"] == 2
+    assert "c" not in text_body.split("\n")[0] and "c\t" not in text_body
+
+
+def test_list_diagram_seeds_resolves_node_id_aliases_in_response(tmp_path):
+    """SEED-09 + D-16: alias threading canonicalizes seed_id in rendered rows."""
+    from graphify.serve import _run_list_diagram_seeds_core
+    seeds = [_sample_seed("attn", layout="mind-map")]
+    manifest = [_manifest_entry("attn", layout="mind-map")]
+    root = _make_seed_tree(tmp_path, seeds, manifest)
+    G = nx.Graph()
+    alias_map = {"attn": "transformer"}
+    response = _run_list_diagram_seeds_core(G, root, {}, alias_map=alias_map)
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "ok"
+    first_field = text_body.split("\n")[0].split("\t")[0]
+    assert first_field == "transformer"
+    assert meta.get("resolved_from_alias") == {"transformer": ["attn"]}
+
+
+def test_list_diagram_seeds_corrupt_manifest_resilient(tmp_path):
+    """SEED-09 + SP-8: corrupt manifest -> stderr warn, no_seeds envelope, no crash."""
+    from graphify.serve import _run_list_diagram_seeds_core
+    seeds_dir = tmp_path / "graphify-out" / "seeds"
+    seeds_dir.mkdir(parents=True)
+    (seeds_dir / "seeds-manifest.json").write_text("{{{ not json", encoding="utf-8")
+    G = nx.Graph()
+    response = _run_list_diagram_seeds_core(G, tmp_path, {}, alias_map=None)
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "no_seeds"
+    assert text_body == ""
+
+
+def test_get_diagram_seed_envelope_ok(tmp_path):
+    """SEED-10: full SeedDict returned as JSON text_body + ok meta."""
+    from graphify.serve import _run_get_diagram_seed_core
+    seed = _sample_seed("transformer")
+    manifest = [_manifest_entry("transformer")]
+    root = _make_seed_tree(tmp_path, [seed], manifest)
+    G = nx.Graph()
+    response = _run_get_diagram_seed_core(G, root, {"seed_id": "transformer"}, alias_map=None)
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "ok"
+    assert meta["seed_id"] == "transformer"
+    assert meta["node_count"] == 3  # 2 main + 1 supporting
+    parsed = json.loads(text_body)
+    assert parsed["seed_id"] == "transformer"
+    assert parsed["suggested_layout_type"] == "architecture"
+
+
+def test_get_diagram_seed_not_found(tmp_path):
+    """SEED-10: nonexistent seed_id -> not_found, empty text_body, no crash."""
+    from graphify.serve import _run_get_diagram_seed_core
+    root = _make_seed_tree(tmp_path, [_sample_seed("a")], [_manifest_entry("a")])
+    G = nx.Graph()
+    response = _run_get_diagram_seed_core(G, root, {"seed_id": "does-not-exist"}, alias_map=None)
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "not_found"
+    assert meta["seed_id"] == "does-not-exist"
+    assert text_body == ""
+
+
+def test_get_diagram_seed_corrupt_file(tmp_path):
+    """SEED-10 + SP-8: corrupt seed JSON file -> corrupt status, empty text_body, no crash."""
+    from graphify.serve import _run_get_diagram_seed_core
+    seeds_dir = tmp_path / "graphify-out" / "seeds"
+    seeds_dir.mkdir(parents=True)
+    (seeds_dir / "x-seed.json").write_text("{{{bad json", encoding="utf-8")
+    (seeds_dir / "seeds-manifest.json").write_text(json.dumps([_manifest_entry("x")]), encoding="utf-8")
+    G = nx.Graph()
+    response = _run_get_diagram_seed_core(G, tmp_path, {"seed_id": "x"}, alias_map=None)
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "corrupt"
+    assert text_body == ""
+
+
+def test_get_diagram_seed_resolves_seed_id_alias(tmp_path):
+    """SEED-10 + D-16: alias map maps requested seed_id to canonical file."""
+    from graphify.serve import _run_get_diagram_seed_core
+    seed = _sample_seed("transformer")
+    manifest = [_manifest_entry("transformer")]
+    root = _make_seed_tree(tmp_path, [seed], manifest)
+    G = nx.Graph()
+    alias_map = {"attn": "transformer"}
+    response = _run_get_diagram_seed_core(G, root, {"seed_id": "attn"}, alias_map=alias_map)
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "ok"
+    assert meta["seed_id"] == "transformer"
+    assert meta.get("resolved_from_alias") == {"transformer": ["attn"]}
+    parsed = json.loads(text_body)
+    assert parsed["seed_id"] == "transformer"
+
+
+def test_get_diagram_seed_rejects_path_traversal(tmp_path):
+    """T-20-03-01: seed_id with path traversal chars -> not_found (never reads outside seeds/)."""
+    from graphify.serve import _run_get_diagram_seed_core
+    root = _make_seed_tree(tmp_path, [_sample_seed("a")], [_manifest_entry("a")])
+    # Create a file we shouldn't be able to reach.
+    evil = tmp_path / "secret.json"
+    evil.write_text('{"secret": true}', encoding="utf-8")
+    G = nx.Graph()
+    response = _run_get_diagram_seed_core(
+        G, root, {"seed_id": "../../secret"}, alias_map=None
+    )
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["status"] == "not_found"
+    assert text_body == ""
