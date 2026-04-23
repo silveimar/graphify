@@ -3032,3 +3032,113 @@ def test_serve_makes_zero_llm_calls():
     )
     for needle in forbidden:
         assert needle not in src, f"serve.py introduced LLM dependency: {needle!r}"
+
+
+def test_argue_topic_tool_registered():
+    """ARGUE-04 registry surface: argue_topic tool discoverable via build_mcp_tools()."""
+    from graphify import mcp_tool_registry
+    tools = (
+        getattr(mcp_tool_registry, "TOOLS", None)
+        or getattr(mcp_tool_registry, "tools", None)
+        or mcp_tool_registry.build_mcp_tools()
+    )
+    tool = next((t for t in tools if getattr(t, "name", None) == "argue_topic"), None)
+    assert tool is not None, "argue_topic missing from registry"
+    schema = tool.inputSchema
+    assert "topic" in schema["required"]
+    assert "scope" in schema["properties"]
+    assert schema["properties"]["scope"]["enum"] == ["topic", "subgraph", "community"]
+
+
+def test_argue_topic_envelope_ok():
+    """ARGUE-04 D-14: _run_argue_topic_core emits D-02 envelope with exact meta keys."""
+    from graphify.serve import _run_argue_topic_core, _communities_from_graph, QUERY_GRAPH_META_SENTINEL
+    G = _make_graph()
+    communities = _communities_from_graph(G)
+    response = _run_argue_topic_core(G, communities, {}, {"topic": "extract"})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    for key in ("status", "verdict", "rounds_run", "argument_package",
+                "citations", "resolved_from_alias", "output_path"):
+        assert key in meta, f"missing meta key: {key}"
+    assert "alias_redirects" not in meta, "Pitfall 4: must use resolved_from_alias, not alias_redirects"
+    assert isinstance(meta["citations"], list)
+    assert isinstance(meta["resolved_from_alias"], dict)
+    assert meta["rounds_run"] == 0
+    assert meta["verdict"] is None
+
+
+def test_argue_topic_output_path():
+    """ARGUE-09: output_path is hardcoded to graphify-out/GRAPH_ARGUMENT.md."""
+    from graphify.serve import _run_argue_topic_core, _communities_from_graph, QUERY_GRAPH_META_SENTINEL
+    G = _make_graph()
+    response = _run_argue_topic_core(G, _communities_from_graph(G), {}, {"topic": "extract"})
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert meta["output_path"] == "graphify-out/GRAPH_ARGUMENT.md"
+    # Empty-input path also hardcodes output_path.
+    response2 = _run_argue_topic_core(G, _communities_from_graph(G), {}, {"topic": ""})
+    _, meta_json2 = response2.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta2 = json.loads(meta_json2)
+    assert meta2["output_path"] == "graphify-out/GRAPH_ARGUMENT.md"
+
+
+def test_argue_topic_alias_redirect():
+    """ARGUE-04 D-16: meta.resolved_from_alias populated on redirect; key is resolved_from_alias (NOT alias_redirects)."""
+    from graphify.serve import _run_argue_topic_core, _communities_from_graph, QUERY_GRAPH_META_SENTINEL
+    G = _make_graph()
+    # Seed an alias map where a node alias redirects to canonical.
+    alias_map = {}
+    # Pick the first node of _make_graph() and create an alias for it
+    first_node = next(iter(G.nodes))
+    alias_map["aliased_extract"] = first_node
+    # Add the alias node into G so populate can surface it as evidence
+    G.add_node("aliased_extract", label=f"AliasOf-{first_node}", source_file="aliases/alias.py")
+    G.add_edge(first_node, "aliased_extract", relation="aliases", confidence="EXTRACTED")
+    response = _run_argue_topic_core(G, _communities_from_graph(G), alias_map, {"topic": first_node.lstrip("n_")})
+    _, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
+    meta = json.loads(meta_json)
+    assert "resolved_from_alias" in meta
+    # If redirect path fired, canonical node should list the alias:
+    if meta["resolved_from_alias"]:
+        for canonical, aliases in meta["resolved_from_alias"].items():
+            assert canonical in G.nodes
+            assert isinstance(aliases, list)
+    assert "alias_redirects" not in meta
+
+
+def test_argue_does_not_invoke_chat():
+    """ARGUE-03 / ARGUE-07 / Pitfall 18: _run_argue_topic_core must not call _run_chat_core."""
+    from pathlib import Path as _P
+    src = _P("graphify/serve.py").read_text()
+
+    def _extract_func_body(src: str, func_sig: str) -> str:
+        """Extract function body using the correct indentation-level boundary."""
+        start = src.find(func_sig)
+        if start == -1:
+            return ""
+        # Determine indentation: count leading spaces before `def`
+        line_start = src.rfind("\n", 0, start) + 1
+        indent = start - line_start
+        # Next function at same indentation level
+        same_indent_def = "\n" + " " * indent + "def "
+        end = src.find(same_indent_def, start + len(func_sig))
+        return src[start:end] if end != -1 else src[start:]
+
+    # _run_argue_topic_core is a top-level function — top-level boundary
+    core_body = _extract_func_body(src, "def _run_argue_topic_core")
+    assert core_body, "_run_argue_topic_core not yet defined"
+    assert "_run_chat_core" not in core_body, (
+        "_run_argue_topic_core must not invoke _run_chat_core (ARGUE-07 recursion guard)"
+    )
+
+    # _tool_argue_topic is nested inside serve() — 4-space indent boundary
+    tool_body = _extract_func_body(src, "def _tool_argue_topic")
+    assert tool_body, "_tool_argue_topic not yet defined"
+    assert "_tool_chat" not in tool_body, (
+        "_tool_argue_topic must not dispatch to _tool_chat (ARGUE-07 recursion guard)"
+    )
+    assert "_run_chat_core" not in tool_body, (
+        "_tool_argue_topic must not invoke _run_chat_core (ARGUE-07 recursion guard)"
+    )

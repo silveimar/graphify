@@ -1354,6 +1354,123 @@ def _run_chat_core(
     return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
 
+def _run_argue_topic_core(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    alias_map: dict[str, str] | None,
+    arguments: dict,
+) -> str:
+    """Phase 16 ARGUE-04: deterministic argue_topic substrate. Zero LLM. D-02 envelope.
+
+    Composes graphify.argue.populate() with alias threading; returns the
+    evidence subgraph summary. Actual debate orchestration happens in
+    skill.md (D-73 honored). Cross-phase chat invocation forbidden (ARGUE-07, Pitfall 18).
+    """
+    from graphify.argue import populate
+
+    output_path = "graphify-out/GRAPH_ARGUMENT.md"
+
+    topic = arguments.get("topic", "")
+    if not isinstance(topic, str) or not topic.strip():
+        meta: dict = {
+            "status": "no_results",
+            "verdict": None,
+            "rounds_run": 0,
+            "argument_package": {},
+            "citations": [],
+            "resolved_from_alias": {},
+            "output_path": output_path,
+        }
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    scope = arguments.get("scope", "topic")
+    if scope not in ("topic", "subgraph", "community"):
+        scope = "topic"
+    budget = arguments.get("budget", 2000)
+    try:
+        budget = int(budget)
+    except (TypeError, ValueError):
+        budget = 2000
+    node_ids = arguments.get("node_ids") if isinstance(arguments.get("node_ids"), list) else None
+    community_id = arguments.get("community_id")
+    if not isinstance(community_id, int):
+        community_id = None
+
+    # _resolve_alias closure — same transitive-cycle-guard pattern as chat core (serve.py:1234-1250).
+    _resolved_aliases: dict[str, list[str]] = {}
+    _effective_alias_map: dict[str, str] = alias_map or {}
+
+    def _resolve_alias(node_id: str) -> str:
+        seen: set[str] = set()
+        current = node_id
+        while current in _effective_alias_map and current not in seen:
+            seen.add(current)
+            nxt = _effective_alias_map[current]
+            if nxt == current:
+                break
+            current = nxt
+        if current != node_id:
+            aliases = _resolved_aliases.setdefault(current, [])
+            if node_id not in aliases:
+                aliases.append(node_id)
+        return current
+
+    pkg = populate(
+        G,
+        topic,
+        scope=scope,
+        budget=budget,
+        node_ids=node_ids,
+        community_id=community_id,
+        communities=communities,
+    )
+
+    # Thread every evidence citation through alias resolution.
+    citations: list[dict] = []
+    for cite in pkg.evidence:
+        canonical = _resolve_alias(cite.node_id)
+        citations.append(
+            {
+                "node_id": canonical,
+                "label": sanitize_label(cite.label),
+                "source_file": cite.source_file,
+            }
+        )
+
+    argument_package_summary = {
+        "nodes": [
+            {
+                "id": _resolve_alias(nid),
+                "label": sanitize_label(G.nodes[nid].get("label", nid)) if nid in G.nodes else sanitize_label(nid),
+                "source_file": G.nodes[nid].get("source_file", "") if nid in G.nodes else "",
+            }
+            for nid in pkg.subgraph.nodes
+        ],
+        "edge_count": pkg.subgraph.number_of_edges(),
+        "perspectives": [{"lens": p.lens} for p in pkg.perspectives],
+        "evidence_count": len(pkg.evidence),
+    }
+
+    safe_topic = sanitize_label(topic)[:120]
+    text_body = (
+        f"Phase 16 argument substrate: {len(pkg.evidence)} evidence nodes queued "
+        f"for debate on topic '{safe_topic}'. Debate orchestration runs in skill.md. "
+        f"See {output_path} after /graphify-argue completes."
+    )
+
+    meta = {
+        "status": "ok" if pkg.evidence else "no_results",
+        "verdict": None,
+        "rounds_run": 0,
+        "argument_package": argument_package_summary,
+        "citations": citations,
+        "resolved_from_alias": _resolved_aliases,
+        "output_path": output_path,
+    }
+
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
 def _run_query_graph(
     G: nx.Graph,
     communities: dict,
@@ -2782,6 +2899,22 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
         return _run_chat_core(G, communities, _alias_map, arguments)
 
+    def _tool_argue_topic(arguments: dict) -> str:
+        """Phase 16 ARGUE-04: multi-persona graph debate substrate. Deterministic, zero LLM."""
+        _reload_if_stale()
+        if not Path(graph_path).exists():
+            meta: dict = {
+                "status": "no_graph",
+                "verdict": None,
+                "rounds_run": 0,
+                "argument_package": {},
+                "citations": [],
+                "resolved_from_alias": {},
+                "output_path": "graphify-out/GRAPH_ARGUMENT.md",
+            }
+            return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+        return _run_argue_topic_core(G, communities, _alias_map, arguments)
+
     def _tool_connect_topics(arguments: dict) -> str:
         """Phase 11 SLASH-03: shortest path + globally surprising bridges between two topics."""
         _reload_if_stale()
@@ -2969,6 +3102,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "get_annotations": _tool_get_annotations,
         "get_agent_edges": _tool_get_agent_edges,
         "graph_summary": _tool_graph_summary,
+        "argue_topic": _tool_argue_topic,   # Phase 16 ARGUE-04
         "chat": _tool_chat,
         "connect_topics": _tool_connect_topics,
         "entity_trace": _tool_entity_trace,
