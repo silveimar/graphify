@@ -1,10 +1,12 @@
 ---
 phase: 15
 slug: async-background-enrichment
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-20
+audited: 2026-04-22
+audit_ref: "18.2-02 — frontmatter refresh after 15-VERIFICATION PASSED (5/5 SCs, 12/12 REQ-IDs); test suites test_enrich*.py + test_enrichment_lifecycle.py 33/33 green"
 ---
 
 # Phase 15 — Validation Strategy

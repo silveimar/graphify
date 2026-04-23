@@ -1,10 +1,12 @@
 ---
 phase: 18
 slug: focus-aware-graph-context
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-20
+audited: 2026-04-22
+audit_ref: "18.2-02 — frontmatter refresh after 18-VERIFICATION PASSED (5/5 SCs, 9/9 FOCUS REQ-IDs post Plan 18-04 SC4 gap closure); focus-context tests in test_serve.py 14/14 green"
 ---
 
 # Phase 18 — Validation Strategy
