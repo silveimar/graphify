@@ -4,7 +4,7 @@ import networkx as nx
 from pathlib import Path
 from graphify.build import build_from_json
 from graphify.cluster import cluster
-from graphify.analyze import god_nodes, surprising_connections, _is_concept_node, graph_diff, _surprise_score, _file_category, render_analysis_context, _is_file_node, _top_level_dir, knowledge_gaps
+from graphify.analyze import god_nodes, surprising_connections, _is_concept_node, graph_diff, _surprise_score, _file_category, render_analysis_context, _is_file_node, _top_level_dir, knowledge_gaps, _cross_community_surprises
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -462,3 +462,224 @@ def test_knowledge_gaps_return_shape():
     assert len(result) >= 1
     for item in result:
         assert set(item.keys()) == {"id", "label", "reason"}
+
+
+# ---------------------------------------------------------------------------
+# Phase 20-01: Diagram Seed Engine — auto-tag possible_diagram_seed
+# ---------------------------------------------------------------------------
+
+
+def _make_real_entity_graph(n: int = 5) -> nx.Graph:
+    """Build a graph with n real entity nodes (not file-hub, not concept)
+    forming a connected chain so they all have degree >= 1.
+    """
+    G = nx.Graph()
+    for i in range(n):
+        G.add_node(
+            f"entity_{i}",
+            label=f"Entity{i}",
+            file_type="code",
+            source_file=f"src/mod_{i}.py",
+            source_location=f"L{i}",
+        )
+    # chain edges + an extra so some nodes have higher degree
+    for i in range(n - 1):
+        G.add_edge(
+            f"entity_{i}",
+            f"entity_{i+1}",
+            relation="calls",
+            confidence="EXTRACTED",
+            source_file=f"src/mod_{i}.py",
+            weight=1.0,
+        )
+    # wire entity_0 to everyone else so it becomes the top god
+    for i in range(2, n):
+        G.add_edge(
+            "entity_0",
+            f"entity_{i}",
+            relation="calls",
+            confidence="EXTRACTED",
+            source_file="src/mod_0.py",
+            weight=1.0,
+        )
+    return G
+
+
+def test_god_nodes_tags_possible_diagram_seed():
+    """god_nodes() must set G.nodes[id]['possible_diagram_seed'] = True on every
+    returned node, and must NOT set it on nodes that were not selected."""
+    G = _make_real_entity_graph(5)
+    result = god_nodes(G, top_n=3)
+    assert len(result) == 3
+    returned_ids = {r["id"] for r in result}
+    for nid in returned_ids:
+        assert G.nodes[nid].get("possible_diagram_seed") is True, (
+            f"expected possible_diagram_seed=True on selected god node {nid}"
+        )
+    # All five nodes exist; any not returned must not have the flag set True.
+    for nid in [f"entity_{i}" for i in range(5)]:
+        if nid not in returned_ids:
+            assert G.nodes[nid].get("possible_diagram_seed") is not True, (
+                f"non-selected node {nid} must not carry possible_diagram_seed=True"
+            )
+
+
+def test_cross_community_surprises_tags_endpoints():
+    """_cross_community_surprises must tag both endpoints of every emitted
+    surprise with possible_diagram_seed=True."""
+    G = nx.Graph()
+    # Two clearly separate dense clusters + a bridge edge
+    for i in range(4):
+        G.add_node(
+            f"a{i}",
+            label=f"A{i}",
+            file_type="code",
+            source_file="single.py",
+            source_location=f"L{i}",
+        )
+        G.add_node(
+            f"b{i}",
+            label=f"B{i}",
+            file_type="code",
+            source_file="single.py",
+            source_location=f"L{i+10}",
+        )
+    for i in range(3):
+        G.add_edge(
+            f"a{i}",
+            f"a{i+1}",
+            relation="calls",
+            confidence="EXTRACTED",
+            source_file="single.py",
+            weight=1.0,
+        )
+        G.add_edge(
+            f"b{i}",
+            f"b{i+1}",
+            relation="calls",
+            confidence="EXTRACTED",
+            source_file="single.py",
+            weight=1.0,
+        )
+    # Cross-community bridge — relation NOT in the skip-list
+    G.add_edge(
+        "a3",
+        "b0",
+        relation="references",
+        confidence="INFERRED",
+        source_file="single.py",
+        weight=0.5,
+    )
+    communities = {0: [f"a{i}" for i in range(4)], 1: [f"b{i}" for i in range(4)]}
+    surprises = _cross_community_surprises(G, communities, top_n=5)
+    assert len(surprises) > 0
+    # every surprise has both endpoints tagged — verify via the underlying nodes
+    # (source/target in the dict are labels, so resolve back by scanning)
+    label_to_id = {G.nodes[n].get("label", n): n for n in G.nodes}
+    for s in surprises:
+        src_id = label_to_id[s["source"]]
+        tgt_id = label_to_id[s["target"]]
+        assert G.nodes[src_id].get("possible_diagram_seed") is True
+        assert G.nodes[tgt_id].get("possible_diagram_seed") is True
+
+
+def test_god_nodes_returns_shape_unchanged():
+    """god_nodes return value remains list[dict] with keys id, label, edges."""
+    G = _make_real_entity_graph(4)
+    result = god_nodes(G, top_n=2)
+    assert isinstance(result, list)
+    for r in result:
+        assert set(r.keys()) == {"id", "label", "edges"}
+
+
+# ---------------------------------------------------------------------------
+# Phase 20-01: detect_user_seeds + tag write-back denylist
+# ---------------------------------------------------------------------------
+
+
+def test_detect_user_seeds_reads_tags():
+    """detect_user_seeds returns user_seeds for nodes whose tags attribute
+    contains 'gen-diagram-seed' or 'gen-diagram-seed/<type>'."""
+    from graphify.analyze import detect_user_seeds
+
+    G = nx.Graph()
+    G.add_node("a", label="Alpha", tags=["gen-diagram-seed"])
+    G.add_node("b", label="Beta", tags=["gen-diagram-seed/workflow"])
+    G.add_node("c", label="Gamma", tags=["unrelated"])
+    G.add_node("d", label="Delta")  # no tags
+    result = detect_user_seeds(G)
+    user_ids = {e["id"] for e in result["user_seeds"]}
+    assert user_ids == {"a", "b"}
+    by_id = {e["id"]: e for e in result["user_seeds"]}
+    assert by_id["a"]["layout_hint"] is None
+    assert by_id["b"]["layout_hint"] == "workflow"
+
+
+def test_detect_user_seeds_auto_seeds_from_attribute():
+    """Nodes carrying possible_diagram_seed=True flow to auto_seeds with layout_hint=None."""
+    from graphify.analyze import detect_user_seeds
+
+    G = nx.Graph()
+    G.add_node("x", label="X", possible_diagram_seed=True)
+    G.add_node("y", label="Y", possible_diagram_seed=True)
+    G.add_node("z", label="Z")
+    result = detect_user_seeds(G)
+    auto_ids = {e["id"] for e in result["auto_seeds"]}
+    assert auto_ids == {"x", "y"}
+    for entry in result["auto_seeds"]:
+        assert entry["layout_hint"] is None
+
+
+def test_detect_user_seeds_tolerates_malformed_tags():
+    """Non-list / non-string tag entries are silently skipped, no crash."""
+    from graphify.analyze import detect_user_seeds
+
+    G = nx.Graph()
+    G.add_node("n1", label="N1", tags=None)
+    G.add_node("n2", label="N2", tags="string-not-list")
+    G.add_node("n3", label="N3", tags=[123, None, "gen-diagram-seed"])
+    result = detect_user_seeds(G)
+    user_ids = {e["id"] for e in result["user_seeds"]}
+    # Only n3 has a valid 'gen-diagram-seed' string element
+    assert user_ids == {"n3"}
+
+
+def test_detect_user_seeds_slash_hint_empty_suffix():
+    """Tag 'gen-diagram-seed/' (no type suffix) yields layout_hint=None, not ''."""
+    from graphify.analyze import detect_user_seeds
+
+    G = nx.Graph()
+    G.add_node("a", label="A", tags=["gen-diagram-seed/"])
+    result = detect_user_seeds(G)
+    assert len(result["user_seeds"]) == 1
+    assert result["user_seeds"][0]["layout_hint"] is None
+
+
+def test_tag_writeback_routed_only_through_compute_merge_plan():
+    """Grep denylist: analyze.py (and seed.py if it exists) must not perform
+    direct frontmatter writes. Tag write-back goes exclusively through
+    graphify.merge.compute_merge_plan (merge.py:70 tags='union' policy)."""
+    import re
+
+    repo_root = Path(__file__).parent.parent
+    files_to_scan = [repo_root / "graphify" / "analyze.py"]
+    seed_path = repo_root / "graphify" / "seed.py"
+    if seed_path.exists():
+        files_to_scan.append(seed_path)
+
+    # Denylist patterns — any direct frontmatter write path
+    denylist = [
+        re.compile(r"\.write_text\("),
+        re.compile(r"""open\s*\([^)]*['"]w['"]"""),
+        re.compile(r"write_note_directly"),
+    ]
+
+    for f in files_to_scan:
+        content = f.read_text()
+        for pat in denylist:
+            matches = pat.findall(content)
+            assert not matches, (
+                f"{f} violates tag write-back denylist: pattern {pat.pattern!r} matched "
+                f"{len(matches)} time(s). Tag write-back must route through "
+                f"graphify.merge.compute_merge_plan."
+            )
