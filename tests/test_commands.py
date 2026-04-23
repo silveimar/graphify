@@ -315,3 +315,39 @@ def test_related_handles_no_context():
         "body must explicitly branch on status == no_context so spoofed/outside-project "
         "source_file values produce a user-visible explanation, not silence"
     )
+
+
+# ============================================================
+# Phase 14 Plan 04 — OBSCMD-05 (/graphify-orphan) + D-05 dual-section render
+# ============================================================
+
+
+def test_orphan_dual_sections():
+    """OBSCMD-05 / D-05: /graphify-orphan emits two distinct labeled sections."""
+    path = _commands_dir() / "graphify-orphan.md"
+    assert path.exists()
+    fm = _parse_frontmatter(path)
+    assert fm.get("name") == "graphify-orphan"
+    assert fm.get("target") == "obsidian"
+    body = path.read_text()
+    assert "## Isolated Nodes" in body, "must have '## Isolated Nodes' section"
+    assert "## Stale/Ghost Nodes" in body, "must have '## Stale/Ghost Nodes' section"
+    # Isolated section must precede Stale section (remediation ordering)
+    idx_iso = body.find("## Isolated Nodes")
+    idx_stale = body.find("## Stale/Ghost Nodes")
+    assert idx_iso < idx_stale, "Isolated Nodes must render before Stale/Ghost"
+
+
+def test_orphan_graceful_without_enrichment():
+    """OBSCMD-05: graceful degrade when enrichment.json absent (Phase 15 optional)."""
+    path = _commands_dir() / "graphify-orphan.md"
+    body = path.read_text()
+    # Must reference enrichment.json absence + remediation
+    assert "enrichment.json" in body, "body must mention enrichment.json file name"
+    assert "graphify enrich" in body, "body must instruct user to run `graphify enrich`"
+    # Must not imply absence is an error — we want a banner, not a stop.
+    # Heuristic: look for a banner/notice phrase tied to absence handling.
+    assert ("unavailable" in body.lower() or "not yet" in body.lower()
+            or "no enrichment" in body.lower()), (
+        "body must render a graceful banner when enrichment.json is missing"
+    )
