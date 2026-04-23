@@ -35,15 +35,36 @@ def validate_extraction(data: dict) -> list[str]:
                     f"Node {i} (id={node.get('id', '?')!r}) has invalid file_type "
                     f"'{node['file_type']}' - must be one of {sorted(VALID_FILE_TYPES)}"
                 )
+            # D-12: source_file may be str OR list[str] after dedup
+            if "source_file" in node:
+                sf = node["source_file"]
+                if not isinstance(sf, (str, list)):
+                    errors.append(
+                        f"Node {i} (id={node.get('id', '?')!r}) 'source_file' must be "
+                        f"str or list[str], got {type(sf).__name__}"
+                    )
+                elif isinstance(sf, list) and not all(isinstance(s, str) for s in sf):
+                    errors.append(
+                        f"Node {i} (id={node.get('id', '?')!r}) source_file list "
+                        f"must contain only strings"
+                    )
+            # D-11: merged_from is optional; when present must be list[str]
+            if "merged_from" in node:
+                mf = node["merged_from"]
+                if not isinstance(mf, list) or not all(isinstance(m, str) for m in mf):
+                    errors.append(
+                        f"Node {i} (id={node.get('id', '?')!r}) 'merged_from' must be list[str]"
+                    )
 
-    # Edges
-    if "edges" not in data:
+    # Edges - accept "links" (NetworkX <= 3.1) as fallback for "edges"
+    edge_list = data.get("edges") if "edges" in data else data.get("links")
+    if edge_list is None:
         errors.append("Missing required key 'edges'")
-    elif not isinstance(data["edges"], list):
+    elif not isinstance(edge_list, list):
         errors.append("'edges' must be a list")
     else:
         node_ids = {n["id"] for n in data.get("nodes", []) if isinstance(n, dict) and "id" in n}
-        for i, edge in enumerate(data["edges"]):
+        for i, edge in enumerate(edge_list):
             if not isinstance(edge, dict):
                 errors.append(f"Edge {i} must be an object")
                 continue

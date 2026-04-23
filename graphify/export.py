@@ -10,7 +10,7 @@ from pathlib import Path
 import networkx as nx
 from networkx.readwrite import json_graph
 from graphify.security import sanitize_label
-from graphify.analyze import _node_community_map
+from graphify.analyze import _node_community_map, _fmt_source_file
 from graphify.profile import safe_filename, safe_frontmatter_value, safe_tag
 
 COMMUNITY_COLORS = [
@@ -297,8 +297,18 @@ def to_json(G: nx.Graph, communities: dict[int, list[str]], output_path: str) ->
             conf = link.get("confidence", "EXTRACTED")
             link["confidence_score"] = _CONFIDENCE_SCORE_DEFAULTS.get(conf, 1.0)
     data["hyperedges"] = getattr(G, "graph", {}).get("hyperedges", [])
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+    # MANIFEST-02: runtime manifest alongside graph.json (same success path).
+    try:
+        from graphify.capability import write_runtime_manifest
+
+        write_runtime_manifest(Path(output_path).parent)
+    except Exception as exc:
+        raise RuntimeError(
+            "graphify-out/capability.json could not be written; install graphify with [mcp] extras "
+            "(jsonschema, PyYAML) or see prior exception"
+        ) from exc
 
 
 def _cypher_escape(s: str) -> str:
@@ -324,7 +334,7 @@ def to_cypher(G: nx.Graph, output_path: str) -> None:
             f"MATCH (a {{id: '{u_esc}'}}), (b {{id: '{v_esc}'}}) "
             f"MERGE (a)-[:{rel} {{confidence: '{conf}'}}]->(b);"
         )
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
 
@@ -348,7 +358,7 @@ def to_html(
 
     node_community = _node_community_map(communities)
     degree = dict(G.degree())
-    max_deg = max(degree.values()) if degree else 1
+    max_deg = max(degree.values(), default=1) or 1
 
     # Build nodes list for vis.js
     vis_nodes = []
@@ -369,7 +379,7 @@ def to_html(
             "title": _html.escape(label),
             "community": cid,
             "community_name": sanitize_label((community_labels or {}).get(cid, f"Community {cid}")),
-            "source_file": sanitize_label(data.get("source_file", "")),
+            "source_file": sanitize_label(_fmt_source_file(data.get("source_file", ""))),
             "file_type": data.get("file_type", ""),
             "degree": deg,
         })
@@ -398,10 +408,14 @@ def to_html(
         n = len(communities.get(cid, []))
         legend_data.append({"cid": cid, "color": color, "label": lbl, "count": n})
 
-    nodes_json = json.dumps(vis_nodes)
-    edges_json = json.dumps(vis_edges)
-    legend_json = json.dumps(legend_data)
-    hyperedges_json = json.dumps(getattr(G, "graph", {}).get("hyperedges", []))
+    # Escape </script> sequences so embedded JSON cannot break out of the script tag
+    def _js_safe(obj) -> str:
+        return json.dumps(obj).replace("</", "<\\/")
+
+    nodes_json = _js_safe(vis_nodes)
+    edges_json = _js_safe(vis_edges)
+    legend_json = _js_safe(legend_data)
+    hyperedges_json = _js_safe(getattr(G, "graph", {}).get("hyperedges", []))
     title = _html.escape(sanitize_label(str(output_path)))
     stats = f"{G.number_of_nodes()} nodes &middot; {G.number_of_edges()} edges &middot; {len(communities)} communities"
 
@@ -442,6 +456,65 @@ def to_html(
 generate_html = to_html
 
 
+# ---------------------------------------------------------------------------
+# Phase 10 D-15: hydrate merged_from from dedup_report.json (--obsidian-dedup)
+# ---------------------------------------------------------------------------
+
+def _hydrate_merged_from(G: nx.Graph, output_dir: Path) -> None:
+    """Populate G.nodes[canonical_id]['merged_from'] from dedup_report.json.
+
+    Called by to_obsidian when obsidian_dedup=True. Mutates G in place.
+
+    Search order for dedup_report.json:
+    1. output_dir.parent (typical graphify-out/obsidian layout — preferred)
+    2. graphify-out/ relative to cwd (fallback for unusual layouts)
+
+    Silently returns when the report is missing. Never raises.
+    """
+    # Note: an earlier implementation also searched `output_dir / ".." /` but
+    # that resolves to the same path as candidate 1 after `.resolve()` and was
+    # removed as redundant.
+    candidates = [
+        output_dir.parent / "dedup_report.json",
+        Path("graphify-out") / "dedup_report.json",
+    ]
+    report_path = None
+    for c in candidates:
+        try:
+            if c.resolve().exists():
+                report_path = c.resolve()
+                break
+        except OSError:
+            continue
+    if report_path is None:
+        print(
+            "[graphify] warning: --obsidian-dedup set but no dedup_report.json found",
+            file=sys.stderr,
+        )
+        return
+    try:
+        data = json.loads(Path(report_path).read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[graphify] warning: could not read {report_path}: {e}",
+              file=sys.stderr)
+        return
+    # Build {canonical_id: [eliminated_ids]} from merges[]
+    merges = data.get("merges", []) if isinstance(data, dict) else []
+    for merge in merges:
+        canonical_id = merge.get("canonical_id")
+        if not canonical_id or canonical_id not in G:
+            continue
+        eliminated_ids = [
+            e.get("id") for e in merge.get("eliminated", [])
+            if isinstance(e, dict) and isinstance(e.get("id"), str)
+        ]
+        # Merge into existing merged_from (if dedup already ran into G.nodes)
+        existing = G.nodes[canonical_id].get("merged_from") or []
+        combined = sorted(set(existing) | set(e for e in eliminated_ids if e))
+        if combined:
+            G.nodes[canonical_id]["merged_from"] = combined
+
+
 def to_obsidian(
     G: nx.Graph,
     communities: dict[int, list[str]],
@@ -451,6 +524,8 @@ def to_obsidian(
     community_labels: dict[int, str] | None = None,
     cohesion: dict[int, float] | None = None,
     dry_run: bool = False,
+    force: bool = False,
+    obsidian_dedup: bool = False,
 ) -> "MergeResult | MergePlan":
     """Export graph as an Obsidian vault using the profile-driven pipeline.
 
@@ -463,6 +538,8 @@ def to_obsidian(
     `community_labels` feeds per-community display names into the classification
     pipeline via profile-independent merge into classify()'s per_community ctx.
     `cohesion` is passed through to classify() for per-community cohesion scores.
+    `force` bypasses user-modified detection (D-10): user-modified notes are
+    updated/replaced as if unmodified. User sentinel blocks (D-08) still preserved.
     """
     # Function-local imports so `graphify install` (which touches export.py through
     # __init__.py's lazy map) doesn't force heavy deps at CLI entry time.
@@ -474,6 +551,7 @@ def to_obsidian(
         apply_merge_plan,
         RenderedNote,
         split_rendered_note,
+        _load_manifest,
     )
 
     out = Path(output_dir)
@@ -487,6 +565,18 @@ def to_obsidian(
             f"to_obsidian: output_dir {out} exists but is not a directory"
         )
     out.mkdir(parents=True, exist_ok=True)
+
+    # Phase 10 D-15: hydrate merged_from from dedup_report.json when flag set.
+    # This mutates G.nodes in place before rendering so render_note can emit aliases:.
+    if obsidian_dedup:
+        _hydrate_merged_from(G, out)
+
+    # Manifest lives in the parent of the vault dir (typically graphify-out/).
+    # vault-manifest.json is a graphify sidecar alongside graph.json.
+    # _load_manifest gracefully returns {} when the file is absent (first run).
+    _vault_dir = out.resolve()
+    manifest_path = _vault_dir.parent / "vault-manifest.json"
+    manifest = _load_manifest(manifest_path)
 
     # D-74: always run the new pipeline. No `if profile is None` branching.
     if profile is None:
@@ -585,10 +675,16 @@ def to_obsidian(
     plan = compute_merge_plan(
         out, rendered_notes, profile,
         skipped_node_ids=skipped,
+        manifest=manifest,
+        force=force,
     )
     if dry_run:
         return plan
-    return apply_merge_plan(plan, out, rendered_notes, profile)
+    return apply_merge_plan(
+        plan, out, rendered_notes, profile,
+        manifest_path=manifest_path,
+        old_manifest=manifest,
+    )
 
 
 def to_canvas(
@@ -608,7 +704,9 @@ def to_canvas(
     CANVAS_COLORS = ["1", "2", "3", "4", "5", "6"]  # red, orange, yellow, green, cyan, purple
 
     def safe_name(label: str) -> str:
-        return re.sub(r'[\\/*?:"<>|#^[\]]', "", label.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")).strip() or "unnamed"
+        cleaned = re.sub(r'[\\/*?:"<>|#^[\]]', "", label.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")).strip()
+        cleaned = re.sub(r"\.(md|mdx|markdown)$", "", cleaned, flags=re.IGNORECASE)
+        return cleaned or "unnamed"
 
     # Build node_filenames if not provided (same dedup logic as to_obsidian)
     # FIX-02: Sort nodes for deterministic dedup across re-runs.
@@ -617,7 +715,7 @@ def to_canvas(
         seen_names: dict[str, int] = {}
         for node_id, data in sorted(
             G.nodes(data=True),
-            key=lambda nd: (nd[1].get("source_file", ""), nd[1].get("label", nd[0]))
+            key=lambda nd: (_fmt_source_file(nd[1].get("source_file", "")), nd[1].get("label", nd[0]))
         ):
             base = safe_filename(data.get("label", node_id))
             if base in seen_names:
@@ -866,7 +964,7 @@ def to_svg(
     pos = nx.spring_layout(G, seed=42, k=2.0 / (G.number_of_nodes() ** 0.5 + 1))
 
     degree = dict(G.degree())
-    max_deg = max(degree.values()) if degree else 1
+    max_deg = max(degree.values(), default=1) or 1
 
     node_colors = [COMMUNITY_COLORS[node_community.get(n, 0) % len(COMMUNITY_COLORS)] for n in G.nodes()]
     node_sizes = [300 + 1200 * (degree.get(n, 1) / max_deg) for n in G.nodes()]

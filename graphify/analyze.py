@@ -8,6 +8,43 @@ def _node_community_map(communities: dict[int, list[str]]) -> dict[str, int]:
     return {n: cid for cid, nodes in communities.items() for n in nodes}
 
 
+def _iter_sources(source_file: "str | list[str] | None") -> list[str]:
+    """Normalize source_file to a flat list of non-empty strings.
+
+    Canonical nodes produced by dedup may carry source_file: list[str] when
+    they were merged from multiple source files (Phase 10 D-12). All analyze.py
+    call sites that read source_file MUST go through this helper so that both
+    str and list[str] shapes are handled identically.
+
+    str   -> [str]  (unchanged single-source nodes)
+    list  -> filtered list of non-empty str elements
+    None/empty -> []
+    """
+    if not source_file:
+        return []
+    if isinstance(source_file, str):
+        return [source_file]
+    if isinstance(source_file, list):
+        return [s for s in source_file if isinstance(s, str) and s]
+    return []
+
+
+def _fmt_source_file(source_file: "str | list[str] | None") -> str:
+    """Flatten source_file to a display string for report rendering.
+
+    list[str] -> comma-joined string (e.g. "src/auth.py, lib/auth_impl.py")
+    str       -> unchanged
+    None/empty -> ""
+
+    Prevents Python list repr (``['a.py', 'b.py']``) from appearing in
+    GRAPH_REPORT.md surprising-connections rows.
+    """
+    sources = _iter_sources(source_file)
+    if not sources:
+        return ""
+    return ", ".join(sources)
+
+
 def _is_file_node(G: nx.Graph, node_id: str) -> bool:
     """
     Return True if this node is a file-level hub node (e.g. 'client', 'models')
@@ -24,7 +61,7 @@ def _is_file_node(G: nx.Graph, node_id: str) -> bool:
     source_file = attrs.get("source_file", "")
     if source_file:
         from pathlib import Path as _Path
-        if label == _Path(source_file).name:
+        if any(label == _Path(s).name for s in _iter_sources(source_file)):
             return True
     # Method stub: AST extractor labels methods as '.method_name()'
     if label.startswith(".") and label.endswith("()"):
@@ -76,11 +113,12 @@ def surprising_connections(
     Concept nodes (empty source_file, or injected semantic annotations) are excluded
     from surprising connections because they are intentional, not discovered.
     """
-    # Identify unique source files (ignore empty/null source_file)
+    # Identify unique source files (ignore empty/null source_file).
+    # source_file may be str or list[str] after dedup; flatten via _iter_sources.
     source_files = {
-        data.get("source_file", "")
+        s
         for _, data in G.nodes(data=True)
-        if data.get("source_file", "")
+        for s in _iter_sources(data.get("source_file", ""))
     }
     is_multi_source = len(source_files) > 1
 
@@ -101,12 +139,12 @@ def _is_concept_node(G: nx.Graph, node_id: str) -> bool:
     """
     data = G.nodes[node_id]
     source = data.get("source_file", "")
-    if not source:
+    sources = _iter_sources(source)
+    if not sources:
         return True
-    # Has no file extension → probably a concept label, not a real file
-    if "." not in source.split("/")[-1]:
-        return True
-    return False
+    # Node is concrete if ANY source looks like a real file (has an extension).
+    # A node is a concept only if NONE of its sources have a file extension.
+    return not any("." in s.split("/")[-1] for s in sources)
 
 
 from graphify.detect import CODE_EXTENSIONS, DOC_EXTENSIONS, PAPER_EXTENSIONS, IMAGE_EXTENSIONS
@@ -210,22 +248,33 @@ def _cross_file_surprises(G: nx.Graph, communities: dict[int, list[str]], top_n:
         if _is_file_node(G, u) or _is_file_node(G, v):
             continue
 
-        u_source = G.nodes[u].get("source_file", "")
-        v_source = G.nodes[v].get("source_file", "")
+        u_source_raw = G.nodes[u].get("source_file", "")
+        v_source_raw = G.nodes[v].get("source_file", "")
 
-        if not u_source or not v_source or u_source == v_source:
+        u_sources = tuple(sorted(_iter_sources(u_source_raw)))
+        v_sources = tuple(sorted(_iter_sources(v_source_raw)))
+
+        if not u_sources or not v_sources or u_sources == v_sources:
             continue
+
+        # Use the first sorted source for single-string helpers (_file_category, _top_level_dir)
+        u_source = u_sources[0]
+        v_source = v_sources[0]
 
         score, reasons = _surprise_score(G, u, v, data, node_community, u_source, v_source)
         src_id = data.get("_src", u)
+        if src_id not in G.nodes:
+            src_id = u
         tgt_id = data.get("_tgt", v)
+        if tgt_id not in G.nodes:
+            tgt_id = v
         candidates.append({
             "_score": score,
             "source": G.nodes[src_id].get("label", src_id),
             "target": G.nodes[tgt_id].get("label", tgt_id),
             "source_files": [
-                G.nodes[src_id].get("source_file", ""),
-                G.nodes[tgt_id].get("source_file", ""),
+                _fmt_source_file(G.nodes[src_id].get("source_file", "")),
+                _fmt_source_file(G.nodes[tgt_id].get("source_file", "")),
             ],
             "confidence": data.get("confidence", "EXTRACTED"),
             "relation": relation,
@@ -267,12 +316,12 @@ def _cross_community_surprises(
                 "source": G.nodes[u].get("label", u),
                 "target": G.nodes[v].get("label", v),
                 "source_files": [
-                    G.nodes[u].get("source_file", ""),
-                    G.nodes[v].get("source_file", ""),
+                    _fmt_source_file(G.nodes[u].get("source_file", "")),
+                    _fmt_source_file(G.nodes[v].get("source_file", "")),
                 ],
                 "confidence": data.get("confidence", "EXTRACTED"),
                 "relation": data.get("relation", ""),
-                "note": f"Bridges graph structure (betweenness={score:.3f})",
+                "why": f"Bridges graph structure (betweenness={score:.3f})",
             })
         return result
 
@@ -294,17 +343,21 @@ def _cross_community_surprises(
         # This edge crosses community boundaries - interesting
         confidence = data.get("confidence", "EXTRACTED")
         src_id = data.get("_src", u)
+        if src_id not in G.nodes:
+            src_id = u
         tgt_id = data.get("_tgt", v)
+        if tgt_id not in G.nodes:
+            tgt_id = v
         surprises.append({
             "source": G.nodes[src_id].get("label", src_id),
             "target": G.nodes[tgt_id].get("label", tgt_id),
             "source_files": [
-                G.nodes[src_id].get("source_file", ""),
-                G.nodes[tgt_id].get("source_file", ""),
+                _fmt_source_file(G.nodes[src_id].get("source_file", "")),
+                _fmt_source_file(G.nodes[tgt_id].get("source_file", "")),
             ],
             "confidence": confidence,
             "relation": relation,
-            "note": f"Bridges community {cid_u} → community {cid_v}",
+            "why": f"Bridges community {cid_u} → community {cid_v}",
             "_pair": tuple(sorted([cid_u, cid_v])),
         })
 
@@ -392,7 +445,11 @@ def suggest_questions(
             others = []
             for u, v, d in inferred[:2]:
                 src_id = d.get("_src", u)
+                if src_id not in G.nodes:
+                    src_id = u
                 tgt_id = d.get("_tgt", v)
+                if tgt_id not in G.nodes:
+                    tgt_id = v
                 other_id = tgt_id if src_id == node_id else src_id
                 others.append(G.nodes[other_id].get("label", other_id))
             questions.append({
@@ -439,6 +496,49 @@ def suggest_questions(
         }]
 
     return questions[:top_n]
+
+
+def render_analysis_context(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    community_labels: dict[int, str],
+    god_node_list: list[dict],
+    surprise_list: list[dict],
+    top_n_nodes: int = 20,
+) -> str:
+    """Serialize graph structure to a compact prompt-safe text block for tournament lens agents."""
+    lines = [
+        f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, {len(communities)} communities",
+        "",
+        "Most-connected entities (god nodes):",
+    ]
+
+    for n in god_node_list[:top_n_nodes]:
+        label = n.get("label", n.get("id", ""))
+        edges = n.get("edges", 0)
+        lines.append(f"  - {label} ({edges} connections)")
+
+    lines += ["", "Surprising cross-file connections:"]
+    if surprise_list:
+        for s in surprise_list:
+            src = s.get("source", "")
+            tgt = s.get("target", "")
+            rel = s.get("relation", "")
+            conf = s.get("confidence", "")
+            why = s.get("why", "")
+            lines.append(f"  - {src} --{rel}--> {tgt} [{conf}]: {why}")
+    else:
+        lines.append("  - None detected")
+
+    lines += ["", "Communities:"]
+    for cid, nodes in communities.items():
+        label = community_labels.get(cid, f"Community {cid}")
+        sample = nodes[:5]
+        node_labels = [G.nodes[n].get("label", n) for n in sample if n in G.nodes]
+        suffix = f", ... (+{len(nodes) - 5} more)" if len(nodes) > 5 else ""
+        lines.append(f"  - {label}: {', '.join(node_labels)}{suffix}")
+
+    return "\n".join(lines)
 
 
 def graph_diff(G_old: nx.Graph, G_new: nx.Graph) -> dict:

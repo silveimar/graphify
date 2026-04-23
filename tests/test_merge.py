@@ -1495,3 +1495,616 @@ def test_split_rendered_note_roundtrip_with_dump_frontmatter():
     assert fm.get("type") == "thing"
     assert fm.get("tags") == ["community/transformer"]
     assert body == "body\n"
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 Plan 01 Task 1 — Vault Manifest I/O + MergeAction extension
+# ---------------------------------------------------------------------------
+
+
+class TestVaultManifest:
+
+    def test_save_load_roundtrip(self, tmp_path):
+        from graphify.merge import _save_manifest, _load_manifest
+        manifest_path = tmp_path / "vault-manifest.json"
+        data = {
+            "Atlas/Note.md": {
+                "content_hash": "abc123",
+                "last_merged": "2026-04-12T10:00:00+00:00",
+                "target_path": "Atlas/Note.md",
+                "node_id": "note",
+                "note_type": "thing",
+                "community_id": 0,
+                "has_user_blocks": False,
+            }
+        }
+        _save_manifest(manifest_path, data)
+        loaded = _load_manifest(manifest_path)
+        assert loaded == data
+
+    def test_load_missing_returns_empty(self, tmp_path):
+        from graphify.merge import _load_manifest
+        manifest_path = tmp_path / "nonexistent-manifest.json"
+        result = _load_manifest(manifest_path)
+        assert result == {}
+
+    def test_load_corrupt_returns_empty(self, tmp_path, capsys):
+        from graphify.merge import _load_manifest
+        manifest_path = tmp_path / "vault-manifest.json"
+        manifest_path.write_text("this is not valid json {{{{", encoding="utf-8")
+        result = _load_manifest(manifest_path)
+        assert result == {}
+        captured = capsys.readouterr()
+        assert "vault-manifest.json" in captured.err
+        assert "corrupted" in captured.err
+
+    def test_save_atomic_no_partial(self, tmp_path, monkeypatch):
+        """If the write fails mid-way, neither .json nor .json.tmp should remain."""
+        import json as json_mod
+        from graphify.merge import _save_manifest
+        manifest_path = tmp_path / "vault-manifest.json"
+
+        original_dumps = json_mod.dumps
+
+        def raising_dumps(*args, **kwargs):
+            raise OSError("simulated write failure")
+
+        monkeypatch.setattr(json_mod, "dumps", raising_dumps)
+        with pytest.raises(OSError):
+            _save_manifest(manifest_path, {"key": "value"})
+        # No partial .json file
+        assert not manifest_path.exists()
+        # No leftover .json.tmp
+        tmp_file = manifest_path.with_suffix(".json.tmp")
+        assert not tmp_file.exists()
+
+    def test_content_hash_content_only(self, tmp_path):
+        """Same content at different paths must produce the same hash."""
+        from graphify.merge import _content_hash
+        file_a = tmp_path / "a" / "note.md"
+        file_b = tmp_path / "b" / "note.md"
+        file_a.parent.mkdir(parents=True)
+        file_b.parent.mkdir(parents=True)
+        content = b"# Hello\nsome content\n"
+        file_a.write_bytes(content)
+        file_b.write_bytes(content)
+        assert _content_hash(file_a) == _content_hash(file_b)
+
+    def test_merge_action_new_fields_backward_compat(self):
+        """MergeAction constructed without new fields must use defaults."""
+        from graphify.merge import MergeAction
+        a = MergeAction(path=Path("x.md"), action="CREATE", reason="new")
+        assert a.user_modified is False
+        assert a.has_user_blocks is False
+        assert a.source == "graphify"
+
+    def test_apply_writes_manifest(self, tmp_path):
+        """apply_merge_plan with manifest_path must write vault-manifest.json."""
+        from graphify.merge import apply_merge_plan, compute_merge_plan
+        vault = _copy_vault_fixture("empty", tmp_path)
+        manifest_path = tmp_path / "graphify-out" / "vault-manifest.json"
+        rn = {
+            "node_id": "transformer",
+            "target_path": Path("Atlas/Dots/Things/Transformer.md"),
+            "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+            "body": "# Transformer\n",
+        }
+        plan = compute_merge_plan(vault, {"transformer": rn}, {})
+        result = apply_merge_plan(
+            plan, vault, {"transformer": rn}, {},
+            manifest_path=manifest_path,
+        )
+        assert manifest_path.exists(), "vault-manifest.json must be written"
+        import json
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        # Find the entry for our note
+        assert len(manifest) == 1
+        entry = next(iter(manifest.values()))
+        assert "content_hash" in entry
+        assert "last_merged" in entry
+        assert "target_path" in entry
+        assert "node_id" in entry
+        assert "note_type" in entry
+        assert "community_id" in entry
+        assert "has_user_blocks" in entry
+        assert entry["node_id"] == "transformer"
+
+    def test_apply_skip_preserve_retains_old_entry(self, tmp_path):
+        """SKIP_PRESERVE notes must keep their prior manifest entry unchanged."""
+        from graphify.merge import apply_merge_plan, compute_merge_plan, MergeAction, MergePlan
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        manifest_path = tmp_path / "graphify-out" / "vault-manifest.json"
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        old_entry = {
+            "content_hash": "old_hash_value",
+            "last_merged": "2026-01-01T00:00:00+00:00",
+            "target_path": target_rel,
+            "node_id": "transformer",
+            "note_type": "thing",
+            "community_id": 0,
+            "has_user_blocks": False,
+        }
+        old_manifest = {target_rel: old_entry}
+        # Build a plan with SKIP_PRESERVE for that file
+        target_path = vault / target_rel
+        plan = MergePlan(
+            actions=[MergeAction(
+                path=target_path,
+                action="SKIP_PRESERVE",
+                reason="strategy=skip",
+            )],
+            orphans=[],
+            summary={"SKIP_PRESERVE": 1},
+        )
+        rn = _rendered_note_matching_pristine(vault)
+        apply_merge_plan(
+            plan, vault, {"transformer": rn}, {},
+            manifest_path=manifest_path,
+            old_manifest=old_manifest,
+        )
+        import json
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert target_rel in manifest
+        assert manifest[target_rel]["content_hash"] == "old_hash_value"
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 Plan 01 Task 2 — User-modified detection in compute_merge_plan
+# ---------------------------------------------------------------------------
+
+
+class TestUserModifiedDetection:
+
+    def test_user_modified_gets_skip_preserve(self, tmp_path):
+        """Note whose hash differs from manifest entry receives SKIP_PRESERVE."""
+        from graphify.merge import compute_merge_plan, _content_hash
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        target_path = vault / target_rel
+        # Build manifest with a DIFFERENT hash so it looks user-modified
+        manifest = {target_rel: {"content_hash": "different_hash_value"}}
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=manifest)
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        assert action.action == "SKIP_PRESERVE"
+        assert action.user_modified is True
+        assert action.source == "user"
+        assert "user-modified" in action.reason
+
+    def test_hash_match_proceeds_normally(self, tmp_path):
+        """Note whose hash matches manifest entry gets normal UPDATE action."""
+        from graphify.merge import compute_merge_plan, _content_hash
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        target_path = vault / target_rel
+        # Build manifest with the MATCHING hash
+        real_hash = _content_hash(target_path)
+        manifest = {target_rel: {"content_hash": real_hash}}
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=manifest)
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        # Should NOT be a user-modified skip — should be UPDATE (idempotent)
+        assert action.action != "SKIP_PRESERVE" or action.user_modified is False
+        assert action.user_modified is False
+
+    def test_missing_manifest_normal_behavior(self, tmp_path):
+        """compute_merge_plan with manifest=None behaves like v1.0."""
+        from graphify.merge import compute_merge_plan
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=None)
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        # Must be UPDATE (normal v1.0 path) — not a user-modified SKIP_PRESERVE
+        assert action.action == "UPDATE"
+        assert action.user_modified is False
+
+    def test_corrupt_entry_no_content_hash(self, tmp_path):
+        """Manifest entry missing content_hash field — note processed normally."""
+        from graphify.merge import compute_merge_plan
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        # Entry without content_hash key
+        manifest = {target_rel: {"last_merged": "2026-01-01T00:00:00+00:00"}}
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=manifest)
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        # Should NOT be short-circuited to SKIP_PRESERVE by user-mod detection
+        assert action.user_modified is False
+
+    def test_force_overrides_user_modified(self, tmp_path):
+        """force=True bypasses user-modified detection — gets UPDATE not SKIP_PRESERVE."""
+        from graphify.merge import compute_merge_plan
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        manifest = {target_rel: {"content_hash": "different_hash_value"}}
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(
+            vault, {"transformer": rn}, {}, manifest=manifest, force=True
+        )
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        # With force=True, must NOT be SKIP_PRESERVE from user-modified detection
+        assert not (action.action == "SKIP_PRESERVE" and action.user_modified is True)
+        assert action.user_modified is False
+
+    def test_source_both_when_has_user_blocks(self, tmp_path):
+        """Note with has_user_blocks=True but matching hash gets source='both'."""
+        from graphify.merge import compute_merge_plan, _content_hash
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = "Atlas/Dots/Things/Transformer.md"
+        target_path = vault / target_rel
+        real_hash = _content_hash(target_path)
+        # Entry with matching hash but has_user_blocks=True
+        manifest = {target_rel: {"content_hash": real_hash, "has_user_blocks": True}}
+        rn = _rendered_note_matching_pristine(vault)
+        plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=manifest)
+        assert len(plan.actions) == 1
+        action = plan.actions[0]
+        # Not user-modified (hash matches), but has_user_blocks=True → source="both"
+        assert action.user_modified is False
+        assert action.source == "both"
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 Plan 02 Task 1 — User sentinel parser (RED tests)
+# ---------------------------------------------------------------------------
+
+
+class TestUserSentinelParser:
+
+    def test_single_pair(self):
+        """Single USER_START/END pair returns list with one tuple."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = (
+            "Some text before.\n"
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "My user content.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+            "Some text after.\n"
+        )
+        result = _parse_user_sentinel_blocks(body)
+        assert len(result) == 1
+        start_idx, end_idx, content = result[0]
+        assert "My user content." in content
+
+    def test_multiple_pairs(self):
+        """Two USER_START/END pairs returns list with two tuples, each preserving content."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = (
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "Block one.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+            "Middle text.\n"
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "Block two.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+        )
+        result = _parse_user_sentinel_blocks(body)
+        assert len(result) == 2
+        assert "Block one." in result[0][2]
+        assert "Block two." in result[1][2]
+
+    def test_no_sentinels(self):
+        """Body with no USER_START/END sentinels returns empty list."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = "Just some content without any sentinels.\n"
+        result = _parse_user_sentinel_blocks(body)
+        assert result == []
+
+    def test_malformed_start_no_end(self, capsys):
+        """START without END returns empty list and prints warning to stderr."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = (
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "Some content with no end marker.\n"
+        )
+        result = _parse_user_sentinel_blocks(body)
+        assert result == []
+        captured = capsys.readouterr()
+        assert "[graphify]" in captured.err
+        assert "malformed" in captured.err.lower()
+
+    def test_nested_start(self, capsys):
+        """Two STARTs before an END returns empty list and prints warning to stderr."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = (
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "Some nested content.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+        )
+        result = _parse_user_sentinel_blocks(body)
+        assert result == []
+        captured = capsys.readouterr()
+        assert "[graphify]" in captured.err
+        assert "nested" in captured.err.lower()
+
+    def test_whitespace_tolerance(self):
+        """Extra spaces inside the sentinel comment still match."""
+        from graphify.merge import _parse_user_sentinel_blocks
+        body = (
+            "<!--  GRAPHIFY_USER_START  -->\n"
+            "Whitespace tolerant content.\n"
+            "<!--  GRAPHIFY_USER_END  -->\n"
+        )
+        result = _parse_user_sentinel_blocks(body)
+        assert len(result) == 1
+        assert "Whitespace tolerant content." in result[0][2]
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 Plan 02 Task 1 — User sentinel preservation (RED tests)
+# ---------------------------------------------------------------------------
+
+
+class TestUserSentinelPreservation:
+
+    def test_replace_preserves_user_blocks(self, tmp_path):
+        """REPLACE action on file containing user sentinel blocks — user block content survives."""
+        from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = Path("Atlas/Dots/Things/Transformer.md")
+        target = vault / target_rel
+
+        # Add user sentinel block to existing file
+        existing_text = target.read_text(encoding="utf-8")
+        user_block = "\n<!-- GRAPHIFY_USER_START -->\nMy personal notes about this.\n<!-- GRAPHIFY_USER_END -->\n"
+        target.write_text(existing_text + user_block, encoding="utf-8")
+
+        # Render a note and use REPLACE strategy
+        existing_fm = _parse_frontmatter(target.read_text(encoding="utf-8"))
+        new_fields = dict(existing_fm)
+        rn = {
+            "node_id": "transformer",
+            "target_path": target_rel,
+            "frontmatter_fields": new_fields,
+            "body": "# Transformer\n\nNew body content from graphify.\n",
+        }
+        profile = {"merge": {"strategy": "replace"}}
+        plan = compute_merge_plan(vault, {"transformer": rn}, profile)
+        assert plan.actions[0].action == "REPLACE"
+        apply_merge_plan(plan, vault, {"transformer": rn}, profile)
+
+        after = target.read_text(encoding="utf-8")
+        assert "My personal notes about this." in after, \
+            "REPLACE must preserve user sentinel block content (D-08)"
+
+    def test_update_preserves_user_blocks(self, tmp_path):
+        """UPDATE action on file with user sentinel blocks — user block content survives."""
+        from graphify.merge import compute_merge_plan, apply_merge_plan, _parse_frontmatter
+        vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+        target_rel = Path("Atlas/Dots/Things/Transformer.md")
+        target = vault / target_rel
+
+        # Add user sentinel block to existing file
+        existing_text = target.read_text(encoding="utf-8")
+        user_block = "\n<!-- GRAPHIFY_USER_START -->\nMy update notes.\n<!-- GRAPHIFY_USER_END -->\n"
+        target.write_text(existing_text + user_block, encoding="utf-8")
+
+        # Render with changed source_file to trigger UPDATE
+        existing_fm = _parse_frontmatter(target.read_text(encoding="utf-8"))
+        new_fields = dict(existing_fm)
+        new_fields["source_file"] = "src/transformer_v2.py"
+        body_start = target.read_text(encoding="utf-8").index("---", 4) + 3
+        rn = {
+            "node_id": "transformer",
+            "target_path": target_rel,
+            "frontmatter_fields": new_fields,
+            "body": target.read_text(encoding="utf-8")[body_start:],
+        }
+        plan = compute_merge_plan(vault, {"transformer": rn}, {})
+        assert plan.actions[0].action == "UPDATE"
+        apply_merge_plan(plan, vault, {"transformer": rn}, {})
+
+        after = target.read_text(encoding="utf-8")
+        assert "My update notes." in after, \
+            "UPDATE must preserve user sentinel block content (D-08)"
+
+    def test_create_has_no_user_blocks(self, tmp_path):
+        """CREATE action produces clean output — no user blocks are relevant."""
+        from graphify.merge import compute_merge_plan, apply_merge_plan
+        vault = _copy_vault_fixture("empty", tmp_path)
+        target_rel = Path("Atlas/Dots/Things/Transformer.md")
+        rn = {
+            "node_id": "transformer",
+            "target_path": target_rel,
+            "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+            "body": "# Transformer\nNew creation.\n",
+        }
+        plan = compute_merge_plan(vault, {"transformer": rn}, {})
+        assert plan.actions[0].action == "CREATE"
+        apply_merge_plan(plan, vault, {"transformer": rn}, {})
+
+        after = (vault / target_rel).read_text(encoding="utf-8")
+        assert "# Transformer" in after
+        assert "New creation." in after
+        # No spurious sentinel markers
+        assert "GRAPHIFY_USER_START" not in after
+
+    def test_extract_restore_roundtrip(self):
+        """Extract user blocks from text, restore into different text — sentinel markers and content present."""
+        from graphify.merge import _extract_user_blocks, _restore_user_blocks
+        original = (
+            "Preamble text.\n"
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "Important user content.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+            "Postamble text.\n"
+        )
+        user_blocks = _extract_user_blocks(original)
+        assert len(user_blocks) == 1
+        assert "Important user content." in user_blocks[0]
+        assert "GRAPHIFY_USER_START" in user_blocks[0]
+        assert "GRAPHIFY_USER_END" in user_blocks[0]
+
+        new_text = "---\ntype: thing\n---\n# New Content\nGraphify body.\n"
+        restored = _restore_user_blocks(new_text, user_blocks)
+        assert "Important user content." in restored
+        assert "GRAPHIFY_USER_START" in restored
+        assert "GRAPHIFY_USER_END" in restored
+        assert "Graphify body." in restored
+
+    def test_has_user_blocks_in_manifest(self, tmp_path):
+        """apply_merge_plan where written file contains user sentinels → manifest has_user_blocks=True."""
+        from graphify.merge import apply_merge_plan, compute_merge_plan
+        vault = _copy_vault_fixture("empty", tmp_path)
+        manifest_path = tmp_path / "graphify-out" / "vault-manifest.json"
+        target_rel = Path("Atlas/Dots/Things/Transformer.md")
+        # Note body contains user sentinel blocks
+        body_with_user_block = (
+            "# Transformer\n"
+            "<!-- GRAPHIFY_USER_START -->\n"
+            "User notes here.\n"
+            "<!-- GRAPHIFY_USER_END -->\n"
+        )
+        rn = {
+            "node_id": "transformer",
+            "target_path": target_rel,
+            "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+            "body": body_with_user_block,
+        }
+        plan = compute_merge_plan(vault, {"transformer": rn}, {})
+        apply_merge_plan(
+            plan, vault, {"transformer": rn}, {},
+            manifest_path=manifest_path,
+        )
+        import json
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert len(manifest) == 1
+        entry = next(iter(manifest.values()))
+        assert entry["has_user_blocks"] is True, \
+            "has_user_blocks must be True when file contains user sentinel blocks"
+
+    def test_no_sentinels_manifest_false(self, tmp_path):
+        """apply_merge_plan where written file has no sentinels → has_user_blocks=False."""
+        from graphify.merge import apply_merge_plan, compute_merge_plan
+        vault = _copy_vault_fixture("empty", tmp_path)
+        manifest_path = tmp_path / "graphify-out" / "vault-manifest.json"
+        target_rel = Path("Atlas/Dots/Things/Transformer.md")
+        rn = {
+            "node_id": "transformer",
+            "target_path": target_rel,
+            "frontmatter_fields": {"type": "thing", "graphify_managed": True},
+            "body": "# Transformer\nNo user blocks here.\n",
+        }
+        plan = compute_merge_plan(vault, {"transformer": rn}, {})
+        apply_merge_plan(
+            plan, vault, {"transformer": rn}, {},
+            manifest_path=manifest_path,
+        )
+        import json
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert len(manifest) == 1
+        entry = next(iter(manifest.values()))
+        assert entry["has_user_blocks"] is False, \
+            "has_user_blocks must be False when file has no user sentinel blocks"
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 / Plan 03 — TestFormatMergePlanRoundTrip
+# Tests for format_merge_plan Source column (D-11) and summary preamble (D-12)
+# ---------------------------------------------------------------------------
+
+
+class TestFormatMergePlanRoundTrip:
+    """Tests for round-trip awareness enhancements to format_merge_plan."""
+
+    def test_format_preamble_with_user_modified(self):
+        """Plan with user_modified actions → preamble line present with correct counts."""
+        plan = _mk_plan([
+            MergeAction(
+                path=Path("notes/User.md"), action="SKIP_PRESERVE",
+                reason="user-modified", user_modified=True, source="user",
+            ),
+            MergeAction(
+                path=Path("notes/User2.md"), action="SKIP_PRESERVE",
+                reason="user-modified", user_modified=True, source="user",
+            ),
+            MergeAction(
+                path=Path("notes/Graphify.md"), action="UPDATE",
+                reason="update", source="graphify",
+                changed_fields=["title"], changed_blocks=[],
+            ),
+            MergeAction(
+                path=Path("notes/New.md"), action="CREATE",
+                reason="new", source="graphify",
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "2 notes user-modified (will be preserved)" in out
+        assert "1 notes graphify-only (will update)" in out
+        assert "1 new notes (will create)" in out
+
+    def test_format_preamble_absent_when_no_user_mods(self):
+        """Plan with only default source='graphify' actions → no preamble line."""
+        plan = _mk_plan([
+            MergeAction(path=Path("a.md"), action="CREATE", reason="new"),
+            MergeAction(
+                path=Path("b.md"), action="UPDATE", reason="update",
+                changed_fields=["x"], changed_blocks=[],
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "notes user-modified" not in out
+
+    def test_format_source_user_annotation(self):
+        """SKIP_PRESERVE action with source='user' → output line contains '[user]'."""
+        plan = _mk_plan([
+            MergeAction(
+                path=Path("UserNote.md"), action="SKIP_PRESERVE",
+                reason="user-modified", user_modified=True, source="user",
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "[user]" in out
+
+    def test_format_source_both_annotation(self):
+        """UPDATE action with source='both' → output line contains '[both]'."""
+        plan = _mk_plan([
+            MergeAction(
+                path=Path("BothNote.md"), action="UPDATE",
+                reason="update", source="both",
+                changed_fields=["x"], changed_blocks=[],
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "[both]" in out
+
+    def test_format_source_graphify_no_annotation(self):
+        """UPDATE action with source='graphify' (default) → no '[graphify]' annotation."""
+        plan = _mk_plan([
+            MergeAction(
+                path=Path("GraphifyNote.md"), action="UPDATE",
+                reason="update", source="graphify",
+                changed_fields=["x"], changed_blocks=[],
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "[graphify]" not in out
+
+    def test_format_user_modified_skip_preserve_suffix(self):
+        """SKIP_PRESERVE action with user_modified=True → line contains '(user-modified)'."""
+        plan = _mk_plan([
+            MergeAction(
+                path=Path("Modified.md"), action="SKIP_PRESERVE",
+                reason="user-modified", user_modified=True, source="user",
+            ),
+        ])
+        out = format_merge_plan(plan)
+        assert "(user-modified)" in out
+
+    def test_format_backward_compat_empty_plan(self):
+        """Empty plan → no preamble, no source annotations — identical to v1.0 behavior."""
+        plan = _mk_plan()
+        out = format_merge_plan(plan)
+        assert "notes user-modified" not in out
+        assert "[user]" not in out
+        assert "[both]" not in out
+        assert "[graphify]" not in out
+        # Standard header still present
+        assert "Merge Plan — 0 actions" in out
+        assert "CREATE:" in out

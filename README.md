@@ -2,14 +2,15 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja-JP.md) | [한국어](README.ko-KR.md)
 
-[![CI](https://github.com/safishamsi/graphify/actions/workflows/ci.yml/badge.svg?branch=v3)](https://github.com/safishamsi/graphify/actions/workflows/ci.yml)
+[![CI](https://github.com/safishamsi/graphify/actions/workflows/ci.yml/badge.svg?branch=v4)](https://github.com/safishamsi/graphify/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/graphifyy)](https://pypi.org/project/graphifyy/)
 [![Downloads](https://static.pepy.tech/badge/graphifyy/month)](https://pepy.tech/project/graphifyy)
 [![Sponsor](https://img.shields.io/badge/sponsor-safishamsi-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/safishamsi)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Safi%20Shamsi-0077B5?logo=linkedin)](https://www.linkedin.com/in/safi-shamsi)
 
-**An AI coding assistant skill.** Type `/graphify` in Claude Code, Codex, OpenCode, Cursor, Gemini CLI, GitHub Copilot CLI, Aider, OpenClaw, Factory Droid, or Trae - it reads your files, builds a knowledge graph, and gives you back structure you didn't know was there. Understand a codebase faster. Find the "why" behind architectural decisions.
+**An AI coding assistant skill.** Type `/graphify` in Claude Code, Codex, OpenCode, Cursor, Gemini CLI, GitHub Copilot CLI, Aider, OpenClaw, Factory Droid, Trae, or Google Antigravity - it reads your files, builds a knowledge graph, and gives you back structure you didn't know was there. Understand a codebase faster. Find the "why" behind architectural decisions.
 
-Fully multimodal. Drop in code, PDFs, markdown, screenshots, diagrams, whiteboard photos, images in other languages, or video and audio files - graphify extracts concepts and relationships from all of it and connects them into one graph. Videos are transcribed with Whisper using a domain-aware prompt derived from your corpus. 20 languages supported via tree-sitter AST (Python, JS, TS, Go, Rust, Java, C, C++, Ruby, C#, Kotlin, Scala, PHP, Swift, Lua, Zig, PowerShell, Elixir, Objective-C, Julia).
+Fully multimodal. Drop in code, PDFs, markdown, screenshots, diagrams, whiteboard photos, images in other languages, or video and audio files - graphify extracts concepts and relationships from all of it and connects them into one graph. Videos are transcribed with Whisper using a domain-aware prompt derived from your corpus. 22 languages supported via tree-sitter AST (Python, JS, TS, Go, Rust, Java, C, C++, Ruby, C#, Kotlin, Scala, PHP, Swift, Lua, Zig, PowerShell, Elixir, Objective-C, Julia, Vue, Svelte).
 
 > Andrej Karpathy keeps a `/raw` folder where he drops papers, tweets, screenshots, and notes. graphify is the answer to that problem - 71.5x fewer tokens per query vs reading the raw files, persistent across sessions, honest about what it found vs guessed.
 
@@ -47,7 +48,7 @@ Every relationship is tagged `EXTRACTED` (found directly in source), `INFERRED` 
 
 ## Install
 
-**Requires:** Python 3.10+ and one of: [Claude Code](https://claude.ai/code), [Codex](https://openai.com/codex), [OpenCode](https://opencode.ai), [Cursor](https://cursor.com), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli), [Aider](https://aider.chat), [OpenClaw](https://openclaw.ai), [Factory Droid](https://factory.ai), or [Trae](https://trae.ai)
+**Requires:** Python 3.10+ and one of: [Claude Code](https://claude.ai/code), [Codex](https://openai.com/codex), [OpenCode](https://opencode.ai), [Cursor](https://cursor.com), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli), [Aider](https://aider.chat), [OpenClaw](https://openclaw.ai), [Factory Droid](https://factory.ai), [Trae](https://trae.ai), or [Google Antigravity](https://antigravity.google)
 
 ```bash
 pip install graphifyy && graphify install
@@ -71,6 +72,7 @@ pip install graphifyy && graphify install
 | Trae CN | `graphify install --platform trae-cn` |
 | Gemini CLI | `graphify install --platform gemini` |
 | Cursor | `graphify cursor install` |
+| Google Antigravity | `graphify antigravity install` |
 
 Codex users also need `multi_agent = true` under `[features]` in `~/.codex/config.toml` for parallel extraction. Factory Droid uses the `Task` tool for parallel subagent dispatch. OpenClaw and Aider use sequential extraction (parallel agent support is still early on those platforms). Trae uses the Agent tool for parallel subagent dispatch and does **not** support PreToolUse hooks — AGENTS.md is the always-on mechanism.
 
@@ -99,6 +101,7 @@ After building a graph, run this once in your project:
 | Trae CN | `graphify trae-cn install` |
 | Cursor | `graphify cursor install` |
 | Gemini CLI | `graphify gemini install` |
+| Google Antigravity | `graphify antigravity install` |
 
 **Claude Code** does two things: writes a `CLAUDE.md` section telling Claude to read `graphify-out/GRAPH_REPORT.md` before answering architecture questions, and installs a **PreToolUse hook** (`settings.json`) that fires before every Glob and Grep call. If a knowledge graph exists, Claude sees: _"graphify: Knowledge graph exists. Read GRAPH_REPORT.md for god nodes and community structure before searching raw files."_ — so Claude navigates via the graph instead of grepping through every file.
 
@@ -111,6 +114,8 @@ After building a graph, run this once in your project:
 **Gemini CLI** copies the skill to `~/.gemini/skills/graphify/SKILL.md`, writes a `GEMINI.md` section, and installs a `BeforeTool` hook in `.gemini/settings.json` that fires before file-read tool calls — same always-on mechanism as Claude Code.
 
 **Aider and OpenClaw, Factory Droid, Trae** write the same rules to `AGENTS.md` in your project root. These platforms don't support tool hooks, so AGENTS.md is the always-on mechanism.
+
+**Google Antigravity** writes `.agent/rules/graphify.md` (always-on rules) and `.agent/workflows/graphify.md` (registers `/graphify` as a slash command). No hook equivalent exists in Antigravity — rules are the always-on mechanism.
 
 **GitHub Copilot CLI** copies the skill to `~/.copilot/skills/graphify/SKILL.md`. Run `graphify copilot install` to set it up.
 
@@ -160,12 +165,21 @@ python -m graphify.serve graphify-out/graph.json
 That gives the assistant structured graph access for repeated queries such as
 `query_graph`, `get_node`, `get_neighbors`, and `shortest_path`.
 
+> **WSL / Linux note:** Ubuntu ships `python3`, not `python`. Install into a project venv to avoid PEP 668 conflicts, and use the full venv path in your `.mcp.json`:
+> ```bash
+> python3 -m venv .venv && .venv/bin/pip install "graphifyy[mcp]"
+> ```
+> ```json
+> { "mcpServers": { "graphify": { "type": "stdio", "command": ".venv/bin/python3", "args": ["-m", "graphify.serve", "graphify-out/graph.json"] } } }
+> ```
+> Also note: the PyPI package is `graphifyy` (double-y) — `pip install graphify` installs an unrelated package.
+
 <details>
 <summary>Manual install (curl)</summary>
 
 ```bash
 mkdir -p ~/.claude/skills/graphify
-curl -fsSL https://raw.githubusercontent.com/safishamsi/graphify/v3/graphify/skill.md \
+curl -fsSL https://raw.githubusercontent.com/safishamsi/graphify/v4/graphify/skill.md \
   > ~/.claude/skills/graphify/SKILL.md
 ```
 
@@ -191,9 +205,15 @@ When the user types `/graphify`, invoke the Skill tool with `skill: "graphify"` 
 /graphify ./raw --obsidian                          # also generate Obsidian vault (opt-in)
 /graphify ./raw --obsidian --obsidian-dir ~/vaults/myproject  # write vault to a specific directory
 
+# standalone Obsidian vault export (profile-driven, merge-aware)
+graphify --obsidian                                   # export graph.json → Obsidian vault
+graphify --obsidian --obsidian-dir ~/vaults/myproject # write to a specific vault directory
+graphify --obsidian --dry-run                         # preview merge plan without writing
+graphify --validate-profile ~/vaults/myproject        # validate .graphify/profile.yaml before export
+
 /graphify add https://arxiv.org/abs/1706.03762        # fetch a paper, save, update graph
 /graphify add https://x.com/karpathy/status/...       # fetch a tweet
-/graphify add https://www.youtube.com/watch?v=...     # download audio, transcribe, add to graph
+/graphify add <video-url>                              # download audio, transcribe, add to graph
 /graphify add https://... --author "Name"             # tag the original author
 /graphify add https://... --contributor "Name"        # tag who added it to the corpus
 
@@ -235,6 +255,8 @@ graphify trae install              # AGENTS.md (Trae)
 graphify trae uninstall
 graphify trae-cn install           # AGENTS.md (Trae CN)
 graphify trae-cn uninstall
+graphify antigravity install       # .agent/rules + .agent/workflows (Google Antigravity)
+graphify antigravity uninstall
 
 # query the graph directly from the terminal (no AI assistant needed)
 graphify query "what connects attention to the optimizer?"
@@ -247,13 +269,38 @@ Works with any mix of file types:
 
 | Type | Extensions | Extraction |
 |------|-----------|------------|
-| Code | `.py .ts .js .jsx .tsx .go .rs .java .c .cpp .rb .cs .kt .scala .php .swift .lua .zig .ps1 .ex .exs .m .mm .jl` | AST via tree-sitter + call-graph + docstring/comment rationale |
+| Code | `.py .ts .js .jsx .tsx .go .rs .java .c .cpp .rb .cs .kt .scala .php .swift .lua .zig .ps1 .ex .exs .m .mm .jl .vue .svelte` | AST via tree-sitter + call-graph + docstring/comment rationale |
 | Docs | `.md .txt .rst` | Concepts + relationships + design rationale via Claude |
 | Office | `.docx .xlsx` | Converted to markdown then extracted via Claude (requires `pip install graphifyy[office]`) |
 | Papers | `.pdf` | Citation mining + concept extraction |
 | Images | `.png .jpg .webp .gif` | Claude vision - screenshots, diagrams, any language |
 | Video / Audio | `.mp4 .mov .mkv .webm .avi .m4v .mp3 .wav .m4a .ogg` | Transcribed locally with faster-whisper, transcript fed into Claude extraction (requires `pip install graphifyy[video]`) |
 | YouTube / URLs | any video URL | Audio downloaded via yt-dlp, then same Whisper pipeline (requires `pip install graphifyy[video]`) |
+
+## Video and audio corpus
+
+Drop video or audio files into your corpus folder alongside your code and docs — graphify picks them up automatically:
+
+```bash
+pip install 'graphifyy[video]'   # one-time setup
+/graphify ./my-corpus            # transcribes any video/audio files it finds
+```
+
+Add a YouTube video (or any public video URL) directly:
+
+```bash
+/graphify add <video-url>
+```
+
+yt-dlp downloads audio-only (fast, small), Whisper transcribes it locally, and the transcript is fed into the same extraction pipeline as your other docs. Transcripts are cached in `graphify-out/transcripts/` so re-runs skip already-transcribed files.
+
+For better accuracy on technical content, use a larger model:
+
+```bash
+/graphify ./my-corpus --whisper-model medium
+```
+
+Audio never leaves your machine. All transcription runs locally.
 
 ## What you get
 
@@ -279,6 +326,55 @@ Works with any mix of file types:
 
 **Wiki** (`--wiki`) - Wikipedia-style markdown articles per community and god node, with an `index.md` entry point. Point any agent at `index.md` and it can navigate the knowledge base by reading files instead of parsing JSON.
 
+## Obsidian vault adapter (Ideaverse integration)
+
+`--obsidian` exports the knowledge graph as a structured Obsidian vault with proper frontmatter, wikilinks, tags, Dataview queries, and folder placement. The adapter is fully profile-driven — it reads a `.graphify/profile.yaml` from the target vault and generates notes that fit your vault's framework.
+
+**How it works:**
+
+1. **Profile loading** — discovers `.graphify/profile.yaml` in the vault. No profile? Falls back to a built-in default that produces an [Ideaverse](https://ideaverse.com)-compatible ACE structure (`Atlas/Maps/`, `Atlas/Dots/Things/`, etc.).
+2. **Classification** — routes each graph node to a note type (MOC, thing, statement, person, source) based on topology (god nodes, degree) and attributes (`file_type`). Custom mapping rules supported.
+3. **Template rendering** — generates markdown with YAML frontmatter, `[[wikilinks]]` to related nodes, Dataview queries for MOCs, and community tags. Override any template by placing a `<type>.md` file in `.graphify/templates/`.
+4. **Merge planning** — compares new notes against existing vault notes. Preserves user-edited fields (configurable via `merge.preserve_fields`), handles orphans (nodes deleted from graph don't auto-delete notes), and supports three strategies: `update` (default), `skip`, `replace`.
+5. **Atomic write** — executes the merge plan, writing only changed files. `--dry-run` previews the plan without writing.
+
+```yaml
+# .graphify/profile.yaml (optional — defaults to Ideaverse ACE)
+folder_mapping:
+  moc: "Atlas/Maps/"
+  thing: "Atlas/Dots/Things/"
+  statement: "Atlas/Dots/Statements/"
+  person: "Atlas/Dots/People/"
+  source: "Atlas/Sources/"
+  default: "Atlas/Dots/"
+
+naming:
+  convention: title_case  # or kebab-case, preserve
+
+merge:
+  strategy: update
+  preserve_fields: [rank, mapState, tags, created]
+  field_policies:
+    tags: union  # union, replace, or preserve
+
+mapping_rules:
+  - when: { file_type: person }
+    then: { note_type: person, folder: "Atlas/Dots/People/" }
+```
+
+```bash
+# validate your profile before exporting
+graphify --validate-profile ~/vaults/myproject
+
+# export with dry-run preview
+graphify --obsidian --obsidian-dir ~/vaults/myproject --dry-run
+
+# full export
+graphify --obsidian --obsidian-dir ~/vaults/myproject
+```
+
+The adapter works with any Obsidian vault framework — Ideaverse, PARA, custom setups — driven entirely by the declarative profile. No code changes needed.
+
 ## Worked examples
 
 | Corpus | Files | Reduction | Output |
@@ -295,11 +391,27 @@ graphify sends file contents to your AI coding assistant's underlying model API 
 
 ## Tech stack
 
-NetworkX + Leiden (graspologic) + tree-sitter + vis.js. Semantic extraction via Claude (Claude Code), GPT-4 (Codex), or whichever model your platform runs. No Neo4j required, no server, runs entirely locally.
+NetworkX + Leiden (graspologic) + tree-sitter + vis.js. Semantic extraction via Claude (Claude Code), GPT-4 (Codex), or whichever model your platform runs. Video transcription via faster-whisper + yt-dlp (optional, `pip install graphifyy[video]`). No Neo4j required, no server, runs entirely locally.
+
+## Built on graphify — Penpax
+
+[**Penpax**](https://safishamsi.github.io/penpax.ai) is the enterprise layer on top of graphify. Where graphify turns a folder of files into a knowledge graph, Penpax applies the same graph to your entire working life — continuously.
+
+| | graphify | Penpax |
+|---|---|---|
+| Input | A folder of files | Browser history, meetings, emails, files, code — everything |
+| Runs | On demand | Continuously in the background |
+| Scope | A project | Your entire working life |
+| Query | CLI / MCP / AI skill | Natural language, always on |
+| Privacy | Local by default | Fully on-device, no cloud |
+
+Built for lawyers, consultants, executives, doctors, researchers — anyone whose work lives across hundreds of conversations and documents they can never fully reconstruct.
+
+**Free trial launching soon.** [Join the waitlist →](https://safishamsi.github.io/penpax.ai)
 
 ## What we are building next
 
-graphify is the graph layer. We are building [Penpax](https://safishamsi.github.io/penpax.ai) on top of it — an on-device digital twin that connects your meetings, browser history, files, emails, and code into one continuously updating knowledge graph. No cloud, no training on your data. [Join the waitlist.](https://safishamsi.github.io/penpax.ai)
+graphify is the graph layer. Penpax is the always-on layer on top of it — an on-device digital twin that connects your meetings, browser history, files, emails, and code into one continuously updating knowledge graph. No cloud, no training on your data. [Join the waitlist.](https://safishamsi.github.io/penpax.ai)
 
 ## Star history
 

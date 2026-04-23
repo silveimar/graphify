@@ -1,0 +1,19 @@
+{
+  "nodes": [
+    {"id": "authservice_code_a", "label": "AuthService", "file_type": "code", "source_file": "auth.py"},
+    {"id": "auth_service_code_b", "label": "auth_service", "file_type": "code", "source_file": "api.py"},
+    {"id": "authentication_service_doc", "label": "Authentication Service", "file_type": "document", "source_file": "docs/auth.md"},
+    {"id": "authservice_test", "label": "AuthService", "file_type": "code", "source_file": "tests/test_auth.py"},
+    {"id": "userprofile_code", "label": "UserProfile", "file_type": "code", "source_file": "models.py"},
+    {"id": "login_handler", "label": "login_handler", "file_type": "code", "source_file": "auth.py"},
+    {"id": "api_router", "label": "api_router", "file_type": "code", "source_file": "api.py"}
+  ],
+  "edges": [
+    {"source": "authservice_code_a", "target": "userprofile_code", "relation": "references", "confidence": "EXTRACTED", "source_file": "auth.py", "weight": 1.0},
+    {"source": "auth_service_code_b", "target": "userprofile_code", "relation": "references", "confidence": "EXTRACTED", "source_file": "api.py", "weight": 1.0},
+    {"source": "login_handler", "target": "authservice_code_a", "relation": "calls", "confidence": "EXTRACTED", "source_file": "auth.py", "weight": 1.0},
+    {"source": "api_router", "target": "auth_service_code_b", "relation": "calls", "confidence": "EXTRACTED", "source_file": "api.py", "weight": 1.0},
+    {"source": "auth.py", "target": "models.py", "relation": "imports", "confidence": "EXTRACTED", "source_file": "auth.py", "weight": 1.0},
+    {"source": "api.py", "target": "auth.py", "relation": "imports", "confidence": "EXTRACTED", "source_file": "api.py", "weight": 1.0}
+  ]
+}

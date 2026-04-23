@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://graphify.dev/schema/capability-manifest.json",
+  "title": "Graphify capability manifest",
+  "type": "object",
+  "required": ["manifest_version", "graphify_version", "CAPABILITY_TOOLS"],
+  "additionalProperties": true,
+  "properties": {
+    "manifest_version": {
+      "type": "string",
+      "description": "Manifest document version"
+    },
+    "graphify_version": {
+      "type": "string",
+      "description": "Installed graphify package version"
+    },
+    "CAPABILITY_TOOLS": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "inputSchema",
+          "cost_class",
+          "deterministic",
+          "cacheable_until",
+          "composable_from"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "inputSchema": { "type": "object" },
+          "cost_class": {
+            "type": "string",
+            "enum": ["free", "cheap", "expensive"]
+          },
+          "deterministic": { "type": "boolean" },
+          "cacheable_until": { "type": "string" },
+          "composable_from": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

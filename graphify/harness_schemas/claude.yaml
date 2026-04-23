@@ -1,0 +1,30 @@
+version: 1
+target: claude
+blocks:
+  soul:
+    filename: "claude-SOUL.md"
+    body: |
+      # Claude SOUL — Graphify Memory Harness
+      Generated: {{ generated_at }} · graphify {{ graphify_version }}
+
+      ## Agent Identity
+      {{ agent_identity }}
+
+      ## God Nodes (top connectivity anchors)
+      {{ god_nodes }}
+  heartbeat:
+    filename: "claude-HEARTBEAT.md"
+    body: |
+      # Claude HEARTBEAT — Recent Graph Motion
+      Generated: {{ generated_at }} · graphify {{ graphify_version }}
+
+      ## Recent Deltas
+      {{ recent_deltas }}
+
+      ## Hot Paths
+      {{ hot_paths }}
+  user:
+    filename: "claude-USER.md"
+    body: |
+      # Claude USER — Interaction Surface
+      Agent identity: {{ agent_identity }}

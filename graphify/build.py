@@ -32,6 +32,9 @@ def build_from_json(extraction: dict, *, directed: bool = False) -> nx.Graph:
     directed=True produces a DiGraph that preserves edge direction (source→target).
     directed=False (default) produces an undirected Graph for backward compatibility.
     """
+    # NetworkX <= 3.1 serialised edges as "links"; remap to "edges" for compatibility.
+    if "edges" not in extraction and "links" in extraction:
+        extraction = dict(extraction, edges=extraction["links"])
     errors = validate_extraction(extraction)
     # Dangling edges (stdlib/external imports) are expected - only warn about real schema errors.
     real_errors = [e for e in errors if "does not match any node id" not in e]
@@ -42,6 +45,12 @@ def build_from_json(extraction: dict, *, directed: bool = False) -> nx.Graph:
         G.add_node(node["id"], **{k: v for k, v in node.items() if k != "id"})
     node_set = set(G.nodes())
     for edge in extraction.get("edges", []):
+        if "source" not in edge and "from" in edge:
+            edge["source"] = edge["from"]
+        if "target" not in edge and "to" in edge:
+            edge["target"] = edge["to"]
+        if "source" not in edge or "target" not in edge:
+            continue
         src, tgt = edge["source"], edge["target"]
         if src not in node_set or tgt not in node_set:
             continue  # skip edges to external/stdlib nodes - expected, not an error

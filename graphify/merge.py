@@ -85,6 +85,11 @@ class MergeAction:
 
     See D-71 for field semantics. `action` is a Literal for type-checker
     benefit only — runtime validation uses the _VALID_ACTIONS set.
+
+    Phase 8 fields (backward-compatible — all have defaults):
+    - user_modified: True when the note's on-disk hash differs from the manifest entry
+    - has_user_blocks: True when the note contains GRAPHIFY_USER_START/END sentinel blocks
+    - source: "graphify" (unmodified), "user" (user-modified), or "both" (has user blocks)
     """
     path: Path
     action: Literal["CREATE", "UPDATE", "SKIP_PRESERVE", "SKIP_CONFLICT", "REPLACE", "ORPHAN"]
@@ -92,6 +97,9 @@ class MergeAction:
     changed_fields: list[str] = field(default_factory=list)
     changed_blocks: list[str] = field(default_factory=list)
     conflict_kind: str | None = None
+    user_modified: bool = False
+    has_user_blocks: bool = False
+    source: str = "graphify"
 
 
 @dataclass(frozen=True)
@@ -250,6 +258,151 @@ def _parse_frontmatter(body: str) -> dict | None:
 # merge.py has NO dependency on templates.py — module isolation.
 _SENTINEL_START_RE = re.compile(r"<!--\s*graphify:([A-Za-z_][A-Za-z0-9_]*):start\s*-->")
 _SENTINEL_END_RE = re.compile(r"<!--\s*graphify:([A-Za-z_][A-Za-z0-9_]*):end\s*-->")
+
+# ---------------------------------------------------------------------------
+# User sentinel block patterns (D-01, D-08) — separate ownership zones
+# ---------------------------------------------------------------------------
+
+# User sentinel patterns are distinct from graphify's managed sentinel patterns
+# (graphify:name:start/end). They use UPPERCASE identifiers so the two cannot
+# be confused — graphify patterns use lowercase names, user patterns use UPPER.
+_USER_SENTINEL_START_RE = re.compile(r"<!--\s*GRAPHIFY_USER_START\s*-->")
+_USER_SENTINEL_END_RE = re.compile(r"<!--\s*GRAPHIFY_USER_END\s*-->")
+
+
+def _parse_user_sentinel_blocks(body: str) -> list[tuple[int, int, str]]:
+    """Parse user sentinel blocks from body text.
+
+    Returns list of (start_line_idx, end_line_idx, content) tuples where
+    content is the lines BETWEEN the sentinel markers (exclusive of marker lines).
+
+    Per D-02: malformed sentinels (START without END, nested STARTs) print a
+    warning to stderr and return [] — note treated as having no user blocks.
+    Per D-03 (Claude's Discretion): multiple USER_START/END pairs are supported.
+
+    Returns empty list when no user sentinel blocks are present.
+    """
+    import sys
+    lines = body.split("\n")
+    result: list[tuple[int, int, str]] = []
+    open_idx: int | None = None  # line index of open START marker
+
+    for idx, line in enumerate(lines):
+        if _USER_SENTINEL_START_RE.search(line):
+            if open_idx is not None:
+                # Nested START — malformed
+                print(
+                    "[graphify] malformed user sentinel: nested START markers — ignoring user blocks",
+                    file=sys.stderr,
+                )
+                return []
+            open_idx = idx
+            continue
+        if _USER_SENTINEL_END_RE.search(line):
+            if open_idx is None:
+                # END without START — treat as malformed per D-02 but just skip
+                # (only warn about START without END, not orphan END)
+                continue
+            content = "\n".join(lines[open_idx + 1 : idx])
+            result.append((open_idx, idx, content))
+            open_idx = None
+
+    if open_idx is not None:
+        # START without matching END
+        print(
+            "[graphify] malformed user sentinel: START without matching END — ignoring user blocks",
+            file=sys.stderr,
+        )
+        return []
+
+    return result
+
+
+def _has_user_sentinel_blocks(body: str) -> bool:
+    """Return True iff body contains at least one complete USER_START/END pair.
+
+    Lightweight check used by _build_manifest_from_result to set has_user_blocks
+    without running the full parser. Verifies that START appears before END to
+    avoid false positives from inverted marker order.
+    """
+    start_match = _USER_SENTINEL_START_RE.search(body)
+    end_match = _USER_SENTINEL_END_RE.search(body)
+    if not start_match or not end_match:
+        return False
+    return start_match.start() < end_match.start()
+
+
+def _extract_user_blocks(text: str) -> list[str]:
+    """Extract complete user sentinel block strings (including marker lines) from text.
+
+    Returns list of strings, each being the full block:
+        "<!-- GRAPHIFY_USER_START -->\\nuser content\\n<!-- GRAPHIFY_USER_END -->"
+
+    Used before rewriting a file to capture user content for later restoration.
+    Malformed sentinels (per _parse_user_sentinel_blocks semantics) return [].
+    """
+    blocks = _parse_user_sentinel_blocks(text)
+    if not blocks:
+        return []
+    lines = text.split("\n")
+    result: list[str] = []
+    for start_idx, end_idx, _ in blocks:
+        # Include the marker lines themselves
+        block_lines = lines[start_idx : end_idx + 1]
+        result.append("\n".join(block_lines))
+    return result
+
+
+def _restore_user_blocks(new_text: str, user_blocks: list[str]) -> str:
+    """Restore captured user sentinel blocks into new_text.
+
+    Strategy:
+    - If new_text contains empty USER_START/END pairs (from a template), replace
+      them in order with the captured blocks.
+    - If new_text has no sentinel markers but user_blocks is non-empty, append
+      the blocks at the end (before any final trailing newline).
+
+    This ensures user content survives even if the template structure changes.
+    """
+    if not user_blocks:
+        return new_text
+
+    # Check if new_text has any user sentinel markers to replace
+    has_markers = _USER_SENTINEL_START_RE.search(new_text) is not None
+
+    if has_markers:
+        # Replace existing empty pairs in order, advancing past each replaced
+        # region so we never re-match a just-inserted user block's markers.
+        result = new_text
+        search_from = 0
+        for block in user_blocks:
+            start_match = _USER_SENTINEL_START_RE.search(result, search_from)
+            if start_match is None:
+                # No more markers — append remaining blocks at the end
+                result = _append_user_block(result, block)
+                continue
+            end_match = _USER_SENTINEL_END_RE.search(result, start_match.end())
+            if end_match is None:
+                # Orphaned START — append block at end
+                result = _append_user_block(result, block)
+                continue
+            # Replace the range [start_match.start(), end_match.end()] with block
+            result = result[:start_match.start()] + block + result[end_match.end():]
+            search_from = start_match.start() + len(block)
+        return result
+    else:
+        # Append all user blocks at end
+        result = new_text
+        for block in user_blocks:
+            result = _append_user_block(result, block)
+        return result
+
+
+def _append_user_block(text: str, block: str) -> str:
+    """Append a user sentinel block to text, before any trailing newline."""
+    if text.endswith("\n"):
+        return text + block + "\n"
+    return text + "\n" + block + "\n"
 
 
 class _MalformedSentinel(Exception):
@@ -714,11 +867,20 @@ def compute_merge_plan(
     *,
     skipped_node_ids: set[str] | None = None,
     previously_managed_paths: set[Path] | None = None,
+    manifest: dict[str, dict] | None = None,
+    force: bool = False,
 ) -> MergePlan:
     """Pure reconciliation of rendered notes against a vault on disk.
 
     Produces a MergePlan listing per-file MergeAction decisions. Never writes.
     Phase 5's --dry-run calls this directly.
+
+    Phase 8 (D-07, TRIP-02, TRIP-03):
+    - manifest: pre-loaded vault-manifest.json dict. When provided, notes whose
+      on-disk hash differs from the stored entry receive SKIP_PRESERVE with
+      user_modified=True, source="user" (user content always wins).
+    - force: when True, bypasses user-modified detection — notes are processed
+      normally even if their hash differs from the manifest (D-10).
     """
     vault_dir = Path(vault_dir).resolve()
     skipped_node_ids = skipped_node_ids or set()
@@ -753,6 +915,26 @@ def compute_merge_plan(
                 reason="new file",
             ))
             continue
+
+        # User-modified detection (D-07, TRIP-02, TRIP-03)
+        # Only runs when a manifest is provided and force is not set.
+        # If the on-disk hash differs from the stored entry the note is
+        # skipped entirely — user content always wins.
+        if manifest and not force:
+            rel_key = str(target_path.relative_to(vault_dir))
+            entry = manifest.get(rel_key)
+            if entry and "content_hash" in entry:
+                current_hash = _content_hash(target_path)
+                if current_hash != entry["content_hash"]:
+                    actions.append(MergeAction(
+                        path=target_path,
+                        action="SKIP_PRESERVE",
+                        reason="user-modified since last merge",
+                        user_modified=True,
+                        has_user_blocks=entry.get("has_user_blocks", False),
+                        source="user",
+                    ))
+                    continue
 
         # File exists — read and parse
         existing_text = target_path.read_text(encoding="utf-8")
@@ -815,12 +997,20 @@ def compute_merge_plan(
         _, changed_blocks = _merge_body_blocks(existing_body, existing_blocks, new_blocks)
 
         reason = "idempotent re-render" if not changed_fields and not changed_blocks else "update"
+        # Determine source — "both" when manifest records has_user_blocks for this note
+        note_source = "graphify"
+        if manifest:
+            rel_key = str(target_path.relative_to(vault_dir))
+            entry = manifest.get(rel_key, {})
+            if entry.get("has_user_blocks", False):
+                note_source = "both"
         actions.append(MergeAction(
             path=target_path,
             action="UPDATE",
             reason=reason,
             changed_fields=changed_fields,
             changed_blocks=changed_blocks,
+            source=note_source,
         ))
 
     # Orphan detection (D-72)
@@ -853,12 +1043,110 @@ def compute_merge_plan(
 # ---------------------------------------------------------------------------
 
 import hashlib
+import json
 import os
+import sys
 
 
 def _hash_bytes(data: bytes) -> str:
     """SHA-256 hash of bytes — used for content-identical skip comparison."""
     return hashlib.sha256(data).hexdigest()
+
+
+def _content_hash(path: Path) -> str:
+    """SHA-256 of raw file bytes only — no path mixed in.
+
+    Unlike cache.file_hash() which includes the resolved path for cache key
+    disambiguation, this hashes ONLY content for round-trip change detection.
+    Per D-04: any file change (whitespace, frontmatter, body) counts.
+    """
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _load_manifest(manifest_path: Path) -> dict[str, dict]:
+    """Load vault-manifest.json, returning {} on missing or corrupt.
+
+    Per D-05: missing manifest degrades gracefully to v1.0 behavior
+    (all notes treated as unmodified). Corrupt manifest also returns {}
+    with a warning to stderr so the pipeline is never aborted.
+    """
+    if not manifest_path.exists():
+        return {}
+    try:
+        return json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        print(
+            "[graphify] vault-manifest.json corrupted or unreadable — treating all notes as unmodified",
+            file=sys.stderr,
+        )
+        return {}
+
+
+def _save_manifest(manifest_path: Path, manifest: dict[str, dict]) -> None:
+    """Write manifest atomically via tmp + os.replace (D-05).
+
+    Creates parent directories if absent. Raises OSError on failure
+    (after best-effort tmp cleanup).
+    """
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = manifest_path.with_suffix(".json.tmp")
+    try:
+        tmp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        os.replace(tmp, manifest_path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _build_manifest_from_result(
+    result: MergeResult,
+    rendered_notes: dict[str, RenderedNote],
+    vault_dir: Path,
+    old_manifest: dict[str, dict],
+) -> dict[str, dict]:
+    """Build a new manifest dict after an apply_merge_plan call.
+
+    Starts from old_manifest (retaining SKIP_PRESERVE entries), updates
+    entries for all succeeded + skipped_identical paths, and removes
+    entries for paths that no longer exist on disk.
+    """
+    # Index rendered_notes by resolved absolute path for lookup
+    notes_by_path: dict[Path, RenderedNote] = {}
+    for rn in rendered_notes.values():
+        try:
+            resolved = _validate_target(Path(rn["target_path"]), vault_dir)
+        except ValueError:
+            continue
+        notes_by_path[resolved] = rn
+
+    new_manifest: dict[str, dict] = dict(old_manifest)
+
+    # Update entries for paths that were actually written (succeeded) or
+    # confirmed identical (skipped_identical — content unchanged but we
+    # re-record the entry to confirm currency)
+    paths_to_record = list(result.succeeded) + list(result.skipped_identical)
+    for path in paths_to_record:
+        if not path.exists():
+            continue
+        rn = notes_by_path.get(path)
+        rel_key = str(path.relative_to(vault_dir))
+        entry: dict[str, object] = {
+            "content_hash": _content_hash(path),
+            "last_merged": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "target_path": rel_key,
+            "node_id": rn["node_id"] if rn else "",
+            "note_type": rn["frontmatter_fields"].get("type", "unknown") if rn else "unknown",
+            "community_id": rn["frontmatter_fields"].get("community", None) if rn else None,
+            "has_user_blocks": _has_user_sentinel_blocks(path.read_text(encoding="utf-8")),
+        }
+        new_manifest[rel_key] = entry
+
+    # Remove entries for paths that no longer exist on disk (orphaned from a prior run)
+    stale_keys = [k for k, v in new_manifest.items() if not (vault_dir / k).exists()]
+    for k in stale_keys:
+        del new_manifest[k]
+
+    return new_manifest
 
 
 def _write_atomic(target: Path, content: str) -> None:
@@ -914,6 +1202,16 @@ def _synthesize_file_text(
     if action.action in ("CREATE", "REPLACE"):
         fm_text = _dump_frontmatter(rendered_note["frontmatter_fields"])
         body = rendered_note["body"]
+        # D-08: preserve user sentinel blocks from existing file during REPLACE.
+        # even with strategy=replace, the user's explicit preservation zones survive.
+        if action.action == "REPLACE" and existing_text is not None:
+            user_blocks = _extract_user_blocks(existing_text)
+            if user_blocks:
+                if body.startswith("\n"):
+                    result_text = fm_text + body
+                else:
+                    result_text = fm_text + "\n" + body
+                return _restore_user_blocks(result_text, user_blocks)
         # Ensure exactly one newline between frontmatter block and body
         if body.startswith("\n"):
             return fm_text + body
@@ -926,14 +1224,23 @@ def _synthesize_file_text(
             raise ValueError("UPDATE action on file with unparseable frontmatter")
         body_start = _find_body_start(existing_text)
         existing_body = existing_text[body_start:]
+        # D-08: extract user sentinel blocks before merge so we can restore them.
+        # The graphify-managed sentinel merge (_merge_body_blocks) handles graphify
+        # sections; user blocks are a separate layer on top.
+        user_blocks = _extract_user_blocks(existing_body)
         merged_fm, _ = _merge_frontmatter(parsed_fm, rendered_note["frontmatter_fields"], profile)
         existing_blocks = _parse_sentinel_blocks(existing_body)
         new_blocks = _parse_sentinel_blocks(rendered_note["body"])
         merged_body, _ = _merge_body_blocks(existing_body, existing_blocks, new_blocks)
         fm_text = _dump_frontmatter(merged_fm)
         if merged_body.startswith("\n"):
-            return fm_text + merged_body
-        return fm_text + "\n" + merged_body
+            result_text = fm_text + merged_body
+        else:
+            result_text = fm_text + "\n" + merged_body
+        # Restore user sentinel blocks if any were present
+        if user_blocks:
+            return _restore_user_blocks(result_text, user_blocks)
+        return result_text
 
     raise ValueError(f"_synthesize_file_text cannot handle action {action.action!r}")
 
@@ -943,6 +1250,9 @@ def apply_merge_plan(
     vault_dir: Path,
     rendered_notes: dict[str, RenderedNote],
     profile: dict,
+    *,
+    manifest_path: Path | None = None,
+    old_manifest: dict[str, dict] | None = None,
 ) -> MergeResult:
     """Consume a MergePlan and apply writes to disk.
 
@@ -957,6 +1267,10 @@ def apply_merge_plan(
 
     Re-validates every target path via _validate_target before writing
     (defense in depth; compute already did this).
+
+    Phase 8 (D-05): if manifest_path is not None, writes vault-manifest.json
+    atomically after all writes complete. Starts from old_manifest if provided
+    (retains entries for SKIP_PRESERVE notes).
     """
     vault_dir = Path(vault_dir).resolve()
     _cleanup_stale_tmp(vault_dir)
@@ -991,12 +1305,17 @@ def apply_merge_plan(
             continue
 
         existing_text: str | None = None
-        if action.action == "UPDATE":
-            try:
-                existing_text = target.read_text(encoding="utf-8")
-            except OSError as exc:
-                failed.append((target, f"read existing failed: {exc}"))
-                continue
+        if action.action in ("UPDATE", "REPLACE"):
+            # Read existing text for UPDATE (required for merge) and REPLACE
+            # (needed for D-08 user sentinel block preservation).
+            if target.exists():
+                try:
+                    existing_text = target.read_text(encoding="utf-8")
+                except OSError as exc:
+                    if action.action == "UPDATE":
+                        failed.append((target, f"read existing failed: {exc}"))
+                        continue
+                    # For REPLACE, a read failure just means no user blocks to preserve
 
         try:
             new_text = _synthesize_file_text(action, rendered, existing_text, profile)
@@ -1021,12 +1340,21 @@ def apply_merge_plan(
         except OSError as exc:
             failed.append((target, f"write failed: {exc}"))
 
-    return MergeResult(
+    result = MergeResult(
         plan=plan,
         succeeded=succeeded,
         failed=failed,
         skipped_identical=skipped_identical,
     )
+
+    # Phase 8 (D-05): write vault-manifest.json atomically after all writes
+    if manifest_path is not None:
+        new_manifest = _build_manifest_from_result(
+            result, rendered_notes, vault_dir, old_manifest or {}
+        )
+        _save_manifest(manifest_path, new_manifest)
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -1039,14 +1367,35 @@ def format_merge_plan(plan: MergePlan) -> str:
 
     Output shape is locked in CONTEXT.md D-76:
       - Header line `Merge Plan — N actions` + separator `=====...`
+      - D-12 round-trip preamble (only when user-modified notes present)
       - Six-line summary block (CREATE/UPDATE/SKIP_PRESERVE/SKIP_CONFLICT/REPLACE/ORPHAN)
       - One per-group section per non-empty action kind, actions sorted by
         str(path) for determinism.
+      - D-11 source annotations ([user]/[both]) on per-action lines when applicable.
     """
     total = len(plan.actions)
     lines: list[str] = []
     lines.append(f"Merge Plan \u2014 {total} actions")
     lines.append("=" * 24)
+
+    # D-12: Round-trip awareness preamble — only shown when user-modified notes exist
+    # or when any action has a non-default source annotation. Keeps v1.0 output clean
+    # when no manifest is in play (no user-modified notes → no preamble).
+    user_modified_count = sum(1 for a in plan.actions if a.user_modified)
+    has_non_default_source = any(a.source != "graphify" for a in plan.actions)
+    if user_modified_count > 0 or has_non_default_source:
+        summary_pre = plan.summary or {}
+        graphify_only_count = sum(
+            1 for a in plan.actions
+            if a.action in ("UPDATE", "REPLACE", "SKIP_PRESERVE") and not a.user_modified
+        )
+        new_count = summary_pre.get("CREATE", 0)
+        lines.append(
+            f"{user_modified_count} notes user-modified (will be preserved), "
+            f"{graphify_only_count} notes graphify-only (will update), "
+            f"{new_count} new notes (will create)"
+        )
+        lines.append("")
 
     # Summary block: always emit all six keys in locked order, even at zero.
     # Right-pad labels to 15 chars so counts align (matches CONTEXT.md example).
@@ -1080,15 +1429,30 @@ def format_merge_plan(plan: MergePlan) -> str:
 
 
 def _format_action_suffix(action: MergeAction) -> str:
-    """Build the trailing parenthetical/bracket for a single action row."""
+    """Build the trailing parenthetical/bracket for a single action row.
+
+    D-11: Prepend [user] or [both] source annotation when source is non-default.
+    Default source="graphify" produces no annotation (clean output for v1.0 plans).
+    """
+    parts: list[str] = []
+
+    # D-11: source annotation — only shown for non-default source values
+    if action.source == "user":
+        parts.append("[user]")
+    elif action.source == "both":
+        parts.append("[both]")
+
     if action.action == "UPDATE":
-        return f"  ({len(action.changed_fields)} fields, {len(action.changed_blocks)} blocks)"
-    if action.action == "SKIP_CONFLICT":
+        parts.append(f"({len(action.changed_fields)} fields, {len(action.changed_blocks)} blocks)")
+    elif action.action == "SKIP_CONFLICT":
         kind = action.conflict_kind or "unknown"
-        return f"  [{kind}]"
-    if action.action == "ORPHAN":
-        return f"  ({action.reason})"
-    return ""
+        parts.append(f"[{kind}]")
+    elif action.action == "ORPHAN":
+        parts.append(f"({action.reason})")
+    elif action.action == "SKIP_PRESERVE" and action.user_modified:
+        parts.append("(user-modified)")
+
+    return ("  " + "  ".join(parts)) if parts else ""
 
 
 # ---------------------------------------------------------------------------

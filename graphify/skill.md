@@ -2,6 +2,7 @@
 name: graphify
 description: any input (code, docs, papers, images) → knowledge graph → clustered communities → HTML + JSON + audit report
 trigger: /graphify
+capability_manifest: graphify-out/capability.json
 ---
 
 # /graphify
@@ -15,6 +16,7 @@ Turn any folder of files into a navigable knowledge graph with community detecti
 /graphify <path>                                      # full pipeline on specific path
 /graphify <path> --mode deep                          # thorough extraction, richer INFERRED edges
 /graphify <path> --update                             # incremental - re-extract only new/changed files
+/graphify <path> --router                            # heterogeneous model routing (CLI: `graphify run <path> --router`, Phase 12)
 /graphify <path> --directed                            # build directed graph (preserves edge direction: source→target)
 /graphify <path> --whisper-model medium                # use a larger Whisper model for better transcription accuracy
 /graphify <path> --cluster-only                       # rerun clustering on existing graph
@@ -36,7 +38,19 @@ Turn any folder of files into a navigable knowledge graph with community detecti
 /graphify query "<question>" --budget 1500            # cap answer at N tokens
 /graphify path "AuthModule" "Database"                # shortest path between two concepts
 /graphify explain "SwinTransformer"                   # plain-language explanation of a node
+/graphify analyze                                      # autoreason tournament: 4 lenses (security, architecture, complexity, onboarding) -> GRAPH_ANALYSIS.md
+/graphify analyze for security and architecture        # subset-lens tournament (any of: security, architecture, complexity, onboarding)
+/graphify analyze for <lens>                           # single-lens tournament (~6 LLM calls vs ~24 for all 4)
 ```
+
+## Available slash commands
+
+After `graphify install`, these commands are available in Claude Code:
+- `/context` — full graph-backed summary (god nodes, top communities, recent deltas)
+- `/trace <entity>` — evolution of a named entity across snapshots
+- `/connect <topic-a> <topic-b>` — shortest path + surprising bridges
+- `/drift` — nodes trending across recent snapshots
+- `/emerge` — new clusters formed since the last snapshot
 
 ## What graphify is for
 
@@ -230,19 +244,47 @@ print(f'Cache: {len(all_files)-len(uncached)} files hit, {len(uncached)} files n
 
 Only dispatch subagents for files listed in `graphify-out/.graphify_uncached.txt`. If all files are cached, skip to Part C directly.
 
-**Step B1 - Split into chunks**
+**Step B0.5 - Cluster files for batched extraction (Phase 10, GRAPH-01)**
 
-Load files from `graphify-out/.graphify_uncached.txt`. Split into chunks of 20-25 files each. Each image gets its own chunk (vision needs separate context). When splitting, group files from the same directory together so related artifacts land in the same chunk and cross-file relationships are more likely to be extracted.
+Before dispatching semantic subagents, group the uncached files into import-connected clusters so each LLM call sees cross-file context:
+
+```bash
+$(cat graphify-out/.graphify_python) -c "
+from graphify.batch import cluster_files
+from pathlib import Path
+import json
+
+uncached_paths = [Path(p) for p in Path('graphify-out/.graphify_uncached.txt').read_text().splitlines() if p.strip()]
+# ast_results was produced earlier in Part A — if AST did not run (non-code corpora),
+# pass [] and clustering falls back to isolated-file clusters.
+ast_results = []
+ast_path = Path('graphify-out/.graphify_ast.json')
+if ast_path.exists():
+    ast_results = [json.loads(ast_path.read_text())]
+token_budget = 50_000  # override via --batch-token-budget CLI flag (D-07)
+clusters = cluster_files(uncached_paths, ast_results, token_budget=token_budget)
+print(f'[graphify] Clustered {len(uncached_paths)} files into {len(clusters)} batches')
+Path('graphify-out/.graphify_clusters.json').write_text(
+    json.dumps(clusters, indent=2), encoding='utf-8',
+)
+"
+```
+
+**Step B1 - Dispatch one subagent per cluster**
+
+Load clusters from `graphify-out/.graphify_clusters.json`. Dispatch one subagent per cluster (instead of fixed 20-25-file chunks). Each subagent receives the files in the cluster's `files` list in topological order. Clusters under 500 tokens may be grouped into a residual chunk for efficiency. Each image still gets its own chunk (vision needs separate context).
 
 **Step B2 - Dispatch ALL subagents in a single message**
 
 Call the Agent tool multiple times IN THE SAME RESPONSE - one call per chunk. This is the only way they run in parallel. If you make one Agent call, wait, then make another, you are doing it sequentially and defeating the purpose.
 
+**IMPORTANT - subagent type:** Always use `subagent_type="general-purpose"`. Do NOT use `Explore` - it is read-only and cannot write chunk files to disk, which silently drops extraction results. General-purpose has Write and Bash access which the subagent needs.
+
 Concrete example for 3 chunks:
 ```
-[Agent tool call 1: files 1-15]
-[Agent tool call 2: files 16-30]  
-[Agent tool call 3: files 31-45]
+[Agent tool call 1: files 1-15, subagent_type="general-purpose"]
+[Agent tool call 2: files 16-30, subagent_type="general-purpose"]
+[Agent tool call 3: files 31-45, subagent_type="general-purpose"]
 ```
 All three in one message. Not three separate messages.
 
@@ -304,10 +346,12 @@ Output exactly this JSON (no other text):
 **Step B3 - Collect, cache, and merge**
 
 Wait for all subagents. For each result:
-- If a subagent returned valid JSON with `nodes` and `edges`, include it and save each file's nodes/edges to the cache
+- Check that `graphify-out/.graphify_chunk_NN.json` exists on disk — this is the success signal
+- If the file exists and contains valid JSON with `nodes` and `edges`, include it and save to cache
+- If the file is missing, the subagent was likely dispatched as read-only (Explore type) — print a warning: "chunk N missing from disk — subagent may have been read-only. Re-run with general-purpose agent." Do not silently skip.
 - If a subagent failed or returned invalid JSON, print a warning and skip that chunk - do not abort
 
-If more than half the chunks failed, stop and tell the user.
+If more than half the chunks failed or are missing, stop and tell the user to re-run and ensure `subagent_type="general-purpose"` is used.
 
 Save new results to cache:
 ```bash
@@ -388,6 +432,27 @@ print(f'Merged: {total} nodes, {edges} edges ({len(ast[\"nodes\"])} AST + {len(s
 "
 ```
 
+**Step C.5 - Entity deduplication (Phase 10, GRAPH-02/03, optional)**
+
+If the user invoked `/graphify` with `--dedup` (or the parent command otherwise indicates dedup), run:
+
+```bash
+graphify --dedup \
+  --dedup-fuzzy-threshold 0.90 \
+  --dedup-embed-threshold 0.85
+```
+
+This reads `graphify-out/extraction.json`, merges fuzzy + embedding-similar nodes, and writes:
+- `graphify-out/extraction.json` (updated with canonical nodes + `merged_from` fields)
+- `graphify-out/extraction.pre-dedup.json` (backup)
+- `graphify-out/dedup_report.json` (machine-readable merge list)
+- `graphify-out/dedup_report.md` (human-readable diff)
+
+Add `--dedup-cross-type` to allow code<->document merges (D-13, GRAPH-04 stretch).
+Requires the `[dedup]` optional extra: `pip install 'graphifyy[dedup]'`.
+
+Note: when `graphify --dedup` is not run, the pipeline proceeds unchanged (dedup is opt-in per D-14).
+
 ### Step 4 - Build graph, cluster, analyze, generate outputs
 
 **Before starting:** note whether `--directed` was given. If so, pass `directed=True` to `build_from_json()` in the code block below. This builds a `DiGraph` that preserves edge direction (source→target) instead of the default undirected `Graph`.
@@ -401,6 +466,7 @@ from graphify.cluster import cluster, score_all
 from graphify.analyze import god_nodes, surprising_connections, suggest_questions
 from graphify.report import generate
 from graphify.export import to_json
+from graphify.serve import _load_telemetry, _save_telemetry, _decay_telemetry
 from pathlib import Path
 
 extraction = json.loads(Path('graphify-out/.graphify_extract.json').read_text())
@@ -416,9 +482,30 @@ labels = {cid: 'Community ' + str(cid) for cid in communities}
 # Placeholder questions - regenerated with real labels in Step 5
 questions = suggest_questions(G, communities, labels)
 
-report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, 'INPUT_PATH', suggested_questions=questions)
+_tel_path = Path('graphify-out/telemetry.json')
+_usage_data = None
+if _tel_path.exists():
+    import json as _json_tel
+    try:
+        _usage_data = _json_tel.loads(_tel_path.read_text())
+    except (ValueError, OSError):
+        pass
+
+report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, 'INPUT_PATH', suggested_questions=questions, usage_data=_usage_data)
 Path('graphify-out/GRAPH_REPORT.md').write_text(report)
 to_json(G, communities, 'graphify-out/graph.json')
+# Decay telemetry counters on rebuild per D-04
+if _tel_path.exists():
+    _tel_data = _load_telemetry(_tel_path)
+    _decay_telemetry(_tel_data)
+    _save_telemetry(Path('graphify-out'), _tel_data)
+from graphify.snapshot import auto_snapshot_and_delta
+_pre_snap_count = len(list(Path('graphify-out/snapshots').glob('*.json'))) if Path('graphify-out/snapshots').exists() else 0
+_snap_path, _delta_path = auto_snapshot_and_delta(G, communities, project_root=Path('.'))
+if _pre_snap_count > 0:
+    print(f'Snapshot saved ({G.number_of_nodes()} nodes). Delta: see GRAPH_DELTA.md')
+else:
+    print(f'Snapshot saved ({G.number_of_nodes()} nodes). No prior snapshot for delta comparison.')
 
 analysis = {
     'communities': {str(k): v for k, v in communities.items()},
@@ -470,7 +557,16 @@ labels = LABELS_DICT
 # Regenerate questions with real community labels (labels affect question phrasing)
 questions = suggest_questions(G, communities, labels)
 
-report = generate(G, communities, cohesion, labels, analysis['gods'], analysis['surprises'], detection, tokens, 'INPUT_PATH', suggested_questions=questions)
+_tel_path = Path('graphify-out/telemetry.json')
+_usage_data = None
+if _tel_path.exists():
+    import json as _json_tel
+    try:
+        _usage_data = _json_tel.loads(_tel_path.read_text())
+    except (ValueError, OSError):
+        pass
+
+report = generate(G, communities, cohesion, labels, analysis['gods'], analysis['surprises'], detection, tokens, 'INPUT_PATH', suggested_questions=questions, usage_data=_usage_data)
 Path('graphify-out/GRAPH_REPORT.md').write_text(report)
 Path('graphify-out/.graphify_labels.json').write_text(json.dumps({str(k): v for k, v in labels.items()}))
 print('Report updated with community labels')
@@ -946,9 +1042,30 @@ gods = god_nodes(G)
 surprises = surprising_connections(G, communities)
 labels = {cid: 'Community ' + str(cid) for cid in communities}
 
-report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, '.')
+_tel_path = Path('graphify-out/telemetry.json')
+_usage_data = None
+if _tel_path.exists():
+    import json as _json_tel
+    try:
+        _usage_data = _json_tel.loads(_tel_path.read_text())
+    except (ValueError, OSError):
+        pass
+
+report = generate(G, communities, cohesion, labels, gods, surprises, detection, tokens, '.', usage_data=_usage_data)
 Path('graphify-out/GRAPH_REPORT.md').write_text(report)
 to_json(G, communities, 'graphify-out/graph.json')
+# Decay telemetry counters on rebuild per D-04
+if _tel_path.exists():
+    _tel_data = _load_telemetry(_tel_path)
+    _decay_telemetry(_tel_data)
+    _save_telemetry(Path('graphify-out'), _tel_data)
+from graphify.snapshot import auto_snapshot_and_delta
+_pre_snap_count = len(list(Path('graphify-out/snapshots').glob('*.json'))) if Path('graphify-out/snapshots').exists() else 0
+_snap_path, _delta_path = auto_snapshot_and_delta(G, communities, project_root=Path('.'))
+if _pre_snap_count > 0:
+    print(f'Snapshot saved ({G.number_of_nodes()} nodes). Delta: see GRAPH_DELTA.md')
+else:
+    print(f'Snapshot saved ({G.number_of_nodes()} nodes). No prior snapshot for delta comparison.')
 
 analysis = {
     'communities': {str(k): v for k, v in communities.items()},
@@ -1265,6 +1382,347 @@ Supported URL types (auto-detected):
 
 ---
 
+## For /graphify analyze
+
+<!-- ANTI-PATTERN: Never pass conversation history between tournament rounds. Each round gets only the TEXT output of prior rounds, not system prompts or reasoning traces. -->
+<!-- ANTI-PATTERN: Never label candidates as incumbent/adversary/synthesis in judge prompts. Use Analysis-1/2/3 with shuffled assignment. -->
+<!-- ANTI-PATTERN: Do NOT call render_analysis() from analyze.py — it lives in report.py. analyze.py stays pure metrics (D-75). -->
+
+When the user says `/graphify analyze` (with optional lens selection like "analyze for security and architecture"):
+
+**Prerequisites:** The graph must already be built. Check that `graphify-out/.graphify_analysis.json` exists. If not, tell the user: "Run `/graphify` first to build the graph, then `/graphify analyze` to run multi-perspective analysis."
+
+**Lens selection:** Parse the user's prompt for lens names. The 4 built-in lenses are: `security`, `architecture`, `complexity`, `onboarding`. If the user specifies a subset (e.g., "analyze for security"), run only those. If no specific lenses mentioned, run all 4.
+
+**Token cost note:** The tournament runs up to 6 LLM calls per lens (1 incumbent + 1 adversary + 1 synthesis + 3 judges). With 4 lenses that is up to 24 calls. Report this estimate to the user before starting.
+
+**Step A1 — Load graph context:**
+
+```bash
+$(cat graphify-out/.graphify_python) -c "
+import json
+import networkx as nx
+from pathlib import Path
+from graphify.analyze import render_analysis_context
+
+analysis_path = Path('graphify-out/.graphify_analysis.json')
+if not analysis_path.exists():
+    print('ERROR: .graphify_analysis.json not found. Run /graphify first to build the graph.')
+    raise SystemExit(1)
+
+analysis = json.loads(analysis_path.read_text())
+graph_data = json.loads(Path('graphify-out/graph.json').read_text())
+G = nx.node_link_graph(graph_data)
+
+communities = {int(k): v for k, v in analysis['communities'].items()}
+labels = {int(k): f'Community {k}' for k in analysis['communities']}
+# Use real labels if available from .graphify_analysis.json
+if 'community_labels' in analysis:
+    labels = {int(k): v for k, v in analysis['community_labels'].items()}
+gods = analysis['gods']
+surprises = analysis['surprises']
+
+context = render_analysis_context(G, communities, labels, gods, surprises)
+Path('graphify-out/.graphify_lens_context.txt').write_text(context)
+print(f'Graph context serialized: {len(context)} chars')
+"
+```
+
+**Step A2 — Lens focus definitions:**
+
+The following focus bullets are substituted into tournament prompts as `{LENS_FOCUS_BULLETS}` for each lens:
+
+**Lens focus definitions:**
+
+- **security**: Authentication/authorization patterns, input validation coverage, secrets exposure, dependency vulnerability signals, trust boundary violations, STRIDE categories visible in graph structure
+- **architecture**: God node coupling risk, community cohesion gaps, circular dependencies, layering violations, single points of failure, separation of concerns
+- **complexity**: High fan-in/fan-out nodes, deep call chains, communities with low cohesion scores, files touching many communities, cognitive load hotspots
+- **onboarding**: Entry point clarity, documentation coverage, community labeling quality, path from entry to core abstractions, isolated nodes newcomers would miss
+
+**Step A3 — Run tournament for each selected lens:**
+
+For EACH selected lens, run 4 rounds of LLM calls. Read `graphify-out/.graphify_lens_context.txt` and substitute it as `{GRAPH_CONTEXT}` in each prompt. Each round is a SEPARATE LLM call with fresh context — only the TEXT output of each prior round flows to the next round.
+
+**Round 1 — Incumbent Analysis (A):**
+
+```
+System: You are a {LENS} expert analyzing a software knowledge graph.
+Respond ONLY with your findings in markdown format. Do not ask for more information.
+If you find no issues, say so explicitly — "no issues found" is a valid and important verdict.
+Format: list findings under headers. Include a confidence level (high/medium/low) per finding.
+End with a single-line "Top finding: [your most important insight or 'None']".
+
+User: Here is the graph context:
+
+{GRAPH_CONTEXT}
+
+Analyze this graph from a {LENS} perspective. Focus on:
+{LENS_FOCUS_BULLETS}
+```
+
+Save the full response as `incumbent_text`.
+
+**Round 2 — Adversarial Revision (B):**
+
+```
+System: You are a rigorous devil's advocate reviewing an analysis of a software knowledge graph.
+Your job: find what the analyst missed, overstated, or got wrong.
+You may also argue "the analysis is correct and complete" — do nothing is a valid position.
+Do not reference the original analyst by name or role.
+Respond in markdown format. End with "Top finding: [your most important insight or 'None']".
+
+User: Here is the graph context:
+
+{GRAPH_CONTEXT}
+
+Here is an analysis from a {LENS} perspective:
+
+{INCUMBENT_TEXT}
+
+Challenge this analysis. What did it miss? What did it overstate? Produce your own revised analysis.
+```
+
+Save the full response as `adversary_text`.
+
+**Round 3 — Synthesis (AB):**
+
+```
+System: You are a neutral synthesizer. Merge two analyses of a software knowledge graph into the best possible combined view.
+Preserve strong findings from both. Discard overclaims. Resolve contradictions explicitly.
+Respond in markdown format. End with "Top finding: [your most important insight or 'None']".
+
+User: Here is the graph context:
+
+{GRAPH_CONTEXT}
+
+Analysis 1:
+{INCUMBENT_TEXT}
+
+Analysis 2:
+{ADVERSARY_TEXT}
+
+Produce a merged analysis that combines the strongest insights from both while discarding overclaims.
+```
+
+Save the full response as `synthesis_text`.
+
+**Round 4 — Blind Borda Judges (3 separate calls):**
+
+Before calling judges, create a shuffled mapping. Assign A/B/AB to Analysis-1/Analysis-2/Analysis-3 using a different rotation per judge:
+- Judge 1: Analysis-1=A, Analysis-2=B, Analysis-3=AB
+- Judge 2: Analysis-1=B, Analysis-2=AB, Analysis-3=A
+- Judge 3: Analysis-1=AB, Analysis-2=A, Analysis-3=B
+
+Each judge call (substitute the shuffled texts accordingly):
+
+```
+System: You are an impartial evaluator. Rank the three analyses below from best (1st) to worst (3rd).
+Criteria: accuracy relative to the graph data, completeness, absence of overclaims, actionability.
+Output ONLY this format, nothing else:
+1st: [label]
+2nd: [label]
+3rd: [label]
+
+Where [label] is one of Analysis-1, Analysis-2, Analysis-3.
+
+User: Here is the graph context:
+
+{GRAPH_CONTEXT}
+
+Analysis-1:
+{SHUFFLED_TEXT_1}
+
+Analysis-2:
+{SHUFFLED_TEXT_2}
+
+Analysis-3:
+{SHUFFLED_TEXT_3}
+
+Rank them.
+```
+
+Parse each judge's response. Validate it matches the format "1st: Analysis-N / 2nd: Analysis-N / 3rd: Analysis-N". If malformed, skip that judge and degrade gracefully to 2 judges. Unshuffle to map labels back to A/B/AB.
+
+**Step A4 — Compute Borda scores and assemble lens result:**
+
+After collecting valid judge rankings for a lens:
+
+```bash
+$(cat graphify-out/.graphify_python) -c "
+import json
+
+# Input: judge_rankings is a list of lists, e.g. [['A','B','AB'], ['A','AB','B'], ['AB','A','B']]
+# (parsed and unshuffled by the skill orchestrator above)
+judge_rankings = JUDGE_RANKINGS_PLACEHOLDER
+
+# Standard Borda count: n=3 candidates, 1st=2pts, 2nd=1pt, 3rd=0pts
+scores = {'A': 0, 'B': 0, 'AB': 0}
+
+# Guard: if all judges failed, force Finding with zero confidence
+if not judge_rankings:
+    print(json.dumps({'winner': 'NONE', 'scores': scores, 'confidence': 0.0, 'confidence_label': 'none', 'tournament_failed': True}))
+    import sys; sys.exit(0)
+
+for ranking in judge_rankings:
+    for rank, candidate in enumerate(ranking):
+        scores[candidate] += (2 - rank)
+
+winner = max(scores, key=scores.get)
+total_points = sum(scores.values())
+confidence = scores[winner] / total_points if total_points > 0 else 0.0
+
+# Confidence label
+if confidence >= 0.8:
+    conf_label = 'high'
+elif confidence >= 0.5:
+    conf_label = 'medium'
+else:
+    conf_label = 'low'
+
+print(json.dumps({'winner': winner, 'scores': scores, 'confidence': confidence, 'confidence_label': conf_label}))
+"
+```
+
+After computing Borda scores, assemble the lens result dict:
+- `verdict`: If Borda output contains `"tournament_failed": true`, force verdict to "Finding" with confidence 0.0 and `voting_rationale` = "Tournament failed: all judges returned malformed responses". Otherwise, if winner is "A" AND `incumbent_text` contains "no issues found" (case-insensitive) → "Clean". Otherwise → "Finding"
+- `findings_text`: The winner's text — `incumbent_text` if A, `adversary_text` if B, `synthesis_text` if AB
+- `top_finding`: Extract the "Top finding: ..." line from `findings_text` (strip the "Top finding: " prefix). Empty string if "None"
+- `voting_rationale`: Format scores as e.g. "3-0 unanimous for incumbent" or "2-1 for synthesis"
+- `incumbent_summary`, `adversary_summary`, `synthesis_summary`: First 100 chars of each text
+- `confidence`, `confidence_label`, `scores`: from Borda output
+
+**Step A5 — Cross-lens synthesis and render (after ALL lenses complete):**
+
+```bash
+$(cat graphify-out/.graphify_python) -c "
+import json
+from pathlib import Path
+from graphify.report import render_analysis
+
+# lens_results is assembled by the skill orchestrator from all lens tournaments
+lens_results = LENS_RESULTS_PLACEHOLDER
+lenses_run = LENSES_RUN_PLACEHOLDER
+
+analysis_md = render_analysis(lens_results, 'INPUT_PATH', lenses_run)
+Path('graphify-out/GRAPH_ANALYSIS.md').write_text(analysis_md)
+print(f'GRAPH_ANALYSIS.md written ({len(analysis_md)} chars, {len(lens_results)} lenses)')
+"
+```
+
+**Step A6 — Report to user:**
+
+After writing GRAPH_ANALYSIS.md, report to the user:
+- Which lenses were run
+- Per-lens verdict (Clean or Finding) with confidence level
+- Top finding per lens (if any)
+- Location: `graphify-out/GRAPH_ANALYSIS.md`
+
+---
+
+## /graphify-argue <question> — SPAR-Kit Graph Argumentation Mode (Phase 16)
+
+**Purpose:** Run a structurally-enforced multi-perspective debate about a decision question, grounded in the knowledge graph. Every persona claim cites a real `node_id`. Produces `graphify-out/GRAPH_ARGUMENT.md` — advisory-only (ARGUE-09).
+
+**Cross-phase rule:** This orchestration MUST NOT invoke the Phase 17 `chat` MCP tool (Pitfall 18 recursion guard). The manifest declares `argue_topic.composable_from: []`. Use `argue_topic` and the deterministic graph primitives only.
+
+### Step B1 — Evidence subgraph
+
+Call the MCP tool `argue_topic` with `{topic: "<question>", scope: "topic"}`. Parse the D-02 envelope. If `meta.status != "ok"`, render the fallback message per `graphify/commands/argue.md` and STOP.
+
+From `meta.argument_package`, extract:
+- `nodes: [{id, label, source_file}, ...]` — the evidence subgraph
+- `perspectives: [{lens}, ...]` — the 4 fixed lenses from `graphify/argue.py::_FIXED_LENSES` (`security`, `architecture`, `complexity`, `onboarding`)
+- `citations: [...]` — flat list to render into the final transcript
+
+### Step B2 — Evidence context block
+
+Build an `{EVIDENCE_SUBGRAPH}` text block from `meta.argument_package.nodes` + `edge_count`. For structured rendering, call `graphify.analyze.render_analysis_context(subG, ...)` if a full subgraph object is available; otherwise format a concise markdown list of `- [node_id:label] (source_file)` lines. This block is fed to every persona prompt unchanged across rounds.
+
+### Step B3 — Debate rounds (up to ROUND_CAP = 6)
+
+Import from `graphify.argue`: `ROUND_CAP` (= 6), `MAX_TEMPERATURE` (= 0.4), `validate_turn`, `compute_overlap`.
+
+For `round in 1..ROUND_CAP`:
+
+1. **Per-round blind-label shuffle (D-05, ARGUE-06).** Shuffle A/B/C/D persona labels at round start — reuse the Phase 9 blind-label harness shuffle pattern documented above (see §Phase 9 tournament harness — "Judge 1: Analysis-1=A, Analysis-2=B, Analysis-3=AB"). The Jaccard detector never sees a stable persona→label mapping across rounds. DO NOT identify personas by their role name in any overlap computation or in any output surface that feeds back into a later round.
+
+2. **Four parallel persona LLM calls (D-04).** For each persona in `[security, architecture, complexity, onboarding]`:
+   - Use the lens focus bullets from §Phase 9 harness (line ~1433 in this file — point to them, do NOT duplicate).
+   - Prompt framing: "Argue a position on the user's question `<question>`, citing only `node_id`s present in the provided `{EVIDENCE_SUBGRAPH}`. Output JSON only: `{claim: string, cites: [node_id]}`. Do not identify yourself as a specific persona role in the output."
+   - Include the `{EVIDENCE_SUBGRAPH}` block + all previous rounds' validated claims (labeled by their round-N shuffle label, not by persona role).
+   - **Temperature ≤ MAX_TEMPERATURE (0.4) — HARD CONSTRAINT.** If the LLM client API requires an explicit temperature argument, set it to exactly `0.4`; never higher.
+
+3. **Validate each turn via `argue.validate_turn(turn, G)` (ARGUE-05).**
+   - If the returned list is non-empty (unknown cites fabricated): hard-reject the turn, re-prompt THE SAME persona ONCE with the message "The following cited node_ids do not exist in the provided subgraph: {list}. Please revise. Cite only `node_id` values that appear in `{EVIDENCE_SUBGRAPH}`."
+   - If the retry is STILL invalid: record the turn as `{claim: "[NO VALID CLAIM]", cites: []}` — this is an abstention (D-09). Do NOT accept a third attempt.
+
+4. **Compute cite-overlap (D-06).** Build `cite_sets = [set(turn["cites"]) for turn in this_round_turns]`. Call `argue.compute_overlap(cite_sets)` — abstentions (empty sets) are dropped by the function before computing Jaccard. Record the round's Jaccard in the trajectory array.
+
+5. **Check early-stop conditions (D-06):**
+   - If `overlap >= 0.7` for TWO consecutive rounds → `verdict = "consensus"` and break.
+   - If `overlap < 0.2` for THREE consecutive rounds → `verdict = "dissent"` and break (valid terminal outcome — no consensus-forcing, D-07).
+   - If `round == ROUND_CAP` without either condition firing → `verdict = "inconclusive"` and break (valid terminal outcome).
+
+### Step B4 — Write advisory-only transcript (ARGUE-09, D-11, D-12, D-13)
+
+Write `graphify-out/GRAPH_ARGUMENT.md` — mirror the write pattern used for `GRAPH_ANALYSIS.md` elsewhere in this file. Contents (per D-11/D-12):
+
+```
+# Graph Argument — <topic>
+
+> **Advisory only.** This transcript is the record of a structurally-enforced graph-grounded debate. No code, no graph data, and no project file has been modified as a result of this run.
+
+## Round 1
+### Security
+- <claim> [node_id:label] [node_id:label]
+### Architecture
+- ...
+### Complexity
+- ...
+### Onboarding
+- ...
+
+## Round 2
+...
+
+## Verdict
+- verdict: <consensus | dissent | inconclusive>
+- rounds_run: <N>
+- cite-overlap trajectory (Jaccard): 0.15 → 0.28 → 0.55 → 0.78 → 0.82
+- cited nodes:
+  - [node_id:label]
+  - ...
+
+> This transcript is advisory only — no code or graph mutations result from this run.
+```
+
+- **Inline cite format is `[node_id:label]` (D-13)** — always use the CANONICAL `node_id` after alias redirect (D-16); labels pass through `graphify.security.sanitize_label` before emission.
+- **Output path is HARDCODED:** `graphify-out/GRAPH_ARGUMENT.md` (ARGUE-09, T-16-05). Do not accept a user-parameterized output path. Validate confinement via `graphify.security.validate_graph_path(output_path, base=project_root)` at write time.
+- **Default overwrite behavior** (matches `GRAPH_ANALYSIS.md` precedent). Timestamped variants deferred to v1.4.x backlog.
+
+### Step B5 — Report to user
+
+Return a summary per `graphify/commands/argue.md` step 3: verdict + Jaccard trajectory + path to `graphify-out/GRAPH_ARGUMENT.md`. Keep under 400 tokens.
+
+### Anti-patterns (DO NOT)
+
+- **DO NOT invoke the `chat` MCP tool from this orchestration.** `composable_from: []` is the manifest-level guard; this is the prose-level reminder. Use `argue_topic` + primitive graph tools only.
+- **DO NOT add a "synthesizer" or "consensus" fifth persona** that merges claims into a fake unified verdict (D-07). Consensus is *detected* mechanically from Jaccard overlap — never produced.
+- **DO NOT strip invalid cites from a claim to "rescue" it** (Pitfall 2, D-10). The `{claim, cites}` unit is atomic — reject the whole turn or accept it whole.
+- **DO NOT echo unmatched topic tokens back to the user** when the evidence subgraph is empty (Pitfall 6). Use the generic `no_results` fallback from `graphify/commands/argue.md`.
+- **DO NOT exceed ROUND_CAP = 6 rounds** for any reason. The cap is a hard constraint.
+- **DO NOT use the key `alias_redirects`** in any transcript section or summary — the canonical meta key is `resolved_from_alias` (Pitfall 4, D-16).
+
+### Deferred P2 requirements (v1.4.x backlog — NOT IMPLEMENTED in this phase)
+
+The following requirements are explicitly deferred per `.planning/phases/16-graph-argumentation-mode/16-CONTEXT.md` "Deferred Ideas" section. They are NOT implemented in the v1 debate loop above. Do not implement them in-session without a new gsd planning pass.
+
+- **ARGUE-11 [P2] — SPAR-Kit INTERROGATE step (deferred to v1.4.x backlog).** Optional cross-examination turn between rounds (+40% synthesis quality per protocol docs). Activation: future `--interrogate` flag.
+- **ARGUE-12 [P2] — Persona memory across rounds (deferred to v1.4.x backlog).** Each persona retains its own prior claims for consistency. Substrate fields would live on `PerspectiveSeed`.
+- **ARGUE-13 [P2] — Clash/rumble/domain intensity scoring (deferred to v1.4.x backlog).** Conflict-density metrics annotating the transcript.
+
+---
+
 ## For --watch
 
 Start a background watcher that monitors a folder and auto-updates the graph when files change.
@@ -1299,6 +1757,21 @@ graphify hook status     # check
 After every `git commit`, the hook detects which code files changed (via `git diff HEAD~1`), re-runs AST extraction on those files, and rebuilds `graph.json` and `GRAPH_REPORT.md`. Doc/image changes are ignored by the hook - run `/graphify --update` manually for those.
 
 If a post-commit hook already exists, graphify appends to it rather than replacing it.
+
+---
+
+## For harness memory export (SEED-002)
+
+Export a set of agent-readable memory files derived from the current graph:
+
+```bash
+graphify harness export [--target claude] [--out PATH]
+```
+
+- `graphify harness export [--target claude]` — dump SOUL/HEARTBEAT/USER markdown to `graphify-out/harness/` (export-only; no auto-trigger).
+- Only the `claude` target ships today; `--out` defaults to `graphify-out`.
+- Annotations are excluded by default (allow-list: `id`, `label`, `source_file`, `relation`, `confidence`). Free-text annotation bodies and `peer_id` never appear in the harness output.
+- Writes `claude-SOUL.md`, `claude-HEARTBEAT.md`, `claude-USER.md` via atomic `.tmp + os.replace`.
 
 ---
 

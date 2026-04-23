@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "graphifyy"
-version = "0.3.29"
+version = "0.4.7"
 description = "AI coding assistant skill (Claude Code, Codex, OpenCode, Cursor, OpenClaw, Factory Droid, Trae) - turn any folder of code, docs, papers, images, or videos into a queryable knowledge graph"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -41,15 +41,17 @@ Repository = "https://github.com/silveimar/graphify"
 Issues = "https://github.com/silveimar/graphify/issues"
 
 [project.optional-dependencies]
-mcp = ["mcp"]
+mcp = ["mcp", "jsonschema", "PyYAML"]
 neo4j = ["neo4j"]
 pdf = ["pypdf", "html2text"]
 watch = ["watchdog"]
 leiden = ["graspologic"]
 office = ["python-docx", "openpyxl"]
 obsidian = ["PyYAML"]
+dedup = ["sentence-transformers"]
 video = ["faster-whisper", "yt-dlp"]
-all = ["mcp", "neo4j", "pypdf", "html2text", "watchdog", "graspologic", "python-docx", "openpyxl", "PyYAML", "faster-whisper", "yt-dlp"]
+routing = ["PyYAML", "radon"]
+all = ["mcp", "neo4j", "pypdf", "html2text", "watchdog", "graspologic", "python-docx", "openpyxl", "PyYAML", "faster-whisper", "yt-dlp", "sentence-transformers", "radon"]
 
 [project.scripts]
 graphify = "graphify.__main__:main"
@@ -59,4 +61,5 @@ where = ["."]
 include = ["graphify*"]
 
 [tool.setuptools.package-data]
-graphify = ["skill.md", "skill-codex.md", "skill-opencode.md", "skill-aider.md", "skill-copilot.md", "skill-claw.md", "skill-windows.md", "skill-droid.md", "skill-trae.md", "builtin_templates/*.md"]
+graphify = ["skill.md", "skill-codex.md", "skill-opencode.md", "skill-aider.md", "skill-copilot.md", "skill-claw.md", "skill-windows.md", "skill-droid.md", "skill-trae.md", "builtin_templates/*.md", "commands/*.md", "routing_models.yaml", "capability_manifest.schema.json", "capability_tool_meta.yaml"]
+"graphify.harness_schemas" = ["claude.yaml", "*.yaml"]

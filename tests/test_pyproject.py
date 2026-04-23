@@ -117,3 +117,23 @@ def test_templates_module_is_pure_stdlib():
         "the [obsidian] extras group. See the IN-10 docstring at the top "
         "of templates.py for the policy."
     )
+
+
+def test_dedup_optional_extra_present():
+    """Phase 10 D-01: [dedup] optional extra must be defined with sentence-transformers."""
+    data = _load_pyproject()
+    extras = data["project"]["optional-dependencies"]
+    assert "dedup" in extras, "Missing [dedup] optional-dependency group"
+    assert "sentence-transformers" in extras["dedup"]
+    # All-extras bundle must also include sentence-transformers
+    assert "sentence-transformers" in extras["all"]
+
+
+def test_package_data_includes_commands():
+    """D-15: pyproject.toml must include commands/*.md in package-data."""
+    data = _load_pyproject()
+    package_data = data["tool"]["setuptools"]["package-data"]["graphify"]
+    assert "commands/*.md" in package_data, (
+        "pyproject.toml package-data is missing 'commands/*.md'. "
+        "Phase 11 requires command files to be included in wheel installs."
+    )

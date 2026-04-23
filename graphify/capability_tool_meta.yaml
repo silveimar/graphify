@@ -1,0 +1,101 @@
+# Per-tool defaults for MANIFEST-06 (merged with introspected MCP tools). Key = tool name.
+query_graph:
+  cost_class: cheap
+  deterministic: false
+  cacheable_until: graph_mtime
+  composable_from: []
+get_node:
+  cost_class: free
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: []
+get_neighbors:
+  cost_class: free
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: [get_node]
+get_community:
+  cost_class: free
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: []
+god_nodes:
+  cost_class: cheap
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: []
+graph_stats:
+  cost_class: free
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: []
+shortest_path:
+  cost_class: cheap
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: [query_graph]
+annotate_node:
+  cost_class: cheap
+  deterministic: false
+  cacheable_until: sidecar_write
+  composable_from: []
+flag_node:
+  cost_class: cheap
+  deterministic: false
+  cacheable_until: sidecar_write
+  composable_from: []
+add_edge:
+  cost_class: cheap
+  deterministic: false
+  cacheable_until: sidecar_write
+  composable_from: []
+propose_vault_note:
+  cost_class: expensive
+  deterministic: false
+  cacheable_until: proposal_write
+  composable_from: []
+get_annotations:
+  cost_class: cheap
+  deterministic: true
+  cacheable_until: annotations_mtime
+  composable_from: []
+get_agent_edges:
+  cost_class: cheap
+  deterministic: true
+  cacheable_until: agent_edges_mtime
+  composable_from: []
+graph_summary:
+  cost_class: expensive
+  deterministic: false
+  cacheable_until: graph_mtime
+  composable_from: [god_nodes, graph_stats]
+argue_topic:
+  cost_class: expensive
+  deterministic: false
+  cacheable_until: graph_mtime
+  composable_from: []   # HARD CONSTRAINT — recursion guard (ARGUE-07, D-15)
+connect_topics:
+  cost_class: expensive
+  deterministic: false
+  cacheable_until: graph_mtime
+  composable_from: [query_graph]
+entity_trace:
+  cost_class: expensive
+  deterministic: false
+  cacheable_until: graph_mtime
+  composable_from: []
+drift_nodes:
+  cost_class: expensive
+  deterministic: false
+  cacheable_until: graph_mtime
+  composable_from: []
+newly_formed_clusters:
+  cost_class: expensive
+  deterministic: false
+  cacheable_until: graph_mtime
+  composable_from: []
+capability_describe:
+  cost_class: free
+  deterministic: true
+  cacheable_until: manifest_hash
+  composable_from: []

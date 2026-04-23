@@ -195,3 +195,13 @@ def sanitize_label(text: str) -> str:
     if len(text) > _MAX_LABEL_LEN:
         text = text[:_MAX_LABEL_LEN]
     return text
+
+
+def sanitize_label_md(text: str) -> str:
+    """Strip characters that could inject markdown structure from untrusted text.
+
+    Replaces backticks with apostrophes (so the value stays safe inside
+    `inline-code` wrappers) and HTML-escapes angle brackets. Apply on top of
+    `sanitize_label` for label values rendered into Markdown reports.
+    """
+    return text.replace("`", "'").replace("<", "&lt;").replace(">", "&gt;")

@@ -41,6 +41,14 @@ def __getattr__(name):
         "RenderedNote": ("graphify.merge", "RenderedNote"),
         "validate_profile_preflight": ("graphify.profile", "validate_profile_preflight"),
         "PreflightResult": ("graphify.profile", "PreflightResult"),
+        "compute_delta": ("graphify.delta", "compute_delta"),
+        "classify_staleness": ("graphify.delta", "classify_staleness"),
+        "render_delta_md": ("graphify.delta", "render_delta_md"),
+        "save_snapshot": ("graphify.snapshot", "save_snapshot"),
+        "load_snapshot": ("graphify.snapshot", "load_snapshot"),
+        "list_snapshots": ("graphify.snapshot", "list_snapshots"),
+        "snapshots_dir": ("graphify.snapshot", "snapshots_dir"),
+        "auto_snapshot_and_delta": ("graphify.snapshot", "auto_snapshot_and_delta"),
     }
     if name in _map:
         import importlib

@@ -644,6 +644,22 @@ def render_note(
         # IN-05: caller-supplied date wins; default to today for back-compat.
         created=created if created is not None else datetime.date.today(),
     )
+
+    # Phase 10 D-15: forward-map wikilinks from eliminated IDs via Obsidian aliases.
+    # Only emitted when merged_from is non-empty; absent = byte-identical to pre-Phase-10.
+    merged_from_ids = node.get("merged_from") or []
+    if merged_from_ids:
+        # Sort + dedupe; sanitize each alias for wikilink safety (T-10-05)
+        aliases_list = sorted({
+            _sanitize_wikilink_alias(str(mid))
+            for mid in merged_from_ids
+            if isinstance(mid, str) and mid
+        })
+        # Filter any sanitized-to-empty results (T-10-05 defense: | → space, etc.)
+        aliases_list = [a for a in aliases_list if a.strip()]
+        if aliases_list:
+            frontmatter_fields["aliases"] = aliases_list
+
     frontmatter = _dump_frontmatter(frontmatter_fields)
 
     wayfinder = _build_wayfinder_callout(

@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Test Commands
 
 ```bash
-pip install -e ".[all]"          # install with all optional deps (mcp, neo4j, pdf, watch, leiden, office)
+pip install -e ".[all]"          # install with all optional deps (mcp, neo4j, pdf, watch, leiden, office, routing)
 pip install -e ".[mcp,pdf,watch]" # install with CI-matching deps
+pip install -e ".[routing]"      # PyYAML + radon for heterogeneous routing (Phase 12)
 pytest tests/ -q                  # run all tests
 pytest tests/test_extract.py -q   # run a single test file
 pytest tests/test_extract.py::test_name -q  # run a single test
@@ -61,6 +62,16 @@ The CLI installs skill files and hooks for Claude Code, Codex, OpenCode, OpenCla
 3. Add suffix to `CODE_EXTENSIONS` in `detect.py` and `_WATCHED_EXTENSIONS` in `watch.py`
 4. Add tree-sitter package to `pyproject.toml`
 5. Add fixture in `tests/fixtures/` and tests in `tests/test_languages.py`
+
+## Upstream Sync
+
+This is a fork. The original repo is configured as the `upstream` remote (local bare clone at `graphify-origin`). To sync new upstream releases:
+
+1. `git fetch upstream` — pull the new vN branch
+2. `git checkout vN && git push origin vN` — push it to the fork
+3. `gh pr create --base main --head vN` — PR it into main
+
+Never commit directly to vN branches — they are clean import points from upstream. All custom work (e.g. ideaverse-integration) lives on feature branches merged into `main`.
 
 ## Testing Conventions
 

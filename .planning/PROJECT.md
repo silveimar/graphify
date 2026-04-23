@@ -8,42 +8,91 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
+## Current Milestone: v1.4 Agent Discoverability & Obsidian Workflows
+
+**Goal:** Make graphify discoverable to agents that don't already know it exists, package graphify-aware thinking commands for Obsidian vault users, and enable continuous background graph improvement. Phase 12 (Heterogeneous Extraction Routing) pulled forward from v1.3 deferral.
+
+**Prior milestone (v1.3) shipped 2026-04-17:** Phases 9.2 (Progressive Graph Retrieval), 10 (Cross-File Semantic Extraction with Entity Deduplication), 11 (Narrative Mode as Interactive Slash Commands). 19/19 plans, 14/15 requirements (TOKEN-04 Bloom filter stretch deferred per D-09). Full detail archived to `.planning/milestones/v1.3-*`.
+
+**Target features (v1.4 — scope confirmed 2026-04-17, requirements pending):**
+
+- Phase 12: Heterogeneous Extraction Routing — file-complexity-aware model routing (AST metrics → model choice); enables parallel multi-endpoint extraction
+- Phase 13: Agent Capability Manifest — machine-readable self-description of graphify's MCP server capabilities (pairs with SEED-002 Harness Memory Export: manifest declares MCP surface, export declares portability surface)
+- Phase 14: Obsidian Thinking Commands — graphify-aware slash commands for enriched vaults
+- Phase 15: Async Background Enrichment — post-build passes that enrich descriptions, detect emerging patterns, update staleness scores
+- Phase 16: Graph Argumentation Mode — knowledge graph as a shared cognitive map for structured LLM debates
+- Phase 17: Conversational Graph Chat — natural-language querying of the knowledge graph
+- Phase 18: Focus-Aware Graph Context — scope graph queries to the user's current editing focus
+
+**Seed activation for v1.4:**
+- **SEED-002 (Harness Memory Export) — ACTIVATED** per its own trigger condition ("v1.4 Phase 13 Agent Capability Manifest is being planned — these are natural companions"). Scope bundled with Phase 13.
+- SEED-001 (Tacit-to-Explicit Elicitation Engine) — remains planted. Trigger is user-side onboarding; v1.4 is agent-side discoverability. Re-evaluate at v1.5.
+
 ## Requirements
 
-### Validated (v1.0 — Ideaverse Integration milestone)
+### Validated
 
-- [x] `.graphify/` vault-side profile system with `profile.yaml` + `templates/` directory _(v1.0, Phase 1: Foundation)_
-- [x] Default built-in profile producing Ideaverse ACE-compatible output (Atlas/Maps, Atlas/Dots, Atlas/Sources) _(v1.0, Phase 1)_
-- [x] Profile YAML schema: folder_mapping, mapping_rules, merge behavior, naming conventions, Obsidian config — plus topology section _(v1.0, Phase 1)_
-- [x] Vault profile takes precedence over default; graceful fallback when no profile exists _(v1.0, Phase 1)_
-- [x] Path-traversal guard on every profile-derived file path (`validate_vault_path`) _(v1.0, Phase 1)_
-- [x] Safety helpers: `safe_filename` (NFC normalization, 200-char cap), `safe_tag` (slug/digit-prefix/plus-sign handling), `safe_frontmatter_value` (YAML injection neutralization) _(v1.0, Phase 1)_
-- [x] FIX-01..05 pre-existing bug fixes: YAML frontmatter injection, nondeterministic filename dedup, shallow tag sanitization, NFC normalization, filename length cap _(v1.0, Phase 1)_
-- [x] Markdown templates with placeholders for note generation per note type (MOC, Dot/Thing, Dot/Statement, Dot/Person, Source, Community Overview) _(v1.0, Phase 2: Template Engine)_
-- [x] Proper Ideaverse frontmatter generation: `up:`, `related:`, `collections:`, `created:`, `tags:` with wikilink format _(v1.0, Phase 2)_
-- [x] Wikilink generation respecting vault naming conventions _(v1.0, Phase 2)_
-- [x] Wayfinder generation in notes (configurable) _(v1.0, Phase 2)_
-- [x] Dataview query embedding in MOC notes via two-phase `string.Template.safe_substitute` (no Jinja2) _(v1.0, Phase 2)_
-- [x] User template overrides in `.graphify/templates/` with built-in fallback _(v1.0, Phase 2)_
-- [x] Configurable filename conventions (title_case, kebab-case, preserve) _(v1.0, Phase 2)_
-- [x] Mapping rules support both graph topology (god node, community hub, leaf node) and node content/attributes (`file_type`, `type`, custom attributes) _(v1.0, Phase 3: Mapping Engine)_
-- [x] Dual evaluation: attribute rules take precedence, then topology rules, then default _(v1.0, Phase 3)_
-- [x] Community-to-MOC mapping: communities above configurable member threshold become MOCs in the configured Maps folder with Dataview queries _(v1.0, Phase 3)_
-- [x] God-node-to-Dot mapping: high-degree abstraction nodes become Dots (Things) with connections as body content _(v1.0, Phase 3)_
-- [x] Source-file-to-Source mapping: origin files become Source notes in configured Sources folder (with file-type sub-folder routing) _(v1.0, Phase 3)_
-- [x] Community-to-MOC threshold configurable (default 3); below-threshold communities collapse into sub-community callouts in parent MOC _(v1.0, Phase 3)_
-- [x] Merge/update strategy for existing notes — update by default, preserve user-specified frontmatter fields, skip or replace as configured _(v1.0, Phase 4: Merge Engine)_
-- [x] `preserve_fields` list in profile specifies frontmatter fields graphify never overwrites (default: `rank`, `mapState`, `tags`) _(v1.0, Phase 4)_
-- [x] Frontmatter field-ordering preserved on update to minimize git diff noise _(v1.0, Phase 4)_
-- [x] Configurable merge strategy per profile: `update` (default), `skip`, `replace` _(v1.0, Phase 4)_
-- [x] `compute_merge_plan` + `apply_merge_plan` with CREATE/UPDATE/SKIP_PRESERVE/SKIP_CONFLICT/REPLACE/ORPHAN action types; content-hash skip for idempotent re-runs _(v1.0, Phase 4)_
-- [x] Replaces current `to_obsidian()` in `export.py` while maintaining backward compatibility (no profile = Atlas/Dots/Things layout identical to prior output) _(v1.0, Phase 5: Integration & CLI)_
-- [x] `graphify --obsidian --dry-run` previews all changes without writing any files _(v1.0, Phase 5)_
-- [x] `graphify --validate-profile <vault-path>` runs a four-layer preflight (schema → templates → dead-rules → path-safety) and exits with appropriate status _(v1.0, Phase 5)_
+**v1.0 — Ideaverse Integration:**
+- ✓ `.graphify/` vault-side profile system with `profile.yaml` + `templates/` directory — v1.0
+- ✓ Default built-in profile producing Ideaverse ACE-compatible output — v1.0
+- ✓ Profile YAML schema with folder_mapping, mapping_rules, merge behavior, naming, topology — v1.0
+- ✓ Vault profile precedence with graceful fallback — v1.0
+- ✓ Path-traversal guard (`validate_vault_path`) — v1.0
+- ✓ Safety helpers: `safe_filename`, `safe_tag`, `safe_frontmatter_value` — v1.0
+- ✓ FIX-01..05 pre-existing bug fixes — v1.0
+- ✓ 6 built-in Markdown templates (MOC, Thing, Statement, Person, Source, Community Overview) — v1.0
+- ✓ Ideaverse frontmatter generation with wikilinks — v1.0
+- ✓ Wayfinder generation, Dataview query embedding, user template overrides — v1.0
+- ✓ Configurable filename conventions (title_case, kebab-case, preserve) — v1.0
+- ✓ Dual mapping (topology + content attributes) with first-match-wins precedence — v1.0
+- ✓ Community-to-MOC, god-node-to-Dot, source-file-to-Source mapping — v1.0
+- ✓ Merge engine with CREATE/UPDATE/SKIP_PRESERVE/SKIP_CONFLICT/REPLACE/ORPHAN actions — v1.0
+- ✓ `preserve_fields`, field-ordering preservation, configurable merge strategy — v1.0
+- ✓ Refactored `to_obsidian()` with backward compatibility — v1.0
+- ✓ `graphify --obsidian --dry-run` and `graphify --validate-profile` CLI flags — v1.0
 
-### Active (v1.1+ candidates — deferred from v1.0 Out of Scope, unscoped until next milestone)
+**v1.1 — Context Persistence & Agent Memory:**
+- ✓ Graph snapshot persistence in `graphify-out/snapshots/` with FIFO retention — v1.1
+- ✓ `GRAPH_DELTA.md` with summary+archive pattern (added/removed nodes, community migration, connectivity changes) — v1.1
+- ✓ Per-node staleness metadata (FRESH/STALE/GHOST) with `extracted_at`, `source_hash`, `source_mtime` — v1.1
+- ✓ MCP mutation tools: `annotate_node`, `flag_node`, `add_edge` with JSONL sidecar persistence — v1.1
+- ✓ Peer identity tracking (`peer_id`, `session_id`, `timestamp`) on all annotations — v1.1
+- ✓ Session-scoped graph views via MCP — v1.1
+- ✓ `propose_vault_note` MCP tool with `graphify approve` CLI for human-in-the-loop — v1.1
+- ✓ Obsidian round-trip: content-hash manifest detects user-modified notes on re-run — v1.1
+- ✓ User sentinel blocks (`GRAPHIFY_USER_START/END`) — inviolable preservation zones — v1.1
+- ✓ `--force` flag, dry-run source annotations, merge plan audit trail — v1.1
+- ✓ MCP `get_node` provenance (staleness classification) and `get_agent_edges` query tool — v1.1
 
-_None yet. Next milestone to be defined via `/gsd-new-milestone`. Candidates captured from this milestone's exploration and v2 requirements list (see `.planning/milestones/v1.0-REQUIREMENTS.md`):_
+**v1.2 — Intelligent Analysis & Cross-File Extraction:** *(Shipped 2026-04-15, narrow scope: phases 9 + 9.1)*
+- ✓ Configurable analysis lenses (security, architecture, complexity, onboarding) with autoreason tournament A/B/AB/Borda — v1.2-REQ-09-A
+- ✓ "No finding" competes as first-class Borda option (Clean verdict) — v1.2-REQ-09-B
+- ✓ Tournament output in `GRAPH_ANALYSIS.md` separate from `GRAPH_REPORT.md` (D-80) — v1.2-REQ-09-C
+- ✓ Per-edge traversal counters via MCP query telemetry (`serve.py`) — v1.2-REQ-09.1-A
+- ✓ Hot-path strengthening and unused-path decay (`_edge_weight` + `_decay_telemetry`) — v1.2-REQ-09.1-B
+- ✓ 2-hop A→C derived edges with INFERRED confidence via `_check_derived_edges` — v1.2-REQ-09.1-C
+- ✓ Hot/cold paths surfaced in `GRAPH_REPORT.md` "## Usage Patterns" section — v1.2-REQ-09.1-D
+
+**v1.3 — Intelligent Analysis Continuation:** *(Shipped 2026-04-17, phases 9.2 + 10 + 11)*
+- ✓ Token-aware 3-layer MCP `graph_query` with `budget` parameter and cardinality estimation — TOKEN-01, TOKEN-02
+- ✓ Bidirectional BFS for depth ≥ 3 with 3-state status return (`ok` / `frontiers_disjoint` / `budget_exhausted`) — TOKEN-03
+- ✓ Import-connected file clustering with token-budget soft cap + topological ordering — GRAPH-01
+- ✓ Post-extraction entity deduplication via fuzzy (`difflib`) + embedding (`sentence-transformers`) — GRAPH-02
+- ✓ Canonical merge with edge re-routing, weight aggregation (sum/max), EXTRACTED>INFERRED>AMBIGUOUS precedence — GRAPH-03
+- ✓ Cross-source ontology alignment (stretch: same entity across `.py` + `.md` + `tests/` resolves to one canonical node) — GRAPH-04
+- ✓ `/context` slash command — graph_summary MCP tool returns god nodes + top communities + recent deltas — SLASH-01
+- ✓ `/trace <entity>` slash command — entity_trace walks snapshot chain with memory discipline — SLASH-02
+- ✓ `/connect <topic-a> <topic-b>` slash command — shortest path + globally surprising bridges as distinct sections — SLASH-03
+- ✓ `/drift` slash command — drift_nodes trend vectors (community / degree / edge-density) across last N snapshots — SLASH-04
+- ✓ `/emerge` slash command — newly_formed_clusters via v1.1 delta machinery — SLASH-05
+- ✓ `/ghost` slash command (stretch, annotation-grounded with anti-impersonation guard) — SLASH-06
+- ✓ `/challenge <belief>` slash command (stretch, anti-fabrication guard + supporting/contradicting sections) — SLASH-07
+
+### Active
+
+Milestone **v1.4 Agent Discoverability & Obsidian Workflows** opened 2026-04-17; scope confirmed via `/gsd-new-milestone v1.4` on 2026-04-17. Phase 12 (Heterogeneous Extraction Routing) pulled forward from v1.3 deferral. Additional phases: 13 Agent Capability Manifest (+ SEED-002 Harness Memory Export), 14 Obsidian Thinking Commands, 15 Async Background Enrichment, 16 Graph Argumentation Mode, 17 Conversational Graph Chat, 18 Focus-Aware Graph Context. Requirements being defined after parallel domain research.
+
+### Deferred (v1.3+ — template engine extensions from v1.0)
 
 - [ ] Conditional template sections (`{{#if_god_node}}...{{/if}}` guards) — TMPL-01
 - [ ] Loop blocks for connections in templates (`{{#connections}}...{{/connections}}`) — TMPL-02
@@ -70,6 +119,25 @@ _None yet. Next milestone to be defined via `/gsd-new-milestone`. Candidates cap
 - **Codebase state:** 11,620 LOC across 24 Python modules under `graphify/`; 10,500 LOC across 33 test files under `tests/`; 872 tests passing.
 - **Shipped in:** 5 phases, 22 plans, ~172 commits over 2 days (2026-04-09 → 2026-04-11), fully verified with goal-backward VERIFICATION.md for each phase plus milestone audit (31/31 in-scope requirements satisfied, 2 de-scoped via D-74).
 - **Tech stack additions:** PyYAML as optional `obsidian` extra (guarded regression test in `tests/test_pyproject.py`).
+
+### v1.1 Phase 7 complete (2026-04-13)
+
+- **Delivered:** MCP write-back and peer modeling. Extended `serve.py` with 5 new MCP tools (annotate_node, flag_node, add_edge, propose_vault_note, get_annotations), JSONL/JSON sidecar persistence, peer/session identity tracking, mtime-based graph reload, and startup compaction. Added `graphify approve` CLI subcommand for human-in-the-loop proposal review. graph.json never mutated by any tool.
+- **Test count:** 952 passing (57 new across `test_serve.py` and `test_approve.py`).
+- **Shipped in:** 3 plans across 3 waves, 11 commits.
+
+### v1.1 Phase 8 complete (2026-04-13)
+
+- **Delivered:** Obsidian round-trip awareness. Content-hash manifest (`vault-manifest.json`) tracks what graphify wrote per note. On re-run, user-modified notes receive SKIP_PRESERVE — user content never overwritten. User sentinel blocks (`<!-- GRAPHIFY_USER_START -->` / `<!-- GRAPHIFY_USER_END -->`) provide explicit preservation zones that survive even REPLACE strategy and `--force` mode. `--force` flag bypasses whole-note user-modified detection while respecting sentinel blocks. Dry-run output enhanced with source annotations (`[user]`/`[both]`) and summary preamble.
+- **Test count:** 985 passing (33 new across 5 test classes in `test_merge.py`).
+- **Shipped in:** 3 plans across 3 waves, 9 feature commits.
+
+### v1.2 shipped (2026-04-15)
+
+- **Delivered:** Intelligent analysis and usage-weighted graph self-improvement. Phase 09 added the autoreason tournament (`render_analysis_context` in `analyze.py:456`, `render_analysis` in `report.py:185`, full A/B/AB/Borda tournament orchestration in `skill.md:1324-1546` writing to `GRAPH_ANALYSIS.md` — separate from `GRAPH_REPORT.md` per D-80). Phase 09.1 added query telemetry (`_record_traversal`, `_save_telemetry`, `_edge_weight`, `_decay_telemetry` in `serve.py`), 2-hop derived shortcut edges with INFERRED confidence (`_check_derived_edges` writes to `agent-edges.json`), and hot/cold path surfacing (`_compute_hot_cold` in `report.py:16`, "## Usage Patterns" section at `report.py:219`). Skill pipeline wired to pass `usage_data=` to all 3 `generate()` call sites and run `_decay_telemetry` at both full-rebuild points.
+- **Test count:** ~1,108 passing (108 new across `test_serve.py` + `test_report.py`).
+- **Shipped in:** 2 phases, 6 plans, ~20 feature commits over 2 days (2026-04-14 → 2026-04-15). Formal goal-backward verification recorded in `09-VERIFICATION.md` (11/12, 1 human_needed resolved via `09-HUMAN-UAT.md` 3/3) and `09.1-VERIFICATION.md` (13/13, generated via Phase 9.1.1 Plan 01 from existing UAT/VALIDATION/SECURITY evidence). 14/14 security threats closed (ASVS L1).
+- **Narrow-scope reconciliation:** Milestone v1.2 originally listed 6 phases (9, 9.1, 9.2, 10, 11, 12) in the ROADMAP. During the `/gsd-audit-milestone` review on 2026-04-16 the operator locked v1.2 at phases 9 + 9.1. Phases 9.2, 10, 11, 12 moved to a new milestone v1.3 "Intelligent Analysis Continuation"; the original v1.3 (Agent Discoverability) renamed to v1.4. Reconciliation executed by Phase 9.1.1 lifecycle cleanup.
 
 ### Enduring background (carries across milestones)
 
@@ -122,17 +190,21 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Current State
 
-**Milestone v1.0 — Ideaverse Integration — Configurable Vault Adapter: ✅ SHIPPED 2026-04-11**
+**Shipped v1.0** (2026-04-11) — Configurable Obsidian vault adapter. 5 phases, 22 plans, 31/31 requirements, 872 tests. See `.planning/milestones/v1.0-*`.
 
-All five v1.0 phases delivered and verified. The configurable vault adapter is the production `to_obsidian()` code path; there is no separate opt-in flag.
+**Shipped v1.1** (2026-04-13) — Context persistence and agent memory. 5 phases, 12 plans, 25/25 requirements, 1,000 tests. See `.planning/milestones/v1.1-*`.
 
-- **Phase 1 (Foundation)** — ✅ Complete & verified. `graphify/profile.py` delivers profile loading, validation, safe-filename/tag helpers, and security primitives. Retroactive `01-VERIFICATION.md` closes the evidence gap found by milestone audit.
-- **Phase 2 (Template Engine)** — ✅ Complete & verified (5/5 must-haves). `graphify/templates.py` renders MOC, Community, Thing, Statement, Person, and Source notes via `string.Template` + 6 built-in `.md` templates shipped in the wheel. `render_note()` / `render_moc()` / `render_community_overview()` are the public entry points.
-- **Phase 3 (Mapping Engine)** — ✅ Complete & verified (5/5 must-haves). `graphify/mapping.py` drives topology + attribute classification with first-match-wins precedence. `ClassificationContext` and `_NOTE_TYPES` are the shared types consumed downstream.
-- **Phase 4 (Merge Engine)** — ✅ Complete & verified (28/28 must-haves). `graphify/merge.py` delivers `compute_merge_plan` (pure) and `apply_merge_plan` (atomic writes, content-hash skip, ORPHAN-preservation). `MergePlan`, `MergeAction`, `RenderedNote`, `split_rendered_note`, `format_merge_plan` all exported.
-- **Phase 5 (Integration & CLI)** — ✅ Complete & re-verified (3/3 must-haves). Refactored `to_obsidian()` wires all four modules into a single entry point. `graphify --obsidian [--dry-run]` and `graphify --validate-profile` land in `__main__.py:691-740`. Gap-closure plan 05-06 and subsequent WR-01/WR-02 code-review fixes finished the milestone.
+**Shipped v1.2** (2026-04-15) — Intelligent analysis & cross-file extraction (narrow scope, + Phase 9.1.1 retroactive lifecycle cleanup). 3 phases, 9 plans, 10/10 requirements satisfied, milestone audit passed (5/5 integration links WIRED, 3/3 E2E flows COMPLETE). See `.planning/milestones/v1.2-*`.
 
-**Next up:** `/gsd-new-milestone` — define v1.1 scope from the "Active (v1.1+ candidates)" list above plus any new requirements that emerge from using v1.0 in production.
+**Shipped v1.3** (2026-04-17) — Intelligent analysis continuation. 3 phases (9.2, 10, 11), 19 plans, 14/15 requirements satisfied (TOKEN-04 Bloom filter stretch deferred per D-09). Progressive Graph Retrieval (token-aware 3-layer MCP `query_graph` + bidirectional BFS), Cross-File Semantic Extraction with Entity Deduplication (import-cluster batching + fuzzy/embedding entity merge with alias redirect), Narrative Mode as Interactive Slash Commands (7 `.claude/commands/*.md` files + 5 new MCP tools). 2 production-breaking bugs caught by post-execution code review and auto-fixed before shipping. See `.planning/milestones/v1.3-*`.
+
+**Codebase:** Python 3.10/3.12; `graphify/` ~16,481 LOC across modules; `tests/` ~16,529 LOC with 1,234 tests passing (up from 1,023 at v1.2 close). 108 files changed in v1.3, +24,057 / −161 lines.
+
+**v1.4 progress:** Phase 12 Heterogeneous Extraction Routing complete (2026-04-17) — `graphify/routing.py`, model-isolated cache keys (`ROUTE-04`), optional `extract(..., router=...)`, `routing.json` audit, P2 cost/canary/vision, `graphify run --router`. Verified: full `pytest` suite green.
+
+## Next Milestone Goals
+
+v1.4 milestone opened 2026-04-17; scope confirmed and requirements pending (see Current Milestone section above). v1.5+ is unscoped — revisit after v1.4 ships and user feedback lands. SEED-001 (Tacit Elicitation) remains a candidate for v1.5+ if onboarding/discovery becomes the milestone theme.
 
 ---
-*Last updated: 2026-04-11 after v1.0 milestone completion*
+*Last updated: 2026-04-17 — Phase 12 complete; remaining v1.4 phases 13–18 per ROADMAP build order*

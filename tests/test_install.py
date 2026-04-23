@@ -8,7 +8,7 @@ PLATFORMS = {
     "claude": (".claude/skills/graphify/SKILL.md",),
     "codex": (".agents/skills/graphify/SKILL.md",),
     "opencode": (".config/opencode/skills/graphify/SKILL.md",),
-    "claw": (".claw/skills/graphify/SKILL.md",),
+    "claw": (".openclaw/skills/graphify/SKILL.md",),
     "droid": (".factory/skills/graphify/SKILL.md",),
     "trae": (".trae/skills/graphify/SKILL.md",),
     "trae-cn": (".trae-cn/skills/graphify/SKILL.md",),
@@ -39,7 +39,7 @@ def test_install_opencode(tmp_path):
 
 def test_install_claw(tmp_path):
     _install(tmp_path, "claw")
-    assert (tmp_path / ".claw" / "skills" / "graphify" / "SKILL.md").exists()
+    assert (tmp_path / ".openclaw" / "skills" / "graphify" / "SKILL.md").exists()
 
 
 def test_install_droid(tmp_path):
@@ -265,6 +265,37 @@ def test_cursor_uninstall_noop_if_not_installed(tmp_path):
     _cursor_uninstall(tmp_path)  # should not raise
 
 
+def test_install_cursor_via_install_helper(tmp_path, monkeypatch):
+    """Regression CR-02: install(platform='cursor') must not raise TypeError.
+
+    Before the fix, _cursor_install() was called with zero arguments inside
+    install(), but the function signature requires project_dir: Path.
+    This test calls the public install() helper with platform='cursor' and
+    verifies it succeeds without TypeError.
+    """
+    import graphify.__main__ as m
+    # Patch _cursor_install to write into tmp_path instead of cwd
+    called_with = []
+
+    def _fake_cursor_install(project_dir):
+        called_with.append(project_dir)
+        # Simulate the real function writing to project_dir
+        rule = project_dir / ".cursor" / "rules" / "graphify.mdc"
+        rule.parent.mkdir(parents=True, exist_ok=True)
+        rule.write_text("# graphify cursor rule\nalwaysApply: true\n")
+
+    monkeypatch.setattr(m, "_cursor_install", _fake_cursor_install)
+
+    # Must not raise TypeError
+    m.install(platform="cursor")
+
+    assert called_with, "_cursor_install was never called"
+    # Argument must be a Path (not missing)
+    assert isinstance(called_with[0], m.Path), (
+        f"_cursor_install was called with {called_with[0]!r}, expected a Path"
+    )
+
+
 # ── Gemini CLI ────────────────────────────────────────────────────────────────
 
 def test_gemini_install_writes_gemini_md(tmp_path):
@@ -318,3 +349,226 @@ def test_gemini_uninstall_removes_hook(tmp_path):
 def test_gemini_uninstall_noop_if_not_installed(tmp_path):
     from graphify.__main__ import gemini_uninstall
     gemini_uninstall(tmp_path)  # should not raise
+
+
+# ── Phase 11: command file install/uninstall tests ────────────────────────────
+
+def test_install_command_files_claude(tmp_path):
+    """D-13: install on claude copies all 5 core command files to .claude/commands/."""
+    from unittest.mock import patch
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+    commands_dir = tmp_path / ".claude" / "commands"
+    for name in ("context.md", "trace.md", "connect.md", "drift.md", "emerge.md"):
+        assert (commands_dir / name).exists(), f"Missing {name} after install"
+
+
+def test_install_command_files_windows(tmp_path):
+    """Plan-checker BLOCKER 3: windows uses the same .claude/commands/ convention as claude.
+
+    RESEARCH.md §Install Path Extension confirms windows has native Claude Code
+    commands support. Without this test, a regression that disables commands on
+    windows (commands_enabled=False) would silently ship.
+    """
+    from unittest.mock import patch
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="windows")
+    commands_dir = tmp_path / ".claude" / "commands"
+    for name in ("context.md", "trace.md", "connect.md", "drift.md", "emerge.md"):
+        assert (commands_dir / name).exists(), f"Missing {name} after install on windows"
+
+
+def test_install_no_commands_flag(tmp_path):
+    """D-14: --no-commands skips command-file copy."""
+    from unittest.mock import patch
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude", no_commands=True)
+    commands_dir = tmp_path / ".claude" / "commands"
+    assert not commands_dir.exists() or not any(commands_dir.glob("*.md"))
+
+
+def test_install_idempotent_commands(tmp_path):
+    """D-14: re-running install is idempotent — overwrites in place."""
+    from unittest.mock import patch
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+        install(platform="claude")   # second run must not raise
+    assert (tmp_path / ".claude" / "commands" / "context.md").exists()
+
+
+def test_uninstall_removes_commands(tmp_path):
+    """D-14: uninstall removes previously-installed command files."""
+    from unittest.mock import patch
+    from graphify.__main__ import install, uninstall
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+        uninstall(platform="claude")
+    commands_dir = tmp_path / ".claude" / "commands"
+    for name in ("context.md", "trace.md", "connect.md", "drift.md", "emerge.md"):
+        assert not (commands_dir / name).exists(), f"{name} not removed after uninstall"
+
+
+def test_uninstall_directory_scan(tmp_path):
+    """OBSCMD-01: _uninstall_commands scans graphify/commands/*.md,
+    not a hardcoded whitelist."""
+    from unittest.mock import patch
+    from graphify.__main__ import install, uninstall
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+        uninstall(platform="claude")
+    dst = tmp_path / ".claude" / "commands"
+    # Both legacy and non-legacy names must be removed (proves source-driven scan)
+    for name in ["connect.md", "ask.md", "argue.md", "context.md", "trace.md"]:
+        assert not (dst / name).exists(), f"{name} not removed by directory-scan uninstall"
+
+
+def test_uninstall_idempotent(tmp_path):
+    """OBSCMD-01: repeated uninstall is a no-op (no exceptions)."""
+    from unittest.mock import patch
+    from graphify.__main__ import install, uninstall
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+        uninstall(platform="claude")
+        uninstall(platform="claude")  # must not raise
+
+
+def test_install_non_claude_platform_skips_commands(tmp_path):
+    """D-13: non-Claude platforms (commands_enabled=False) do not receive command files.
+
+    Note: `windows` IS Claude Code (commands_enabled=True); this test uses `codex`
+    which has no native slash-command support.
+    """
+    from unittest.mock import patch
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="codex")   # commands_enabled=False for codex
+    # .claude/commands/ should not exist (or be empty) for a codex install
+    assert not (tmp_path / ".claude" / "commands").exists() or \
+        not any((tmp_path / ".claude" / "commands").glob("*.md"))
+
+
+# ============================================================
+# Phase 14 Plan 01 — OBSCMD-02: target filter + --no-obsidian-commands
+# ============================================================
+
+LEGACY_COMMAND_NAMES = (
+    "argue", "ask", "challenge", "connect", "context",
+    "drift", "emerge", "ghost", "trace",
+)
+
+
+def test_install_missing_target_defaults_both(tmp_path):
+    """OBSCMD-02: a command file without `target:` frontmatter defaults to 'both'."""
+    from graphify.__main__ import _read_command_target
+    f = tmp_path / "nofield.md"
+    f.write_text(
+        "---\nname: foo\ndisable-model-invocation: true\n---\n\nBody.\n",
+        encoding="utf-8",
+    )
+    assert _read_command_target(f) == "both"
+
+
+def test_read_command_target_parses_obsidian(tmp_path):
+    """_read_command_target extracts target: obsidian from frontmatter."""
+    from graphify.__main__ import _read_command_target
+    f = tmp_path / "vault-only.md"
+    f.write_text(
+        "---\nname: graphify-vault\ntarget: obsidian\n---\n\nBody.\n",
+        encoding="utf-8",
+    )
+    assert _read_command_target(f) == "obsidian"
+
+
+def test_read_command_target_parses_code(tmp_path):
+    """_read_command_target extracts target: code from frontmatter."""
+    from graphify.__main__ import _read_command_target
+    f = tmp_path / "code-only.md"
+    f.write_text(
+        "---\nname: graphify-code\ntarget: code\n---\n\nBody.\n",
+        encoding="utf-8",
+    )
+    assert _read_command_target(f) == "code"
+
+
+def test_install_filters_by_target(tmp_path, monkeypatch):
+    """OBSCMD-02: _install_commands skips files whose target is not in platform supports."""
+    from graphify.__main__ import _install_commands
+    # Build synthetic src dir with an obsidian-only file and a both file
+    src_dir = tmp_path / "src_commands"
+    src_dir.mkdir()
+    (src_dir / "vault-only.md").write_text(
+        "---\nname: graphify-vault\ntarget: obsidian\n---\nBody\n",
+        encoding="utf-8",
+    )
+    (src_dir / "universal.md").write_text(
+        "---\nname: graphify-universal\ntarget: both\n---\nBody\n",
+        encoding="utf-8",
+    )
+    dst_dir = tmp_path / ".claude" / "commands"
+    cfg = {
+        "commands_enabled": True,
+        "commands_dst": Path(".claude") / "commands",
+        "supports": ["code"],  # NOT including obsidian
+    }
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        _install_commands(cfg, src_dir, verbose=False)
+    assert (dst_dir / "universal.md").exists(), "target: both must install on code-only platform"
+    assert not (dst_dir / "vault-only.md").exists(), "target: obsidian must be filtered out"
+
+
+def test_install_filter_allows_matching_target(tmp_path):
+    """OBSCMD-02: target: obsidian installs on a platform whose supports includes obsidian."""
+    from graphify.__main__ import _install_commands
+    src_dir = tmp_path / "src_commands"
+    src_dir.mkdir()
+    (src_dir / "vault-only.md").write_text(
+        "---\nname: graphify-vault\ntarget: obsidian\n---\nBody\n",
+        encoding="utf-8",
+    )
+    cfg = {
+        "commands_enabled": True,
+        "commands_dst": Path(".claude") / "commands",
+        "supports": ["code", "obsidian"],
+    }
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        _install_commands(cfg, src_dir, verbose=False)
+    assert (tmp_path / ".claude" / "commands" / "vault-only.md").exists()
+
+
+def test_no_obsidian_commands_flag(tmp_path):
+    """OBSCMD-02: --no-obsidian-commands suppresses target: obsidian files."""
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude", no_obsidian_commands=True)
+    dst = tmp_path / ".claude" / "commands"
+    # All 9 legacy commands are target: both → survive the flag
+    for name in LEGACY_COMMAND_NAMES:
+        assert (dst / f"{name}.md").exists(), f"{name}.md (target: both) must survive --no-obsidian-commands"
+
+
+def test_legacy_commands_still_install(tmp_path):
+    """Regression: all 9 legacy commands still install on claude after Plan 01."""
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+    dst = tmp_path / ".claude" / "commands"
+    for name in LEGACY_COMMAND_NAMES:
+        assert (dst / f"{name}.md").exists(), f"{name}.md must still install"
+
+
+def test_platform_config_has_supports_key():
+    """Every _PLATFORM_CONFIG entry must declare a `supports` list."""
+    from graphify.__main__ import _PLATFORM_CONFIG
+    for plat, cfg in _PLATFORM_CONFIG.items():
+        assert "supports" in cfg, f"platform {plat!r} missing 'supports' key"
+        assert isinstance(cfg["supports"], list) and cfg["supports"], (
+            f"platform {plat!r}: 'supports' must be a non-empty list"
+        )
+        for s in cfg["supports"]:
+            assert s in ("code", "obsidian"), (
+                f"platform {plat!r}: unknown support target {s!r}"
+            )

@@ -126,3 +126,63 @@ def test_to_html_contains_nodes_and_edges():
         content = out.read_text()
         assert "RAW_NODES" in content
         assert "RAW_EDGES" in content
+
+
+# ---------------------------------------------------------------------------
+# Phase 10 Plan 07: obsidian_dedup wiring (D-15)
+# ---------------------------------------------------------------------------
+
+def test_to_obsidian_obsidian_dedup_hydrates_merged_from(tmp_path):
+    """--obsidian-dedup populates G.nodes[canonical]['merged_from'] from dedup_report.json."""
+    from graphify.export import to_obsidian
+    import networkx as nx
+    import json
+
+    G = nx.Graph()
+    G.add_node("authservice", label="AuthService", file_type="code",
+               source_file="a.py", community=0)
+    # graphify-out/ layout: dedup_report.json lives as sibling of obsidian/
+    out_root = tmp_path / "graphify-out"
+    out_root.mkdir()
+    obsidian_dir = out_root / "obsidian"
+    obsidian_dir.mkdir()
+    report = {
+        "version": "1",
+        "alias_map": {"auth": "authservice"},
+        "merges": [{
+            "canonical_id": "authservice",
+            "canonical_label": "AuthService",
+            "eliminated": [{"id": "auth", "label": "auth", "source_file": "b.py"}],
+            "fuzzy_score": 0.95,
+            "cosine_score": 0.90,
+        }],
+    }
+    (out_root / "dedup_report.json").write_text(json.dumps(report), encoding="utf-8")
+
+    result = to_obsidian(
+        G,
+        communities={0: ["authservice"]},
+        output_dir=str(obsidian_dir),
+        dry_run=True,
+        obsidian_dedup=True,
+    )
+    # After hydration, the node's merged_from list must include 'auth'
+    assert "auth" in G.nodes["authservice"].get("merged_from", [])
+
+
+def test_to_obsidian_default_no_dedup_hydration(tmp_path):
+    """Backward compat: default obsidian_dedup=False leaves merged_from untouched."""
+    from graphify.export import to_obsidian
+    import networkx as nx
+
+    G = nx.Graph()
+    G.add_node("foo", label="Foo", file_type="code", source_file="a.py", community=0)
+    obsidian_dir = tmp_path / "obsidian"
+    obsidian_dir.mkdir()
+    to_obsidian(
+        G,
+        communities={0: ["foo"]},
+        output_dir=str(obsidian_dir),
+        dry_run=True,
+    )
+    assert "merged_from" not in G.nodes["foo"]

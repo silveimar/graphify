@@ -6,9 +6,9 @@
 [![PyPI](https://img.shields.io/pypi/v/graphifyy)](https://pypi.org/project/graphifyy/)
 [![Sponsor](https://img.shields.io/badge/sponsor-safishamsi-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/safishamsi)
 
-**AIコーディングアシスタント向けのスキル。** Claude Code、Codex、OpenCode、OpenClaw、Factory Droid で `/graphify` と入力するだけで、ファイルを読み込んでナレッジグラフを構築し、あなたが気づいていなかった構造を返します。コードベースをより速く理解し、アーキテクチャ上の意思決定の「なぜ」を見つけ出します。
+**AIコーディングアシスタント向けのスキル。** Claude Code、Codex、OpenCode、Cursor、Gemini CLI、GitHub Copilot CLI、Aider、OpenClaw、Factory Droid、Trae、または Google Antigravity で `/graphify` と入力するだけで、ファイルを読み込んでナレッジグラフを構築し、あなたが気づいていなかった構造を返します。コードベースをより速く理解し、アーキテクチャ上の意思決定の「なぜ」を見つけ出します。
 
-完全にマルチモーダル対応。コード、PDF、Markdown、スクリーンショット、図、ホワイトボード写真、他言語の画像まで――graphify は Claude Vision を使ってそれらすべてから概念と関係性を抽出し、1 つのグラフに接続します。tree-sitter AST により 19 言語をサポート（Python、JS、TS、Go、Rust、Java、C、C++、Ruby、C#、Kotlin、Scala、PHP、Swift、Lua、Zig、PowerShell、Elixir、Objective-C）。
+完全にマルチモーダル対応。コード、PDF、Markdown、スクリーンショット、図、ホワイトボード写真、他言語の画像、さらにビデオや音声ファイルまで――graphify はこれらすべてから概念と関係性を抽出し、1 つのグラフに接続します。ビデオはコーパスから導出されたドメイン認識プロンプトを使用して Whisper でローカル転写されます。tree-sitter AST により 22 言語をサポート（Python、JS、TS、Go、Rust、Java、C、C++、Ruby、C#、Kotlin、Scala、PHP、Swift、Lua、Zig、PowerShell、Elixir、Objective-C、Julia、Vue、Svelte）。
 
 > Andrej Karpathy は論文、ツイート、スクリーンショット、メモを放り込む `/raw` フォルダを持っています。graphify はまさにその問題への答えです――生ファイルを読むのに比べて1クエリあたりのトークン数が 71.5 倍少なく、セッションをまたいで永続化され、見つけたものと推測したものを正直に区別します。
 
@@ -46,7 +46,7 @@ graphify は 2 パスで動作します。まず、決定論的な AST パスが
 
 ## インストール
 
-**必要なもの:** Python 3.10+ および以下のいずれか： [Claude Code](https://claude.ai/code), [Codex](https://openai.com/codex), [OpenCode](https://opencode.ai), [OpenClaw](https://openclaw.ai), または [Factory Droid](https://factory.ai)
+**必要なもの:** Python 3.10+ および以下のいずれか： [Claude Code](https://claude.ai/code), [Codex](https://openai.com/codex), [OpenCode](https://opencode.ai), [Cursor](https://cursor.com), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli), [Aider](https://aider.chat), [OpenClaw](https://openclaw.ai), [Factory Droid](https://factory.ai), [Trae](https://trae.ai), または [Google Antigravity](https://antigravity.google)
 
 ```bash
 pip install graphifyy && graphify install
@@ -62,10 +62,17 @@ pip install graphifyy && graphify install
 | Claude Code (Windows) | `graphify install`（自動検出）または `graphify install --platform windows` |
 | Codex | `graphify install --platform codex` |
 | OpenCode | `graphify install --platform opencode` |
+| GitHub Copilot CLI | `graphify install --platform copilot` |
+| Aider | `graphify install --platform aider` |
 | OpenClaw | `graphify install --platform claw` |
 | Factory Droid | `graphify install --platform droid` |
+| Trae | `graphify install --platform trae` |
+| Trae CN | `graphify install --platform trae-cn` |
+| Gemini CLI | `graphify install --platform gemini` |
+| Cursor | `graphify cursor install` |
+| Google Antigravity | `graphify antigravity install` |
 
-Codex ユーザーは並列抽出のために `~/.codex/config.toml` の `[features]` の下に `multi_agent = true` も必要です。Factory Droid は並列サブエージェントディスパッチに `Task` ツールを使用します。OpenClaw は逐次抽出を使用します（並列エージェントサポートはこのプラットフォームではまだ初期段階です）。
+Codex ユーザーは並列抽出のために `~/.codex/config.toml` の `[features]` の下に `multi_agent = true` も必要です。Factory Droid は並列サブエージェントディスパッチに `Task` ツールを使用します。OpenClaw と Aider は逐次抽出を使用します（並列エージェントサポートはこれらのプラットフォームではまだ初期段階です）。Trae は Agent ツールで並列サブエージェントディスパッチを行い、PreToolUse フックは**サポートしていません** ―― AGENTS.md が常時有効のメカニズムです。
 
 次に、AI コーディングアシスタントを開いて入力します：
 
@@ -203,6 +210,25 @@ graphify query "..." --graph path/to/graph.json
 **Git フック** (`graphify hook install`) - post-commit と post-checkout フックをインストールします。コミットごと、ブランチ切り替えごとにグラフが自動的に再構築されます。再構築が失敗した場合、フックは非ゼロコードで終了するため、git がエラーを表面化し、静かに続行することはありません。バックグラウンドプロセスは不要です。
 
 **Wiki** (`--wiki`) - コミュニティごとおよびゴッドノードごとの Wikipedia スタイルの Markdown 記事と、`index.md` エントリポイント。任意のエージェントを `index.md` に向ければ、JSON をパースする代わりにファイルを読むことでナレッジベースをナビゲートできます。
+
+## Obsidian vault アダプター（Ideaverse 統合）
+
+`--obsidian` はナレッジグラフを構造化された Obsidian vault としてエクスポートします――適切なフロントマター、wikilinks、タグ、Dataview クエリ、フォルダ配置を含みます。アダプターは完全にプロファイル駆動型で、ターゲット vault の `.graphify/profile.yaml` を読み取り、vault のフレームワークに合ったノートを生成します。
+
+プロファイルがない場合、デフォルトで [Ideaverse](https://ideaverse.com) 互換の ACE 構造（`Atlas/Maps/`、`Atlas/Dots/Things/` など）を生成します。Ideaverse、PARA、カスタム設定――任意の Obsidian vault フレームワーク用にカスタムプロファイルを記述でき、コード変更は不要です。
+
+```bash
+# プロファイルの検証
+graphify --validate-profile ~/vaults/myproject
+
+# マージプランのプレビュー（ファイルは書き込まない）
+graphify --obsidian --obsidian-dir ~/vaults/myproject --dry-run
+
+# 完全エクスポート
+graphify --obsidian --obsidian-dir ~/vaults/myproject
+```
+
+3 つのマージ戦略をサポート：`update`（デフォルト、ユーザー編集フィールドを保持）、`skip`（既存ノートを上書きしない）、`replace`（完全に上書き）。グラフから削除されたノードに対応するノートは自動削除されません。
 
 ## 実例
 

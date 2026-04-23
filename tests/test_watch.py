@@ -66,3 +66,89 @@ def test_watch_raises_without_watchdog(tmp_path, monkeypatch):
     from graphify.watch import watch
     with pytest.raises(ImportError, match="watchdog not installed"):
         watch(tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Plan 15-05 Task 2: opt-in --enrich trigger + atexit cleanup (ENRICH-06, Pitfall 4)
+# ---------------------------------------------------------------------------
+
+def test_enrichment_trigger_opt_in(tmp_path, monkeypatch):
+    """ENRICH-06: enabled=False spawns nothing; enabled=True spawns exactly one child."""
+    import subprocess as _subprocess
+    import graphify.watch as watch_mod
+
+    out_dir = tmp_path / "graphify-out"
+    out_dir.mkdir()
+
+    popen_calls: list[list[str]] = []
+
+    class _FakePopen:
+        def __init__(self, argv, **kw):
+            popen_calls.append(list(argv))
+            self.pid = 99999
+
+        def poll(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+        def terminate(self):
+            pass
+
+        def kill(self):
+            pass
+
+    fake_subprocess = type("M", (), {
+        "Popen": _FakePopen,
+        "DEVNULL": None,
+        "TimeoutExpired": _subprocess.TimeoutExpired,
+    })
+    monkeypatch.setattr(watch_mod, "subprocess", fake_subprocess)
+
+    watch_mod._active_enrichment_child = None
+    try:
+        # enabled=False → no call
+        watch_mod._maybe_trigger_enrichment(out_dir, enabled=False)
+        assert popen_calls == []
+
+        # enabled=True → exactly one call, argv contains 'enrich' + '--graph'
+        watch_mod._maybe_trigger_enrichment(out_dir, enabled=True)
+        assert len(popen_calls) == 1
+        assert "enrich" in popen_calls[0]
+        assert "--graph" in popen_calls[0]
+
+        # If a child is still running (poll() is None), subsequent calls skip
+        watch_mod._maybe_trigger_enrichment(out_dir, enabled=True)
+        assert len(popen_calls) == 1, "prior running child should suppress new spawn"
+    finally:
+        watch_mod._active_enrichment_child = None
+
+
+def test_watch_atexit_terminates_child(monkeypatch):
+    """Pitfall 4: atexit handler SIGTERMs a still-running enrichment child."""
+    import graphify.watch as watch_mod
+
+    terminated: list[bool] = []
+
+    class _RunningChild:
+        pid = 12345
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            terminated.append(True)
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            pass
+
+    watch_mod._active_enrichment_child = _RunningChild()
+    try:
+        watch_mod._cleanup_on_exit()
+        assert terminated == [True]
+    finally:
+        watch_mod._active_enrichment_child = None

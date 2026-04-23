@@ -1,5 +1,135 @@
 # Milestones
 
+## v1.3 Intelligent Analysis Continuation (Shipped: 2026-04-17)
+
+**Delivered:** Graphify is production-viable on multi-source codebases — agents query it without blowing their token budget (Phase 9.2), extraction produces dramatically better graphs via cross-file semantic clustering + entity deduplication (Phase 10), and humans get a live thinking partner via seven MCP-backed slash commands (Phase 11). The static `GRAPH_TOUR.md` artifact concept was replaced with interactive `/context`, `/trace`, `/connect`, `/drift`, `/emerge`, `/ghost`, `/challenge` command files that ship via `graphify install`.
+
+**Phases completed:** 3 phases (9.2, 10, 11), 19 plans
+**Timeline:** 2026-04-16 → 2026-04-17 (2 days)
+**Codebase delta:** 108 files changed, +24,057 / −161 lines (~16,481 LOC in `graphify/`, 16,529 LOC in `tests/`)
+**Test suite:** 1,234 passing (up from 1,023 at v1.2), no regressions
+**Requirements:** 14/15 satisfied (TOKEN-04 Bloom filter stretch — explicitly deferred per Phase 9.2 D-09)
+
+### Key Accomplishments
+
+1. **Progressive Graph Retrieval** (Phase 9.2) — Token-aware 3-layer MCP `query_graph` response (Layer 1 compact summaries, Layer 2 edge details, Layer 3 full subgraph) with `budget: int` parameter that clamps response size. Deterministic cardinality estimator emits a pre-execution estimate so agents can abort before paying for exploding multi-hop queries. Bidirectional BFS for depth ≥ 3 with 3-state status return (`ok` / `frontiers_disjoint` / `budget_exhausted`) replaces the old exponential-path implementation. New D-02 hybrid response envelope — `text_body + "\n---GRAPHIFY-META---\n" + json(meta)` with status codes — becomes the canonical MCP contract that Phases 10 and 11 inherit.
+
+2. **Cross-File Semantic Extraction with Entity Deduplication** (Phase 10) — File clustering via import-graph connected components capped by top-level directory, with a token-budgeted soft cap (default 50,000 tokens per cluster) and import-topological ordering for cluster emission. New `graphify/dedup.py` merges fuzzy-matched (`difflib.SequenceMatcher ≥ 0.90`) and embedding-similar (`sentence-transformers all-MiniLM-L6-v2` cosine ≥ 0.85) entities with both signals required to agree. Edge re-routing with weight sum + confidence_score max + EXTRACTED > INFERRED > AMBIGUOUS enum precedence. MCP `query_graph` transparently redirects merged-away IDs with `resolved_from_alias` meta. Opt-in via `--dedup` flag; vault runs use separate `--obsidian-dedup` to control wikilink forward-mapping.
+
+3. **Narrative Mode as Interactive Slash Commands** (Phase 11) — Five new MCP tools (`graph_summary`, `entity_trace`, `connect_topics`, `drift_nodes`, `newly_formed_clusters`) compose existing `analyze.py` / `delta.py` / `snapshot.py` primitives (D-18: no new graphify/ modules). Seven `.claude/commands/*.md` files (`/context`, `/trace`, `/connect`, `/drift`, `/emerge`, `/ghost`, `/challenge`) ship via extended `_PLATFORM_CONFIG` in `__main__.py` with `commands_enabled: True` on Claude Code + Windows and a `--no-commands` opt-out. Snapshot-chain walkers use explicit `del G_snap` memory discipline verified via weakref tests. All new tools inherit the Phase 9.2 envelope contract and Phase 10 alias-redirect contract.
+
+4. **Quality gates caught production bugs early** — Phase 11's gsd-code-reviewer found 2 critical runtime bugs that all unit tests had missed: (a) `list_snapshots()` called with `graphify-out/` where it internally re-prepends `graphify-out/snapshots/` — all 4 snapshot-chain tools would have always returned `insufficient_history` in production (tests passed `tmp_path` directly and never tripped the double-nesting), and (b) `_cursor_install()` called without its required `project_dir` argument — `TypeError` on `graphify install --platform=cursor`. Both auto-fixed by `gsd-code-review-fix` with regression tests that match production path semantics.
+
+### Architectural Decisions Locked
+
+- **D-02 (Phase 9.2):** MCP responses use hybrid `text_body + SENTINEL + json(meta)` envelope with status codes — all future MCP tools inherit
+- **D-09 (Phase 9.2):** TOKEN-04 Bloom filter + 2-3 hop materialized cache deferred beyond v1.3 — orthogonal to token economy, belongs in a performance milestone
+- **D-16 (Phase 10):** MCP `query_graph` transparently redirects merged-away aliases — preserves agent callsites across dedup without breaking
+- **D-18 (Phase 11):** No new `graphify/*.py` modules — Phase 11 is plumbing over existing primitives; new analysis algorithms belong in separate phases
+- **BLOCKER 3 fix (Phase 11):** Windows platform has native `.claude/commands/` support; `_PLATFORM_CONFIG` treats it identically to Claude Code (not grouped with non-Claude platforms)
+
+### Known Deferred Items
+
+- **TOKEN-04** (stretch, Phase 9.2) — Bloom filter probe skip + 2-3-hop materialized cache. Deferred per D-09 to a future performance milestone where it's the focused scope rather than an add-on.
+- **Sibling thinking-skill project** (conditional, Phase 11) — `/ghost` and `/challenge` shipped in graphify this cycle, but the door is preserved for migrating them to a companion skill if scope/voice diverges post-v1.3.
+
+### Archives
+
+- Full phase detail: `.planning/milestones/v1.3-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.3-REQUIREMENTS.md`
+- Per-phase artifacts: `.planning/phases/09.2-*`, `.planning/phases/10-*`, `.planning/phases/11-*`
+
+---
+
+## v1.2 Intelligent Analysis & Cross-File Extraction (Shipped: 2026-04-15)
+
+**Delivered:** LLM-assisted multi-perspective graph analysis via autoreason tournament (A/B/AB/blind-Borda rounds across 4 lenses), per-edge MCP query telemetry with hot-path strengthening and decay of unused edges, 2-hop A→C derived edges with INFERRED confidence, and hot/cold paths surfaced in `GRAPH_REPORT.md`. Analysis output is scoped to a dedicated `GRAPH_ANALYSIS.md` file — `GRAPH_REPORT.md` remains the mechanical metrics artifact (D-80 separation).
+
+**Phases completed:** 3 phases (09, 09.1, 09.1.1), 9 plans
+**Timeline:** 2026-04-14 → 2026-04-15 (2 days of code + 1 day of retroactive lifecycle cleanup 2026-04-15/16)
+**Codebase delta:** 6 code files changed, +1083 / −6 lines (9.1.1 was planning-only, zero code delta)
+**Test suite:** 1023 passing (up from 1000 at v1.1), no regressions
+**Requirements:** 10/10 satisfied
+**Audit:** Passed (10/10 REQ-IDs, 5/5 integration links WIRED, 3/3 E2E flows COMPLETE) — see `.planning/milestones/v1.2-MILESTONE-AUDIT.md`
+
+### Key Accomplishments
+
+1. **Autoreason Tournament Analysis** (Phase 9) — `render_analysis_context()` in `analyze.py` serializes the graph (nodes, edges, communities, god nodes, surprising connections) for tournament LLM prompts. `render_analysis()` in `report.py` produces the final `GRAPH_ANALYSIS.md` with per-lens sections, cross-lens synthesis (convergences + tensions), overall verdict, and tournament rationale (A/B/AB Borda scores). Tournament orchestration lives in `skill.md` (~260 lines, 6-step protocol A1–A6) with 4 independent lenses × 4 rounds × blind judges. "No finding" competes as a first-class Borda option — prevents hallucinated problems on clean graphs. 23 new tests (9 for context, 14 for report).
+
+2. **Query Telemetry & Usage-Weighted Edges** (Phase 9.1) — `serve.py` records every MCP traversal to a `telemetry.json` sidecar with atomic `os.replace()` writes. Per-edge traversal counters feed a weight formula with exponential decay of unused edges. After N traversals of A→B→C, a direct A→C derived edge is proposed with `confidence=INFERRED`, `confidence_score=0.7`, and a `via` field naming the intermediate node. Neighbor-identity skip in `_check_derived_edges` prevents self-loops when `neighbor == a`. `report.py` emits a new "Usage Patterns" section with hot/cold paths classified via percentile thresholds.
+
+3. **Pipeline Integration** (Phase 9.1, Plan 3) — Telemetry decay fires on every rebuild; usage data flows into all three `generate()` call sites and both rebuild points in `skill.md`. The graph's `agent-edges.json` and `annotations.jsonl` sidecars use the same atomic-write pattern as telemetry — no partial-write corruption possible mid-query.
+
+4. **Retroactive Milestone Lifecycle Cleanup** (Phase 9.1.1) — Planning-only phase that closed three structural gaps found by `/gsd-audit-milestone`: (a) generated retroactive `09.1-VERIFICATION.md` from existing UAT/VALIDATION/SECURITY evidence, (b) created project-level `.planning/REQUIREMENTS.md` with 10 v1.2 REQ-IDs and a full traceability matrix back to file:line anchors, (c) reconciled scope contradictions across `ROADMAP.md` / `STATE.md` / `PROJECT.md` into a consistent narrow-v1.2 narrative, moving phases 9.2/10/11/12 into a new v1.3 milestone and renaming the old v1.3 → v1.4. Zero code changes; audit status upgraded `gaps_found → passed`.
+
+### Architectural Decisions Locked
+
+- **D-80: GRAPH_ANALYSIS.md is separate from GRAPH_REPORT.md** — tournament output never mutates the mechanical metrics artifact. Verified behaviorally in 09-HUMAN-UAT.md.
+- **D-83: Every lens always appears as a section** — `report.py` iterates all lens_results with no filtering, so Clean verdicts (e.g., "3-0 unanimous for incumbent") are visible rather than silently omitted.
+- **Blind Borda judges** — judge prompts use shuffled neutral labels (Analysis-1/2/3) with no role identity disclosed; shuffle rotation enforced across 3 judges.
+- **Telemetry atomicity** — `telemetry.json`, `agent-edges.json`, and `annotations.jsonl` use `os.replace()` for all writes; no torn reads during concurrent MCP queries.
+- **Narrow-scope milestone policy** — v1.2 closed when 2/6 originally-planned phases completed the intent. Remaining scope queued into v1.3 with clear origin anchoring rather than leaving v1.2 open indefinitely.
+
+### Known Gaps / Deferred
+
+- 09.1-SECURITY.md lacks structured YAML frontmatter (no `threats_total`/`threats_open` fields) — all 7 threats marked CLOSED in the table body but grep-based frontmatter extraction returns empty. Non-blocking tech debt.
+- v1.2 was never formally instantiated via `/gsd-new-milestone`; REQUIREMENTS.md was created post-hoc by Phase 9.1.1, so SUMMARY.md files for 09 and 09.1 predate it and have no `requirements_completed` frontmatter. Non-blocking; audit accepted as documented.
+- Remaining v1.2-origin scope (Progressive Graph Retrieval, Cross-File Semantic Extraction, Narrative Mode, Heterogeneous Extraction Routing) carried forward to v1.3.
+
+### Archives
+
+- `.planning/milestones/v1.2-ROADMAP.md` — full phase detail with plan breakdowns
+- `.planning/milestones/v1.2-REQUIREMENTS.md` — 10 v1.2 REQ-IDs with traceability table (file:line evidence)
+- `.planning/milestones/v1.2-MILESTONE-AUDIT.md` — final audit report (passed)
+
+---
+
+## v1.1 Context Persistence & Agent Memory (Shipped: 2026-04-13)
+
+**Delivered:** Persistent, evolving context layer — graphify is no longer a one-shot graph builder. Agents can read AND write to the knowledge graph across sessions, users see how their corpus changes over time, and Obsidian vault notes survive round-trip re-runs with user content preservation.
+
+**Phases completed:** 5 phases (6–8.2), 12 plans, ~117 commits
+**Timeline:** 2026-04-12 → 2026-04-13 (2 days)
+**Codebase delta:** 13,520 LOC across 26 Python modules (`graphify/`) — 3,663 insertions across 13 files
+**Test suite:** 1,000 passing (up from 872 at v1.0)
+**Requirements:** 25/25 satisfied
+**Audit:** Passed (25/25 requirements, 5/5 phases, 25/25 integration, 3/3 flows)
+
+### Key Accomplishments
+
+1. **Graph Delta Analysis & Staleness** (Phase 6) — `snapshot.py` and `delta.py` modules deliver run-over-run comparison with `GRAPH_DELTA.md` output, snapshot persistence with FIFO retention, per-node provenance metadata (`extracted_at`, `source_hash`, `source_mtime`), three-state staleness classification (FRESH/STALE/GHOST), and community migration tracking. `graphify snapshot` CLI subcommand with `--name/--cap/--from/--to/--delta` flags.
+
+2. **MCP Write-Back with Peer Modeling** (Phase 7) — 5 new MCP tools (`annotate_node`, `flag_node`, `add_edge`, `propose_vault_note`, `get_annotations`) with JSONL/JSON sidecar persistence, peer identity tracking (`peer_id`, `session_id`, `timestamp`), mtime-based graph reload, and startup compaction. `graph.json` is never mutated by agent tools.
+
+3. **Human-in-the-Loop Proposals** (Phase 7, Plan 3) — `graphify approve` CLI subcommand for listing, approving, rejecting, and batch-processing agent-proposed vault notes. Proposals stage to `graphify-out/proposals/` with UUID4 filenames; vault is untouched until explicit approval.
+
+4. **Obsidian Round-Trip Awareness** (Phase 8) — Content-hash manifest (`vault-manifest.json`) tracks what graphify wrote per note. On re-run, user-modified notes receive `SKIP_PRESERVE`. User sentinel blocks (`<!-- GRAPHIFY_USER_START -->` / `<!-- GRAPHIFY_USER_END -->`) provide inviolable preservation zones that survive even REPLACE strategy and `--force` mode. Dry-run enhanced with source annotations and summary preamble.
+
+5. **Pipeline Integration & MCP Enhancements** (Phases 8.1–8.2) — Auto-snapshot and auto-delta on every `/graphify` run (skill.md wiring). Approve path threaded through vault manifest for user-modified detection. MCP `get_node` surfaces provenance fields and staleness classification. New `get_agent_edges` query tool with peer/session/node filtering.
+
+### Architectural Decisions Locked
+
+- peer_id defaults to `"anonymous"` — never derived from environment variables (security: prevents machine identity leaking into committed annotation files)
+- `graph.json` is read-only pipeline ground truth — all agent state lives in JSONL/JSON sidecars
+- Proposal filenames are server-generated UUID4 — never derived from agent-supplied input
+- Content-hash manifest uses content-only SHA256 (no path) to avoid macOS symlink mismatch
+- User sentinel blocks are inviolable even for REPLACE strategy — user content always wins
+- Multiple USER_START/END pairs per note supported
+
+### Known Gaps / Deferred
+
+- **WIRING-01** (low): `_approve_and_write_proposal` hardcodes manifest path to `Path('graphify-out')` — doesn't respect `--out-dir` override
+- 6 human verification items pending (real vault E2E tests for Phases 8 and 8.1)
+- Template engine extensions (TMPL-01/02/03, CFG-02/03) deferred to v1.2+
+
+### Archives
+
+- `.planning/milestones/v1.1-ROADMAP.md` — full phase detail with success criteria and plan descriptions
+- `.planning/milestones/v1.1-REQUIREMENTS.md` — 25 v1.1 requirements with traceability table
+- `.planning/milestones/v1.1-MILESTONE-AUDIT.md` — audit report with integration verification
+
+---
+
 ## v1.0 Ideaverse Integration — Configurable Vault Adapter (Shipped: 2026-04-11)
 
 **Delivered:** Configurable output adapter that injects graphify knowledge graphs into any Obsidian vault framework via a declarative `.graphify/profile.yaml`. Replaces the monolithic `to_obsidian()` with a four-component pipeline (profile → mapping → templates → merge) and wires it behind two new CLI entry points. Backward-compatible when no vault profile exists (default profile emits Ideaverse ACE Atlas/ layout).

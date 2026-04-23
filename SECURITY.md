@@ -4,6 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
+| 0.4.x   | Yes       |
 | 0.3.x   | Yes       |
 | < 0.3   | No        |
 
@@ -35,6 +36,10 @@ graphify is a **local development tool**. It runs as a Claude Code skill and opt
 | XSS in graph HTML output | `security.sanitize_label()` strips control characters, caps at 256 chars, and HTML-escapes all node labels and edge titles before pyvis embeds them. |
 | Prompt injection via node labels | `sanitize_label()` also applied to MCP text output - node labels from user-controlled source files cannot break the text format returned to agents. |
 | YAML frontmatter injection | `_yaml_str()` escapes backslashes, double quotes, and newlines before embedding user-controlled strings (webpage titles, query questions) in YAML frontmatter. |
+| YAML frontmatter injection (vault adapter) | `profile.safe_frontmatter_value()` quotes values containing YAML structural characters (`:`, `#`, `[`, `]`, etc.) and strips control characters. Prevents node labels from breaking frontmatter structure in Obsidian notes. |
+| Path traversal in vault adapter | `profile.validate_vault_path()` resolves paths and requires them to stay inside the vault directory. Applied to all profile-derived folder mappings and template paths. No `~` expansion, no absolute paths, no `..` sequences allowed in profile paths. |
+| Filename injection in vault adapter | `profile.safe_filename()` applies Unicode NFC normalization, strips OS-illegal characters, and caps length at 200 characters with SHA256 hash suffix for collision handling. Prevents malicious node labels from creating files outside the vault. |
+| Tag injection in vault adapter | `profile.safe_tag()` slugifies community names to lowercase hyphen-separated strings with `x-` prefix for leading digits, producing valid Obsidian tags. |
 | Encoding crashes on source files | All tree-sitter byte slices decoded with `errors="replace"` - non-UTF-8 source files degrade gracefully instead of crashing extraction. |
 | Symlink traversal | `os.walk(..., followlinks=False)` is explicit throughout `detect.py`. |
 | Corrupted graph.json | `_load_graph()` in `serve.py` wraps `json.JSONDecodeError` and prints a clear recovery message instead of crashing. |
