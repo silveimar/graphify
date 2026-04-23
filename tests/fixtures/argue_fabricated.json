@@ -1,0 +1,5 @@
+{
+  "claim": "Extract connects to a phantom layer",
+  "cites": ["n_extract", "n_does_not_exist", "n_also_fake"],
+  "expected_invalid": ["n_does_not_exist", "n_also_fake"]
+}
