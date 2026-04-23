@@ -4,7 +4,7 @@
 
 ## Overview
 
-v1.5 has two workstreams. **Layer B (Phase 19, VAULT-01..05)** — a pure-file-I/O vault promotion script that writes `graph.json`-derived Obsidian notes into Ideaverse Pro 2.5 folders with full frontmatter and tag taxonomy. Pulled in from v1.4 scope-reconciliation 2026-04-23. **Diagram pipeline (Phases 20–22)** — turns the knowledge graph into Excalidraw diagrams, strictly ordered by dependency: seed engine first (Phase 20), profile extension + template bootstrap second (Phase 21), skill + install bridge last (Phase 22). Phase 19 is independent of 20–22 and can execute in any order relative to them.
+v1.5 has two workstreams. **Layer B (Phase 19, VAULT-01..07)** — a pure-file-I/O vault promotion script that writes `graph.json`-derived Obsidian notes into Ideaverse Pro 2.5 folders with full frontmatter and tag taxonomy. Pulled in from v1.4 scope-reconciliation 2026-04-23. **Diagram pipeline (Phases 20–22)** — turns the knowledge graph into Excalidraw diagrams, strictly ordered by dependency: seed engine first (Phase 20), profile extension + template bootstrap second (Phase 21), skill + install bridge last (Phase 22). Phase 19 is independent of 20–22 and can execute in any order relative to them.
 
 ---
 
@@ -17,6 +17,8 @@ Derived from ROADMAP.md Phase 19 success criteria. Full requirement text and pla
 - [ ] **VAULT-03** Node-type → folder dispatch is correct: god-node domain concepts → `Atlas/Dots/Things/`; knowledge gaps → `Atlas/Dots/Questions/`; clusters → `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
 - [ ] **VAULT-04** `related:` wikilinks are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted.
 - [ ] **VAULT-05** `graphify-out/import-log.md` is written after each run with vault path, run timestamp, promoted-count by type, threshold, and skipped-count.
+- [ ] **VAULT-06** Profile write-back: union-merge Layer 3 auto-detected tags into `.graphify/profile.yaml`, gated by `profile_sync.auto_update` (default `true`). Writes atomic (tempfile + os.replace).
+- [ ] **VAULT-07** Hybrid 3-layer tag taxonomy: Layer 1 `_DEFAULT_PROFILE` baseline → Layer 2 user `.graphify/profile.yaml` (deep-merged) → Layer 3 auto-detected from `graph.json` source_file extensions + file_type (deep-merged in memory; persisted via VAULT-06).
 
 ---
 
@@ -112,6 +114,8 @@ Derived from ROADMAP.md Phase 19 success criteria. Full requirement text and pla
 | VAULT-03 | 19 | TBD | — |
 | VAULT-04 | 19 | TBD | — |
 | VAULT-05 | 19 | TBD | — |
+| VAULT-06 | 19 | TBD | — |
+| VAULT-07 | 19 | TBD | — |
 | SEED-01 | 20 | 20-02 | — |
 | SEED-02 | 20 | 20-01 | — |
 | SEED-03 | 20 | 20-01 | — |
