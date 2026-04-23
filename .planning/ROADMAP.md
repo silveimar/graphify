@@ -219,7 +219,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   4. A regression test replays the Phase 9 blind-label bias suite against Phase 16 — blind A/B labels, stripped persona phrases, rotating judge identity all verified intact.
   5. `GRAPH_ARGUMENT.md` is advisory-only — the file exists under `graphify-out/` and never triggers any code change or graph mutation.
 **Plans**: 3 plans (planned 2026-04-22 — P1 + documented P2 deferrals).
-- [ ] 16-01-PLAN.md — `graphify/argue.py` zero-LLM substrate: `ArgumentPackage`, `PerspectiveSeed`, `NodeCitation` dataclasses; `populate()` composing serve.py primitives; `validate_turn()` fabrication guard; `compute_overlap()` Jaccard detector; `ROUND_CAP=6` + `MAX_TEMPERATURE=0.4` constants; tests/test_argue.py (18+ cases incl. zero-LLM grep + Phase 9 blind-harness regression anchor). (ARGUE-01, ARGUE-02, ARGUE-03, ARGUE-05, ARGUE-06, ARGUE-08)
+- [x] 16-01-PLAN.md — `graphify/argue.py` zero-LLM substrate: `ArgumentPackage`, `PerspectiveSeed`, `NodeCitation` dataclasses; `populate()` composing serve.py primitives; `validate_turn()` fabrication guard; `compute_overlap()` Jaccard detector; `ROUND_CAP=6` + `MAX_TEMPERATURE=0.4` constants; tests/test_argue.py (18+ cases incl. zero-LLM grep + Phase 9 blind-harness regression anchor). (ARGUE-01, ARGUE-02, ARGUE-03, ARGUE-05, ARGUE-06, ARGUE-08)
 - [ ] 16-02-PLAN.md — `argue_topic` MCP tool: `_run_argue_topic_core` + `_tool_argue_topic` in serve.py with D-02 envelope (`resolved_from_alias`, hardcoded `output_path`); mcp_tool_registry `argue_topic` Tool entry; `capability_tool_meta.yaml` entry with `composable_from: []`; tests/test_serve.py (5 cases) + tests/test_capability.py `test_argue_topic_not_composable`. (ARGUE-04, ARGUE-07, ARGUE-09)
 - [ ] 16-03-PLAN.md — `graphify/commands/argue.md` slash command (mirrors ask.md frontmatter, no `target:`); skill.md SPAR-Kit `/graphify-argue` orchestration section (4 lenses × ≤6 rounds, per-round blind-label shuffle reusing Phase 9 harness at skill.md:1511, Jaccard early-stop D-06, advisory-only write to `graphify-out/GRAPH_ARGUMENT.md`); tests/test_commands.py::test_argue_md_frontmatter; P2 deferrals (ARGUE-11/12/13) explicitly documented as v1.4.x backlog. (ARGUE-06, ARGUE-09, ARGUE-10, ARGUE-11 [P2], ARGUE-12 [P2], ARGUE-13 [P2])
 
@@ -301,7 +301,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 4/4 | Complete | 2026-04-17 |
 | 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
 | 15. Async Background Enrichment | v1.4 | 6/6 | Complete    | 2026-04-22 |
-| 16. Graph Argumentation Mode | v1.4 | 0/TBD | Planned | — |
+| 16. Graph Argumentation Mode | v1.4 | 1/3 | In Progress|  |
 | 17. Conversational Graph Chat | v1.4 | 3/3 | Complete   | 2026-04-22 |
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
 | 19. Vault Promotion Script (Layer B) | v1.4 | 0/TBD | Planned | — |
