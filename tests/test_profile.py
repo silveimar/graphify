@@ -1015,3 +1015,90 @@ def test_preflight_result_rule_and_template_counts_populated(tmp_path):
     result = validate_profile_preflight(vault)
     assert result.rule_count == 3
     assert result.template_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Tests for tag_taxonomy and profile_sync — Wave 0, Plan 19-01
+# ---------------------------------------------------------------------------
+
+def test_load_profile_none_has_tag_taxonomy_defaults():
+    """load_profile(None) returns default profile with the 4-namespace verbatim taxonomy."""
+    p = load_profile(None)
+    assert "tag_taxonomy" in p
+    tt = p["tag_taxonomy"]
+    assert isinstance(tt, dict)
+    assert "plant" in tt["garden"]
+    assert "question" in tt["garden"]
+    assert "component" in tt["graph"]
+    assert "confluence" in tt["source"]
+    assert "python" in tt["tech"]
+
+
+def test_load_profile_none_has_profile_sync_auto_update():
+    """load_profile(None) returns default profile with profile_sync.auto_update=True."""
+    p = load_profile(None)
+    assert "profile_sync" in p
+    assert p["profile_sync"]["auto_update"] is True
+
+
+def test_validate_profile_tag_taxonomy_not_dict():
+    """tag_taxonomy: non-dict value returns an error mentioning tag_taxonomy."""
+    errors = validate_profile({"tag_taxonomy": "notadict"})
+    assert len(errors) >= 1
+    assert any("tag_taxonomy" in e for e in errors)
+
+
+def test_validate_profile_tag_taxonomy_namespace_not_list():
+    """tag_taxonomy.garden: non-list value returns an error mentioning tag_taxonomy.garden."""
+    errors = validate_profile({"tag_taxonomy": {"garden": "notalist"}})
+    assert len(errors) >= 1
+    assert any("tag_taxonomy.garden" in e for e in errors)
+
+
+def test_validate_profile_tag_taxonomy_non_string_values():
+    """tag_taxonomy.garden: list with non-string elements returns an error."""
+    errors = validate_profile({"tag_taxonomy": {"garden": [1, 2]}})
+    assert len(errors) >= 1
+    assert any("tag_taxonomy" in e for e in errors)
+
+
+def test_validate_profile_tag_taxonomy_valid():
+    """tag_taxonomy with valid string-list namespace returns no errors."""
+    errors = validate_profile({"tag_taxonomy": {"garden": ["plant", "cultivate"]}})
+    assert errors == []
+
+
+def test_validate_profile_profile_sync_not_dict():
+    """profile_sync: non-dict value returns an error mentioning profile_sync."""
+    errors = validate_profile({"profile_sync": "notadict"})
+    assert len(errors) >= 1
+    assert any("profile_sync" in e for e in errors)
+
+
+def test_validate_profile_profile_sync_auto_update_not_bool():
+    """profile_sync.auto_update: non-bool value returns an error mentioning profile_sync.auto_update."""
+    errors = validate_profile({"profile_sync": {"auto_update": "yes"}})
+    assert len(errors) >= 1
+    assert any("profile_sync.auto_update" in e for e in errors)
+
+
+def test_validate_profile_profile_sync_valid():
+    """profile_sync with valid auto_update=False returns no errors."""
+    errors = validate_profile({"profile_sync": {"auto_update": False}})
+    assert errors == []
+
+
+def test_load_profile_user_tag_taxonomy_deep_merge(tmp_path):
+    """User profile with custom tag_taxonomy.garden overrides the default via deep merge (Layer 2 wins)."""
+    import yaml
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    gdir = vault / ".graphify"
+    gdir.mkdir()
+    (gdir / "profile.yaml").write_text(
+        "tag_taxonomy:\n  garden: [custom]\n", encoding="utf-8"
+    )
+    p = load_profile(vault)
+    assert p["tag_taxonomy"]["garden"] == ["custom"]
+    # Other namespaces from defaults should still be present
+    assert "python" in p["tag_taxonomy"]["tech"]

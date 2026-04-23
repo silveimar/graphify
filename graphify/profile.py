@@ -62,11 +62,19 @@ _DEFAULT_PROFILE: dict = {
     # Phase 3 extensions (D-48, D-52)
     "topology": {"god_node": {"top_n": 10}},
     "mapping": {"moc_threshold": 3},
+    # Phase 19 extensions (D-17, D-18)
+    "tag_taxonomy": {
+        "garden": ["plant", "cultivate", "probe", "repot", "revitalize", "revisit", "question"],
+        "graph": ["component", "domain", "workflow", "decision", "concept", "integration", "service", "dataset", "team", "extracted", "inferred", "ambiguous"],
+        "source": ["confluence", "readme", "doc", "code", "paper", "pdf", "jira", "slack", "github", "notion", "obsidian", "web"],
+        "tech": ["python", "typescript", "javascript", "go", "rust", "java", "sql", "graphql", "docker", "k8s"],
+    },
+    "profile_sync": {"auto_update": True},
 }
 
 _VALID_TOP_LEVEL_KEYS = {
     "folder_mapping", "naming", "merge", "mapping_rules", "obsidian",
-    "topology", "mapping",
+    "topology", "mapping", "tag_taxonomy", "profile_sync",
 }
 
 _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
@@ -125,12 +133,14 @@ def _deep_merge(base: dict, override: dict) -> dict:
 # Profile loading (PROF-01, PROF-02, D-04)
 # ---------------------------------------------------------------------------
 
-def load_profile(vault_dir: str | Path) -> dict:
+def load_profile(vault_dir: str | Path | None) -> dict:
     """Discover and load a vault profile, merging over built-in defaults.
 
-    Returns the merged profile dict. Falls back to defaults when no
-    profile.yaml exists or when PyYAML is not installed.
+    Returns the merged profile dict. Falls back to defaults when vault_dir is
+    None, no profile.yaml exists, or when PyYAML is not installed.
     """
+    if vault_dir is None:
+        return _deep_merge(_DEFAULT_PROFILE, {})
     profile_path = Path(vault_dir) / ".graphify" / "profile.yaml"
     if not profile_path.exists():
         return _deep_merge(_DEFAULT_PROFILE, {})
@@ -310,6 +320,30 @@ def validate_profile(profile: dict) -> list[str]:
             # from graphify.profile). See plan 03-03 T-3-11.
             from graphify.mapping import validate_rules
             errors.extend(validate_rules(mapping_rules))
+
+    # tag_taxonomy section (Phase 19, D-17, D-18)
+    tag_taxonomy = profile.get("tag_taxonomy")
+    if tag_taxonomy is not None:
+        if not isinstance(tag_taxonomy, dict):
+            errors.append("'tag_taxonomy' must be a mapping (dict)")
+        else:
+            for ns, values in tag_taxonomy.items():
+                if not isinstance(ns, str):
+                    errors.append(f"tag_taxonomy namespace key must be a string, got {type(ns).__name__}")
+                elif not isinstance(values, list):
+                    errors.append(f"tag_taxonomy.{ns} must be a list of strings")
+                elif not all(isinstance(v, str) for v in values):
+                    errors.append(f"tag_taxonomy.{ns} must contain only strings")
+
+    # profile_sync section (Phase 19, D-18 — VAULT-06 opt-out)
+    profile_sync = profile.get("profile_sync")
+    if profile_sync is not None:
+        if not isinstance(profile_sync, dict):
+            errors.append("'profile_sync' must be a mapping (dict)")
+        else:
+            auto_update = profile_sync.get("auto_update")
+            if auto_update is not None and not isinstance(auto_update, bool):
+                errors.append("'profile_sync.auto_update' must be a boolean")
 
     return errors
 
