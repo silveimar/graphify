@@ -1181,6 +1181,9 @@ def main() -> None:
         print("    --dry-run               print the merge plan via format_merge_plan without writing files")
         print("    --force                 force update of user-modified notes (preserves sentinel blocks)")
         print("    --obsidian-dedup        hydrate merged_from from dedup_report.json (Phase 10 D-15)")
+        print("  --init-diagram-templates    write .excalidraw.md template stubs to vault (TMPL-01..05)")
+        print("    --vault <path>          target vault directory (required)")
+        print("    --force                 overwrite existing stubs")
         print("  --diagram-seeds         emit diagram seed JSON + manifest under graphify-out/seeds/ (SEED-01)")
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
         print("    --vault <path>          opt-in: route gen-diagram-seed tag write-back through compute_merge_plan (D-08)")
@@ -1418,6 +1421,53 @@ def main() -> None:
         from graphify.seed import build_all_seeds
         summary = build_all_seeds(G, graphify_out=gp.parent, vault=vault_path)
         print(f"[graphify] diagram-seeds complete: {summary}")
+        sys.exit(0)
+
+    # --init-diagram-templates [--vault PATH] [--force]  (Phase 21, TMPL-01..05)
+    # Writes .excalidraw.md stubs (one per profile diagram_types entry, or the
+    # 6 built-in defaults if the profile declares none) under the vault's
+    # Excalidraw/Templates/ directory. Idempotent without --force; --force
+    # overwrites. Stubs hard-code `compress: false` (one-way door, D-TMPL-01).
+    # All target paths routed through validate_vault_path for path confinement.
+    if cmd == "--init-diagram-templates":
+        vault_arg: str | None = None
+        force_flag = False
+        args = sys.argv[2:]
+        i = 0
+        while i < len(args):
+            if args[i] == "--vault" and i + 1 < len(args):
+                vault_arg = args[i + 1]; i += 2
+            elif args[i].startswith("--vault="):
+                vault_arg = args[i].split("=", 1)[1]; i += 1
+            elif args[i] == "--force":
+                force_flag = True; i += 1
+            else:
+                print(
+                    f"error: unknown --init-diagram-templates option: {args[i]}",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+        if not vault_arg:
+            print("error: --vault PATH required", file=sys.stderr)
+            sys.exit(2)
+        from graphify.excalidraw import write_stubs
+        from graphify.profile import load_profile
+        try:
+            profile = load_profile(vault_arg)
+        except Exception:
+            # Fall back to _DEFAULT_PROFILE diagram_types if load_profile fails
+            from graphify.profile import _DEFAULT_PROFILE
+            profile = dict(_DEFAULT_PROFILE)
+        diagram_types = profile.get("diagram_types") or []
+        try:
+            written = write_stubs(vault_arg, diagram_types, force=force_flag)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        print(
+            f"[graphify] init-diagram-templates complete: "
+            f"wrote {len(written)} stub(s) (force={force_flag})"
+        )
         sys.exit(0)
 
     # --dedup [options] (Phase 10, GRAPH-02, GRAPH-03)
