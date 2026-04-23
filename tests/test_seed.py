@@ -285,16 +285,26 @@ def _make_cap_graph(n_auto: int = 25, n_user: int = 0) -> nx.Graph:
         nid = f"auto_{i:02d}"
         G.add_node(nid, label=f"Auto{i}", file_type="code", community=0, source_file=f"auto_{i}.py",
                    possible_diagram_seed=True)
-        # Give each auto node a specific degree (more edges for lower-index → higher rank)
+        # Give each auto node a specific degree (more edges for lower-index → higher rank).
+        # Peers are file-hub nodes (label matches source_file basename) so they're
+        # excluded from god_nodes() and don't accidentally become auto candidates.
         for j in range(n_auto - i):
             peer_id = f"{nid}_peer_{j}"
-            G.add_node(peer_id, label=f"P{j}", file_type="code", community=0, source_file=f"p.py")
+            peer_src = f"{peer_id}.py"
+            G.add_node(peer_id, label=peer_src, file_type="code", community=0, source_file=peer_src)
             G.add_edge(nid, peer_id, relation="calls", confidence="EXTRACTED", source_file=f"{nid}.py")
     for i in range(n_user):
         nid = f"user_{i}"
         G.add_node(nid, label=f"User{i}", file_type="code", community=0, source_file=f"user_{i}.py",
                    tags=["gen-diagram-seed"])
-        G.add_edge("anchor", nid, relation="references", confidence="EXTRACTED", source_file="x.py")
+        # Give each user node its own dedicated peer (file-hub) so `nx.degree`
+        # is non-zero AND the node isn't isolated. Do NOT route through the
+        # shared anchor — that would inflate anchor's degree enough for
+        # god_nodes() to accidentally pick it up as an auto candidate.
+        upeer = f"user_{i}_peer"
+        upeer_src = f"{upeer}.py"
+        G.add_node(upeer, label=upeer_src, file_type="code", community=0, source_file=upeer_src)
+        G.add_edge(nid, upeer, relation="references", confidence="EXTRACTED", source_file=f"{nid}.py")
     return G
 
 
@@ -430,19 +440,18 @@ def test_partial_write_failure_leaves_no_visible_state(tmp_path, monkeypatch):
 
 
 def _make_small_graph_with_3_god_nodes() -> nx.Graph:
-    """10-node graph: 3 hub concepts, 7 peripherals, enough degree for god_nodes()."""
+    """~30-node graph: 3 hub concepts, each with its own 5-peer cluster so their
+    ego-graphs don't overlap >60% and each can produce a distinct seed."""
     G = nx.Graph()
-    # 3 concept hubs (not file nodes) — degree must exceed file nodes
     for hub in ["alpha", "beta", "gamma"]:
         G.add_node(hub, label=hub.title(), file_type="code", community=0, source_file=f"{hub}.py")
-    # 7 peripheral nodes (concepts, not file hubs; labels don't match filenames)
-    for i in range(7):
-        nid = f"p{i}"
-        G.add_node(nid, label=f"Peripheral{i}", file_type="code", community=0, source_file=f"p{i}.py")
-    # Connect each hub to ~5 peripherals
-    for hub in ["alpha", "beta", "gamma"]:
+        # Dedicated per-hub peers (unique node ids + label matches source_file so
+        # they're file-hub nodes excluded from god_nodes() selection).
         for i in range(5):
-            G.add_edge(hub, f"p{i}", relation="references", confidence="EXTRACTED", source_file=f"{hub}.py")
+            peer_nid = f"{hub}_p{i}"
+            peer_src = f"{peer_nid}.py"
+            G.add_node(peer_nid, label=peer_src, file_type="code", community=0, source_file=peer_src)
+            G.add_edge(hub, peer_nid, relation="references", confidence="EXTRACTED", source_file=f"{hub}.py")
     return G
 
 
@@ -591,7 +600,7 @@ def test_build_all_seeds_with_vault_routes_tag_writeback_through_compute_merge_p
     def _spy(vault_dir, rendered_notes, profile, **kwargs):
         calls.append({"vault_dir": vault_dir, "rendered_notes": rendered_notes, "profile": profile})
         # Return a minimal MergePlan-shaped stub
-        return merge_mod.MergePlan(actions=[], orphan_paths=[])
+        return merge_mod.MergePlan(actions=[], orphans=[], summary={})
 
     monkeypatch.setattr(merge_mod, "compute_merge_plan", _spy)
 
@@ -607,7 +616,7 @@ def test_build_all_seeds_with_vault_routes_tag_writeback_through_compute_merge_p
     assert calls[0]["rendered_notes"], "rendered_notes must contain auto-tagged entries"
     # Verify merge policy embeds tags: union — either inside profile.merge or defaults
     # Confirm the default policy resolves to 'union' for tags
-    assert merge_mod._DEFAULT_FIELD_POLICY["tags"] == "union"
+    assert merge_mod._DEFAULT_FIELD_POLICIES["tags"] == "union"
 
 
 def test_cli_diagram_seeds_flag_smoke(tmp_path):
