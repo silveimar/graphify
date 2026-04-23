@@ -57,7 +57,7 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 - [x] **OBSCMD-02**: Command frontmatter gains `target: obsidian | code | both` field; `_install_commands()` filters per platform config (Claude Code + Windows get both by default; `--no-obsidian-commands` flag suppresses)
 - [x] **OBSCMD-03**: `/graphify-moc <community_id>` command expands a community into an Obsidian MOC note via `get_community` MCP tool + profile-driven template rendering
 - [x] **OBSCMD-04**: `/graphify-related` command shows graph-connected notes for the active vault note (reads note frontmatter `source_file` → `get_focus_context` → community + neighbors)
-- [ ] **OBSCMD-05**: `/graphify-orphan` command lists nodes with zero community membership or staleness=GHOST (uses existing `get_agent_edges` + community metadata)
+- [x] **OBSCMD-05**: `/graphify-orphan` command lists nodes with zero community membership or staleness=GHOST (uses existing `get_agent_edges` + community metadata)
 - [ ] **OBSCMD-06**: `/graphify-wayfind` command emits a breadcrumb path from the vault MOC to the current note (uses `connect_topics` shortest-path machinery)
 - [x] **OBSCMD-07**: `/graphify-*` prefix convention enforced at install time to prevent collision with user-authored commands (Pitfall 14 mitigation)
 - [x] **OBSCMD-08**: All vault writes from these commands route through `propose_vault_note` + `graphify approve` (v1.1 trust boundary + sentinel blocks preserved — never auto-write)

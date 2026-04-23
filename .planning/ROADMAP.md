@@ -191,7 +191,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - [x] 14-01-PLAN.md — `target: obsidian|code|both` frontmatter filter + `--no-obsidian-commands` CLI flag + `supports` per `_PLATFORM_CONFIG` entry + `target: both` backfill on 9 legacy commands + `/graphify-*` prefix enforcement (Wave 1; OBSCMD-02, OBSCMD-07)
 - [x] 14-02-PLAN.md — `/graphify-moc <community_id>` command with vault-profile-first render + `propose_vault_note` trust boundary (Wave 2; OBSCMD-03, OBSCMD-08)
 - [x] 14-03-PLAN.md — `/graphify-related <note-path>` read-only command consuming `get_focus_context`, explicit `no_context` handling (Wave 2; OBSCMD-04)
-- [ ] 14-04-PLAN.md — `/graphify-orphan` parameter-less read-only command with dual-section render + graceful `enrichment.json` absence (Wave 2; OBSCMD-05)
+- [x] 14-04-PLAN.md — `/graphify-orphan` parameter-less read-only command with dual-section render + graceful `enrichment.json` absence (Wave 2; OBSCMD-05)
 - [ ] 14-05-PLAN.md — `/graphify-wayfind <topic>` command resolving MOC-root via largest-community heuristic + `connect_topics` shortest-path + `propose_vault_note` (Wave 2; OBSCMD-06, OBSCMD-08)
 
 **Deferred to v1.4.x backlog** (P2, not planned in this phase):
@@ -311,7 +311,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 11. Narrative Mode as Interactive Slash Commands | v1.3 | 7/7 | Complete   | 2026-04-17 |
 | 12. Heterogeneous Extraction Routing | v1.4 | 6/6 | Complete | 2026-04-17 |
 | 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 4/4 | Complete | 2026-04-17 |
-| 14. Obsidian Thinking Commands | v1.4 | 4/6 | In Progress|  |
+| 14. Obsidian Thinking Commands | v1.4 | 5/6 | In Progress|  |
 | 15. Async Background Enrichment | v1.4 | 6/6 | Complete    | 2026-04-22 |
 | 16. Graph Argumentation Mode | v1.4 | 3/3 | Complete   | 2026-04-23 |
 | 17. Conversational Graph Chat | v1.4 | 3/3 | Complete   | 2026-04-22 |
