@@ -187,7 +187,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   4. User runs `/graphify-wayfind` and receives a breadcrumb path from the vault MOC to the current note using the existing `connect_topics` shortest-path machinery.
   5. Installer filters commands by frontmatter `target: obsidian|code|both` — a `--no-obsidian-commands` flag suppresses vault-only commands on code-only platforms; `/graphify-*` prefix convention prevents collision with user-authored commands.
 **Plans**: 6 plans in 2 waves (planned 2026-04-22 — P1 only; OBSCMD-09/10/11/12 deferred to v1.4.x backlog per D-01).
-- [ ] 14-00-PLAN.md — `_uninstall_commands` directory-scan refactor, symmetric with `_install_commands` (Wave 1; OBSCMD-01)
+- [x] 14-00-PLAN.md — `_uninstall_commands` directory-scan refactor, symmetric with `_install_commands` (Wave 1; OBSCMD-01)
 - [ ] 14-01-PLAN.md — `target: obsidian|code|both` frontmatter filter + `--no-obsidian-commands` CLI flag + `supports` per `_PLATFORM_CONFIG` entry + `target: both` backfill on 9 legacy commands + `/graphify-*` prefix enforcement (Wave 1; OBSCMD-02, OBSCMD-07)
 - [ ] 14-02-PLAN.md — `/graphify-moc <community_id>` command with vault-profile-first render + `propose_vault_note` trust boundary (Wave 2; OBSCMD-03, OBSCMD-08)
 - [ ] 14-03-PLAN.md — `/graphify-related <note-path>` read-only command consuming `get_focus_context`, explicit `no_context` handling (Wave 2; OBSCMD-04)
@@ -311,7 +311,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 | 11. Narrative Mode as Interactive Slash Commands | v1.3 | 7/7 | Complete   | 2026-04-17 |
 | 12. Heterogeneous Extraction Routing | v1.4 | 6/6 | Complete | 2026-04-17 |
 | 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 4/4 | Complete | 2026-04-17 |
-| 14. Obsidian Thinking Commands | v1.4 | 0/TBD | Planned | — |
+| 14. Obsidian Thinking Commands | v1.4 | 1/6 | In Progress|  |
 | 15. Async Background Enrichment | v1.4 | 6/6 | Complete    | 2026-04-22 |
 | 16. Graph Argumentation Mode | v1.4 | 3/3 | Complete   | 2026-04-23 |
 | 17. Conversational Graph Chat | v1.4 | 3/3 | Complete   | 2026-04-22 |

@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
 status: executing
 stopped_at: Phase 14 context gathered
-last_updated: "2026-04-23T01:28:31.280Z"
-last_activity: 2026-04-23 -- Phase 14 planning complete
+last_updated: "2026-04-23T01:33:48.586Z"
+last_activity: 2026-04-23
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 32
-  completed_plans: 26
-  percent: 81
+  completed_plans: 27
+  percent: 84
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis and usage-weighted self-improvement, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, now being extended in v1.4 to agent discoverability (MCP capability manifest + SEED-002 harness export), Obsidian thinking-command depth, and graph-quality-over-time via heterogeneous routing + async enrichment + focus-aware zoom + grounded chat + SPAR-Kit argumentation.
-**Current focus:** Phase 17 — conversational-graph-chat
+**Current focus:** Phase 14 — obsidian-thinking-commands
 
 ## Current Position
 
-Phase: 17 (conversational-graph-chat) — ✅ COMPLETE
-Plan: 3 of 3 shipped
+Phase: 14 (obsidian-thinking-commands) — EXECUTING
+Plan: 2 of 6
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 5/7 phases complete (12 ✅ + 13 ✅ + 15 ✅ + 17 ✅ + 18 ✅), Phase 16 next candidate.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
 Status: Ready to execute
-Last activity: 2026-04-23 -- Phase 14 planning complete
+Last activity: 2026-04-23
 
 Progress: [███████░░░] 71% (5/7 phases complete — 12 ✅, 13 ✅, 15 ✅, 17 ✅, 18 ✅)
 
@@ -155,6 +155,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-23T01:00:28.170Z
+Last session: 2026-04-23T01:33:48.583Z
 Stopped at: Phase 14 context gathered
 Next action: Run `/gsd-verify-work` on Phase 17. After verification, per locked v1.4 build order (12 ✅ → 18 ✅ → 13A ✅ → 15 ✅ → 17 ✅ → 16 → 14 → 13B + SEED-002), **Phase 16 SPAR-Kit Argumentation** is the next candidate (soft-depends on 17 citation format ✅; MUST NOT call 17). Start with `/gsd-discuss-phase 16` or `/gsd-plan-phase 16`.

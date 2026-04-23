@@ -53,7 +53,7 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 
 ### Obsidian Thinking Commands (Phase 14)
 
-- [ ] **OBSCMD-01**: Plan 00 — migrate `_uninstall_commands()` in `__main__.py:153` from hardcoded filename whitelist to directory-scan (reads `graphify/commands/*.md` at runtime). Existing Phase-11 commands remain installed; refactor is transparent
+- [x] **OBSCMD-01**: Plan 00 — migrate `_uninstall_commands()` in `__main__.py:153` from hardcoded filename whitelist to directory-scan (reads `graphify/commands/*.md` at runtime). Existing Phase-11 commands remain installed; refactor is transparent
 - [ ] **OBSCMD-02**: Command frontmatter gains `target: obsidian | code | both` field; `_install_commands()` filters per platform config (Claude Code + Windows get both by default; `--no-obsidian-commands` flag suppresses)
 - [ ] **OBSCMD-03**: `/graphify-moc <community_id>` command expands a community into an Obsidian MOC note via `get_community` MCP tool + profile-driven template rendering
 - [ ] **OBSCMD-04**: `/graphify-related` command shows graph-connected notes for the active vault note (reads note frontmatter `source_file` → `get_focus_context` → community + neighbors)
