@@ -1181,6 +1181,9 @@ def main() -> None:
         print("    --dry-run               print the merge plan via format_merge_plan without writing files")
         print("    --force                 force update of user-modified notes (preserves sentinel blocks)")
         print("    --obsidian-dedup        hydrate merged_from from dedup_report.json (Phase 10 D-15)")
+        print("  --diagram-seeds         emit diagram seed JSON + manifest under graphify-out/seeds/ (SEED-01)")
+        print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
+        print("    --vault <path>          opt-in: route gen-diagram-seed tag write-back through compute_merge_plan (D-08)")
         print("  --dedup                 run entity deduplication on graphify-out/extraction.json (Phase 10)")
         print("    --graph <path>          source extraction.json or graph.json (default graphify-out/extraction.json)")
         print("    --out-dir <path>        output directory (default graphify-out/)")
@@ -1365,6 +1368,56 @@ def main() -> None:
                 f"wrote obsidian vault at {Path(obsidian_dir).resolve()} "
                 f"\u2014 {total} actions ({created} CREATE, {updated} UPDATE)"
             )
+        sys.exit(0)
+
+    # --diagram-seeds [options] (Phase 20, SEED-01/04/05/06/07/08)
+    # Reads an already-built graphify-out/graph.json, composes god_nodes() +
+    # detect_user_seeds() from graphify.analyze, writes per-seed JSON files
+    # plus seeds-manifest.json under graphify-out/seeds/ (D-01/D-02 atomic +
+    # manifest-last). Optional --vault routes tag write-back through
+    # graphify.merge.compute_merge_plan (tags: 'union' policy, D-08).
+    if cmd == "--diagram-seeds":
+        graph_path = "graphify-out/graph.json"
+        vault_path: Path | None = None
+        args = sys.argv[2:]
+        i = 0
+        while i < len(args):
+            if args[i] == "--graph" and i + 1 < len(args):
+                graph_path = args[i + 1]; i += 2
+            elif args[i].startswith("--graph="):
+                graph_path = args[i].split("=", 1)[1]; i += 1
+            elif args[i] == "--vault" and i + 1 < len(args):
+                vault_path = Path(args[i + 1]); i += 2
+            elif args[i].startswith("--vault="):
+                vault_path = Path(args[i].split("=", 1)[1]); i += 1
+            else:
+                print(f"error: unknown --diagram-seeds option: {args[i]}", file=sys.stderr)
+                sys.exit(2)
+
+        gp = Path(graph_path).resolve()
+        if not gp.exists():
+            print(f"error: graph file not found: {gp}", file=sys.stderr)
+            print("hint: run /graphify to produce graphify-out/graph.json first", file=sys.stderr)
+            sys.exit(1)
+        if gp.suffix != ".json":
+            print("error: graph file must be a .json file", file=sys.stderr)
+            sys.exit(1)
+
+        try:
+            import json as _json
+            from networkx.readwrite import json_graph
+            _raw = _json.loads(gp.read_text(encoding="utf-8"))
+            try:
+                G = json_graph.node_link_graph(_raw, edges="links")
+            except TypeError:
+                G = json_graph.node_link_graph(_raw)
+        except Exception as exc:
+            print(f"error: could not load graph: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        from graphify.seed import build_all_seeds
+        summary = build_all_seeds(G, graphify_out=gp.parent, vault=vault_path)
+        print(f"[graphify] diagram-seeds complete: {summary}")
         sys.exit(0)
 
     # --dedup [options] (Phase 10, GRAPH-02, GRAPH-03)

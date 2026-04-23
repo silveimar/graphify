@@ -658,7 +658,15 @@ def test_detect_user_seeds_slash_hint_empty_suffix():
 def test_tag_writeback_routed_only_through_compute_merge_plan():
     """Grep denylist: analyze.py (and seed.py if it exists) must not perform
     direct frontmatter writes. Tag write-back goes exclusively through
-    graphify.merge.compute_merge_plan (merge.py:70 tags='union' policy)."""
+    graphify.merge.compute_merge_plan (merge.py:70 tags='union' policy).
+
+    Note for seed.py (Plan 20-02): the atomic-write helpers `_write_atomic`
+    and `_save_seeds_manifest` ARE allowed `open(..., "w")` usages — they
+    write seed JSON + seeds-manifest.json under graphify-out/seeds/, which is
+    NOT vault frontmatter. These helpers are the only sanctioned seed-file
+    write path; all other writes in seed.py must go through them. We enforce
+    this by scanning only the code OUTSIDE those helper bodies.
+    """
     import re
 
     repo_root = Path(__file__).parent.parent
@@ -674,8 +682,40 @@ def test_tag_writeback_routed_only_through_compute_merge_plan():
         re.compile(r"write_note_directly"),
     ]
 
+    # Atomic-write helpers in seed.py are sanctioned (see docstring above).
+    # We strip their bodies before scanning so downstream callers are still
+    # forced to route through them.
+    _WHITELIST_HELPERS = {"_write_atomic", "_save_seeds_manifest"}
+
+    def _strip_whitelisted_helpers(source: str) -> str:
+        lines = source.splitlines(keepends=True)
+        out: list[str] = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            stripped = line.lstrip()
+            m = re.match(r"def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", stripped)
+            if m and m.group(1) in _WHITELIST_HELPERS and not line.startswith(" "):
+                # Skip the def line and all indented body lines until the next
+                # top-level def/class or EOF.
+                i += 1
+                while i < len(lines):
+                    nxt = lines[i]
+                    if nxt.strip() == "":
+                        i += 1
+                        continue
+                    if not nxt.startswith((" ", "\t")):
+                        break
+                    i += 1
+                continue
+            out.append(line)
+            i += 1
+        return "".join(out)
+
     for f in files_to_scan:
         content = f.read_text()
+        if f.name == "seed.py":
+            content = _strip_whitelisted_helpers(content)
         for pat in denylist:
             matches = pat.findall(content)
             assert not matches, (
