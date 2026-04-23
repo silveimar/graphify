@@ -6,8 +6,8 @@
 - ✅ **v1.1 Context Persistence & Agent Memory** — Phases 6–8.2 (shipped 2026-04-13)
 - ✅ **v1.2 Intelligent Analysis & Cross-File Extraction** — Phases 9, 9.1 (+ 9.1.1 gap closure) (shipped 2026-04-15)
 - ✅ **v1.3 Intelligent Analysis Continuation** — Phases 9.2, 10, 11 (shipped 2026-04-17)
-- ✅ **v1.4 Agent Discoverability & Obsidian Workflows** — Phases 12–19 (shipped 2026-04-22)
-- 🚧 **v1.5 Diagram Intelligence & Excalidraw Bridge** — Phases 20–22 (3 phases; 27 REQ-IDs)
+- ✅ **v1.4 Agent Discoverability & Obsidian Workflows** — Phases 12–18.2 (shipped 2026-04-22)
+- 🚧 **v1.5 Diagram Intelligence & Excalidraw Bridge** — Phases 19–22 (4 phases; 32 REQ-IDs)
 
 ## Phases
 
@@ -311,20 +311,6 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - [ ] 18.2-02-PLAN.md — Refresh stale frontmatter on `15-VALIDATION.md` + `18-VALIDATION.md` (metadata-only; VERIFICATION is PASSED for both).
 - [ ] 18.2-03-PLAN.md — Reconcile REQUIREMENTS.md traceability: check off ROUTE-01..07, MANIFEST-01..08, ENRICH-01, ENRICH-04; update coverage count.
 
-### Phase 19: Vault Promotion Script (Layer B)
-**Goal**: A Python script (`graphify/vault_promote.py`) that reads `graphify-out/graph.json` and `GRAPH_REPORT.md`, classifies and scores nodes, then writes promoted Obsidian markdown notes directly into the user's vault at the correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy.
-**Depends on**: Phase 12 (graph.json schema stable), Phase 18 (graph.json read patterns established). No `serve.py` changes — pure file I/O.
-**Requirements**: VAULT-01, VAULT-02, VAULT-03, VAULT-04, VAULT-05 — 5 REQ-IDs.
-**Success Criteria** (what must be TRUE):
-  1. Running `graphify vault-promote --vault /path/to/vault --threshold 3` reads `graphify-out/graph.json` and writes notes to correct Ideaverse folders without touching any existing vault file it did not create.
-  2. Every promoted note has valid Ideaverse frontmatter: `up`, `related`, `created`, `collections`, `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold`, and at minimum one tag from each of: `garden/*`, `source/*`, `graph/*`.
-  3. Node type dispatch is correct: a god-node domain concept lands in `Atlas/Dots/Things/`, a knowledge gap lands in `Atlas/Dots/Questions/`, a cluster becomes `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
-  4. `related:` links are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted from wikilinks.
-  5. `graphify-out/import-log.md` is written after each run with vault path, run timestamp, promoted-count by type, threshold, and skipped-count.
-**Plans**: TBD (not yet planned).
-
----
-
 ### 🌱 Candidate Phase: ACE-Aligned Vocabulary, Linking & Naming
 
 **Goal:** Replace graphify's hardcoded note-type vocabulary with an ACE-aligned,
@@ -370,7 +356,7 @@ rank, confidence tags) and enforce naming conventions across all vault output.
 
 **Theme:** Turn graphify's knowledge graph into a diagram generation pipeline. Auto-detect and user-tag seed nodes from the analyzed graph, produce structured diagram seeds with layout heuristics, bootstrap vault Excalidraw templates from a new `diagram_types` profile section, and deploy a SKILL.md that orchestrates the full seeds → mcp_excalidraw → vault flow. No new required Python dependencies.
 
-**Origin:** Scope confirmed 2026-04-22 via `/gsd-new-milestone v1.5`. Research completed 2026-04-22 (`.planning/research/SUMMARY.md`). 27 atomic REQ-IDs across 3 phases (SEED-01..11, PROF-01..04, TMPL-01..06, SKILL-01..06).
+**Origin:** Scope confirmed 2026-04-22 via `/gsd-new-milestone v1.5`. Research completed 2026-04-22 (`.planning/research/SUMMARY.md`). Phase 19 (Vault Promotion Script Layer B, VAULT-01..05) pulled in from v1.4 scope-reconciliation 2026-04-23. 32 atomic REQ-IDs across 4 phases (VAULT-01..05, SEED-01..11, PROF-01..04, TMPL-01..06, SKILL-01..06).
 
 **Milestone-level invariants carried forward from v1.4:**
 - **D-02 MCP envelope** — `list_diagram_seeds` + `get_diagram_seed` emit `text_body + "\n---GRAPHIFY-META---\n" + json(meta)`.
@@ -383,9 +369,24 @@ rank, confidence tags) and enforce naming conventions across all vault output.
 
 **Phases:**
 
+- [ ] Phase 19: Vault Promotion Script (Layer B) — `graphify/vault_promote.py` reads `graph.json` + `GRAPH_REPORT.md`, classifies/scores nodes, writes promoted Obsidian markdown notes directly to the user's vault at correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy. Pulled in from v1.4 scope-reconciliation 2026-04-23. (plans TBD)
 - [ ] Phase 20: Diagram Seed Engine — `analyze.py` auto-tagging + `detect_user_seeds(G)`; new `seed.py` module with `build_seed` / `build_all_seeds` / layout heuristics / >60% overlap dedup / max_seeds=20 cap; `--diagram-seeds` CLI; `list_diagram_seeds` + `get_diagram_seed` MCP tools. (3 plans)
 - [ ] Phase 21: Profile Extension & Template Bootstrap — `profile.yaml` `diagram_types:` section (ATOMIC with first reader); 6 built-in diagram type defaults; `--init-diagram-templates` CLI command writing real `.excalidraw.md` JSON stubs; `gen-diagram-seed` tag write-back via vault adapter. (2 plans)
 - [ ] Phase 22: Excalidraw Skill & Vault Bridge — `skill-excalidraw.md` full orchestration (list seeds → get seed → read template → mcp_excalidraw → vault); `graphify install --excalidraw`; pure-Python `.excalidraw.md` fallback path complete before mcp_excalidraw integration. (2 plans)
+
+---
+
+### Phase 19: Vault Promotion Script (Layer B)
+**Goal**: A Python script (`graphify/vault_promote.py`) that reads `graphify-out/graph.json` and `GRAPH_REPORT.md`, classifies and scores nodes, then writes promoted Obsidian markdown notes directly into the user's vault at the correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy.
+**Depends on**: Phase 12 (graph.json schema stable), Phase 18 (graph.json read patterns established). No `serve.py` changes — pure file I/O.
+**Requirements**: VAULT-01, VAULT-02, VAULT-03, VAULT-04, VAULT-05 — 5 REQ-IDs.
+**Success Criteria** (what must be TRUE):
+  1. Running `graphify vault-promote --vault /path/to/vault --threshold 3` reads `graphify-out/graph.json` and writes notes to correct Ideaverse folders without touching any existing vault file it did not create.
+  2. Every promoted note has valid Ideaverse frontmatter: `up`, `related`, `created`, `collections`, `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold`, and at minimum one tag from each of: `garden/*`, `source/*`, `graph/*`.
+  3. Node type dispatch is correct: a god-node domain concept lands in `Atlas/Dots/Things/`, a knowledge gap lands in `Atlas/Dots/Questions/`, a cluster becomes `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
+  4. `related:` links are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted from wikilinks.
+  5. `graphify-out/import-log.md` is written after each run with vault path, run timestamp, promoted-count by type, threshold, and skipped-count.
+**Plans**: TBD (not yet planned).
 
 ---
 
@@ -468,10 +469,10 @@ rank, confidence tags) and enforce naming conventions across all vault output.
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
 | 18.1 v1.4 Gap Closure — Phase 13 Verification Artifacts | v1.4 | 0/3 | Not started | — |
 | 18.2 v1.4 Gap Closure — Manifest Metadata + Tech Debt Cleanup | v1.4 | 0/3 | Not started | — |
-| 19. Vault Promotion Script (Layer B) | v1.4 | 0/TBD | Planned | — |
+| 19. Vault Promotion Script (Layer B) | v1.5 | 0/TBD | Planned | — |
 | 20. Diagram Seed Engine | v1.5 | 0/3 | Not started | — |
 | 21. Profile Extension & Template Bootstrap | v1.5 | 0/2 | Not started | — |
 | 22. Excalidraw Skill & Vault Bridge | v1.5 | 0/2 | Not started | — |
 
 ---
-*Last updated: 2026-04-22 — v1.5 Diagram Intelligence & Excalidraw Bridge opened; Phases 20–22 added (27 REQ-IDs: SEED-01..11, PROF-01..04, TMPL-01..06, SKILL-01..06). v1.4 marked complete (Phases 12–19, 86 REQ-IDs).*
+*Last updated: 2026-04-23 — Phase 19 (Vault Promotion Script Layer B, VAULT-01..05) moved from v1.4 to v1.5 per scope reconciliation; v1.4 scope corrected to Phases 12–18.2 (86 REQ-IDs); v1.5 now Phases 19–22 (32 REQ-IDs: VAULT-01..05, SEED-01..11, PROF-01..04, TMPL-01..06, SKILL-01..06). v1.5 Diagram Intelligence & Excalidraw Bridge opened 2026-04-22.*

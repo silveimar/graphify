@@ -1,10 +1,22 @@
 # Requirements: graphify — Milestone v1.5 Diagram Intelligence & Excalidraw Bridge
 
-**Milestone:** v1.5 · **Status:** Planning · **Phases:** 20–22 · **Plans:** 7
+**Milestone:** v1.5 · **Status:** Planning · **Phases:** 19–22 · **Plans:** 7 + Phase 19 TBD
 
 ## Overview
 
-v1.5 turns graphify's knowledge graph into a diagram generation pipeline. The three phases are strictly ordered by dependency: seed engine first (Phase 20), profile extension + template bootstrap second (Phase 21), skill + install bridge last (Phase 22).
+v1.5 has two workstreams. **Layer B (Phase 19, VAULT-01..05)** — a pure-file-I/O vault promotion script that writes `graph.json`-derived Obsidian notes into Ideaverse Pro 2.5 folders with full frontmatter and tag taxonomy. Pulled in from v1.4 scope-reconciliation 2026-04-23. **Diagram pipeline (Phases 20–22)** — turns the knowledge graph into Excalidraw diagrams, strictly ordered by dependency: seed engine first (Phase 20), profile extension + template bootstrap second (Phase 21), skill + install bridge last (Phase 22). Phase 19 is independent of 20–22 and can execute in any order relative to them.
+
+---
+
+## VAULT — Vault Promotion Script Layer B (Phase 19)
+
+Derived from ROADMAP.md Phase 19 success criteria. Full requirement text and plan decomposition to be elaborated during `/gsd-plan-phase 19`.
+
+- [ ] **VAULT-01** `graphify vault-promote --vault /path/to/vault --threshold N` CLI reads `graphify-out/graph.json` + `GRAPH_REPORT.md` and writes promoted notes into Ideaverse Pro 2.5 destination folders without touching any existing vault file it did not create (write-only, no overwrite of foreign files).
+- [ ] **VAULT-02** Every promoted note has valid Ideaverse frontmatter: `up`, `related`, `created`, `collections`, `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold`, and at minimum one tag from each of `garden/*`, `source/*`, `graph/*`.
+- [ ] **VAULT-03** Node-type → folder dispatch is correct: god-node domain concepts → `Atlas/Dots/Things/`; knowledge gaps → `Atlas/Dots/Questions/`; clusters → `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
+- [ ] **VAULT-04** `related:` wikilinks are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted.
+- [ ] **VAULT-05** `graphify-out/import-log.md` is written after each run with vault path, run timestamp, promoted-count by type, threshold, and skipped-count.
 
 ---
 
@@ -62,7 +74,6 @@ v1.5 turns graphify's knowledge graph into a diagram generation pipeline. The th
 - Multi-seed diagram (combining two seeds into one diagram) — v1.6+
 - Real-time seed refresh via watch mode — v1.6+
 - mcp_excalidraw `import_scene` merge semantics validation — Phase 22 planning research flag
-- Phase 19 Vault Promotion Script — TBD (stub from v1.4 ROADMAP)
 
 ---
 
@@ -96,6 +107,11 @@ v1.5 turns graphify's knowledge graph into a diagram generation pipeline. The th
 
 | REQ-ID | Phase | Plan | Status |
 |--------|-------|------|--------|
+| VAULT-01 | 19 | TBD | — |
+| VAULT-02 | 19 | TBD | — |
+| VAULT-03 | 19 | TBD | — |
+| VAULT-04 | 19 | TBD | — |
+| VAULT-05 | 19 | TBD | — |
 | SEED-01 | 20 | 20-02 | — |
 | SEED-02 | 20 | 20-01 | — |
 | SEED-03 | 20 | 20-01 | — |

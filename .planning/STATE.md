@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 
 Phase: Not started (defining requirements)
 Plan: —
-Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge — 🚧 STARTED (2026-04-22), 0/3 phases complete
+Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge — 🚧 STARTED (2026-04-22), 0/4 phases complete (Phase 19 pulled in from v1.4 2026-04-23)
 Previous milestone: v1.4 Agent Discoverability & Obsidian Workflows — ✅ SHIPPED 2026-04-22 (phases 12–18, 32 plans, 86/86 requirements)
 Status: Defining requirements
 Last activity: 2026-04-22
