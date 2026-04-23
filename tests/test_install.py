@@ -449,3 +449,126 @@ def test_install_non_claude_platform_skips_commands(tmp_path):
     # .claude/commands/ should not exist (or be empty) for a codex install
     assert not (tmp_path / ".claude" / "commands").exists() or \
         not any((tmp_path / ".claude" / "commands").glob("*.md"))
+
+
+# ============================================================
+# Phase 14 Plan 01 — OBSCMD-02: target filter + --no-obsidian-commands
+# ============================================================
+
+LEGACY_COMMAND_NAMES = (
+    "argue", "ask", "challenge", "connect", "context",
+    "drift", "emerge", "ghost", "trace",
+)
+
+
+def test_install_missing_target_defaults_both(tmp_path):
+    """OBSCMD-02: a command file without `target:` frontmatter defaults to 'both'."""
+    from graphify.__main__ import _read_command_target
+    f = tmp_path / "nofield.md"
+    f.write_text(
+        "---\nname: foo\ndisable-model-invocation: true\n---\n\nBody.\n",
+        encoding="utf-8",
+    )
+    assert _read_command_target(f) == "both"
+
+
+def test_read_command_target_parses_obsidian(tmp_path):
+    """_read_command_target extracts target: obsidian from frontmatter."""
+    from graphify.__main__ import _read_command_target
+    f = tmp_path / "vault-only.md"
+    f.write_text(
+        "---\nname: graphify-vault\ntarget: obsidian\n---\n\nBody.\n",
+        encoding="utf-8",
+    )
+    assert _read_command_target(f) == "obsidian"
+
+
+def test_read_command_target_parses_code(tmp_path):
+    """_read_command_target extracts target: code from frontmatter."""
+    from graphify.__main__ import _read_command_target
+    f = tmp_path / "code-only.md"
+    f.write_text(
+        "---\nname: graphify-code\ntarget: code\n---\n\nBody.\n",
+        encoding="utf-8",
+    )
+    assert _read_command_target(f) == "code"
+
+
+def test_install_filters_by_target(tmp_path, monkeypatch):
+    """OBSCMD-02: _install_commands skips files whose target is not in platform supports."""
+    from graphify.__main__ import _install_commands
+    # Build synthetic src dir with an obsidian-only file and a both file
+    src_dir = tmp_path / "src_commands"
+    src_dir.mkdir()
+    (src_dir / "vault-only.md").write_text(
+        "---\nname: graphify-vault\ntarget: obsidian\n---\nBody\n",
+        encoding="utf-8",
+    )
+    (src_dir / "universal.md").write_text(
+        "---\nname: graphify-universal\ntarget: both\n---\nBody\n",
+        encoding="utf-8",
+    )
+    dst_dir = tmp_path / ".claude" / "commands"
+    cfg = {
+        "commands_enabled": True,
+        "commands_dst": Path(".claude") / "commands",
+        "supports": ["code"],  # NOT including obsidian
+    }
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        _install_commands(cfg, src_dir, verbose=False)
+    assert (dst_dir / "universal.md").exists(), "target: both must install on code-only platform"
+    assert not (dst_dir / "vault-only.md").exists(), "target: obsidian must be filtered out"
+
+
+def test_install_filter_allows_matching_target(tmp_path):
+    """OBSCMD-02: target: obsidian installs on a platform whose supports includes obsidian."""
+    from graphify.__main__ import _install_commands
+    src_dir = tmp_path / "src_commands"
+    src_dir.mkdir()
+    (src_dir / "vault-only.md").write_text(
+        "---\nname: graphify-vault\ntarget: obsidian\n---\nBody\n",
+        encoding="utf-8",
+    )
+    cfg = {
+        "commands_enabled": True,
+        "commands_dst": Path(".claude") / "commands",
+        "supports": ["code", "obsidian"],
+    }
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        _install_commands(cfg, src_dir, verbose=False)
+    assert (tmp_path / ".claude" / "commands" / "vault-only.md").exists()
+
+
+def test_no_obsidian_commands_flag(tmp_path):
+    """OBSCMD-02: --no-obsidian-commands suppresses target: obsidian files."""
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude", no_obsidian_commands=True)
+    dst = tmp_path / ".claude" / "commands"
+    # All 9 legacy commands are target: both → survive the flag
+    for name in LEGACY_COMMAND_NAMES:
+        assert (dst / f"{name}.md").exists(), f"{name}.md (target: both) must survive --no-obsidian-commands"
+
+
+def test_legacy_commands_still_install(tmp_path):
+    """Regression: all 9 legacy commands still install on claude after Plan 01."""
+    from graphify.__main__ import install
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+    dst = tmp_path / ".claude" / "commands"
+    for name in LEGACY_COMMAND_NAMES:
+        assert (dst / f"{name}.md").exists(), f"{name}.md must still install"
+
+
+def test_platform_config_has_supports_key():
+    """Every _PLATFORM_CONFIG entry must declare a `supports` list."""
+    from graphify.__main__ import _PLATFORM_CONFIG
+    for plat, cfg in _PLATFORM_CONFIG.items():
+        assert "supports" in cfg, f"platform {plat!r} missing 'supports' key"
+        assert isinstance(cfg["supports"], list) and cfg["supports"], (
+            f"platform {plat!r}: 'supports' must be a non-empty list"
+        )
+        for s in cfg["supports"]:
+            assert s in ("code", "obsidian"), (
+                f"platform {plat!r}: unknown support target {s!r}"
+            )

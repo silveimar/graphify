@@ -201,8 +201,8 @@ def test_ask_md_frontmatter():
     assert fm.get("description"), "description field required"
     assert fm.get("argument-hint"), "argument-hint field required"
     assert fm.get("disable-model-invocation") == "true"
-    # Per CONTEXT.md Clarification: no `target:` field
-    assert "target" not in fm, "ask.md must NOT have a target: field per CONTEXT.md Clarification"
+    # Phase 14 Plan 01 backfill: legacy files now carry `target: both`
+    assert fm.get("target") == "both", "ask.md must have target: both (Plan 14-01 backfill)"
     # Body must reference the chat MCP tool
     body = path.read_text()
     assert "chat" in body, "ask.md body must invoke the chat MCP tool"
@@ -218,7 +218,7 @@ def test_argue_md_frontmatter():
     assert fm.get("description"), "description field required"
     assert fm.get("argument-hint"), "argument-hint field required"
     assert fm.get("disable-model-invocation") == "true"
-    assert "target" not in fm, "argue.md must NOT have a target: field"
+    assert fm.get("target") == "both", "argue.md must have target: both (Plan 14-01 backfill)"
     body = path.read_text()
     assert "argue_topic" in body, "argue.md body must invoke the argue_topic MCP tool"
     assert "$ARGUMENTS" in body, "argue.md must pass $ARGUMENTS to topic"
@@ -226,3 +226,34 @@ def test_argue_md_frontmatter():
     assert "alias_redirects" not in body, "argue.md must use resolved_from_alias, never alias_redirects"
     # ARGUE-09 advisory-only enforcement — body must state non-mutation invariant.
     assert "advisory" in body.lower(), "argue.md must document advisory-only invariant (ARGUE-09)"
+
+
+# ============================================================
+# Phase 14 Plan 01 — OBSCMD-02 (target filter) + OBSCMD-07 (prefix enforcement)
+# ============================================================
+
+LEGACY_COMMANDS = (
+    "argue", "ask", "challenge", "connect", "context",
+    "drift", "emerge", "ghost", "trace",
+)
+
+
+def test_legacy_commands_have_target():
+    """Plan 01 backfill: all 9 pre-Phase-14 commands carry target: both."""
+    for name in LEGACY_COMMANDS:
+        fm = _parse_frontmatter(_commands_dir() / f"{name}.md")
+        assert fm.get("target") == "both", f"{name}.md missing target: both"
+
+
+def test_graphify_prefix_enforced():
+    """OBSCMD-07: every command name is either /graphify-* or in the legacy allow-list."""
+    LEGACY_ALLOW = set(LEGACY_COMMANDS)
+    for path in sorted(_commands_dir().glob("*.md")):
+        fm = _parse_frontmatter(path)
+        name = fm.get("name", path.stem)
+        stem = path.stem
+        if stem in LEGACY_ALLOW:
+            continue
+        assert name.startswith("graphify-"), (
+            f"{path.name}: new commands must start with 'graphify-' (OBSCMD-07)"
+        )
