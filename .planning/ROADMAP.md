@@ -186,7 +186,19 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   3. User runs `/graphify-orphan` and receives a list of nodes with zero community membership or `staleness=GHOST`, sourced from existing telemetry + community metadata.
   4. User runs `/graphify-wayfind` and receives a breadcrumb path from the vault MOC to the current note using the existing `connect_topics` shortest-path machinery.
   5. Installer filters commands by frontmatter `target: obsidian|code|both` — a `--no-obsidian-commands` flag suppresses vault-only commands on code-only platforms; `/graphify-*` prefix convention prevents collision with user-authored commands.
-**Plans**: TBD (planner will refine; 4–6 plans expected — Plan 00 = whitelist refactor, Plan 01 = frontmatter filter + installer, Plan 02+ = command implementations).
+**Plans**: 6 plans in 2 waves (planned 2026-04-22 — P1 only; OBSCMD-09/10/11/12 deferred to v1.4.x backlog per D-01).
+- [ ] 14-00-PLAN.md — `_uninstall_commands` directory-scan refactor, symmetric with `_install_commands` (Wave 1; OBSCMD-01)
+- [ ] 14-01-PLAN.md — `target: obsidian|code|both` frontmatter filter + `--no-obsidian-commands` CLI flag + `supports` per `_PLATFORM_CONFIG` entry + `target: both` backfill on 9 legacy commands + `/graphify-*` prefix enforcement (Wave 1; OBSCMD-02, OBSCMD-07)
+- [ ] 14-02-PLAN.md — `/graphify-moc <community_id>` command with vault-profile-first render + `propose_vault_note` trust boundary (Wave 2; OBSCMD-03, OBSCMD-08)
+- [ ] 14-03-PLAN.md — `/graphify-related <note-path>` read-only command consuming `get_focus_context`, explicit `no_context` handling (Wave 2; OBSCMD-04)
+- [ ] 14-04-PLAN.md — `/graphify-orphan` parameter-less read-only command with dual-section render + graceful `enrichment.json` absence (Wave 2; OBSCMD-05)
+- [ ] 14-05-PLAN.md — `/graphify-wayfind <topic>` command resolving MOC-root via largest-community heuristic + `connect_topics` shortest-path + `propose_vault_note` (Wave 2; OBSCMD-06, OBSCMD-08)
+
+**Deferred to v1.4.x backlog** (P2, not planned in this phase):
+- OBSCMD-09 [P2]: /graphify-bridge — surprising-connections Dataview embed
+- OBSCMD-10 [P2]: /graphify-voice — anti-impersonation guard design required
+- OBSCMD-11 [P2]: /graphify-drift-notes — Dataview embed of /drift output
+- OBSCMD-12 [P2]: trigger_pipeline frontmatter + cost-preview banner
 
 ### Phase 15: Async Background Enrichment
 **Goal**: Graphify runs four derivation passes in the background after each rebuild, enriching node descriptions, detecting emerging cross-snapshot patterns, generating per-community summaries, and refreshing staleness — writing only an overlay sidecar, never mutating `graph.json`.
