@@ -412,6 +412,30 @@ def test_uninstall_removes_commands(tmp_path):
         assert not (commands_dir / name).exists(), f"{name} not removed after uninstall"
 
 
+def test_uninstall_directory_scan(tmp_path):
+    """OBSCMD-01: _uninstall_commands scans graphify/commands/*.md,
+    not a hardcoded whitelist."""
+    from unittest.mock import patch
+    from graphify.__main__ import install, uninstall
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+        uninstall(platform="claude")
+    dst = tmp_path / ".claude" / "commands"
+    # Both legacy and non-legacy names must be removed (proves source-driven scan)
+    for name in ["connect.md", "ask.md", "argue.md", "context.md", "trace.md"]:
+        assert not (dst / name).exists(), f"{name} not removed by directory-scan uninstall"
+
+
+def test_uninstall_idempotent(tmp_path):
+    """OBSCMD-01: repeated uninstall is a no-op (no exceptions)."""
+    from unittest.mock import patch
+    from graphify.__main__ import install, uninstall
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="claude")
+        uninstall(platform="claude")
+        uninstall(platform="claude")  # must not raise
+
+
 def test_install_non_claude_platform_skips_commands(tmp_path):
     """D-13: non-Claude platforms (commands_enabled=False) do not receive command files.
 
