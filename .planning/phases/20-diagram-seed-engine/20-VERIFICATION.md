@@ -1,13 +1,14 @@
 ---
 phase: 20-diagram-seed-engine
 verified: 2026-04-23T13:25:00Z
-status: gaps_found
-score: 10/11 must-haves verified
+status: verified
+score: 11/11 must-haves verified
 overrides_applied: 0
 re_verification:
-  previous_status: null
-  previous_score: null
-  gaps_closed: []
+  previous_status: gaps_found
+  previous_score: 10/11 must-haves verified
+  gaps_closed:
+    - "SEED-10 list→get round-trip — fix(20-04) in 7e9f880 writes seed files as {seed_id}-seed.json so merged seeds (merged-<sha12>) resolve correctly. RED test 9bf0777 → GREEN. Full suite 1525 passed."
   gaps_remaining: []
   regressions: []
 gaps:
@@ -157,3 +158,16 @@ All other Phase 20 deliverables are VERIFIED.
 
 *Verified: 2026-04-23T13:25:00Z*
 *Verifier: Claude (gsd-verifier)*
+
+---
+
+## Re-verification — 2026-04-23T13:30:00Z
+
+Gap closed inline by fix(20-04):
+
+- `9bf0777` test(20-04): RED — end-to-end regression `test_build_all_seeds_merged_seed_list_then_get_round_trip` drives the real `build_all_seeds` pipeline (not the fixture that papered over the bug), asserts list→get round-trip succeeds for a dedup-merged seed.
+- `7e9f880` fix(20-04): `seed.py:508` + `seed.py:524` now key filenames off `seed['seed_id']` instead of `seed['main_node_id']`. For non-merged seeds the two are identical, so behavior is unchanged; for merged seeds the file is now `merged-<sha12>-seed.json`, matching what `list_diagram_seeds` emits and what `get_diagram_seed` looks up.
+
+Full test suite: 1525 passed, 8 warnings, 41.07s. No regressions.
+
+**Status:** verified (11/11).
