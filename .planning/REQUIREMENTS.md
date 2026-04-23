@@ -17,8 +17,8 @@ Derived from ROADMAP.md Phase 19 success criteria. Full requirement text and pla
 - [ ] **VAULT-03** Node-type → folder dispatch is correct: god-node domain concepts → `Atlas/Dots/Things/`; knowledge gaps → `Atlas/Dots/Questions/`; clusters → `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
 - [ ] **VAULT-04** `related:` wikilinks are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted.
 - [ ] **VAULT-05** `graphify-out/import-log.md` is written after each run with vault path, run timestamp, promoted-count by type, threshold, and skipped-count.
-- [ ] **VAULT-06** Profile write-back: union-merge Layer 3 auto-detected tags into `.graphify/profile.yaml`, gated by `profile_sync.auto_update` (default `true`). Writes atomic (tempfile + os.replace).
-- [ ] **VAULT-07** Hybrid 3-layer tag taxonomy: Layer 1 `_DEFAULT_PROFILE` baseline → Layer 2 user `.graphify/profile.yaml` (deep-merged) → Layer 3 auto-detected from `graph.json` source_file extensions + file_type (deep-merged in memory; persisted via VAULT-06).
+- [x] **VAULT-06** Profile write-back: union-merge Layer 3 auto-detected tags into `.graphify/profile.yaml`, gated by `profile_sync.auto_update` (default `true`). Writes atomic (tempfile + os.replace).
+- [x] **VAULT-07** Hybrid 3-layer tag taxonomy: Layer 1 `_DEFAULT_PROFILE` baseline → Layer 2 user `.graphify/profile.yaml` (deep-merged) → Layer 3 auto-detected from `graph.json` source_file extensions + file_type (deep-merged in memory; persisted via VAULT-06).
 
 ---
 
