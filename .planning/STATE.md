@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
 status: executing
 stopped_at: Phase 14 context gathered
-last_updated: "2026-04-23T01:33:48.586Z"
+last_updated: "2026-04-23T01:41:23.716Z"
 last_activity: 2026-04-23
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 32
-  completed_plans: 27
-  percent: 84
+  completed_plans: 28
+  percent: 88
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-17 on v1.4 milestone open)
 ## Current Position
 
 Phase: 14 (obsidian-thinking-commands) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Milestone: v1.4 Agent Discoverability & Obsidian Workflows — 🚧 STARTED (2026-04-17), 5/7 phases complete (12 ✅ + 13 ✅ + 15 ✅ + 17 ✅ + 18 ✅), Phase 16 next candidate.
 Previous milestone: v1.3 Intelligent Analysis Continuation — ✅ SHIPPED 2026-04-17 (phases 9.2 + 10 + 11)
 Status: Ready to execute
@@ -133,6 +133,8 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 - [Phase 17]: Plan 17-03: `/graphify-ask` follows connect.md frontmatter convention — no `target:` field (CONTEXT.md Clarification)
 - [Phase 17]: Plan 17-03: Zero-LLM invariant enforced structurally via grep-on-source (CHAT-03 SC4 architectural test)
 - [Phase ?]: D-14/D-15/D-16: argue_topic D-02 envelope with composable_from:[] recursion guard; resolved_from_alias (not alias_redirects)
+- [Phase ?]: Phase 14-01: target frontmatter uses stdlib re-module (no PyYAML); missing target defaults to both for back-compat
+- [Phase ?]: Phase 14-01: _PLATFORM_CONFIG supports is capability intent list, never a filename whitelist — TM-14-02 defense
 
 ### Blockers/Concerns
 
@@ -152,9 +154,10 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | Phase 17 P03 | 12m | 2 tasks | 4 files (ask.md + serve.py + 2 test files) |
 | Phase 16 P03 | 8m | 2 tasks | 3 files |
 | Phase 16 P02 | 7m | 2 tasks | 5 files |
+| Phase 14 P01 | 253 | 2 tasks | 12 files |
 
 ## Session Continuity
 
-Last session: 2026-04-23T01:33:48.583Z
+Last session: 2026-04-23T01:41:08.967Z
 Stopped at: Phase 14 context gathered
 Next action: Run `/gsd-verify-work` on Phase 17. After verification, per locked v1.4 build order (12 ✅ → 18 ✅ → 13A ✅ → 15 ✅ → 17 ✅ → 16 → 14 → 13B + SEED-002), **Phase 16 SPAR-Kit Argumentation** is the next candidate (soft-depends on 17 citation format ✅; MUST NOT call 17). Start with `/gsd-discuss-phase 16` or `/gsd-plan-phase 16`.
