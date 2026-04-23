@@ -505,7 +505,7 @@ def build_all_seeds(
     prior_manifest = _load_seeds_manifest(graphify_out)
     prior_files: dict[str, str] = {e["node_id"]: e["seed_file"] for e in prior_manifest if e.get("seed_file")}
 
-    new_files_set = {f"{_safe_filename_stem(s['main_node_id'])}-seed.json" for s in deduped}
+    new_files_set = {f"{_safe_filename_stem(s['seed_id'])}-seed.json" for s in deduped}
     for prior_nid, prior_file in prior_files.items():
         if prior_nid not in retained_node_ids and prior_file not in new_files_set:
             orphan = seeds_dir / prior_file
@@ -521,7 +521,7 @@ def build_all_seeds(
     for seed in deduped:
         # Strip internal-only keys
         seed_out = {k: v for k, v in seed.items() if not k.startswith("_")}
-        filename = f"{_safe_filename_stem(seed['main_node_id'])}-seed.json"
+        filename = f"{_safe_filename_stem(seed['seed_id'])}-seed.json"
         seed_path = seeds_dir / filename
         content = json.dumps(seed_out, indent=2, ensure_ascii=False)
         _write_atomic(seed_path, content)
