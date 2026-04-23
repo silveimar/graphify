@@ -360,3 +360,47 @@ def test_manifest_hash_stable_after_examples_added() -> None:
         assert "_meta" in entry
         assert "examples" in entry["_meta"]
         assert isinstance(entry["_meta"]["examples"], list)
+
+
+def test_all_registered_tools_have_explicit_meta_yaml() -> None:
+    """MANIFEST-06: every registered MCP tool must have an explicit entry in
+    capability_tool_meta.yaml — no silent cascade to defaults. Guards against
+    the `chat` / `get_focus_context` drift found in v1.4 milestone audit."""
+    import yaml
+
+    from graphify.mcp_tool_registry import build_mcp_tools
+
+    meta_path = Path(__file__).resolve().parent.parent / "graphify" / "capability_tool_meta.yaml"
+    meta_keys = set(yaml.safe_load(meta_path.read_text()).keys())
+    registry_names = {t.name for t in build_mcp_tools()}
+    missing = registry_names - meta_keys
+    assert not missing, (
+        f"Registered MCP tools missing explicit metadata in capability_tool_meta.yaml: "
+        f"{sorted(missing)}. Add entries with cost_class, deterministic, "
+        f"cacheable_until, composable_from."
+    )
+
+
+def test_chat_cost_class_expensive() -> None:
+    """MANIFEST-06: chat must not cascade to default cheap — it is expensive."""
+    m = build_manifest_dict()
+    tool = next((t for t in m["CAPABILITY_TOOLS"] if t["name"] == "chat"), None)
+    assert tool is not None, "chat missing from manifest"
+    assert tool.get("cost_class") == "expensive", (
+        f"chat.cost_class must be 'expensive', got {tool.get('cost_class')!r} — "
+        f"likely cascaded to default because capability_tool_meta.yaml lacks a `chat:` entry."
+    )
+    assert tool.get("deterministic") is False
+    assert tool.get("composable_from") == [], (
+        "chat.composable_from must be [] — recursion guard pairs with argue_topic."
+    )
+
+
+def test_get_focus_context_metadata_declared() -> None:
+    """MANIFEST-06: get_focus_context must have explicit metadata, not cascade defaults."""
+    m = build_manifest_dict()
+    tool = next((t for t in m["CAPABILITY_TOOLS"] if t["name"] == "get_focus_context"), None)
+    assert tool is not None, "get_focus_context missing from manifest"
+    assert tool.get("cost_class") == "cheap"
+    assert tool.get("deterministic") is True
+    assert tool.get("cacheable_until") == "graph_mtime"

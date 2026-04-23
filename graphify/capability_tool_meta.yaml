@@ -99,3 +99,13 @@ capability_describe:
   deterministic: true
   cacheable_until: manifest_hash
   composable_from: []
+chat:
+  cost_class: expensive
+  deterministic: false   # varies with session_id history
+  cacheable_until: graph_mtime
+  composable_from: []    # HARD CONSTRAINT — recursion guard (CHAT-05, pairs with argue_topic)
+get_focus_context:
+  cost_class: cheap
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: []
