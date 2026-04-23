@@ -2549,6 +2549,232 @@ def _check_focus_freshness(
     return (current - ts).total_seconds() <= 300
 
 
+# ----------------------------------------------------------------------------
+# Phase 20 SEED-09 / SEED-10: list_diagram_seeds + get_diagram_seed MCP tools.
+# Both cores:
+#   * Never raise (SP-8); every failure collapses to a D-02 status envelope.
+#   * Thread D-16 alias map over seed_id args and over node IDs in responses.
+#   * Confine every disk read to project_root / graphify-out / seeds /.
+# ----------------------------------------------------------------------------
+_SEED_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
+
+
+def _run_list_diagram_seeds_core(
+    G: "nx.Graph",
+    project_root: "Path",
+    arguments: dict,
+    alias_map: "dict[str, str] | None" = None,
+) -> str:
+    """SEED-09: list available diagram seeds as tab-separated rows + D-02 meta.
+
+    Never raises. Missing seeds/ dir or empty/corrupt manifest -> no_seeds envelope.
+    Each row: seed_id\\tmain_node_label\\tsuggested_layout_type\\ttrigger\\tnode_count.
+    Node IDs are threaded through the D-16 alias map; meta.resolved_from_alias records
+    any redirects.
+    """
+    budget = int(arguments.get("budget", 500))
+    seeds_dir = Path(project_root) / "graphify-out" / "seeds"
+    manifest_path = seeds_dir / "seeds-manifest.json"
+
+    def _no_seeds() -> str:
+        meta_nc = {"status": "no_seeds", "seed_count": 0, "budget_used": 0}
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta_nc, ensure_ascii=False)
+
+    if not seeds_dir.exists():
+        return _no_seeds()
+
+    # D-16 alias threading closure (lifted from _run_query_graph:1524-1534)
+    _resolved_aliases: dict[str, list[str]] = {}
+    _effective_alias_map: dict[str, str] = alias_map or {}
+
+    def _resolve_alias(node_id: str) -> str:
+        canonical = _effective_alias_map.get(node_id)
+        if canonical and canonical != node_id:
+            aliases = _resolved_aliases.setdefault(canonical, [])
+            if node_id not in aliases:
+                aliases.append(node_id)
+            return canonical
+        return node_id
+
+    # Read manifest (SP-8: tolerate corruption)
+    manifest_entries: list[dict] = []
+    if manifest_path.exists():
+        try:
+            raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest_entries = raw if isinstance(raw, list) else []
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+            print(
+                "[graphify] seeds-manifest.json unreadable — returning no_seeds",
+                file=sys.stderr,
+            )
+            return _no_seeds()
+
+    lines: list[str] = []
+    seed_count = 0
+    for entry in manifest_entries:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("dropped_due_to_cap"):
+            continue
+        seed_file_name = entry.get("seed_file") or ""
+        if not seed_file_name or not _SEED_ID_RE.match(seed_file_name.replace("-seed.json", "")):
+            continue
+        seed_file = seeds_dir / seed_file_name
+        # Path confinement (T-20-03-01)
+        try:
+            resolved = seed_file.resolve()
+            if not str(resolved).startswith(str(seeds_dir.resolve())):
+                continue
+        except (OSError, RuntimeError):
+            continue
+        if not seed_file.exists():
+            continue
+        try:
+            seed = json.loads(seed_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+            continue
+        canonical_id = _resolve_alias(str(seed.get("seed_id", "")))
+        node_count = len(seed.get("main_nodes", []) or []) + len(
+            seed.get("supporting_nodes", []) or []
+        )
+        line = "\t".join([
+            canonical_id,
+            str(seed.get("main_node_label", "")),
+            str(seed.get("suggested_layout_type", "")),
+            str(seed.get("trigger", "")),
+            str(node_count),
+        ])
+        lines.append(line)
+        seed_count += 1
+        # Soft character cap based on budget
+        if sum(len(l) for l in lines) > budget * 200:
+            break
+
+    if seed_count == 0:
+        return _no_seeds()
+
+    text_body = "\n".join(lines)
+    meta: dict = {
+        "status": "ok",
+        "seed_count": seed_count,
+        "budget_used": len(text_body),
+    }
+    if _resolved_aliases:
+        meta["resolved_from_alias"] = _resolved_aliases
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
+def _run_get_diagram_seed_core(
+    G: "nx.Graph",
+    project_root: "Path",
+    arguments: dict,
+    alias_map: "dict[str, str] | None" = None,
+) -> str:
+    """SEED-10: return full SeedDict JSON + D-02 envelope for a single seed_id.
+
+    Never raises. Missing seed_id / dir / file -> not_found; corrupt file -> corrupt.
+    Resolves alias on seed_id arg AND on node IDs inside the returned SeedDict.
+    Path confinement: rejects any seed_id containing traversal characters.
+    """
+    requested_id_raw = str(arguments.get("seed_id", ""))
+    budget = int(arguments.get("budget", 2000))
+    seeds_dir = Path(project_root) / "graphify-out" / "seeds"
+
+    _resolved_aliases: dict[str, list[str]] = {}
+    _effective_alias_map: dict[str, str] = alias_map or {}
+
+    def _resolve_alias(node_id: str) -> str:
+        canonical = _effective_alias_map.get(node_id)
+        if canonical and canonical != node_id:
+            aliases = _resolved_aliases.setdefault(canonical, [])
+            if node_id not in aliases:
+                aliases.append(node_id)
+            return canonical
+        return node_id
+
+    canonical_id = _resolve_alias(requested_id_raw)
+
+    def _not_found() -> str:
+        meta_nf: dict = {
+            "status": "not_found",
+            "seed_id": requested_id_raw,
+            "budget_used": 0,
+        }
+        if _resolved_aliases:
+            meta_nf["resolved_from_alias"] = _resolved_aliases
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta_nf, ensure_ascii=False)
+
+    # T-20-03-01: reject path-traversal attempts on seed_id before constructing path.
+    if not canonical_id or not _SEED_ID_RE.match(canonical_id):
+        return _not_found()
+    if not seeds_dir.exists():
+        return _not_found()
+
+    seed_path = seeds_dir / f"{canonical_id}-seed.json"
+    # Belt-and-suspenders path confinement.
+    try:
+        resolved = seed_path.resolve()
+        if not str(resolved).startswith(str(seeds_dir.resolve())):
+            return _not_found()
+    except (OSError, RuntimeError):
+        return _not_found()
+    if not seed_path.exists():
+        return _not_found()
+
+    try:
+        seed = json.loads(seed_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        meta_c: dict = {
+            "status": "corrupt",
+            "seed_id": requested_id_raw,
+            "budget_used": 0,
+        }
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta_c, ensure_ascii=False)
+
+    if not isinstance(seed, dict):
+        return _not_found()
+
+    # Thread alias over node IDs inside main_nodes / supporting_nodes / relations.
+    for collection in ("main_nodes", "supporting_nodes"):
+        items = seed.get(collection)
+        if isinstance(items, list):
+            for n in items:
+                if isinstance(n, dict) and isinstance(n.get("id"), str):
+                    n["id"] = _resolve_alias(n["id"])
+    rels = seed.get("relations")
+    if isinstance(rels, list):
+        for rel in rels:
+            if not isinstance(rel, dict):
+                continue
+            if isinstance(rel.get("source"), str):
+                rel["source"] = _resolve_alias(rel["source"])
+            if isinstance(rel.get("target"), str):
+                rel["target"] = _resolve_alias(rel["target"])
+
+    # Also reflect canonical seed_id in the payload so agents see canonical form.
+    seed["seed_id"] = canonical_id
+
+    text_body = json.dumps(seed, indent=2, ensure_ascii=False)
+    # T-20-03-02: DoS guard — cap text_body relative to budget.
+    char_cap = budget * 10
+    truncated = False
+    if len(text_body) > char_cap:
+        text_body = text_body[:char_cap]
+        truncated = True
+    node_count = len(seed.get("main_nodes", []) or []) + len(
+        seed.get("supporting_nodes", []) or []
+    )
+    meta: dict = {
+        "status": "truncated" if truncated else "ok",
+        "seed_id": canonical_id,
+        "node_count": node_count,
+        "budget_used": len(text_body),
+    }
+    if _resolved_aliases:
+        meta["resolved_from_alias"] = _resolved_aliases
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
 def serve(graph_path: str = "graphify-out/graph.json") -> None:
     """Start the MCP server. Requires pip install mcp."""
     try:
@@ -3087,6 +3313,20 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         }
         return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
+    def _tool_list_diagram_seeds(arguments: dict) -> str:
+        """Phase 20 SEED-09: list diagram seeds in graphify-out/seeds/."""
+        _reload_if_stale()
+        return _run_list_diagram_seeds_core(
+            G, _out_dir.parent, arguments or {}, alias_map=_alias_map
+        )
+
+    def _tool_get_diagram_seed(arguments: dict) -> str:
+        """Phase 20 SEED-10: return full SeedDict for a given seed_id."""
+        _reload_if_stale()
+        return _run_get_diagram_seed_core(
+            G, _out_dir.parent, arguments or {}, alias_map=_alias_map
+        )
+
     _handlers = {
         "query_graph": _tool_query_graph,
         "get_node": _tool_get_node,
@@ -3110,6 +3350,8 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "drift_nodes": _tool_drift_nodes,
         "newly_formed_clusters": _tool_newly_formed_clusters,
         "capability_describe": _tool_capability_describe,
+        "list_diagram_seeds": _tool_list_diagram_seeds,  # Phase 20 SEED-09
+        "get_diagram_seed": _tool_get_diagram_seed,      # Phase 20 SEED-10
     }
 
     _reg_tools = build_mcp_tools()

@@ -345,6 +345,41 @@ def build_mcp_tools():
             ),
             inputSchema={"type": "object", "properties": {}},
         ),
+        types.Tool(
+            name="list_diagram_seeds",
+            description=(
+                "List all available diagram seeds in graphify-out/seeds/. Returns per-seed: "
+                "seed_id, main_node_label, suggested_layout_type, trigger (auto|user), node_count. "
+                "D-02 envelope. Alias-resolved per D-16. Returns no_seeds envelope when "
+                "directory empty or manifest missing/corrupt."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "budget": {"type": "integer", "default": 500},
+                },
+            },
+        ),
+        types.Tool(
+            name="get_diagram_seed",
+            description=(
+                "Return the full SeedDict for a specific seed by seed_id. Non-existent seed_id "
+                "returns a not_found envelope; corrupt file returns a corrupt envelope; never "
+                "crashes. D-02 envelope. Alias-resolved per D-16 on both the seed_id argument "
+                "and the node IDs in the returned SeedDict body."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "seed_id": {
+                        "type": "string",
+                        "description": "Seed identifier from list_diagram_seeds",
+                    },
+                    "budget": {"type": "integer", "default": 2000},
+                },
+                "required": ["seed_id"],
+            },
+        ),
     ]
 
 

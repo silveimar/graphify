@@ -3268,7 +3268,9 @@ def test_list_diagram_seeds_skips_dropped_by_cap_entries(tmp_path):
     text_body, meta_json = response.split(QUERY_GRAPH_META_SENTINEL, 1)
     meta = json.loads(meta_json)
     assert meta["seed_count"] == 2
-    assert "c" not in text_body.split("\n")[0] and "c\t" not in text_body
+    rows = [row.split("\t")[0] for row in text_body.split("\n")]
+    assert "c" not in rows
+    assert set(rows) == {"a", "b"}
 
 
 def test_list_diagram_seeds_resolves_node_id_aliases_in_response(tmp_path):

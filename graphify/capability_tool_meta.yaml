@@ -109,3 +109,13 @@ get_focus_context:
   deterministic: true
   cacheable_until: graph_mtime
   composable_from: []
+list_diagram_seeds:
+  cost_class: cheap
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: []
+get_diagram_seed:
+  cost_class: cheap
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: [list_diagram_seeds]
