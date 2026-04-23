@@ -8,25 +8,25 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: v1.4 Agent Discoverability & Obsidian Workflows
+## Current Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge
 
-**Goal:** Make graphify discoverable to agents that don't already know it exists, package graphify-aware thinking commands for Obsidian vault users, and enable continuous background graph improvement. Phase 12 (Heterogeneous Extraction Routing) pulled forward from v1.3 deferral.
+**Goal:** Turn graphify's knowledge graph into a diagram generation pipeline — auto-detect and user-tag seed nodes, produce structured diagram seeds, bootstrap vault templates from profile, and wire a skill that orchestrates the full seeds → Excalidraw → vault flow.
 
-**Prior milestone (v1.3) shipped 2026-04-17:** Phases 9.2 (Progressive Graph Retrieval), 10 (Cross-File Semantic Extraction with Entity Deduplication), 11 (Narrative Mode as Interactive Slash Commands). 19/19 plans, 14/15 requirements (TOKEN-04 Bloom filter stretch deferred per D-09). Full detail archived to `.planning/milestones/v1.3-*`.
+**Prior milestone (v1.4) shipped 2026-04-22:** Phases 12–18 (7 phases, 32 plans). Heterogeneous Extraction Routing, Agent Capability Manifest + SEED-002 Harness Export, Async Background Enrichment, Focus-Aware Graph Context, Conversational Graph Chat, Graph Argumentation Mode, Obsidian Thinking Commands. 86/86 requirements. Full detail archived to `.planning/milestones/v1.4-*`.
 
-**Target features (v1.4 — scope confirmed 2026-04-17, requirements pending):**
+**Target features (v1.5 — scope confirmed 2026-04-22):**
 
-- Phase 12: Heterogeneous Extraction Routing — file-complexity-aware model routing (AST metrics → model choice); enables parallel multi-endpoint extraction
-- Phase 13: Agent Capability Manifest — machine-readable self-description of graphify's MCP server capabilities (pairs with SEED-002 Harness Memory Export: manifest declares MCP surface, export declares portability surface)
-- Phase 14: Obsidian Thinking Commands — graphify-aware slash commands for enriched vaults
-- Phase 15: Async Background Enrichment — post-build passes that enrich descriptions, detect emerging patterns, update staleness scores
-- Phase 16: Graph Argumentation Mode — knowledge graph as a shared cognitive map for structured LLM debates
-- Phase 17: Conversational Graph Chat — natural-language querying of the knowledge graph
-- Phase 18: Focus-Aware Graph Context — scope graph queries to the user's current editing focus
+- Phase 20: Diagram Seed Engine — auto-tag god nodes + cross-community bridges as `possible-diagram-seed`; read vault `gen-diagram-seed` tags (Phase 8 round-trip); new `seed.py` builds structured seeds with layout heuristics; merge overlapping seeds (>60% node overlap → union); output to `graphify-out/seeds/`; `--diagram-seeds` CLI flag; MCP tools `list_diagram_seeds` + `get_diagram_seed`
+- Phase 21: Profile Extension & Template Bootstrap — `profile.yaml` gains `diagram_types:` section (template paths, trigger conditions, naming patterns for 6 layout types); graphify writes `gen-diagram-seed` tag back to auto-detected vault notes via vault adapter; `--init-diagram-templates` writes real `.excalidraw.md` JSON stubs to vault
+- Phase 22: Excalidraw Skill & Vault Bridge — `excalidraw-diagram` SKILL.md orchestrates seeds → mcp_excalidraw → vault; `graphify install --excalidraw` deploys skill
 
-**Seed activation for v1.4:**
-- **SEED-002 (Harness Memory Export) — ACTIVATED** per its own trigger condition ("v1.4 Phase 13 Agent Capability Manifest is being planned — these are natural companions"). Scope bundled with Phase 13.
-- SEED-001 (Tacit-to-Explicit Elicitation Engine) — remains planted. Trigger is user-side onboarding; v1.4 is agent-side discoverability. Re-evaluate at v1.5.
+**Key constraints carried forward from v1.4:**
+- D-02 MCP envelope on all new MCP tools (`get_diagram_seed`)
+- D-16 alias redirect on all MCP tools
+- D-18 compose don't plumb (`seed.py` composes `analyze.py` primitives; no new pure plumbing modules)
+
+**Seed activation for v1.5:**
+- SEED-001 (Tacit-to-Explicit Elicitation Engine) — remains planted. Trigger is onboarding/upstream features; v1.5 is diagram intelligence. Re-evaluate at v1.6.
 
 ## Requirements
 
@@ -90,7 +90,7 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 ### Active
 
-Milestone **v1.4 Agent Discoverability & Obsidian Workflows** opened 2026-04-17; scope confirmed via `/gsd-new-milestone v1.4` on 2026-04-17. Phase 12 (Heterogeneous Extraction Routing) pulled forward from v1.3 deferral. Additional phases: 13 Agent Capability Manifest (+ SEED-002 Harness Memory Export), 14 Obsidian Thinking Commands, 15 Async Background Enrichment, 16 Graph Argumentation Mode, 17 Conversational Graph Chat, 18 Focus-Aware Graph Context. Requirements being defined after parallel domain research.
+Milestone **v1.5 Diagram Intelligence & Excalidraw Bridge** opened 2026-04-22; scope confirmed via `/gsd-new-milestone v1.5` on 2026-04-22. Three phases (20–22): Diagram Seed Engine, Profile Extension & Template Bootstrap, Excalidraw Skill & Vault Bridge. Requirements being defined.
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -204,7 +204,7 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-v1.4 milestone opened 2026-04-17; scope confirmed and requirements pending (see Current Milestone section above). v1.5+ is unscoped — revisit after v1.4 ships and user feedback lands. SEED-001 (Tacit Elicitation) remains a candidate for v1.5+ if onboarding/discovery becomes the milestone theme.
+v1.5 milestone opened 2026-04-22; scope confirmed and requirements being defined (see Current Milestone section above). v1.6+ is unscoped — revisit after v1.5 ships. SEED-001 (Tacit Elicitation) remains a candidate for v1.6+ if onboarding/discovery becomes the milestone theme.
 
 ---
-*Last updated: 2026-04-17 — Phase 12 complete; remaining v1.4 phases 13–18 per ROADMAP build order*
+*Last updated: 2026-04-22 — v1.4 complete (7 phases, 32 plans); v1.5 Diagram Intelligence & Excalidraw Bridge opened*
