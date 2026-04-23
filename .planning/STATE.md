@@ -4,8 +4,8 @@ milestone: v1.5
 milestone_name: Diagram Intelligence & Excalidraw Bridge
 status: executing
 stopped_at: Phase 19 context gathered
-last_updated: "2026-04-23T05:46:40.197Z"
-last_activity: 2026-04-23 -- Phase 19 planning complete
+last_updated: "2026-04-23T05:47:31.507Z"
+last_activity: 2026-04-23 -- Phase 19 execution started
 progress:
   total_phases: 4
   completed_phases: 0
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23 at v1.4 milestone close)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, and in v1.4 (shipped 2026-04-22) with agent discoverability (MCP capability manifest + SEED-002 harness export), Obsidian thinking-command depth, and graph-quality-over-time via heterogeneous routing + async enrichment + focus-aware zoom + grounded chat + SPAR-Kit argumentation. v1.5 extends to vault promotion (Phase 19) and diagram intelligence (Phases 20–22).
-**Current focus:** v1.5 Phase 19/20 — requirements defined, planning pending
+**Current focus:** Phase 19 — Vault Promotion Script (Layer B)
 
 ## Deferred Items
 
@@ -38,12 +38,12 @@ Items acknowledged and deferred at v1.4 milestone close on 2026-04-23:
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
+Phase: 19 (Vault Promotion Script (Layer B)) — EXECUTING
+Plan: 1 of 4
 Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge — 🚧 STARTED (2026-04-22), 0/4 phases complete (Phase 19 pulled in from v1.4 2026-04-23)
 Previous milestone: v1.4 Agent Discoverability & Obsidian Workflows — ✅ SHIPPED 2026-04-22 (phases 12–18, 32 plans, 86/86 requirements)
-Status: Ready to execute
-Last activity: 2026-04-23 -- Phase 19 planning complete
+Status: Executing Phase 19
+Last activity: 2026-04-23 -- Phase 19 execution started
 
 Progress: [░░░░░░░░░░] 0% (0/3 phases complete)
 
