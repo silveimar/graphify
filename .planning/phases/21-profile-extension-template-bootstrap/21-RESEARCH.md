@@ -543,21 +543,21 @@ def test_no_lzstring_import_anywhere():
 | A3 | `tags` union policy is automatic via `_DEFAULT_FIELD_POLICIES` — no per-call wiring needed | Code Examples #5 | Verified — merge.py:70 explicitly sets `"tags": "union"` in defaults |
 | A4 | Font family 5 declaration in `appState` is currently a no-op for empty-scene stubs but is required by D-02 | Excalidraw .md Stub Format, rule 6 | None — D-02 is locked; future phases will populate `elements` and inherit the font |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should stubs ship as pkg-data files under `graphify/builtin_templates/diagram/`, or be generated in code at init time?**
    - What we know: CONTEXT.md explicitly leaves this to the planner. The existing `builtin_templates/` dir holds note templates (`.md`), not `.excalidraw.md`. Generation-in-code is simpler for D-01 (minimal empty scene).
    - What's unclear: Whether shipping as pkg-data adds value for user inspectability.
-   - Recommendation: **Generate in code.** Reasons: (a) D-01 shape is ~200 bytes of JSON and three frontmatter lines — no reason for a separate file; (b) avoids `pyproject.toml` package-data wiring; (c) keeps the `compress: false` and scene-JSON constants in one Python module where they're covered by unit tests.
+   - **RESOLVED:** Generate in code. Reasons: (a) D-01 shape is ~200 bytes of JSON and three frontmatter lines — no reason for a separate file; (b) avoids `pyproject.toml` package-data wiring; (c) keeps the `compress: false` and scene-JSON constants in one Python module where they're covered by unit tests.
 
 2. **Where should the `_render_excalidraw_stub` helper live?**
    - What we know: `seed.py` and `export.py` already handle diagram-adjacent concerns. A new `graphify/excalidraw.py` would isolate Excalidraw-format code.
    - What's unclear: Whether Phase 22 (Skill & Vault Bridge) will need the same helper.
-   - Recommendation: **Create `graphify/excalidraw.py`** as a new module. Phase 22's downstream code (skill writes styled templates, fills elements) will reuse the same frontmatter + scene-JSON helpers. Keeps `__main__.py` from growing further.
+   - **RESOLVED:** Create `graphify/excalidraw.py` as a new module. Phase 22's downstream code (skill writes styled templates, fills elements) will reuse the same frontmatter + scene-JSON helpers. Keeps `__main__.py` from growing further.
 
 3. **Should the grep denylist test use AST parsing (precise) or regex (simple)?**
    - What we know: Regex is easier; AST is less false-positive-prone.
-   - Recommendation: **Start with regex + explicit allowlist comments** (e.g., `# allow-vault-write: template`). Upgrade to AST only if false positives bite. Precedent: no AST-based denylist tests currently exist in this repo.
+   - **RESOLVED:** Start with regex + explicit allowlist comments (e.g., `# allow-vault-write: template`). Upgrade to AST only if false positives bite. Precedent: no AST-based denylist tests currently exist in this repo.
 
 ## Environment Availability
 
