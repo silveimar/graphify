@@ -201,7 +201,7 @@ rank, confidence tags) and enforce naming conventions across all vault output.
 
 **Phases:**
 
-- [ ] Phase 19: Vault Promotion Script (Layer B) — `graphify/vault_promote.py` reads `graph.json` + `GRAPH_REPORT.md`, classifies/scores nodes, writes promoted Obsidian markdown notes directly to the user's vault at correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy. Pulled in from v1.4 scope-reconciliation 2026-04-23. (plans TBD)
+- [ ] Phase 19: Vault Promotion Script (Layer B) — `graphify/vault_promote.py` reads `graph.json` + `GRAPH_REPORT.md`, classifies/scores nodes, writes promoted Obsidian markdown notes directly to the user's vault at correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy. Scope expanded to VAULT-01..07 (adds VAULT-06 profile write-back + VAULT-07 hybrid 3-layer tag taxonomy). Pulled in from v1.4 scope-reconciliation 2026-04-23. (4 plans)
 - [ ] Phase 20: Diagram Seed Engine — `analyze.py` auto-tagging + `detect_user_seeds(G)`; new `seed.py` module with `build_seed` / `build_all_seeds` / layout heuristics / >60% overlap dedup / max_seeds=20 cap; `--diagram-seeds` CLI; `list_diagram_seeds` + `get_diagram_seed` MCP tools. (3 plans)
 - [ ] Phase 21: Profile Extension & Template Bootstrap — `profile.yaml` `diagram_types:` section (ATOMIC with first reader); 6 built-in diagram type defaults; `--init-diagram-templates` CLI command writing real `.excalidraw.md` JSON stubs; `gen-diagram-seed` tag write-back via vault adapter. (2 plans)
 - [ ] Phase 22: Excalidraw Skill & Vault Bridge — `skill-excalidraw.md` full orchestration (list seeds → get seed → read template → mcp_excalidraw → vault); `graphify install --excalidraw`; pure-Python `.excalidraw.md` fallback path complete before mcp_excalidraw integration. (2 plans)
@@ -211,14 +211,19 @@ rank, confidence tags) and enforce naming conventions across all vault output.
 ### Phase 19: Vault Promotion Script (Layer B)
 **Goal**: A Python script (`graphify/vault_promote.py`) that reads `graphify-out/graph.json` and `GRAPH_REPORT.md`, classifies and scores nodes, then writes promoted Obsidian markdown notes directly into the user's vault at the correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy.
 **Depends on**: Phase 12 (graph.json schema stable), Phase 18 (graph.json read patterns established). No `serve.py` changes — pure file I/O.
-**Requirements**: VAULT-01, VAULT-02, VAULT-03, VAULT-04, VAULT-05 — 5 REQ-IDs.
+**Requirements**: VAULT-01, VAULT-02, VAULT-03, VAULT-04, VAULT-05, VAULT-06, VAULT-07 — 7 REQ-IDs (VAULT-06 and VAULT-07 added via CONTEXT.md D-01 scope expansion 2026-04-22).
 **Success Criteria** (what must be TRUE):
   1. Running `graphify vault-promote --vault /path/to/vault --threshold 3` reads `graphify-out/graph.json` and writes notes to correct Ideaverse folders without touching any existing vault file it did not create.
   2. Every promoted note has valid Ideaverse frontmatter: `up`, `related`, `created`, `collections`, `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold`, and at minimum one tag from each of: `garden/*`, `source/*`, `graph/*`.
   3. Node type dispatch is correct: a god-node domain concept lands in `Atlas/Dots/Things/`, a knowledge gap lands in `Atlas/Dots/Questions/`, a cluster becomes `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
   4. `related:` links are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted from wikilinks.
   5. `graphify-out/import-log.md` is written after each run with vault path, run timestamp, promoted-count by type, threshold, and skipped-count.
-**Plans**: TBD (not yet planned).
+**Plans:** 4 plans
+Plans:
+- [ ] 19-01-PLAN.md — Wave 0 foundations: extract analyze.knowledge_gaps(), add profile.tag_taxonomy + profile_sync keys, ship question.md + quote.md templates, scaffold tests/test_vault_promote.py, register VAULT-06/07 in REQUIREMENTS.md
+- [ ] 19-02-PLAN.md — Wave 1: core vault_promote.py (graph loader, 7-folder classifier, render pipeline with EXTRACTED-only related, Layer-3 tech-tag detection)
+- [ ] 19-03-PLAN.md — Wave 2: atomic writer + vault-manifest.json decision table + import-log.md journal + profile write-back + CLI subcommand registration
+- [ ] 19-04-PLAN.md — Wave 3: integration fixture + end-to-end/heuristic tests + README + skill.md docs + REQUIREMENTS.md traceability closure
 
 ---
 
