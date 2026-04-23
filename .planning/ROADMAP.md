@@ -42,6 +42,47 @@ Next milestone is unscoped. Candidate work carried forward from v1.0's v2 Requir
 
 **Run `/gsd-new-milestone` to formally scope v1.1.**
 
+---
+
+### 🌱 Candidate Phase: ACE-Aligned Vocabulary, Linking & Naming
+
+**Goal:** Replace graphify's hardcoded note-type vocabulary with an ACE-aligned,
+profile-driven system. Emit full Ideaverse-compatible frontmatter (backlinks, collections,
+rank, confidence tags) and enforce naming conventions across all vault output.
+
+**Scope:**
+
+- `project.yaml` — new `vocabulary:` section (note types, tags taxonomy, `diagrams:` with
+  `x/Excalidraw/` folder map and per-template stencil/palette config)
+- `profile.py` — parse and validate the `vocabulary:` section; expose typed dicts to all exporters
+- `templates.py` — replace hardcoded `_NOTE_TYPES` frozenset with `vocab.note_types.keys()`
+  loaded from profile; add `map`, `dot`, `work`, `question` built-in templates
+- `mapping.py` — `classify()` driven by profile vocabulary rules; emit `rank` score to frontmatter
+- `export.py` — emit full frontmatter: `up`, `related`, `down`, `collections`, `rank`,
+  `created`, and confidence tags (`extracted`/`inferred`/`ambiguous`) on all promoted notes;
+  all vault filenames use `safe_filename()` → `lowercase-hyphen` slugs with type prefix
+- `seeds.py` (new) — generate `-seed.md` files in `x/Excalidraw/seeds/` from promoted Dots
+  using `vocab.diagrams` template/stencil/palette config
+- `builtin_templates/` — add `map-template.md`, `dot-template.md`, `work-template.md`,
+  `question-template.md`; rename existing templates to `lowercase-hyphen-template` convention
+
+**Naming conventions enforced (all output):**
+- Tags: `lowercase-hyphen-separated`, no IDs/symbols/numbers
+- Master Keys: `PascalCase`, max 4 words
+- MD filenames: `lowercase-hyphen-separated` with type prefix
+- Wikilinks: always with human-readable alias `[[filename|Human Readable Alias]]`
+- Seeds: `name-seed.md` in `x/Excalidraw/seeds/`
+- Diagrams: `name.excalidraw.md` in `x/Excalidraw/diagrams/`
+
+**ACE folder targets:**
+`Atlas/Maps`, `Atlas/Dots`, `Atlas/Dots/Things`, `Atlas/Dots/Statements`,
+`Atlas/Dots/Questions`, `Atlas/Dots/People`, `Atlas/Sources`, `Efforts/Works`,
+`x/Excalidraw/{annotations,cropped,diagrams,palettes,templates,seeds,scripts/downloaded,scripts/custom}`
+
+**Design doc:** `.planning/notes/ace-vocabulary-naming-conventions.md`
+
+**Entry point:** Run `/gsd-add-phase` to formally scope and plan this phase.
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
