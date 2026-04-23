@@ -13,9 +13,9 @@ v1.5 has two workstreams. **Layer B (Phase 19, VAULT-01..07)** — a pure-file-I
 Derived from ROADMAP.md Phase 19 success criteria. Full requirement text and plan decomposition to be elaborated during `/gsd-plan-phase 19`.
 
 - [ ] **VAULT-01** `graphify vault-promote --vault /path/to/vault --threshold N` CLI reads `graphify-out/graph.json` + `GRAPH_REPORT.md` and writes promoted notes into Ideaverse Pro 2.5 destination folders without touching any existing vault file it did not create (write-only, no overwrite of foreign files).
-- [ ] **VAULT-02** Every promoted note has valid Ideaverse frontmatter: `up`, `related`, `created`, `collections`, `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold`, and at minimum one tag from each of `garden/*`, `source/*`, `graph/*`.
-- [ ] **VAULT-03** Node-type → folder dispatch is correct: god-node domain concepts → `Atlas/Dots/Things/`; knowledge gaps → `Atlas/Dots/Questions/`; clusters → `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
-- [ ] **VAULT-04** `related:` wikilinks are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted.
+- [x] **VAULT-02** Every promoted note has valid Ideaverse frontmatter: `up`, `related`, `created`, `collections`, `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold`, and at minimum one tag from each of `garden/*`, `source/*`, `graph/*`.
+- [x] **VAULT-03** Node-type → folder dispatch is correct: god-node domain concepts → `Atlas/Dots/Things/`; knowledge gaps → `Atlas/Dots/Questions/`; clusters → `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
+- [x] **VAULT-04** `related:` wikilinks are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted.
 - [ ] **VAULT-05** `graphify-out/import-log.md` is written after each run with vault path, run timestamp, promoted-count by type, threshold, and skipped-count.
 - [x] **VAULT-06** Profile write-back: union-merge Layer 3 auto-detected tags into `.graphify/profile.yaml`, gated by `profile_sync.auto_update` (default `true`). Writes atomic (tempfile + os.replace).
 - [x] **VAULT-07** Hybrid 3-layer tag taxonomy: Layer 1 `_DEFAULT_PROFILE` baseline → Layer 2 user `.graphify/profile.yaml` (deep-merged) → Layer 3 auto-detected from `graph.json` source_file extensions + file_type (deep-merged in memory; persisted via VAULT-06).
