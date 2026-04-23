@@ -433,11 +433,180 @@ def test_vault05_manifest_roundtrip(tmp_path):
 # Task 3.2 — promote() orchestrator + profile write-back (VAULT-06) + CLI
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skip(reason="Plan 03 Task 3.2 implements promote() orchestrator")
-def test_vault01_cli_does_not_overwrite_foreign(tmp_path): ...
+def _make_minimal_graph_json(tmp_path: Path, *, with_py: bool = True) -> Path:
+    """Build a tiny graph.json for promote() smoke tests.
 
-@pytest.mark.skip(reason="Plan 03 Task 3.2 implements profile write-back")
-def test_vault06_profile_writeback_union_merge(tmp_path): ...
+    Produces 3 nodes: a document god-node (high degree), an isolated node
+    (becomes a Question gap), and optionally a Python source node.
+    """
+    import json as _json
+    from networkx.readwrite import json_graph as _jg
 
-@pytest.mark.skip(reason="Plan 03 Task 3.2 implements profile write-back")
-def test_vault06_profile_writeback_opt_out(tmp_path): ...
+    G = nx.Graph()
+    G.add_node("doc_hub", label="DocHub", file_type="document", source_file="notes/hub.md", community=0)
+    G.add_node("isolated", label="OrphanConcept", file_type="document", source_file="notes/orphan.md", community=1)
+    # Add enough edges so doc_hub is a god node (degree >= 3)
+    for i in range(5):
+        peer = f"peer_{i}"
+        G.add_node(peer, label=f"Peer{i}", file_type="document", source_file=f"notes/peer{i}.md", community=0)
+        G.add_edge("doc_hub", peer, relation="references", confidence="EXTRACTED", source_file="notes/hub.md", weight=1.0)
+    if with_py:
+        G.add_node("pymod", label="PyModule", file_type="code", source_file="src/mod.py", community=0)
+        G.add_edge("doc_hub", "pymod", relation="imports", confidence="EXTRACTED", source_file="notes/hub.md", weight=1.0)
+
+    communities = {0: ["doc_hub"] + [f"peer_{i}" for i in range(5)] + (["pymod"] if with_py else []),
+                   1: ["isolated"]}
+    for cid, nodes in communities.items():
+        for nid in nodes:
+            if nid in G.nodes:
+                G.nodes[nid]["community"] = cid
+
+    out = tmp_path / "graphify-out"
+    out.mkdir(parents=True, exist_ok=True)
+    raw = _jg.node_link_data(G)
+    (out / "graph.json").write_text(_json.dumps(raw), encoding="utf-8")
+    return out / "graph.json"
+
+
+def test_promote_smoke(tmp_path):
+    """promote() on a small synthetic graph produces notes, manifest, and import-log."""
+    from graphify.vault_promote import promote
+
+    graph_path = _make_minimal_graph_json(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    summary = promote(graph_path=graph_path, vault_path=vault, threshold=3)
+
+    # Manifest must exist with at least one entry
+    manifest_path = tmp_path / "graphify-out" / "vault-manifest.json"
+    assert manifest_path.exists(), "vault-manifest.json must be written"
+    import json as _json
+    manifest = _json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert len(manifest) >= 1, "Manifest must have at least one entry"
+
+    # Import-log must exist and have one Run block
+    log_path = tmp_path / "graphify-out" / "import-log.md"
+    assert log_path.exists(), "import-log.md must be created"
+    log_content = log_path.read_text(encoding="utf-8")
+    assert "## Run " in log_content, "import-log.md must contain a Run block"
+
+    # Summary must have promoted dict
+    assert "promoted" in summary, f"Summary must have 'promoted' key, got: {summary}"
+
+
+def test_promote_idempotent(tmp_path):
+    """Running promote() twice → second run uses overwritten (not written), no foreign skips."""
+    from graphify.vault_promote import promote
+
+    graph_path = _make_minimal_graph_json(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    promote(graph_path=graph_path, vault_path=vault, threshold=3)
+    summary2 = promote(graph_path=graph_path, vault_path=vault, threshold=3)
+
+    # No foreign skips on second run
+    skipped = summary2.get("skipped", {})
+    assert "foreign" not in skipped or len(skipped.get("foreign", [])) == 0, (
+        f"Second run must not produce foreign skips: {skipped}"
+    )
+
+    # import-log must have 2 Run blocks
+    log_content = (tmp_path / "graphify-out" / "import-log.md").read_text(encoding="utf-8")
+    assert log_content.count("## Run ") == 2, (
+        f"Expected 2 Run blocks in import-log, got: {log_content.count('## Run ')}"
+    )
+
+
+def test_vault01_cli_does_not_overwrite_foreign(tmp_path):
+    """promote() skips files on disk not in manifest; records them in summary + import-log."""
+    from graphify.vault_promote import promote
+
+    graph_path = _make_minimal_graph_json(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    # Pre-place a foreign file in a path graphify would use.
+    # Maps are rendered with safe_filename(label) where label = "Community 0", "Community 1" etc.
+    # Use "Community 0.md" which matches the first community in the synthetic graph.
+    foreign_dir = vault / "Atlas" / "Maps"
+    foreign_dir.mkdir(parents=True, exist_ok=True)
+    foreign_file = foreign_dir / "Community 0.md"
+    foreign_file.write_text("## User's own map note", encoding="utf-8")
+    original_content = foreign_file.read_text(encoding="utf-8")
+
+    summary = promote(graph_path=graph_path, vault_path=vault, threshold=3)
+
+    # The foreign file must be unchanged
+    assert foreign_file.read_text(encoding="utf-8") == original_content, (
+        "Foreign file must not be overwritten"
+    )
+
+    # Summary must record the foreign skip
+    skipped = summary.get("skipped", {})
+    has_foreign = any("foreign" in reason for reason in skipped)
+    # The skipped dict maps reason → list of paths
+    foreign_paths = skipped.get("foreign", [])
+    assert len(foreign_paths) >= 1, f"Expected foreign skips in summary, got: {skipped}"
+
+    # Import-log must mention the skipped file
+    log_content = (tmp_path / "graphify-out" / "import-log.md").read_text(encoding="utf-8")
+    assert "foreign" in log_content, "Import-log must mention foreign skip"
+
+
+def test_vault06_profile_writeback_union_merge(tmp_path):
+    """promote() with auto_update=True adds detected tech tags to .graphify/profile.yaml."""
+    pytest.importorskip("yaml")
+    from graphify.vault_promote import promote
+
+    graph_path = _make_minimal_graph_json(tmp_path, with_py=True)  # has .py node
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    promote(graph_path=graph_path, vault_path=vault, threshold=3)
+
+    profile_path = vault / ".graphify" / "profile.yaml"
+    assert profile_path.exists(), ".graphify/profile.yaml must be written on auto_update=True"
+
+    import yaml
+    written = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+    tech_tags = written.get("tag_taxonomy", {}).get("tech", [])
+    assert "python" in tech_tags, f"tech/python must be in profile after promote; got {tech_tags}"
+
+
+def test_vault06_profile_writeback_opt_out(tmp_path):
+    """promote() with auto_update=False must NOT modify .graphify/profile.yaml."""
+    pytest.importorskip("yaml")
+    import yaml
+    from graphify.vault_promote import promote
+
+    graph_path = _make_minimal_graph_json(tmp_path, with_py=True)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    # Pre-write profile.yaml with auto_update: false
+    graphify_dir = vault / ".graphify"
+    graphify_dir.mkdir(parents=True, exist_ok=True)
+    profile_path = graphify_dir / "profile.yaml"
+    initial_profile = {"profile_sync": {"auto_update": False}, "tag_taxonomy": {"tech": ["existing"]}}
+    profile_path.write_text(yaml.dump(initial_profile), encoding="utf-8")
+    original_bytes = profile_path.read_bytes()
+
+    promote(graph_path=graph_path, vault_path=vault, threshold=3)
+
+    assert profile_path.read_bytes() == original_bytes, (
+        "profile.yaml must be byte-identical when auto_update=False"
+    )
+
+
+def test_cli_subcommand_help_works():
+    """graphify vault-promote --help exits 0 with --vault in stdout."""
+    import subprocess
+    result = subprocess.run(
+        ["python", "-m", "graphify", "vault-promote", "--help"],
+        capture_output=True, text=True
+    )
+    assert result.returncode == 0, f"--help must exit 0, got {result.returncode}. stderr: {result.stderr}"
+    assert "--vault" in result.stdout, f"--vault must appear in help output: {result.stdout}"
+    assert "--threshold" in result.stdout, f"--threshold must appear in help output: {result.stdout}"

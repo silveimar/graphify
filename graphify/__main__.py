@@ -2108,6 +2108,39 @@ def main() -> None:
                 pass
         result = run_benchmark(graph_path, corpus_words=corpus_words)
         print_benchmark(result)
+    elif cmd == "vault-promote":
+        # graphify vault-promote --vault PATH [--threshold N] [--graph PATH]
+        import argparse as _ap
+
+        _p_vp = _ap.ArgumentParser(
+            prog="graphify vault-promote",
+            description="Promote knowledge graph nodes into an Obsidian vault (VAULT-01/05/06)",
+        )
+        _p_vp.add_argument("--vault", required=True, help="Path to the target Obsidian vault")
+        _p_vp.add_argument(
+            "--threshold",
+            type=int,
+            default=3,
+            help="Minimum node degree for Things promotion (default: 3)",
+        )
+        _p_vp.add_argument(
+            "--graph",
+            default="graphify-out/graph.json",
+            help="Path to graph.json (default: graphify-out/graph.json)",
+        )
+        opts = _p_vp.parse_args(sys.argv[2:])
+        from graphify.vault_promote import promote
+        summary = promote(
+            graph_path=Path(opts.graph),
+            vault_path=Path(opts.vault),
+            threshold=opts.threshold,
+        )
+        promoted = summary.get("promoted", {})
+        skipped = summary.get("skipped", {})
+        promoted_str = ", ".join(f"{k}={v}" for k, v in promoted.items() if v > 0) or "none"
+        skipped_str = ", ".join(f"{r}={len(paths)}" for r, paths in skipped.items()) or "none"
+        print(f"[graphify] vault-promote complete: promoted={promoted_str}; skipped={skipped_str}")
+        sys.exit(0)
     else:
         print(f"error: unknown command '{cmd}'", file=sys.stderr)
         print("Run 'graphify --help' for usage.", file=sys.stderr)

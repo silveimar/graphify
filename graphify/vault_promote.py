@@ -796,3 +796,182 @@ def _format_run_block(
             lines.append(f"- {rel_path} — {reason}")
 
     return "\n".join(lines) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# Profile write-back (VAULT-06) — Plan 03
+# ---------------------------------------------------------------------------
+
+def _writeback_profile(vault_dir: Path, detected_tags: dict[str, list[str]]) -> str:
+    """Union-merge detected Layer-3 tags into .graphify/profile.yaml in vault_dir.
+
+    Returns "written", "disabled" (caller opted out), or "skipped_no_yaml"
+    (PyYAML not installed).
+
+    Guards:
+    - PyYAML absence → warn to stderr and return "skipped_no_yaml"
+    - validate_vault_path called before write (path traversal prevention)
+    - Atomic write via tempfile + os.replace
+    - Union-only, deduplicated, sorted alphabetically (never removes existing tags)
+    """
+    try:
+        import yaml
+    except ImportError:
+        print(
+            "[graphify] PyYAML not installed — profile write-back skipped. "
+            "Install with: pip install graphifyy[obsidian]",
+            file=sys.stderr,
+        )
+        return "skipped_no_yaml"
+
+    profile_path = vault_dir / ".graphify" / "profile.yaml"
+    # Security: confirm the profile path stays inside the vault
+    validate_vault_path(profile_path, vault_dir)
+
+    existing: dict = {}
+    if profile_path.exists():
+        try:
+            existing = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            existing = {}
+
+    taxonomy = existing.setdefault("tag_taxonomy", {})
+    for ns, tags in detected_tags.items():
+        current = taxonomy.get(ns, [])
+        merged = sorted(set(current) | set(tags))
+        taxonomy[ns] = merged
+    existing["tag_taxonomy"] = taxonomy
+
+    profile_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_atomic(profile_path, yaml.dump(existing, allow_unicode=True, sort_keys=True))
+    return "written"
+
+
+# ---------------------------------------------------------------------------
+# Main orchestrator (VAULT-01, VAULT-05, VAULT-06) — Plan 03
+# ---------------------------------------------------------------------------
+
+# Folder type → vault relative path prefix (D-11)
+_FOLDER_PATH_PREFIX: dict[str, str] = {
+    "things": "Atlas/Dots/Things",
+    "questions": "Atlas/Dots/Questions",
+    "statements": "Atlas/Dots/Statements",
+    "people": "Atlas/Dots/People",
+    "quotes": "Atlas/Dots/Quotes",
+    "maps": "Atlas/Maps",
+    "sources": "Atlas/Sources/Clippings",
+}
+
+_BUCKET_TO_FOLDER_TYPE: dict[str, str] = {
+    "things": "Things",
+    "questions": "Questions",
+    "statements": "Statements",
+    "people": "People",
+    "quotes": "Quotes",
+    "maps": "Maps",
+    "sources": "Sources",
+}
+
+
+def promote(
+    graph_path: Path,
+    vault_path: Path,
+    threshold: int = 3,
+) -> dict:
+    """Orchestrate the full vault promotion pipeline.
+
+    Steps:
+    1. Load graph + communities
+    2. Load user profile (Layers 1+2) from vault
+    3. Resolve taxonomy (Layer 3 auto-detect merged in)
+    4. Validate vault root path
+    5. Classify nodes into 7 buckets
+    6. Render each note → write via write_note (D-13 decision table)
+    7. Save manifest atomically
+    8. Append run block to import-log.md
+    9. If profile_sync.auto_update → write back detected tags to .graphify/profile.yaml
+
+    Returns
+    -------
+    dict with keys:
+      "promoted"  : {type_name: count}
+      "skipped"   : {reason: [rel_path, ...]}
+      "writeback" : "written" | "disabled" | "skipped_no_yaml"
+    """
+    from graphify.profile import load_profile
+
+    # Step 1: Load graph
+    G, communities = load_graph_and_communities(graph_path)
+
+    # Step 2: Load user profile
+    user_profile = load_profile(vault_path)
+
+    # Step 3: Resolve taxonomy (includes Layer-3 auto-detected tech tags)
+    merged_profile = resolve_taxonomy(G, user_profile)
+
+    # Step 4: Validate vault root
+    vault_dir = validate_vault_path(vault_path, vault_path)
+
+    # Determine graphify-out dir (sibling of graph.json)
+    graphify_out = graph_path.parent
+
+    # Step 5: Load manifest
+    manifest = _load_manifest(graphify_out)
+
+    # Step 6: Classify
+    classified = classify_nodes(G, communities, user_profile, threshold)
+
+    run_ts = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    run_meta = {
+        "project": vault_dir.name,
+        "run_id": run_ts,
+        "threshold": threshold,
+        "vault": str(vault_dir),
+    }
+
+    promoted_counts: dict[str, int] = {k: 0 for k in _FOLDER_PATH_PREFIX}
+    skipped: dict[str, list[str]] = {}
+    skipped_entries: list[tuple[str, str]] = []  # for import-log
+
+    bucket_order = ["things", "questions", "maps", "sources", "people", "quotes", "statements"]
+
+    for bucket_key in bucket_order:
+        records = classified.get(bucket_key, [])
+        folder_type = _BUCKET_TO_FOLDER_TYPE[bucket_key]
+        prefix = _FOLDER_PATH_PREFIX[bucket_key]
+
+        for record in records:
+            filename_stem, content = render_note(record, folder_type, G, merged_profile, run_meta)
+            rel_path = f"{prefix}/{filename_stem}.md"
+            outcome = write_note(vault_dir, rel_path, content, manifest)
+
+            if outcome in ("written", "overwritten"):
+                promoted_counts[bucket_key] = promoted_counts.get(bucket_key, 0) + 1
+            else:
+                # outcome is "skipped_foreign" or "skipped_user_modified"
+                reason = outcome.replace("skipped_", "")
+                if reason not in skipped:
+                    skipped[reason] = []
+                skipped[reason].append(rel_path)
+                skipped_entries.append((rel_path, reason))
+
+    # Step 7: Save manifest
+    _save_manifest(manifest, graphify_out)
+
+    # Step 8: Append import-log
+    run_block = _format_run_block(run_meta, promoted_counts, skipped_entries)
+    _append_import_log(graphify_out, run_block)
+
+    # Step 9: Profile write-back
+    auto_update = user_profile.get("profile_sync", {}).get("auto_update", True)
+    if auto_update:
+        detected_layer3 = _detect_tech_tags(G)
+        writeback_result = _writeback_profile(vault_dir, detected_layer3)
+    else:
+        writeback_result = "disabled"
+
+    return {
+        "promoted": promoted_counts,
+        "skipped": skipped,
+        "writeback": writeback_result,
+    }
