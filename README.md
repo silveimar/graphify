@@ -375,6 +375,27 @@ graphify --obsidian --obsidian-dir ~/vaults/myproject
 
 The adapter works with any Obsidian vault framework — Ideaverse, PARA, custom setups — driven entirely by the declarative profile. No code changes needed.
 
+### Vault Promotion — `graphify vault-promote`
+
+Write-only promotion of `graphify-out/graph.json` into an Obsidian vault.
+
+```bash
+graphify vault-promote --vault /path/to/vault --threshold 3
+```
+
+Reads `graphify-out/graph.json` and `GRAPH_REPORT.md`, classifies nodes
+into Ideaverse Pro 2.5 folders (`Atlas/Dots/{Things,Questions,Statements,People,Quotes}`,
+`Atlas/Maps`, `Atlas/Sources/Clippings`), and writes promoted notes with
+full frontmatter and a 4-namespace tag taxonomy (`garden/`, `source/`,
+`graph/`, `tech/`).
+
+**Write semantics:** never overwrites foreign files; overwrites self-created
+files only when `graphify-out/vault-manifest.json` hash matches disk.
+User-modified notes are preserved and recorded in `graphify-out/import-log.md`.
+
+**Coexists with `graphify approve`:** pick `approve` for merge-with-review,
+`vault-promote` for direct write-only. See `.planning/notes/layer-b-vault-promotion-design.md`.
+
 ## Worked examples
 
 | Corpus | Files | Reduction | Output |

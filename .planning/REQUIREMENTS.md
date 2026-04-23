@@ -109,13 +109,13 @@ Derived from ROADMAP.md Phase 19 success criteria. Full requirement text and pla
 
 | REQ-ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| VAULT-01 | 19 | TBD | — |
-| VAULT-02 | 19 | TBD | — |
-| VAULT-03 | 19 | TBD | — |
-| VAULT-04 | 19 | TBD | — |
-| VAULT-05 | 19 | TBD | — |
-| VAULT-06 | 19 | TBD | — |
-| VAULT-07 | 19 | TBD | — |
+| VAULT-01 | 19 | 19-03 | — |
+| VAULT-02 | 19 | 19-02 | — |
+| VAULT-03 | 19 | 19-02 | — |
+| VAULT-04 | 19 | 19-02 | — |
+| VAULT-05 | 19 | 19-03 | — |
+| VAULT-06 | 19 | 19-03 | — |
+| VAULT-07 | 19 | 19-01, 19-02 | — |
 | SEED-01 | 20 | 20-02 | — |
 | SEED-02 | 20 | 20-01 | — |
 | SEED-03 | 20 | 20-01 | — |

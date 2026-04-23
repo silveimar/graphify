@@ -1775,6 +1775,25 @@ graphify harness export [--target claude] [--out PATH]
 
 ---
 
+## For vault-promote (Obsidian write-only promotion)
+
+Promote `graphify-out/graph.json` directly into an Obsidian vault:
+
+```bash
+graphify vault-promote --vault /path/to/vault --threshold 3
+```
+
+- **`graphify vault-promote --vault PATH --threshold N`** — Promote graph to Obsidian
+  vault. Write-only; never overwrites foreign files; idempotent via
+  `graphify-out/vault-manifest.json`. See README §Vault Promotion.
+- Classifies nodes into Ideaverse Pro 2.5 folders (`Atlas/Dots/{Things,Questions,Statements,People,Quotes}`, `Atlas/Maps`, `Atlas/Sources/Clippings`).
+- Writes `graphify-out/import-log.md` with promoted counts, skipped notes, and run timestamp after each run.
+- Auto-detects tech tags from `source_file` extensions (`.py` → `tech/python`, `.ts` → `tech/typescript`, etc.) and union-merges them into `.graphify/profile.yaml`.
+
+**When to use:** Use `vault-promote` when the target vault is clean or only contains prior graphify output; use `approve` when manual review of merges is required.
+
+---
+
 ## For native CLAUDE.md integration
 
 Run once per project to make graphify always-on in Claude Code sessions:
