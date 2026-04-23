@@ -3383,3 +3383,66 @@ def test_get_diagram_seed_rejects_path_traversal(tmp_path):
     meta = json.loads(meta_json)
     assert meta["status"] == "not_found"
     assert text_body == ""
+
+
+def test_build_all_seeds_merged_seed_list_then_get_round_trip(tmp_path):
+    """SEED-10 regression via the REAL build pipeline: when dedup merges two seeds,
+    list_diagram_seeds emits `merged-<sha12>`; get_diagram_seed must resolve that
+    same id back to an on-disk file. Before the fix, seed files were written as
+    `{main_node_id}-seed.json` while list emitted `merged-<sha12>`, so the
+    advertised round-trip returned `not_found`.
+    """
+    from graphify.seed import build_all_seeds
+    from graphify.serve import _run_list_diagram_seeds_core, _run_get_diagram_seed_core
+
+    # Build a graph where two god-node ego-graphs overlap > 60% (triggering dedup merge).
+    G = nx.Graph()
+    shared = [f"shared_{i}" for i in range(6)]
+    G.add_node("hub_a", label="HubA", file_type="code", source_file="a.py")
+    G.add_node("hub_b", label="HubB", file_type="code", source_file="b.py")
+    for s in shared:
+        G.add_node(s, label=s, file_type="code", source_file="s.py")
+        G.add_edge("hub_a", s, relation="references", confidence="EXTRACTED", source_file="a.py")
+        G.add_edge("hub_b", s, relation="references", confidence="EXTRACTED", source_file="b.py")
+    # Give a third unrelated god node so dedup leaves something distinct.
+    G.add_node("hub_c", label="HubC", file_type="code", source_file="c.py")
+    for i in range(6):
+        nid = f"c_{i}"
+        G.add_node(nid, label=nid, file_type="code", source_file="c.py")
+        G.add_edge("hub_c", nid, relation="references", confidence="EXTRACTED", source_file="c.py")
+
+    out_dir = tmp_path / "graphify-out"
+    out_dir.mkdir()
+    summary = build_all_seeds(G, graphify_out=out_dir)
+    assert summary["manifest_path"].endswith("seeds-manifest.json")
+
+    manifest = json.loads((out_dir / "seeds" / "seeds-manifest.json").read_text(encoding="utf-8"))
+    merged_entries = [e for e in manifest if e.get("dedup_merged_from")]
+    assert merged_entries, (
+        f"Test graph failed to produce a dedup-merged seed; manifest={manifest!r}"
+    )
+    merged_entry = merged_entries[0]
+
+    # Read the actual seed file to learn the canonical seed_id the list tool will emit.
+    seed_file_on_disk = out_dir / "seeds" / merged_entry["seed_file"]
+    assert seed_file_on_disk.exists(), f"manifest points to missing file: {seed_file_on_disk}"
+    merged_seed = json.loads(seed_file_on_disk.read_text(encoding="utf-8"))
+    merged_id = merged_seed["seed_id"]
+    assert merged_id.startswith("merged-"), f"expected merged-<sha12> seed_id, got {merged_id!r}"
+
+    list_resp = _run_list_diagram_seeds_core(G, tmp_path, {}, alias_map=None)
+    list_body, list_meta_json = list_resp.split(QUERY_GRAPH_META_SENTINEL, 1)
+    assert json.loads(list_meta_json)["status"] == "ok"
+    first_col_ids = [line.split("\t", 1)[0] for line in list_body.splitlines() if line]
+    assert merged_id in first_col_ids, (
+        f"list_diagram_seeds must emit merged seed id {merged_id!r}; got {first_col_ids!r}"
+    )
+
+    get_resp = _run_get_diagram_seed_core(G, tmp_path, {"seed_id": merged_id}, alias_map=None)
+    get_body, get_meta_json = get_resp.split(QUERY_GRAPH_META_SENTINEL, 1)
+    get_meta = json.loads(get_meta_json)
+    assert get_meta["status"] == "ok", (
+        f"list→get round-trip broken: list emitted {merged_id!r} but get returned {get_meta!r}"
+    )
+    assert get_meta["seed_id"] == merged_id
+    assert json.loads(get_body)["seed_id"] == merged_id
