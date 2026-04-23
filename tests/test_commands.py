@@ -207,3 +207,22 @@ def test_ask_md_frontmatter():
     body = path.read_text()
     assert "chat" in body, "ask.md body must invoke the chat MCP tool"
     assert "$ARGUMENTS" in body, "ask.md must pass $ARGUMENTS to query"
+
+
+def test_argue_md_frontmatter():
+    """ARGUE-10: /graphify-argue command file exists with ask.md-style frontmatter."""
+    path = _commands_dir() / "argue.md"
+    assert path.exists(), "graphify/commands/argue.md missing"
+    fm = _parse_frontmatter(path)
+    assert fm.get("name") == "graphify-argue"
+    assert fm.get("description"), "description field required"
+    assert fm.get("argument-hint"), "argument-hint field required"
+    assert fm.get("disable-model-invocation") == "true"
+    assert "target" not in fm, "argue.md must NOT have a target: field"
+    body = path.read_text()
+    assert "argue_topic" in body, "argue.md body must invoke the argue_topic MCP tool"
+    assert "$ARGUMENTS" in body, "argue.md must pass $ARGUMENTS to topic"
+    # Pitfall 4 guard — the canonical meta key is resolved_from_alias, NOT alias_redirects.
+    assert "alias_redirects" not in body, "argue.md must use resolved_from_alias, never alias_redirects"
+    # ARGUE-09 advisory-only enforcement — body must state non-mutation invariant.
+    assert "advisory" in body.lower(), "argue.md must document advisory-only invariant (ARGUE-09)"
