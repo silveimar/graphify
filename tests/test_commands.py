@@ -257,3 +257,35 @@ def test_graphify_prefix_enforced():
         assert name.startswith("graphify-"), (
             f"{path.name}: new commands must start with 'graphify-' (OBSCMD-07)"
         )
+
+
+# ============================================================
+# Phase 14 Plan 02 — OBSCMD-03 (/graphify-moc) + OBSCMD-08 (trust boundary) + TM-14-01
+# ============================================================
+
+
+def test_graphify_moc_frontmatter():
+    """OBSCMD-03: /graphify-moc command file exists with vault-target frontmatter."""
+    path = _commands_dir() / "graphify-moc.md"
+    assert path.exists(), "graphify/commands/graphify-moc.md missing"
+    fm = _parse_frontmatter(path)
+    assert fm.get("name") == "graphify-moc"
+    assert fm.get("description"), "description required"
+    assert fm.get("argument-hint"), "argument-hint required"
+    assert fm.get("disable-model-invocation") == "true"
+    assert fm.get("target") == "obsidian", "graphify-moc must declare target: obsidian"
+
+
+def test_moc_trust_boundary_and_contract():
+    """OBSCMD-03 + OBSCMD-08 + TM-14-01: body invokes correct MCP tools AND routes writes through propose_vault_note."""
+    import re as _re
+    path = _commands_dir() / "graphify-moc.md"
+    body = path.read_text()
+    assert "get_community" in body, "body must invoke get_community MCP tool"
+    assert "load_profile" in body, "body must call load_profile for profile-first + fallback (D-03)"
+    assert "propose_vault_note" in body, "OBSCMD-08: all vault writes via propose_vault_note"
+    assert "$ARGUMENTS" in body, "must accept <community_id> as $ARGUMENTS"
+    for forbidden in [r"Path\.write_text", r"write_note_directly", r"open\([^)]*['\"]w['\"]"]:
+        assert not _re.search(forbidden, body), (
+            f"TM-14-01: graphify-moc.md must not call direct-write pattern {forbidden!r}"
+        )
