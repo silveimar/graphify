@@ -1,10 +1,11 @@
 ---
 phase: 14
 slug: obsidian-thinking-commands
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-22
+audited: 2026-04-22
 ---
 
 # Phase 14 — Validation Strategy
@@ -41,22 +42,22 @@ created: 2026-04-22
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 14-00-XX | 00 | 1 | OBSCMD-01 | — | `_uninstall_commands` removes all installed `.md` files via directory scan (symmetric with install glob) | unit | `pytest tests/test_install.py::test_uninstall_directory_scan -q` | ❌ W0 | ⬜ pending |
-| 14-00-XX | 00 | 1 | OBSCMD-01 | — | Idempotent: second uninstall is a no-op (no errors, no extra deletes) | unit | `pytest tests/test_install.py::test_uninstall_idempotent -q` | ❌ W0 | ⬜ pending |
-| 14-01-XX | 01 | 1 | OBSCMD-02 | — | `_install_commands` filters by `target:` frontmatter vs platform `supports:` list | unit | `pytest tests/test_install.py::test_install_filters_by_target -q` | ❌ W0 | ⬜ pending |
-| 14-01-XX | 01 | 1 | OBSCMD-02 | — | `target:` absent defaults to `both` (backward compat for the 9 legacy commands) | unit | `pytest tests/test_install.py::test_install_missing_target_defaults_both -q` | ❌ W0 | ⬜ pending |
-| 14-01-XX | 01 | 1 | OBSCMD-02 | — | `--no-obsidian-commands` CLI flag suppresses vault-only commands on `install` | unit | `pytest tests/test_install.py::test_no_obsidian_commands_flag -q` | ❌ W0 | ⬜ pending |
-| 14-01-XX | 01 | 1 | OBSCMD-02 | — | All 9 existing command files carry `target: both` after backfill | unit | `pytest tests/test_commands.py::test_legacy_commands_have_target -q` | ❌ W0 | ⬜ pending |
-| 14-01-XX | 01 | 1 | OBSCMD-07 | — | All command files use the `/graphify-*` prefix OR an allow-listed legacy name; no new command without the prefix ships | unit | `pytest tests/test_commands.py::test_graphify_prefix_enforced -q` | ❌ W0 | ⬜ pending |
-| 14-02-XX | 02 | 2 | OBSCMD-03 | — | `graphify/commands/graphify-moc.md` exists with valid frontmatter (`name`, `description`, `target: both`) | unit | `pytest tests/test_commands.py::test_graphify_moc_frontmatter -q` | ❌ W0 | ⬜ pending |
-| 14-02-XX | 02 | 2 | OBSCMD-03, OBSCMD-08 | TM-14-01 | `graphify-moc.md` body references `get_community`, `load_profile`, AND `propose_vault_note` (never a direct write helper) | unit-grep | `pytest tests/test_commands.py::test_moc_trust_boundary_and_contract -q` | ❌ W0 | ⬜ pending |
-| 14-03-XX | 03 | 2 | OBSCMD-04 | — | `graphify-related.md` exists with valid frontmatter; body references `get_focus_context` and reads note frontmatter `source_file` | unit-grep | `pytest tests/test_commands.py::test_related_contract -q` | ❌ W0 | ⬜ pending |
-| 14-03-XX | 03 | 2 | OBSCMD-04 | — | Skill text explicitly handles `get_focus_context` `status == no_context` (spoof-silent invariant from Phase 18 SC2) | unit-grep | `pytest tests/test_commands.py::test_related_handles_no_context -q` | ❌ W0 | ⬜ pending |
-| 14-04-XX | 04 | 2 | OBSCMD-05 | — | `graphify-orphan.md` exists; body produces two labeled sections: `## Isolated Nodes` and `## Stale/Ghost Nodes` | unit-grep | `pytest tests/test_commands.py::test_orphan_dual_sections -q` | ❌ W0 | ⬜ pending |
-| 14-04-XX | 04 | 2 | OBSCMD-05 | — | `/graphify-orphan` degrades gracefully when `enrichment.json` is absent (renders isolated section + banner, not error) | integration | `pytest tests/test_commands.py::test_orphan_graceful_without_enrichment -q` | ❌ W0 | ⬜ pending |
-| 14-05-XX | 05 | 2 | OBSCMD-06 | — | `graphify-wayfind.md` exists; body references `connect_topics` shortest-path MCP tool | unit-grep | `pytest tests/test_commands.py::test_wayfind_contract -q` | ❌ W0 | ⬜ pending |
-| 14-02..05 | 02-05 | 2 | OBSCMD-08 | TM-14-01 | Every new command skill.md that produces a vault note references `propose_vault_note`; none calls a direct write helper | unit-grep | `pytest tests/test_commands.py::test_trust_boundary_invariant_all_p1 -q` | ❌ W0 | ⬜ pending |
-| 14-all | 00-05 | — | regression | — | Existing 9 legacy commands still install on Claude platform after `target` filter lands | integration | `pytest tests/test_install.py::test_legacy_commands_still_install -q` | ❌ W0 | ⬜ pending |
+| 14-00-XX | 00 | 1 | OBSCMD-01 | — | `_uninstall_commands` removes all installed `.md` files via directory scan (symmetric with install glob) | unit | `pytest tests/test_install.py::test_uninstall_directory_scan -q` | ✅ | ✅ green |
+| 14-00-XX | 00 | 1 | OBSCMD-01 | — | Idempotent: second uninstall is a no-op (no errors, no extra deletes) | unit | `pytest tests/test_install.py::test_uninstall_idempotent -q` | ✅ | ✅ green |
+| 14-01-XX | 01 | 1 | OBSCMD-02 | — | `_install_commands` filters by `target:` frontmatter vs platform `supports:` list | unit | `pytest tests/test_install.py::test_install_filters_by_target -q` | ✅ | ✅ green |
+| 14-01-XX | 01 | 1 | OBSCMD-02 | — | `target:` absent defaults to `both` (backward compat for the 9 legacy commands) | unit | `pytest tests/test_install.py::test_install_missing_target_defaults_both -q` | ✅ | ✅ green |
+| 14-01-XX | 01 | 1 | OBSCMD-02 | — | `--no-obsidian-commands` CLI flag suppresses vault-only commands on `install` | unit | `pytest tests/test_install.py::test_no_obsidian_commands_flag -q` | ✅ | ✅ green |
+| 14-01-XX | 01 | 1 | OBSCMD-02 | — | All 9 existing command files carry `target: both` after backfill | unit | `pytest tests/test_commands.py::test_legacy_commands_have_target -q` | ✅ | ✅ green |
+| 14-01-XX | 01 | 1 | OBSCMD-07 | — | All command files use the `/graphify-*` prefix OR an allow-listed legacy name; no new command without the prefix ships | unit | `pytest tests/test_commands.py::test_graphify_prefix_enforced -q` | ✅ | ✅ green |
+| 14-02-XX | 02 | 2 | OBSCMD-03 | — | `graphify/commands/graphify-moc.md` exists with valid frontmatter (`name`, `description`, `target: both`) | unit | `pytest tests/test_commands.py::test_graphify_moc_frontmatter -q` | ✅ | ✅ green |
+| 14-02-XX | 02 | 2 | OBSCMD-03, OBSCMD-08 | TM-14-01 | `graphify-moc.md` body references `get_community`, `load_profile`, AND `propose_vault_note` (never a direct write helper) | unit-grep | `pytest tests/test_commands.py::test_moc_trust_boundary_and_contract -q` | ✅ | ✅ green |
+| 14-03-XX | 03 | 2 | OBSCMD-04 | — | `graphify-related.md` exists with valid frontmatter; body references `get_focus_context` and reads note frontmatter `source_file` | unit-grep | `pytest tests/test_commands.py::test_related_contract -q` | ✅ | ✅ green |
+| 14-03-XX | 03 | 2 | OBSCMD-04 | — | Skill text explicitly handles `get_focus_context` `status == no_context` (spoof-silent invariant from Phase 18 SC2) | unit-grep | `pytest tests/test_commands.py::test_related_handles_no_context -q` | ✅ | ✅ green |
+| 14-04-XX | 04 | 2 | OBSCMD-05 | — | `graphify-orphan.md` exists; body produces two labeled sections: `## Isolated Nodes` and `## Stale/Ghost Nodes` | unit-grep | `pytest tests/test_commands.py::test_orphan_dual_sections -q` | ✅ | ✅ green |
+| 14-04-XX | 04 | 2 | OBSCMD-05 | — | `/graphify-orphan` degrades gracefully when `enrichment.json` is absent (renders isolated section + banner, not error) | integration | `pytest tests/test_commands.py::test_orphan_graceful_without_enrichment -q` | ✅ | ✅ green |
+| 14-05-XX | 05 | 2 | OBSCMD-06 | — | `graphify-wayfind.md` exists; body references `connect_topics` shortest-path MCP tool | unit-grep | `pytest tests/test_commands.py::test_wayfind_contract -q` | ✅ | ✅ green |
+| 14-02..05 | 02-05 | 2 | OBSCMD-08 | TM-14-01 | Every new command skill.md that produces a vault note references `propose_vault_note`; none calls a direct write helper | unit-grep | `pytest tests/test_commands.py::test_trust_boundary_invariant_all_p1 -q` | ✅ | ✅ green |
+| 14-all | 00-05 | — | regression | — | Existing 9 legacy commands still install on Claude platform after `target` filter lands | integration | `pytest tests/test_install.py::test_legacy_commands_still_install -q` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -68,9 +69,9 @@ created: 2026-04-22
 
 Each row's test above marked `❌ W0` must exist before Wave 1 starts. Practical minimum:
 
-- [ ] `tests/test_commands.py` — extend existing module with frontmatter-schema, trust-boundary-grep, and dual-section assertions for all 4 P1 commands + the 9 legacy backfill check
-- [ ] `tests/test_install.py` — extend with directory-scan uninstall test, target-filter test, `--no-obsidian-commands` flag test, default-both test, legacy-regression test
-- [ ] Minimal fixtures in `tests/conftest.py` if any new helpers are needed (existing pytest tmp_path + monkeypatch pattern should suffice)
+- [x] `tests/test_commands.py` — extend existing module with frontmatter-schema, trust-boundary-grep, and dual-section assertions for all 4 P1 commands + the 9 legacy backfill check
+- [x] `tests/test_install.py` — extend with directory-scan uninstall test, target-filter test, `--no-obsidian-commands` flag test, default-both test, legacy-regression test
+- [x] Minimal fixtures in `tests/conftest.py` if any new helpers are needed (existing pytest tmp_path + monkeypatch pattern should suffice)
 
 ---
 
@@ -97,11 +98,31 @@ Each row's test above marked `❌ W0` must exist before Wave 1 starts. Practical
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved — 2026-04-22
+
+---
+
+## Validation Audit 2026-04-22
+
+All 16 declared automated rows executed as a single pytest invocation.
+
+| Metric | Count |
+|--------|-------|
+| Automated rows declared | 16 |
+| COVERED (test exists + green) | 16 |
+| PARTIAL (test exists, failing) | 0 |
+| MISSING (no test) | 0 |
+| Gaps resolved | 0 (no gaps) |
+| Escalated to manual-only | 0 |
+| Manual-only items (UAT) | 3 (unchanged — subjective / require live vault) |
+
+**Command:** `pytest tests/test_install.py::{test_uninstall_directory_scan,test_uninstall_idempotent,test_install_filters_by_target,test_install_missing_target_defaults_both,test_no_obsidian_commands_flag,test_legacy_commands_still_install} tests/test_commands.py::{test_legacy_commands_have_target,test_graphify_prefix_enforced,test_graphify_moc_frontmatter,test_moc_trust_boundary_and_contract,test_related_contract,test_related_handles_no_context,test_orphan_dual_sections,test_orphan_graceful_without_enrichment,test_wayfind_contract,test_trust_boundary_invariant_all_p1} -q`
+
+**Result:** `16 passed in 0.10s` — every Per-Task Verification Map row now resolves to a green test. Phase 14 is Nyquist-compliant.
