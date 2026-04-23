@@ -689,22 +689,22 @@ The `_handlers` dict key count must equal `build_mcp_tools()` length — `MANIFE
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`render_analysis_context` signature vs. subgraph-only context**
    - What we know: `render_analysis_context(G, communities, community_labels, god_node_list, surprise_list)` takes full-graph artifacts (god nodes, surprises, community labels) — not just a subgraph.
    - What's unclear: For a debate-scoped subgraph, should the planner pre-compute god nodes / surprises on the subgraph only, or pass full-graph analytics and rely on subgraph node filtering in the prompt?
-   - Recommendation: Compute god nodes + surprises on the subgraph (`analyze.god_nodes(subG)`, `analyze.surprise_connections(subG)`) rather than the full graph — debate should be scoped. This is a planner decision; either approach works.
+   - **RESOLVED:** Compute god nodes + surprises on the subgraph (`analyze.god_nodes(subG)`, `analyze.surprise_connections(subG)`) — debate stays scoped. Adopted in 16-03 Task 2 action.
 
 2. **`ArgumentPackage` JSON serialization of `subgraph: nx.Graph`**
    - What we know: `nx.node_link_data(G)` produces a dict serializable to JSON; used in `serve.py` graph loading.
    - What's unclear: Whether to serialize the full subgraph into `meta.argument_package` or only the subgraph node/edge IDs.
-   - Recommendation: Serialize only `{nodes: [{id, label, source_file}], edge_count: N}` summary — the full graph is already in `graph.json`. This keeps the MCP envelope payload reasonable.
+   - **RESOLVED:** Serialize only `{nodes: [{id, label, source_file}], edge_count: N}` summary — the full graph is already in `graph.json`. Adopted in 16-02 Task 2 behavior.
 
 3. **`test_commands.py` extension for argue.md**
    - What we know: `test_commands.py` covers `CORE_COMMANDS` and has explicit tests for `ask.md` (Phase 17).
    - What's unclear: Whether to add `argue` to `CORE_COMMANDS` dict or add a dedicated `test_argue_md_frontmatter` function following the `test_ask_md_frontmatter` pattern.
-   - Recommendation: Add a dedicated `test_argue_md_frontmatter` function modeled exactly on `test_ask_md_frontmatter` (lines 195-209 of `tests/test_commands.py`).
+   - **RESOLVED:** Add a dedicated `test_argue_md_frontmatter` function modeled exactly on `test_ask_md_frontmatter` (lines 195-209 of `tests/test_commands.py`). Adopted in 16-03 Task 1.
 
 ---
 
