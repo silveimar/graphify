@@ -1619,6 +1619,110 @@ After writing GRAPH_ANALYSIS.md, report to the user:
 
 ---
 
+## /graphify-argue <question> — SPAR-Kit Graph Argumentation Mode (Phase 16)
+
+**Purpose:** Run a structurally-enforced multi-perspective debate about a decision question, grounded in the knowledge graph. Every persona claim cites a real `node_id`. Produces `graphify-out/GRAPH_ARGUMENT.md` — advisory-only (ARGUE-09).
+
+**Cross-phase rule:** This orchestration MUST NOT invoke the Phase 17 `chat` MCP tool (Pitfall 18 recursion guard). The manifest declares `argue_topic.composable_from: []`. Use `argue_topic` and the deterministic graph primitives only.
+
+### Step B1 — Evidence subgraph
+
+Call the MCP tool `argue_topic` with `{topic: "<question>", scope: "topic"}`. Parse the D-02 envelope. If `meta.status != "ok"`, render the fallback message per `graphify/commands/argue.md` and STOP.
+
+From `meta.argument_package`, extract:
+- `nodes: [{id, label, source_file}, ...]` — the evidence subgraph
+- `perspectives: [{lens}, ...]` — the 4 fixed lenses from `graphify/argue.py::_FIXED_LENSES` (`security`, `architecture`, `complexity`, `onboarding`)
+- `citations: [...]` — flat list to render into the final transcript
+
+### Step B2 — Evidence context block
+
+Build an `{EVIDENCE_SUBGRAPH}` text block from `meta.argument_package.nodes` + `edge_count`. For structured rendering, call `graphify.analyze.render_analysis_context(subG, ...)` if a full subgraph object is available; otherwise format a concise markdown list of `- [node_id:label] (source_file)` lines. This block is fed to every persona prompt unchanged across rounds.
+
+### Step B3 — Debate rounds (up to ROUND_CAP = 6)
+
+Import from `graphify.argue`: `ROUND_CAP` (= 6), `MAX_TEMPERATURE` (= 0.4), `validate_turn`, `compute_overlap`.
+
+For `round in 1..ROUND_CAP`:
+
+1. **Per-round blind-label shuffle (D-05, ARGUE-06).** Shuffle A/B/C/D persona labels at round start — reuse the Phase 9 blind-label harness shuffle pattern documented above (see §Phase 9 tournament harness — "Judge 1: Analysis-1=A, Analysis-2=B, Analysis-3=AB"). The Jaccard detector never sees a stable persona→label mapping across rounds. DO NOT identify personas by their role name in any overlap computation or in any output surface that feeds back into a later round.
+
+2. **Four parallel persona LLM calls (D-04).** For each persona in `[security, architecture, complexity, onboarding]`:
+   - Use the lens focus bullets from §Phase 9 harness (line ~1433 in this file — point to them, do NOT duplicate).
+   - Prompt framing: "Argue a position on the user's question `<question>`, citing only `node_id`s present in the provided `{EVIDENCE_SUBGRAPH}`. Output JSON only: `{claim: string, cites: [node_id]}`. Do not identify yourself as a specific persona role in the output."
+   - Include the `{EVIDENCE_SUBGRAPH}` block + all previous rounds' validated claims (labeled by their round-N shuffle label, not by persona role).
+   - **Temperature ≤ MAX_TEMPERATURE (0.4) — HARD CONSTRAINT.** If the LLM client API requires an explicit temperature argument, set it to exactly `0.4`; never higher.
+
+3. **Validate each turn via `argue.validate_turn(turn, G)` (ARGUE-05).**
+   - If the returned list is non-empty (unknown cites fabricated): hard-reject the turn, re-prompt THE SAME persona ONCE with the message "The following cited node_ids do not exist in the provided subgraph: {list}. Please revise. Cite only `node_id` values that appear in `{EVIDENCE_SUBGRAPH}`."
+   - If the retry is STILL invalid: record the turn as `{claim: "[NO VALID CLAIM]", cites: []}` — this is an abstention (D-09). Do NOT accept a third attempt.
+
+4. **Compute cite-overlap (D-06).** Build `cite_sets = [set(turn["cites"]) for turn in this_round_turns]`. Call `argue.compute_overlap(cite_sets)` — abstentions (empty sets) are dropped by the function before computing Jaccard. Record the round's Jaccard in the trajectory array.
+
+5. **Check early-stop conditions (D-06):**
+   - If `overlap >= 0.7` for TWO consecutive rounds → `verdict = "consensus"` and break.
+   - If `overlap < 0.2` for THREE consecutive rounds → `verdict = "dissent"` and break (valid terminal outcome — no consensus-forcing, D-07).
+   - If `round == ROUND_CAP` without either condition firing → `verdict = "inconclusive"` and break (valid terminal outcome).
+
+### Step B4 — Write advisory-only transcript (ARGUE-09, D-11, D-12, D-13)
+
+Write `graphify-out/GRAPH_ARGUMENT.md` — mirror the write pattern used for `GRAPH_ANALYSIS.md` elsewhere in this file. Contents (per D-11/D-12):
+
+```
+# Graph Argument — <topic>
+
+> **Advisory only.** This transcript is the record of a structurally-enforced graph-grounded debate. No code, no graph data, and no project file has been modified as a result of this run.
+
+## Round 1
+### Security
+- <claim> [node_id:label] [node_id:label]
+### Architecture
+- ...
+### Complexity
+- ...
+### Onboarding
+- ...
+
+## Round 2
+...
+
+## Verdict
+- verdict: <consensus | dissent | inconclusive>
+- rounds_run: <N>
+- cite-overlap trajectory (Jaccard): 0.15 → 0.28 → 0.55 → 0.78 → 0.82
+- cited nodes:
+  - [node_id:label]
+  - ...
+
+> This transcript is advisory only — no code or graph mutations result from this run.
+```
+
+- **Inline cite format is `[node_id:label]` (D-13)** — always use the CANONICAL `node_id` after alias redirect (D-16); labels pass through `graphify.security.sanitize_label` before emission.
+- **Output path is HARDCODED:** `graphify-out/GRAPH_ARGUMENT.md` (ARGUE-09, T-16-05). Do not accept a user-parameterized output path. Validate confinement via `graphify.security.validate_graph_path(output_path, base=project_root)` at write time.
+- **Default overwrite behavior** (matches `GRAPH_ANALYSIS.md` precedent). Timestamped variants deferred to v1.4.x backlog.
+
+### Step B5 — Report to user
+
+Return a summary per `graphify/commands/argue.md` step 3: verdict + Jaccard trajectory + path to `graphify-out/GRAPH_ARGUMENT.md`. Keep under 400 tokens.
+
+### Anti-patterns (DO NOT)
+
+- **DO NOT invoke the `chat` MCP tool from this orchestration.** `composable_from: []` is the manifest-level guard; this is the prose-level reminder. Use `argue_topic` + primitive graph tools only.
+- **DO NOT add a "synthesizer" or "consensus" fifth persona** that merges claims into a fake unified verdict (D-07). Consensus is *detected* mechanically from Jaccard overlap — never produced.
+- **DO NOT strip invalid cites from a claim to "rescue" it** (Pitfall 2, D-10). The `{claim, cites}` unit is atomic — reject the whole turn or accept it whole.
+- **DO NOT echo unmatched topic tokens back to the user** when the evidence subgraph is empty (Pitfall 6). Use the generic `no_results` fallback from `graphify/commands/argue.md`.
+- **DO NOT exceed ROUND_CAP = 6 rounds** for any reason. The cap is a hard constraint.
+- **DO NOT use the key `alias_redirects`** in any transcript section or summary — the canonical meta key is `resolved_from_alias` (Pitfall 4, D-16).
+
+### Deferred P2 requirements (v1.4.x backlog — NOT IMPLEMENTED in this phase)
+
+The following requirements are explicitly deferred per `.planning/phases/16-graph-argumentation-mode/16-CONTEXT.md` "Deferred Ideas" section. They are NOT implemented in the v1 debate loop above. Do not implement them in-session without a new gsd planning pass.
+
+- **ARGUE-11 [P2] — SPAR-Kit INTERROGATE step (deferred to v1.4.x backlog).** Optional cross-examination turn between rounds (+40% synthesis quality per protocol docs). Activation: future `--interrogate` flag.
+- **ARGUE-12 [P2] — Persona memory across rounds (deferred to v1.4.x backlog).** Each persona retains its own prior claims for consistency. Substrate fields would live on `PerspectiveSeed`.
+- **ARGUE-13 [P2] — Clash/rumble/domain intensity scoring (deferred to v1.4.x backlog).** Conflict-density metrics annotating the transcript.
+
+---
+
 ## For --watch
 
 Start a background watcher that monitors a folder and auto-updates the graph when files change.
