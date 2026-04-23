@@ -586,22 +586,22 @@ Source: [VERIFIED: adapted from tests/test_commands.py existing shape]
 | A3 | `cluster.py` uses `-1` or `None` or missing attribute to mark isolated nodes | Pitfall 6 | MEDIUM — `/graphify-orphan` skill.md must verify exact encoding at implementation time; if encoding differs (e.g., all nodes get a community_id and isolation is encoded elsewhere), skill prose needs updating. Planner should add a one-line verification task in Plan 04. |
 | A4 | MOC-root heuristic "largest community, tie-break lowest community_id" is acceptable for `/graphify-wayfind` | Claude's Discretion | LOW — D-03/D-05 in CONTEXT explicitly leaves this to planner discretion. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Plan 04: community=null vs community=-1 encoding**
    - What we know: `cluster.py` runs Leiden (graspologic) with Louvain fallback; comments at `graphify/mapping.py:299` mention "sentinel community id -1".
    - What's unclear: Whether every node always gets a community assignment (even isolated) or if some nodes lack the attribute entirely.
-   - Recommendation: Plan 04 first task is a 5-minute code scan of `cluster.py` output to confirm exact encoding, then lock skill.md prose accordingly.
+   - RESOLVED: Plan 04 first task is a 5-minute code scan of `cluster.py` output to confirm exact encoding, then lock skill.md prose accordingly.
 
 2. **Plan 00: install manifest vs pure directory-scan for uninstall**
    - What we know: D-04 Claude's-discretion note recommends directory-scan with optional content-hash belt-and-suspenders.
    - What's unclear: Whether the upgrade-path edge case (user upgrades package, then uninstalls) is worth the manifest-persistence complexity.
-   - Recommendation: Ship directory-scan in Plan 00; document the upgrade edge as a known limitation. If support volume shows it matters, add manifest in v1.4.x.
+   - RESOLVED: Ship directory-scan in Plan 00; document the upgrade edge as a known limitation. If support volume shows it matters, add manifest in v1.4.x.
 
 3. **Plan 02: MOC render — skill-md-only vs small Python helper**
    - What we know: D-03 says "thin caller" to `load_profile`. Phase 16/17 pattern is skill.md does all composition.
    - What's unclear: Whether Dataview query template substitution (`${community_tag}` replacement) is reliably done by the LLM or should be a 10-line Python helper for determinism.
-   - Recommendation: Start with pure skill.md; if blind-label tests of the output show inconsistency, add helper in a follow-up wave.
+   - RESOLVED: Start with pure skill.md; if blind-label tests of the output show inconsistency, add helper in a follow-up wave.
 
 ## Environment Availability
 
