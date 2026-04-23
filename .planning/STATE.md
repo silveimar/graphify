@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Diagram Intelligence & Excalidraw Bridge
 status: executing
-stopped_at: Completed 19-02-PLAN.md
-last_updated: "2026-04-23T06:09:12.937Z"
+stopped_at: Completed 19-03-PLAN.md
+last_updated: "2026-04-23T06:19:14.731Z"
 last_activity: 2026-04-23
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -39,7 +39,7 @@ Items acknowledged and deferred at v1.4 milestone close on 2026-04-23:
 ## Current Position
 
 Phase: 19 (Vault Promotion Script (Layer B)) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge — 🚧 STARTED (2026-04-22), 0/4 phases complete (Phase 19 pulled in from v1.4 2026-04-23)
 Previous milestone: v1.4 Agent Discoverability & Obsidian Workflows — ✅ SHIPPED 2026-04-22 (phases 12–18, 32 plans, 86/86 requirements)
 Status: Ready to execute
@@ -153,6 +153,9 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 - [Phase ?]: Phase 14 Plan 04: /graphify-orphan read-only by design — OBSCMD-08 propose_vault_note intentionally N/A
 - [Phase ?]: Phase 14 Plan 04: enrichment.json treated as OPTIONAL Phase 15 overlay — absence renders graceful banner
 - [Phase 14]: Phase 14 Plan 05: /graphify-wayfind shipped; cross-command trust-boundary invariant codified across all P1 write commands
+- [Phase ?]: promote() returns {promoted, skipped, writeback} enabling idempotent re-runs and structured import-log
+- [Phase ?]: validate_vault_path called before every vault write — T-19-03-01/02 path traversal mitigated
+- [Phase ?]: _writeback_profile: PyYAML optional guard, returns skipped_no_yaml on ImportError, never crashes pipeline
 
 ### Blockers/Concerns
 
@@ -178,9 +181,10 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | Phase 14 P04 | 5 | 2 tasks | 2 files |
 | Phase 14 P05 | 180 | 2 tasks | 2 files |
 | Phase 19 P02 | 6 min | 2 tasks | 2 files |
+| Phase 19 P03 | 374 | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-04-23T06:09:12.933Z
-Stopped at: Completed 19-02-PLAN.md
+Last session: 2026-04-23T06:19:14.728Z
+Stopped at: Completed 19-03-PLAN.md
 Next action: /gsd-plan-phase 20 to plan Phase 20 (Diagram Seed Engine).

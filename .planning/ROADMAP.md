@@ -218,11 +218,11 @@ rank, confidence tags) and enforce naming conventions across all vault output.
   3. Node type dispatch is correct: a god-node domain concept lands in `Atlas/Dots/Things/`, a knowledge gap lands in `Atlas/Dots/Questions/`, a cluster becomes `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
   4. `related:` links are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted from wikilinks.
   5. `graphify-out/import-log.md` is written after each run with vault path, run timestamp, promoted-count by type, threshold, and skipped-count.
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 Plans:
 - [x] 19-01-PLAN.md — Wave 0 foundations: extract analyze.knowledge_gaps(), add profile.tag_taxonomy + profile_sync keys, ship question.md + quote.md templates, scaffold tests/test_vault_promote.py, register VAULT-06/07 in REQUIREMENTS.md
 - [x] 19-02-PLAN.md — Wave 1: core vault_promote.py (graph loader, 7-folder classifier, render pipeline with EXTRACTED-only related, Layer-3 tech-tag detection)
-- [ ] 19-03-PLAN.md — Wave 2: atomic writer + vault-manifest.json decision table + import-log.md journal + profile write-back + CLI subcommand registration
+- [x] 19-03-PLAN.md — Wave 2: atomic writer + vault-manifest.json decision table + import-log.md journal + profile write-back + CLI subcommand registration
 - [ ] 19-04-PLAN.md — Wave 3: integration fixture + end-to-end/heuristic tests + README + skill.md docs + REQUIREMENTS.md traceability closure
 
 ---
@@ -306,7 +306,7 @@ Plans:
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
 | 18.1 v1.4 Gap Closure — Phase 13 Verification Artifacts | v1.4 | 0/3 | Not started | — |
 | 18.2 v1.4 Gap Closure — Manifest Metadata + Tech Debt Cleanup | v1.4 | 0/3 | Not started | — |
-| 19. Vault Promotion Script (Layer B) | v1.5 | 2/4 | In Progress|  |
+| 19. Vault Promotion Script (Layer B) | v1.5 | 3/4 | In Progress|  |
 | 20. Diagram Seed Engine | v1.5 | 0/3 | Not started | — |
 | 21. Profile Extension & Template Bootstrap | v1.5 | 0/2 | Not started | — |
 | 22. Excalidraw Skill & Vault Bridge | v1.5 | 0/2 | Not started | — |
