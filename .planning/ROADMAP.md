@@ -127,7 +127,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 
 - [x] Phase 12: Heterogeneous Extraction Routing — Per-file complexity classifier (AST metrics) routes extraction to cheap/mid/expensive model classes with parallel fan-out, cost ceiling enforcement, model-isolated cache keys, and a `routing.json` sidecar audit trail. (6/6 plans, completed 2026-04-17)
 - [x] Phase 13: Agent Capability Manifest (+ SEED-002 Harness Memory Export) — Static `server.json` + runtime `manifest.json` with MCP `capability_describe` tool, CLI `graphify capability`, introspection-driven generation (never hand-maintained), manifest-hash drift detection, and bundled SEED-002 `graphify harness export` producing SOUL/HEARTBEAT/USER triplet for Claude harness. Shipped 2026-04-17 (4/4 plans, 18/18 REQ-IDs).
-- [ ] Phase 14: Obsidian Thinking Commands — Vault-scoped `/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind` slash commands (plus P2 `/graphify-bridge`, `/graphify-voice`, `/graphify-drift-notes`) with `target: obsidian|code|both` frontmatter filtering, mandatory `propose_vault_note + approve` trust boundary, and a Plan 00 refactor migrating `_uninstall_commands()` from hardcoded whitelist to directory-scan.
+- [x] Phase 14: Obsidian Thinking Commands — Vault-scoped `/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind` slash commands (plus P2 `/graphify-bridge`, `/graphify-voice`, `/graphify-drift-notes`) with `target: obsidian|code|both` frontmatter filtering, mandatory `propose_vault_note + approve` trust boundary, and a Plan 00 refactor migrating `_uninstall_commands()` from hardcoded whitelist to directory-scan. (completed 2026-04-23)
 - [x] Phase 15: Async Background Enrichment — Four-pass background enricher (description, patterns, community summaries, staleness) writing overlay-only `enrichment.json`; event-driven via `watch.py` post-rebuild hook; `fcntl.flock`-coordinated with foreground `/graphify`; snapshot-pinned at process start for determinism. (completed 2026-04-22)
 - [x] Phase 16: Graph Argumentation Mode — `graphify/argue.py` substrate populates a SPAR-Kit-style `ArgumentPackage` from a graph subgraph; `skill.md` orchestrates the LLM debate (Phase 9 blind-label harness reused); mandatory `{claim, cites: [node_id]}` schema rejects fabricated node IDs; round cap 6; `dissent`/`inconclusive` valid outputs; `GRAPH_ARGUMENT.md` advisory-only artifact. (completed 2026-04-23)
 - [x] Phase 17: Conversational Graph Chat — Two-stage structurally-enforced `chat(query, session_id)` MCP tool (Stage 1 tool-call only, Stage 2 compose from results only); every claim cited to `{node_id, label, source_file}`; empty results return templated fuzzy suggestions; session-scoped history; `/graphify-ask` slash command. (completed 2026-04-22)
@@ -192,7 +192,7 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 - [x] 14-02-PLAN.md — `/graphify-moc <community_id>` command with vault-profile-first render + `propose_vault_note` trust boundary (Wave 2; OBSCMD-03, OBSCMD-08)
 - [x] 14-03-PLAN.md — `/graphify-related <note-path>` read-only command consuming `get_focus_context`, explicit `no_context` handling (Wave 2; OBSCMD-04)
 - [x] 14-04-PLAN.md — `/graphify-orphan` parameter-less read-only command with dual-section render + graceful `enrichment.json` absence (Wave 2; OBSCMD-05)
-- [ ] 14-05-PLAN.md — `/graphify-wayfind <topic>` command resolving MOC-root via largest-community heuristic + `connect_topics` shortest-path + `propose_vault_note` (Wave 2; OBSCMD-06, OBSCMD-08)
+- [x] 14-05-PLAN.md — `/graphify-wayfind <topic>` command resolving MOC-root via largest-community heuristic + `connect_topics` shortest-path + `propose_vault_note` (Wave 2; OBSCMD-06, OBSCMD-08)
 
 **Deferred to v1.4.x backlog** (P2, not planned in this phase):
 - OBSCMD-09 [P2]: /graphify-bridge — surprising-connections Dataview embed
@@ -352,7 +352,7 @@ rank, confidence tags) and enforce naming conventions across all vault output.
 | 11. Narrative Mode as Interactive Slash Commands | v1.3 | 7/7 | Complete   | 2026-04-17 |
 | 12. Heterogeneous Extraction Routing | v1.4 | 6/6 | Complete | 2026-04-17 |
 | 13. Agent Capability Manifest (+ SEED-002 Harness Export) | v1.4 | 4/4 | Complete | 2026-04-17 |
-| 14. Obsidian Thinking Commands | v1.4 | 5/6 | In Progress|  |
+| 14. Obsidian Thinking Commands | v1.4 | 6/6 | Complete   | 2026-04-23 |
 | 15. Async Background Enrichment | v1.4 | 6/6 | Complete    | 2026-04-22 |
 | 16. Graph Argumentation Mode | v1.4 | 3/3 | Complete   | 2026-04-23 |
 | 17. Conversational Graph Chat | v1.4 | 3/3 | Complete   | 2026-04-22 |
