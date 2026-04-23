@@ -218,7 +218,15 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
   3. Debate runs end-to-end with `dissent` or `inconclusive` as valid final outcomes (no consensus-forcing); round cap = 6 is never exceeded; temperature ≤ 0.4 is enforced.
   4. A regression test replays the Phase 9 blind-label bias suite against Phase 16 — blind A/B labels, stripped persona phrases, rotating judge identity all verified intact.
   5. `GRAPH_ARGUMENT.md` is advisory-only — the file exists under `graphify-out/` and never triggers any code change or graph mutation.
-**Plans**: TBD (planner will refine; 4–6 plans expected, including `argue.py` substrate + `ArgumentPackage`, `argue_topic` MCP tool, skill-side debate orchestration with blind harness, `/graphify-argue` command, citation validator).
+**Plans**: 3 plans (planned 2026-04-22 — P1 + documented P2 deferrals).
+- [ ] 16-01-PLAN.md — `graphify/argue.py` zero-LLM substrate: `ArgumentPackage`, `PerspectiveSeed`, `NodeCitation` dataclasses; `populate()` composing serve.py primitives; `validate_turn()` fabrication guard; `compute_overlap()` Jaccard detector; `ROUND_CAP=6` + `MAX_TEMPERATURE=0.4` constants; tests/test_argue.py (18+ cases incl. zero-LLM grep + Phase 9 blind-harness regression anchor). (ARGUE-01, ARGUE-02, ARGUE-03, ARGUE-05, ARGUE-06, ARGUE-08)
+- [ ] 16-02-PLAN.md — `argue_topic` MCP tool: `_run_argue_topic_core` + `_tool_argue_topic` in serve.py with D-02 envelope (`resolved_from_alias`, hardcoded `output_path`); mcp_tool_registry `argue_topic` Tool entry; `capability_tool_meta.yaml` entry with `composable_from: []`; tests/test_serve.py (5 cases) + tests/test_capability.py `test_argue_topic_not_composable`. (ARGUE-04, ARGUE-07, ARGUE-09)
+- [ ] 16-03-PLAN.md — `graphify/commands/argue.md` slash command (mirrors ask.md frontmatter, no `target:`); skill.md SPAR-Kit `/graphify-argue` orchestration section (4 lenses × ≤6 rounds, per-round blind-label shuffle reusing Phase 9 harness at skill.md:1511, Jaccard early-stop D-06, advisory-only write to `graphify-out/GRAPH_ARGUMENT.md`); tests/test_commands.py::test_argue_md_frontmatter; P2 deferrals (ARGUE-11/12/13) explicitly documented as v1.4.x backlog. (ARGUE-06, ARGUE-09, ARGUE-10, ARGUE-11 [P2], ARGUE-12 [P2], ARGUE-13 [P2])
+
+**Deferred to v1.4.x backlog** (P2, documented in 16-03-PLAN.md but not implemented):
+- ARGUE-11 [P2]: SPAR-Kit INTERROGATE step — optional cross-examination turn, `--interrogate` flag.
+- ARGUE-12 [P2]: Persona memory across rounds — perspective identity retention.
+- ARGUE-13 [P2]: Clash/rumble/domain intensity scoring — conflict-density metrics on transcript.
 
 ### Phase 17: Conversational Graph Chat
 **Goal**: User asks a natural-language question about the codebase and receives a graph-grounded narrative answer where every claim traces back to a real node — no fabricated entities, no hallucinated connections.
