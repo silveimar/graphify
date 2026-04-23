@@ -155,7 +155,14 @@ def _install_commands(cfg: dict, src_dir: Path, *, verbose: bool = True) -> None
 
 
 def _uninstall_commands(cfg: dict, *, verbose: bool = True) -> None:
-    """Remove command files previously installed by _install_commands."""
+    """Remove command files previously installed by _install_commands.
+
+    Directory-scan symmetric with _install_commands: the single source of truth
+    is `graphify/commands/*.md` (resolved from `cfg['commands_src_dir']`). Any
+    file present in the source tree at uninstall time is removed from dst_dir.
+    Only names that originated in our source tree are touched — user-authored
+    adjacent commands in dst_dir are preserved. (TM-14-02, OBSCMD-01)
+    """
     if not cfg.get("commands_enabled"):
         return
     dst_rel = cfg.get("commands_dst")
@@ -164,13 +171,15 @@ def _uninstall_commands(cfg: dict, *, verbose: bool = True) -> None:
     dst_dir = Path.home() / dst_rel
     if not dst_dir.exists():
         return
-    # Remove only the files we know Phase 11 installs (core 5 + stretch placeholders)
-    for name in ("context.md", "trace.md", "connect.md", "drift.md", "emerge.md", "ghost.md", "challenge.md"):
-        target = dst_dir / name
-        if target.exists():
-            target.unlink()
-            if verbose:
-                print(f"  command removed    ->  {target}")
+    src_dir = Path(__file__).parent / cfg["commands_src_dir"]
+    if not src_dir.exists():
+        return
+    for src in sorted(src_dir.glob("*.md")):
+        target = dst_dir / src.name
+        existed = target.exists()
+        target.unlink(missing_ok=True)
+        if verbose and existed:
+            print(f"  command removed    ->  {target}")
 
 
 def install(platform: str = "claude", no_commands: bool = False) -> None:
