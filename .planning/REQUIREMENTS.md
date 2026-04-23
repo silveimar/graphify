@@ -86,16 +86,16 @@ Requirements grouped by REQ-ID prefix, each mapping to exactly one roadmap phase
 - [x] **ARGUE-01**: New module `graphify/argue.py` — substrate only. Exposes `populate(G, topic|subgraph, *, scope: "topic"|"subgraph"|"community", budget: int) -> ArgumentPackage`
 - [x] **ARGUE-02**: `ArgumentPackage` dataclass fields: `subgraph: nx.Graph`, `perspectives: list[PerspectiveSeed]`, `evidence: list[NodeCitation]`
 - [x] **ARGUE-03**: LLM orchestration lives in `skill.md` (D-73 honored); `argue.py` contains zero LLM calls — parallels Phase 9 autoreason tournament structure
-- [ ] **ARGUE-04**: New MCP tool `argue_topic(topic, scope, budget)` returns `ArgumentPackage` serialized into D-02 meta envelope
+- [x] **ARGUE-04**: New MCP tool `argue_topic(topic, scope, budget)` returns `ArgumentPackage` serialized into D-02 meta envelope
 - [x] **ARGUE-05**: Mandatory `{claim, cites: [node_id]}` schema on every persona turn; validator rejects unknown cites as `[FABRICATED]` and re-prompts (Pitfall 4 mitigation)
 - [x] **ARGUE-06**: Phase 9 blind-label harness reused as-is — shuffled A/B labels, stripped persona phrases, rotating judge identity (prevents Defender bias regression)
-- [ ] **ARGUE-07**: Manifest declares `composable_from: []` for `argue_topic` — Phase 16 MUST NOT invoke Phase 17 chat as primitive (Pitfall 18 recursion guard)
+- [x] **ARGUE-07**: Manifest declares `composable_from: []` for `argue_topic` — Phase 16 MUST NOT invoke Phase 17 chat as primitive (Pitfall 18 recursion guard)
 - [x] **ARGUE-08**: Round cap = 6; debate temperature ≤ 0.4; `dissent` and `inconclusive` are valid outputs (no consensus-forcing)
-- [ ] **ARGUE-09**: Output written to `graphify-out/GRAPH_ARGUMENT.md`; argumentation is **advisory only** — never auto-applies changes to code or graph
-- [ ] **ARGUE-10**: `/graphify-argue <question>` command file invokes `argue_topic` via MCP
-- [ ] **ARGUE-11** `[P2]`: SPAR-Kit INTERROGATE step between ABSTRACT and RUMBLE (+40% synthesis quality per protocol docs); opt-in via `--interrogate` flag
-- [ ] **ARGUE-12** `[P2]`: Persona memory across rounds (persistent perspective identity) — each persona retains its prior claims across the debate to avoid contradiction
-- [ ] **ARGUE-13** `[P2]`: Clash/rumble/domain intensity scoring annotates the transcript with conflict density metrics for post-hoc review
+- [x] **ARGUE-09**: Output written to `graphify-out/GRAPH_ARGUMENT.md`; argumentation is **advisory only** — never auto-applies changes to code or graph
+- [x] **ARGUE-10**: `/graphify-argue <question>` command file invokes `argue_topic` via MCP
+- [x] **ARGUE-11** `[P2]`: SPAR-Kit INTERROGATE step between ABSTRACT and RUMBLE (+40% synthesis quality per protocol docs); opt-in via `--interrogate` flag
+- [x] **ARGUE-12** `[P2]`: Persona memory across rounds (persistent perspective identity) — each persona retains its prior claims across the debate to avoid contradiction
+- [x] **ARGUE-13** `[P2]`: Clash/rumble/domain intensity scoring annotates the transcript with conflict density metrics for post-hoc review
 
 ### Conversational Graph Chat (Phase 17)
 

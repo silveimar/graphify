@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Agent Discoverability & Obsidian Workflows
 status: verifying
 stopped_at: Phase 16 context gathered
-last_updated: "2026-04-23T00:26:19.348Z"
+last_updated: "2026-04-23T00:36:18.416Z"
 last_activity: 2026-04-23
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 26
-  completed_plans: 24
-  percent: 92
+  completed_plans: 26
+  percent: 100
 ---
 
 # Project State
@@ -132,6 +132,7 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 - [Phase 17]: Plan 17-03: Chat citations canonical-post-dedup via `_resolve_alias` threading (CHAT-07 / D-16 / T-17-05)
 - [Phase 17]: Plan 17-03: `/graphify-ask` follows connect.md frontmatter convention — no `target:` field (CONTEXT.md Clarification)
 - [Phase 17]: Plan 17-03: Zero-LLM invariant enforced structurally via grep-on-source (CHAT-03 SC4 architectural test)
+- [Phase ?]: D-14/D-15/D-16: argue_topic D-02 envelope with composable_from:[] recursion guard; resolved_from_alias (not alias_redirects)
 
 ### Blockers/Concerns
 
@@ -149,9 +150,11 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | Phase 17 P01 | 15m | 2 tasks | 4 files |
 | Phase 17 P02 | 10 | 2 tasks | 2 files |
 | Phase 17 P03 | 12m | 2 tasks | 4 files (ask.md + serve.py + 2 test files) |
+| Phase 16 P03 | 8m | 2 tasks | 3 files |
+| Phase 16 P02 | 7m | 2 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-04-23T00:26:19.345Z
+Last session: 2026-04-23T00:36:18.406Z
 Stopped at: Phase 16 context gathered
 Next action: Run `/gsd-verify-work` on Phase 17. After verification, per locked v1.4 build order (12 ✅ → 18 ✅ → 13A ✅ → 15 ✅ → 17 ✅ → 16 → 14 → 13B + SEED-002), **Phase 16 SPAR-Kit Argumentation** is the next candidate (soft-depends on 17 citation format ✅; MUST NOT call 17). Start with `/gsd-discuss-phase 16` or `/gsd-plan-phase 16`.
