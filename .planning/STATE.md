@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Diagram Intelligence & Excalidraw Bridge
-status: verifying
-stopped_at: Phase 21 context gathered
-last_updated: "2026-04-23T15:08:22.389Z"
-last_activity: 2026-04-23
+status: executing
+stopped_at: Phase 21 verified PASS
+last_updated: "2026-04-23T16:10:00.000Z"
+last_activity: 2026-04-23 -- Phase 21 executed + verified (profile extension + template bootstrap)
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  completed_phases: 3
+  total_plans: 9
+  completed_plans: 9
   percent: 100
 ---
 
@@ -38,14 +38,14 @@ Items acknowledged and deferred at v1.4 milestone close on 2026-04-23:
 
 ## Current Position
 
-Phase: 20 (diagram-seed-engine) — EXECUTING
-Plan: 3 of 3
-Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge — 🚧 STARTED (2026-04-22), 0/4 phases complete (Phase 19 pulled in from v1.4 2026-04-23)
+Phase: 21 (profile-extension-template-bootstrap) — ✅ COMPLETE (verified 2026-04-23)
+Next: Phase 22
+Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge — 🚧 IN PROGRESS (3/4 phases complete: 19, 20, 21)
 Previous milestone: v1.4 Agent Discoverability & Obsidian Workflows — ✅ SHIPPED 2026-04-22 (phases 12–18, 32 plans, 86/86 requirements)
-Status: Phase complete — ready for verification
-Last activity: 2026-04-23
+Status: Phase 21 shipped (PROF-01..04 + TMPL-01..06, 1554 tests green)
+Last activity: 2026-04-23 -- Phase 21 executed + verified PASS
 
-Progress: [░░░░░░░░░░] 0% (0/3 phases complete)
+Progress: [███████░░░] 75% (3/4 phases complete)
 
 **Build order (locked in SUMMARY.md):**
 
