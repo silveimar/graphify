@@ -819,3 +819,25 @@ def test_tech_layer3_detection_persists_via_writeback(tmp_path):
     tech_tags = written.get("tag_taxonomy", {}).get("tech", [])
     assert "python" in tech_tags, f"tech/python must be in profile.yaml tech tags; got {tech_tags}"
     assert "typescript" in tech_tags, f"tech/typescript must be in profile.yaml tech tags; got {tech_tags}"
+
+
+def test_subpath_isolation_vault_manifest(tmp_path):
+    """MANIFEST-11: two sequential _save_manifest calls with disjoint path sets preserve union (locks existing contract)."""
+    from graphify.vault_promote import _save_manifest, _load_manifest
+
+    graphify_out = tmp_path / "graphify-out"
+    graphify_out.mkdir()
+
+    # Simulate subpath A run: load existing (empty), merge new rows, save
+    existing = _load_manifest(graphify_out)
+    existing.update({"Atlas/Dots/sub_a/NoteA.md": "hash_a1"})
+    _save_manifest(existing, graphify_out)
+
+    # Simulate subpath B run: load existing (has sub_a rows), merge new rows, save
+    existing2 = _load_manifest(graphify_out)
+    existing2.update({"Atlas/Dots/sub_b/NoteB.md": "hash_b1"})
+    _save_manifest(existing2, graphify_out)
+
+    final = _load_manifest(graphify_out)
+    assert "Atlas/Dots/sub_a/NoteA.md" in final, "sub_a row must survive sub_b write"
+    assert "Atlas/Dots/sub_b/NoteB.md" in final, "sub_b row must be present"

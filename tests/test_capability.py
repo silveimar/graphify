@@ -404,3 +404,26 @@ def test_get_focus_context_metadata_declared() -> None:
     assert tool.get("cost_class") == "cheap"
     assert tool.get("deterministic") is True
     assert tool.get("cacheable_until") == "graph_mtime"
+
+
+def test_subpath_isolation_capability_manifest(tmp_path: Path) -> None:
+    """MANIFEST-11: two sequential write_manifest_atomic() calls with disjoint tool sets preserve union."""
+    import json
+
+    data_a = {
+        "manifest_version": "1",
+        "graphify_version": "test",
+        "CAPABILITY_TOOLS": [{"name": "tool_alpha", "description": "a", "inputSchema": {}}],
+    }
+    data_b = {
+        "manifest_version": "1",
+        "graphify_version": "test",
+        "CAPABILITY_TOOLS": [{"name": "tool_beta", "description": "b", "inputSchema": {}}],
+    }
+    write_manifest_atomic(tmp_path, data_a)
+    write_manifest_atomic(tmp_path, data_b)
+
+    result = json.loads((tmp_path / "capability.json").read_text(encoding="utf-8"))
+    names = {t["name"] for t in result["CAPABILITY_TOOLS"]}
+    assert "tool_alpha" in names, "tool_alpha (sub_a run) must survive sub_b write"
+    assert "tool_beta" in names, "tool_beta (sub_b run) must be present"
