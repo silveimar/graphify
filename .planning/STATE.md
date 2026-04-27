@@ -18,10 +18,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-23 at v1.4 milestone close)
+See: .planning/PROJECT.md (updated 2026-04-27 at v1.5 milestone close)
 
-**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended in v1.1 with context persistence and agent memory, in v1.2 with multi-perspective analysis, in v1.3 with token-aware retrieval / entity dedup / interactive slash commands, and in v1.4 (shipped 2026-04-22) with agent discoverability (MCP capability manifest + SEED-002 harness export), Obsidian thinking-command depth, and graph-quality-over-time via heterogeneous routing + async enrichment + focus-aware zoom + grounded chat + SPAR-Kit argumentation. v1.5 extends to vault promotion (Phase 19) and diagram intelligence (Phases 20–22).
-**Current focus:** Phase 22 — excalidraw-skill-vault-bridge
+**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking-command depth + graph-quality-over-time) and now v1.5 (vault promotion CLI + diagram intelligence: auto-detected diagram seeds, profile-driven Excalidraw template bootstrap, deployable excalidraw-diagram skill).
+**Current focus:** Planning next milestone (v1.6 unscoped)
 
 ## Deferred Items
 
@@ -44,15 +44,15 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: 22 (excalidraw-skill-vault-bridge) — EXECUTING
-Plan: 2 of 2
-Next: Phase 22
-Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge — 🚧 IN PROGRESS (3/4 phases complete: 19, 20, 21)
+Phase: — (no active phase)
+Plan: —
+Next: Run `/gsd-new-milestone` to scope v1.6
+Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge — ✅ SHIPPED 2026-04-27 (phases 19–22, 11 plans, 34/34 requirements)
 Previous milestone: v1.4 Agent Discoverability & Obsidian Workflows — ✅ SHIPPED 2026-04-22 (phases 12–18, 32 plans, 86/86 requirements)
-Status: Phase complete — ready for verification
+Status: Between milestones — v1.6 unscoped
 Last activity: 2026-04-27
 
-Progress: [███████░░░] 75% (3/4 phases complete)
+Progress: [██████████] 100% (4/4 phases complete)
 
 **Build order (locked in SUMMARY.md):**
 
