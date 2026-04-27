@@ -1,0 +1,60 @@
+# Milestone v1.6 — Hardening & Onboarding Requirements
+
+**Goal:** Close known stability gaps and make v1.5's diagram intelligence + Excalidraw pipeline learnable from documentation alone.
+
+**Started:** 2026-04-27
+
+---
+
+## v1.6 Requirements
+
+### Dedup Stability (DEDUP)
+
+- [ ] **DEDUP-01**: `graphify --dedup --dedup-cross-type` completes without `TypeError: unhashable type: 'list'` on extractions whose edges already carry list-form `source_file` values (Issue #4)
+- [ ] **DEDUP-02**: Merged edge `source_file` after dedup is the sorted unique union of inputs when ≥ 2 sources contribute, or the scalar value when exactly 1 contributes (preserves shape consumed by `export.py`)
+- [ ] **DEDUP-03**: Regression test in `tests/test_dedup.py` exercises the cross-type path on a fixture extraction containing pre-merged `list[str]` `source_file` values and asserts no exception + correct merge shape
+
+### Manifest Hardening (MANIFEST)
+
+- [ ] **MANIFEST-09**: Running `graphify` on a subpath of a vault/output directory does not erase manifest entries belonging to siblings or previous runs on other subpaths
+- [ ] **MANIFEST-10**: All on-disk manifest writers (`vault-manifest.json`, `seeds-manifest.json`, `routing.json`, MCP `manifest.json`) follow read-merge-write semantics with atomic `.tmp` + `os.replace` commit, scoped by row identity (path/id), not by run
+- [ ] **MANIFEST-11**: Subpath isolation regression test: two sequential runs on `vault/sub_a/` then `vault/sub_b/` yield a single manifest containing rows from both subpaths
+- [ ] **MANIFEST-12**: Audit document (`.planning/phases/24-*/AUDIT.md` or equivalent) enumerates every manifest writer in the codebase, its merge policy before v1.6, and its merge policy after the fix — anchors future manifest additions
+
+### Skill Memory Persistence (SKILLMEM)
+
+- [ ] **SKILLMEM-01**: Source skill file `graphify/skill.md` contains a "Mandatory response persistence" section requiring every interactive `query` / `path` / `explain` / `analyze` response to write two artifacts to `graphify-out/memory/CMD_<TS>_<SLUG>.{graph,human}.md`
+- [ ] **SKILLMEM-02**: All platform skill variants emitted by `graphify install` (`skill.md`, `skill-codex.md`, `skill-opencode.md`, `skill-openclaw.md`, `skill-droid.md`, `skill-trae.md`, `skill-trae-cn.md`, plus copilot/antigravity derivations from `_PLATFORM_CONFIG`) carry the same persistence contract verbatim or as a platform-correct paraphrase
+- [ ] **SKILLMEM-03**: `graphify install <platform>` re-emits the persistence block on a fresh install for every entry in `_PLATFORM_CONFIG`
+- [ ] **SKILLMEM-04**: Regression test grep-asserts the persistence block (or a stable canary string) in every emitted skill file under each `_PLATFORM_CONFIG[*].skill_dst`
+
+### v1.5 Configuration Guide (DOCS)
+
+- [ ] **DOCS-01**: A new top-level guide (`CONFIGURING_V1_5.md` or `docs/v1.5-configuration.md`) walks a new user end-to-end through the v1.5 pipeline on a sample vault: `vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → invoke skill
+- [ ] **DOCS-02**: Guide includes a complete example `.graphify/profile.yaml` showing the `diagram_types:` schema with at least one custom type beyond the 6 built-ins, plus annotated frontmatter explaining D-06 gating and D-07 tiebreak
+- [ ] **DOCS-03**: Guide documents the MCP `list_diagram_seeds` and `get_diagram_seed` tools — invocation shape, return schema, and the closure-local `_resolve_alias` traversal-defense behavior — so an agent author can integrate them without reading source
+- [ ] **DOCS-04**: Guide is reachable from `README.md` via a "v1.5 Configuration" link in the docs/getting-started area
+
+---
+
+## Future Requirements
+
+(Carryover seeds remain dormant; no v1.7 commitments yet.)
+
+---
+
+## Out of Scope (v1.6)
+
+- **SEED-001 (Tacit-to-Explicit Elicitation Engine)** — trigger conditions (onboarding/discovery milestone, user without artifacts) not met by v1.6's hardening + docs theme
+- **SEED-002 multi-harness expansion** (codex/letta/honcho/AGENTS.md) and inverse-import — deferred pending prompt-injection defenses; v1.6 doesn't unlock either
+- **New extraction features, new export formats, new CLI verbs** — v1.6 is explicitly polish, not capability expansion
+- **Refactor of `to_obsidian()` or the `_PLATFORM_CONFIG` structure** — touch only what the persistence-block requirement requires; broader cleanup waits
+- **Automated framework-profile discovery** (Sefirot/Guitton/LSA fusion) — separate workstream
+
+---
+
+## Traceability
+
+| REQ-ID | Phase | Plan |
+|--------|-------|------|
+| (filled in by roadmap) | | |
