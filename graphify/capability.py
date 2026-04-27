@@ -235,7 +235,26 @@ def write_manifest_atomic(out_dir: Path, data: dict[str, Any]) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / "capability.json"
     tmp = target.with_suffix(".tmp")
-    payload = json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+    # MANIFEST-09/10: read existing capability.json, merge by tool name (last-write-wins).
+    existing_tools: dict[str, Any] = {}
+    if target.exists():
+        try:
+            on_disk = json.loads(target.read_text(encoding="utf-8"))
+            existing_tools = {
+                t["name"]: t
+                for t in on_disk.get("CAPABILITY_TOOLS", [])
+                if isinstance(t, dict) and "name" in t
+            }
+        except (json.JSONDecodeError, OSError):
+            existing_tools = {}
+    incoming_tools = {
+        t["name"]: t
+        for t in data.get("CAPABILITY_TOOLS", [])
+        if isinstance(t, dict) and "name" in t
+    }
+    merged_tools = {**existing_tools, **incoming_tools}
+    merged_data = {**data, "CAPABILITY_TOOLS": list(merged_tools.values())}
+    payload = json.dumps(merged_data, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
     tmp.write_text(payload, encoding="utf-8")
     os.replace(tmp, target)
     return target
