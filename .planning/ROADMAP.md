@@ -238,8 +238,9 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
   2. `vault-manifest.json`, `seeds-manifest.json`, `routing.json`, and the MCP `manifest.json` all commit via `.tmp` + `os.replace` after read-merge-write keyed by row identity (path/id), not by run
   3. Two sequential runs against `vault/sub_a/` then `vault/sub_b/` produce a single manifest containing rows from both subpaths (regression test asserts both row sets present)
   4. `pytest tests/ -q` is green; subpath isolation regression test added under existing test conventions
-**Plans**: 1 plan
-  - [ ] 23-01-PLAN.md — Patch dedup.py edge-merge to flatten source_file via _iter_sources; add 2 regression tests
+**Plans**: 2 plans
+  - [ ] 24-01-PLAN.md — Patch routing_audit.flush + capability.write_manifest_atomic with read-merge-write; add 3 subpath-isolation tests (MANIFEST-09/10/11)
+  - [ ] 24-02-PLAN.md — Ship AUDIT.md enumerating all 5 manifest writers with policy diff (MANIFEST-12)
 
 ### Phase 25: Mandatory Dual-Artifact Persistence in Skill Files
 **Goal**: Every platform skill file emitted by `graphify install` carries the "Mandatory response persistence" contract verbatim (or platform-correct paraphrase), so interactive `query` / `path` / `explain` / `analyze` responses always write `graphify-out/memory/CMD_<TS>_<SLUG>.{graph,human}.md` regardless of which AI harness invokes the skill.
