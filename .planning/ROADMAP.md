@@ -264,7 +264,7 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
   3. The guide documents `list_diagram_seeds` and `get_diagram_seed` MCP tools — invocation shape, return schema, and `_resolve_alias` traversal-defense behavior — sufficient for an agent author to integrate without reading source
   4. `README.md` links to the guide via a "v1.5 Configuration" entry in the docs/getting-started area
 **Plans**: 1 plan
-  - [ ] 23-01-PLAN.md — Patch dedup.py edge-merge to flatten source_file via _iter_sources; add 2 regression tests
+  - [ ] 26-01-PLAN.md — Author CONFIGURING_V1_5.md + README cross-link + tracker updates (DOCS-01..04)
 
 ## Progress
 

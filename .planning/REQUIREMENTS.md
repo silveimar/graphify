@@ -68,7 +68,7 @@
 | SKILLMEM-02 | Phase 25 | TBD |
 | SKILLMEM-03 | Phase 25 | TBD |
 | SKILLMEM-04 | Phase 25 | TBD |
-| DOCS-01 | Phase 26 | TBD |
-| DOCS-02 | Phase 26 | TBD |
-| DOCS-03 | Phase 26 | TBD |
-| DOCS-04 | Phase 26 | TBD |
+| DOCS-01 | Phase 26 | 26-01-PLAN.md |
+| DOCS-02 | Phase 26 | 26-01-PLAN.md |
+| DOCS-03 | Phase 26 | 26-01-PLAN.md |
+| DOCS-04 | Phase 26 | 26-01-PLAN.md |
