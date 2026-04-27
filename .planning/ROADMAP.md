@@ -252,7 +252,7 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
   3. `graphify install <platform>` on a fresh install for each `_PLATFORM_CONFIG` entry emits a skill file containing the persistence canary string at its `skill_dst`
   4. A regression test in `tests/` grep-asserts the persistence canary in every emitted skill file across all `_PLATFORM_CONFIG[*].skill_dst` paths
 **Plans**: 1 plan
-  - [ ] 25-01-PLAN.md — Insert verbatim persistence contract block into 9 skill files + pytest canary/drift-lock (SKILLMEM-01..04)
+  - [x] 25-01-PLAN.md — Insert verbatim persistence contract block into 9 skill files + pytest canary/drift-lock (SKILLMEM-01..04)
 
 ### Phase 26: v1.5 Configuration Guide & Walkthrough Docs
 **Goal**: A new user can configure and run the v1.5 pipeline (`vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → invoke skill) end-to-end on a sample vault using docs alone, including MCP tool integration.
@@ -302,7 +302,7 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
 
 | 23. Dedup `source_file` List-Handling Fix | v1.6 | 1/1 | Complete   | 2026-04-27 |
 | 24. Manifest Writer Audit + Atomic Read-Merge-Write | v1.6 | 2/2 | Complete    | 2026-04-27 |
-| 25. Mandatory Dual-Artifact Persistence in Skill Files | v1.6 | 0/0 | Not started | — |
+| 25. Mandatory Dual-Artifact Persistence in Skill Files | v1.6 | 1/1 | Complete    | 2026-04-27 |
 | 26. v1.5 Configuration Guide & Walkthrough Docs | v1.6 | 0/0 | Not started | — |
 
 ---

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Hardening & Onboarding
-status: verifying
+status: executing
 stopped_at: Phase 25 context gathered
-last_updated: "2026-04-27T22:21:47.935Z"
+last_updated: "2026-04-27T22:58:14.840Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  completed_phases: 3
+  total_plans: 4
+  completed_plans: 4
   percent: 100
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-27 at v1.5 milestone close)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking-command depth + graph-quality-over-time) and now v1.5 (vault promotion CLI + diagram intelligence: auto-detected diagram seeds, profile-driven Excalidraw template bootstrap, deployable excalidraw-diagram skill).
-**Current focus:** Phase 24 — Manifest Writer Audit + Atomic Read-Merge-Write Hardening
+**Current focus:** Phase 25 — mandatory-dual-artifact-persistence-in-skill-files
 
 ## Deferred Items
 
@@ -44,16 +44,16 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: 25
+Phase: 26
 Plan: Not started
-Status: Phase complete — ready for verification
+Status: Executing Phase 25
 Last activity: 2026-04-27
 
 ## Performance Metrics
 
 **Velocity (v1.0):**
 
-- Total plans completed: 46
+- Total plans completed: 47
 - Total tests: 872 passing
 - Timeline: 2 days (2026-04-09 → 2026-04-11)
 - Commits in milestone: ~172
