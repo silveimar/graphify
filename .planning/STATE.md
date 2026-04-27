@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Hardening & Onboarding
-status: verifying
-stopped_at: Completed 26-01-PLAN.md
+status: complete
+stopped_at: Phase 26 verified — v1.6 milestone complete
 last_updated: "2026-04-27T23:43:16.148Z"
 last_activity: 2026-04-27
 progress:
@@ -44,9 +44,9 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: 26 (v1-5-configuration-guide-walkthrough-docs) — EXECUTING
+Phase: 26 (v1-5-configuration-guide-walkthrough-docs) — COMPLETE
 Plan: 1 of 1
-Status: Phase complete — ready for verification
+Status: Phase verified (6/6 must-haves passed) — v1.6 milestone complete (4/4 phases)
 Last activity: 2026-04-27
 
 ## Performance Metrics
