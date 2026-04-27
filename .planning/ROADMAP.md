@@ -227,7 +227,7 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
   3. `pytest tests/test_dedup.py -q` includes a regression case exercising the cross-type path on the list-shaped fixture and is green
   4. `export.py` consumers (HTML, JSON, GraphML, Obsidian) handle the merged `source_file` shape without raising
 **Plans**: 1 plan
-  - [ ] 23-01-PLAN.md — Patch dedup.py edge-merge to flatten source_file via _iter_sources; add 2 regression tests
+  - [x] 23-01-PLAN.md — Patch dedup.py edge-merge to flatten source_file via _iter_sources; add 2 regression tests
 
 ### Phase 24: Manifest Writer Audit + Atomic Read-Merge-Write Hardening
 **Goal**: All on-disk manifest writers in graphify use uniform read-merge-write semantics scoped by row identity, so subpath runs on a shared vault never erase sibling-subpath rows.
@@ -299,7 +299,7 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
 | 21. Profile Extension & Template Bootstrap | v1.5 | 2/2 | Complete | 2026-04-23 |
 | 22. Excalidraw Skill & Vault Bridge | v1.5 | 2/2 | Complete | 2026-04-27 |
 
-| 23. Dedup `source_file` List-Handling Fix | v1.6 | 0/0 | Not started | — |
+| 23. Dedup `source_file` List-Handling Fix | v1.6 | 1/1 | Complete   | 2026-04-27 |
 | 24. Manifest Writer Audit + Atomic Read-Merge-Write | v1.6 | 0/0 | Not started | — |
 | 25. Mandatory Dual-Artifact Persistence in Skill Files | v1.6 | 0/0 | Not started | — |
 | 26. v1.5 Configuration Guide & Walkthrough Docs | v1.6 | 0/0 | Not started | — |
