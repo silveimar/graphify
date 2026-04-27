@@ -1,4 +1,5 @@
 """Tests for graphify install --platform routing."""
+import re
 from pathlib import Path
 from unittest.mock import patch
 import pytest
@@ -572,3 +573,123 @@ def test_platform_config_has_supports_key():
             assert s in ("code", "obsidian"), (
                 f"platform {plat!r}: unknown support target {s!r}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Phase 22 — Excalidraw skill (Tasks 1, 5; install/uninstall in plan 22-02)
+# ---------------------------------------------------------------------------
+
+
+def _read_excalidraw_skill() -> str:
+    import graphify
+    return (Path(graphify.__file__).parent / "skill-excalidraw.md").read_text(
+        encoding="utf-8"
+    )
+
+
+# --- Skill content tests (Task 5) ------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
+def test_excalidraw_skill_in_package():
+    import graphify
+    pkg = Path(graphify.__file__).parent
+    assert (pkg / "skill-excalidraw.md").exists()
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
+def test_excalidraw_skill_has_seven_steps():
+    body = _read_excalidraw_skill()
+    # Either 7 numbered list items at line start, or an explicit
+    # "## What I do (7 steps)" section with 7 numbered children.
+    numbered = re.findall(r"^[1-7]\.", body, re.M)
+    assert len(numbered) >= 7, f"expected >=7 numbered steps, got {len(numbered)}"
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
+def test_excalidraw_skill_calls_seed_tools():
+    body = _read_excalidraw_skill()
+    assert "list_diagram_seeds" in body
+    assert "get_diagram_seed" in body
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
+def test_excalidraw_skill_has_mcp_json():
+    body = _read_excalidraw_skill()
+    assert "mcpServers" in body
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
+def test_excalidraw_skill_has_style_rules():
+    body = _read_excalidraw_skill()
+    assert "fontFamily: 5" in body
+    assert "#1e1e2e" in body
+    assert "transparent" in body
+    assert "compress: false" in body
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
+def test_excalidraw_skill_has_guard_list():
+    body = _read_excalidraw_skill().lower()
+    # Forbidden mentions in guard list
+    assert "lzstring" in body
+    assert "label" in body  # "label-derived" guard
+    assert "multi-seed" in body or "multi seed" in body
+    assert "frontmatter" in body
+    assert ".mcp.json" in body
+
+
+# --- Install/uninstall/idempotency tests (Plan 22-02) ----------------------
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
+def test_install_excalidraw(tmp_path):
+    _install(tmp_path, "excalidraw")
+    assert (
+        tmp_path / ".claude" / "skills" / "excalidraw-diagram" / "SKILL.md"
+    ).exists()
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
+def test_uninstall_excalidraw(tmp_path):
+    from graphify.__main__ import install, uninstall
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        install(platform="excalidraw")
+        uninstall(platform="excalidraw")
+    assert not (
+        tmp_path / ".claude" / "skills" / "excalidraw-diagram" / "SKILL.md"
+    ).exists()
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
+def test_install_excalidraw_idempotent(tmp_path):
+    _install(tmp_path, "excalidraw")
+    target = tmp_path / ".claude" / "skills" / "excalidraw-diagram" / "SKILL.md"
+    first = target.read_text(encoding="utf-8")
+    _install(tmp_path, "excalidraw")
+    second = target.read_text(encoding="utf-8")
+    assert first == second
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
+def test_uninstall_excalidraw_idempotent(tmp_path):
+    from graphify.__main__ import uninstall
+    with patch("graphify.__main__.Path.home", return_value=tmp_path):
+        uninstall(platform="excalidraw")  # absent → no-op
+        uninstall(platform="excalidraw")  # absent again → still no-op
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
+def test_install_excalidraw_does_not_touch_claude_skill(tmp_path):
+    _install(tmp_path, "claude")
+    _install(tmp_path, "excalidraw")
+    assert (tmp_path / ".claude" / "skills" / "graphify" / "SKILL.md").exists()
+    assert (
+        tmp_path / ".claude" / "skills" / "excalidraw-diagram" / "SKILL.md"
+    ).exists()
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
+def test_platform_config_has_excalidraw():
+    from graphify.__main__ import _PLATFORM_CONFIG
+    assert "excalidraw" in _PLATFORM_CONFIG

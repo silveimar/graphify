@@ -1165,3 +1165,59 @@ def test_profile_diagram_types_unknown_key_rejected():
     errors = validate_profile({"diagram_types": [{"name": "x", "extra": 1}]})
     assert errors
     assert any("unknown key 'extra'" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# Phase 22 — diagram_types extension: layout_type + output_path (Task 2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — schema extension in Task 2")
+def test_diagram_types_layout_type_accepted():
+    errors = validate_profile(
+        {"diagram_types": [{"name": "mind-map", "layout_type": "mind-map"}]}
+    )
+    assert errors == []
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — schema extension in Task 2")
+def test_diagram_types_output_path_accepted():
+    errors = validate_profile(
+        {"diagram_types": [{"name": "mind-map", "output_path": "Excalidraw/Diagrams/"}]}
+    )
+    assert errors == []
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — schema extension in Task 2")
+def test_diagram_types_layout_type_must_be_str():
+    errors = validate_profile(
+        {"diagram_types": [{"name": "x", "layout_type": 123}]}
+    )
+    assert errors
+    assert any("layout_type must be str" in e for e in errors)
+
+
+@pytest.mark.xfail(strict=True, reason="Wave 0 stub — schema extension in Task 2")
+def test_diagram_types_output_path_must_be_str():
+    errors = validate_profile(
+        {"diagram_types": [{"name": "x", "output_path": ["not", "a", "string"]}]}
+    )
+    assert errors
+    assert any("output_path must be str" in e for e in errors)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="Wave 0 stub — write-time path traversal validation lives in Task 4 "
+    "(write_diagram via validate_vault_path); schema-level test optional",
+)
+def test_diagram_types_output_path_traversal():
+    # Per CONTEXT D-08 + PATTERNS, traversal is enforced at WRITE time
+    # (validate_vault_path inside write_diagram), not the schema validator.
+    # This test is a placeholder for the validator-level surface and stays
+    # xfail in Wave 1 unless we promote schema-level traversal checks.
+    errors = validate_profile(
+        {"diagram_types": [{"name": "x", "output_path": "../../etc"}]}
+    )
+    assert errors
+    assert any(".." in e for e in errors)
