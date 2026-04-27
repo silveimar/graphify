@@ -240,7 +240,7 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
   4. `pytest tests/ -q` is green; subpath isolation regression test added under existing test conventions
 **Plans**: 2 plans
   - [x] 24-01-PLAN.md — Patch routing_audit.flush + capability.write_manifest_atomic with read-merge-write; add 3 subpath-isolation tests (MANIFEST-09/10/11)
-  - [ ] 24-02-PLAN.md — Ship AUDIT.md enumerating all 5 manifest writers with policy diff (MANIFEST-12)
+  - [x] 24-02-PLAN.md — Ship AUDIT.md enumerating all 5 manifest writers with policy diff (MANIFEST-12)
 
 ### Phase 25: Mandatory Dual-Artifact Persistence in Skill Files
 **Goal**: Every platform skill file emitted by `graphify install` carries the "Mandatory response persistence" contract verbatim (or platform-correct paraphrase), so interactive `query` / `path` / `explain` / `analyze` responses always write `graphify-out/memory/CMD_<TS>_<SLUG>.{graph,human}.md` regardless of which AI harness invokes the skill.
@@ -301,7 +301,7 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
 | 22. Excalidraw Skill & Vault Bridge | v1.5 | 2/2 | Complete | 2026-04-27 |
 
 | 23. Dedup `source_file` List-Handling Fix | v1.6 | 1/1 | Complete   | 2026-04-27 |
-| 24. Manifest Writer Audit + Atomic Read-Merge-Write | v1.6 | 1/2 | In Progress|  |
+| 24. Manifest Writer Audit + Atomic Read-Merge-Write | v1.6 | 2/2 | Complete   | 2026-04-27 |
 | 25. Mandatory Dual-Artifact Persistence in Skill Files | v1.6 | 0/0 | Not started | — |
 | 26. v1.5 Configuration Guide & Walkthrough Docs | v1.6 | 0/0 | Not started | — |
 
