@@ -30,10 +30,10 @@
 
 ### v1.5 Configuration Guide (DOCS)
 
-- [ ] **DOCS-01**: A new top-level guide (`CONFIGURING_V1_5.md` or `docs/v1.5-configuration.md`) walks a new user end-to-end through the v1.5 pipeline on a sample vault: `vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → invoke skill
-- [ ] **DOCS-02**: Guide includes a complete example `.graphify/profile.yaml` showing the `diagram_types:` schema with at least one custom type beyond the 6 built-ins, plus annotated frontmatter explaining D-06 gating and D-07 tiebreak
-- [ ] **DOCS-03**: Guide documents the MCP `list_diagram_seeds` and `get_diagram_seed` tools — invocation shape, return schema, and the closure-local `_resolve_alias` traversal-defense behavior — so an agent author can integrate them without reading source
-- [ ] **DOCS-04**: Guide is reachable from `README.md` via a "v1.5 Configuration" link in the docs/getting-started area
+- [x] **DOCS-01**: A new top-level guide (`CONFIGURING_V1_5.md` or `docs/v1.5-configuration.md`) walks a new user end-to-end through the v1.5 pipeline on a sample vault: `vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → invoke skill
+- [x] **DOCS-02**: Guide includes a complete example `.graphify/profile.yaml` showing the `diagram_types:` schema with at least one custom type beyond the 6 built-ins, plus annotated frontmatter explaining D-06 gating and D-07 tiebreak
+- [x] **DOCS-03**: Guide documents the MCP `list_diagram_seeds` and `get_diagram_seed` tools — invocation shape, return schema, and the closure-local `_resolve_alias` traversal-defense behavior — so an agent author can integrate them without reading source
+- [x] **DOCS-04**: Guide is reachable from `README.md` via a "v1.5 Configuration" link in the docs/getting-started area
 
 ---
 

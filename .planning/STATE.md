@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Hardening & Onboarding
-status: executing
-stopped_at: Phase 26 context gathered
-last_updated: "2026-04-27T23:34:52.794Z"
-last_activity: 2026-04-27 -- Phase 26 planning complete
+status: verifying
+stopped_at: Completed 26-01-PLAN.md
+last_updated: "2026-04-27T23:43:16.148Z"
+last_activity: 2026-04-27
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-27 at v1.5 milestone close)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking-command depth + graph-quality-over-time) and now v1.5 (vault promotion CLI + diagram intelligence: auto-detected diagram seeds, profile-driven Excalidraw template bootstrap, deployable excalidraw-diagram skill).
-**Current focus:** Phase 25 — mandatory-dual-artifact-persistence-in-skill-files
+**Current focus:** Phase 26 — v1-5-configuration-guide-walkthrough-docs
 
 ## Deferred Items
 
@@ -44,10 +44,10 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: 26
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-04-27 -- Phase 26 planning complete
+Phase: 26 (v1-5-configuration-guide-walkthrough-docs) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-04-27
 
 ## Performance Metrics
 
@@ -141,6 +141,8 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 - [Phase ?]: Phase 20-01: D-18 detection boundary enforced; tag write-back exclusively via graphify.merge.compute_merge_plan
 - [Phase ?]: Plan 20-02: seed.py composes god_nodes+detect_user_seeds from analyze.py (D-18); atomic-write + manifest-last pattern lifted from vault_promote.py; --vault opt-in tag write-back via graphify.merge.compute_merge_plan (D-08)
 - [Phase ?]: Phase 22 Plan 01: pure-Python Excalidraw fallback (write_diagram + 4 layout helpers + skill prompt) ships; profile schema gains layout_type/output_path; no new required deps; SKILL-06 ordering invariant honored
+- [Phase 26]: Phase 26-01 quoted MCP tool source verbatim (mcp_tool_registry.py + serve.py:1234-1250) rather than paraphrasing — guarantees DOCS-03 contract that an agent author can integrate without reading source. — Per RESEARCH §4: the loader's allowlist would reject any new diagram_types[*] keys, and CONTEXT D-05/D-06 thresholds are author policies not loader gates.
+- [Phase 26]: Phase 26-01 ships D-05/D-06 policy values (>=3 outbound branches, betweenness centrality) as inline YAML # comments rather than new schema keys. — Profile loader allowlist (graphify/profile.py:106-108 top-level + 367-404 diagram_types[*]) rejects any unknown keys; only min_main_nodes is the loader-enforced gate per seed.py:265-289.
 
 ### Blockers/Concerns
 
@@ -173,9 +175,10 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | Phase 22 P01 | 30min | 5 tasks | 6 files |
 | Phase 22 P02 | 5min | 1 tasks | 3 files |
 | Phase 24-manifest-writer-audit-atomic-read-merge-write-hardening P02 | 150 | 1 tasks | 1 files |
+| Phase 26 P01 | 237 | 3 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-04-27T23:18:26.003Z
-Stopped at: Phase 26 context gathered
+Last session: 2026-04-27T23:43:16.144Z
+Stopped at: Completed 26-01-PLAN.md
 Next action: /gsd-plan-phase 20 to plan Phase 20 (Diagram Seed Engine).
