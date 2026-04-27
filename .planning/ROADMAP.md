@@ -226,7 +226,8 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
   2. After dedup, an edge contributed by ≥2 sources has `source_file` equal to the sorted unique union of its inputs; an edge with exactly 1 contributor preserves the scalar shape
   3. `pytest tests/test_dedup.py -q` includes a regression case exercising the cross-type path on the list-shaped fixture and is green
   4. `export.py` consumers (HTML, JSON, GraphML, Obsidian) handle the merged `source_file` shape without raising
-**Plans**: TBD
+**Plans**: 1 plan
+  - [ ] 23-01-PLAN.md — Patch dedup.py edge-merge to flatten source_file via _iter_sources; add 2 regression tests
 
 ### Phase 24: Manifest Writer Audit + Atomic Read-Merge-Write Hardening
 **Goal**: All on-disk manifest writers in graphify use uniform read-merge-write semantics scoped by row identity, so subpath runs on a shared vault never erase sibling-subpath rows.
@@ -237,7 +238,8 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
   2. `vault-manifest.json`, `seeds-manifest.json`, `routing.json`, and the MCP `manifest.json` all commit via `.tmp` + `os.replace` after read-merge-write keyed by row identity (path/id), not by run
   3. Two sequential runs against `vault/sub_a/` then `vault/sub_b/` produce a single manifest containing rows from both subpaths (regression test asserts both row sets present)
   4. `pytest tests/ -q` is green; subpath isolation regression test added under existing test conventions
-**Plans**: TBD
+**Plans**: 1 plan
+  - [ ] 23-01-PLAN.md — Patch dedup.py edge-merge to flatten source_file via _iter_sources; add 2 regression tests
 
 ### Phase 25: Mandatory Dual-Artifact Persistence in Skill Files
 **Goal**: Every platform skill file emitted by `graphify install` carries the "Mandatory response persistence" contract verbatim (or platform-correct paraphrase), so interactive `query` / `path` / `explain` / `analyze` responses always write `graphify-out/memory/CMD_<TS>_<SLUG>.{graph,human}.md` regardless of which AI harness invokes the skill.
@@ -248,7 +250,8 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
   2. All platform variants in `_PLATFORM_CONFIG` (claude, codex, opencode, openclaw, droid, trae, trae-cn, plus copilot/antigravity derivations — 8 entries total) carry the persistence contract verbatim or as a platform-correct paraphrase
   3. `graphify install <platform>` on a fresh install for each `_PLATFORM_CONFIG` entry emits a skill file containing the persistence canary string at its `skill_dst`
   4. A regression test in `tests/` grep-asserts the persistence canary in every emitted skill file across all `_PLATFORM_CONFIG[*].skill_dst` paths
-**Plans**: TBD
+**Plans**: 1 plan
+  - [ ] 23-01-PLAN.md — Patch dedup.py edge-merge to flatten source_file via _iter_sources; add 2 regression tests
 
 ### Phase 26: v1.5 Configuration Guide & Walkthrough Docs
 **Goal**: A new user can configure and run the v1.5 pipeline (`vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → invoke skill) end-to-end on a sample vault using docs alone, including MCP tool integration.
@@ -259,7 +262,8 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
   2. The guide ships a complete example `.graphify/profile.yaml` with `diagram_types:` showing at least one custom type beyond the 6 built-ins, plus annotated frontmatter explaining D-06 gating and D-07 tiebreak
   3. The guide documents `list_diagram_seeds` and `get_diagram_seed` MCP tools — invocation shape, return schema, and `_resolve_alias` traversal-defense behavior — sufficient for an agent author to integrate without reading source
   4. `README.md` links to the guide via a "v1.5 Configuration" entry in the docs/getting-started area
-**Plans**: TBD
+**Plans**: 1 plan
+  - [ ] 23-01-PLAN.md — Patch dedup.py edge-merge to flatten source_file via _iter_sources; add 2 regression tests
 
 ## Progress
 
