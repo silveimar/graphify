@@ -60,9 +60,9 @@ Derived from ROADMAP.md Phase 19 success criteria. Full requirement text and pla
 
 ## SKILL — Excalidraw Skill & Vault Bridge (Phase 22)
 
-- [ ] **SKILL-01** `graphify install excalidraw` installs `skill-excalidraw.md` to `.claude/skills/excalidraw-diagram/SKILL.md`. New `excalidraw` platform entry in `_PLATFORM_CONFIG` in `__main__.py`. *(Positional form per Phase 22 CONTEXT D-04, matching every other platform; the original `--excalidraw` flag wording was prose-shorthand, not a CLI contract.)*
-- [ ] **SKILL-02** `graphify uninstall excalidraw` removes the installed skill file. *(Positional form per Phase 22 CONTEXT D-04.)*
-- [ ] **SKILL-03** Install and uninstall are idempotent (running twice is safe).
+- [x] **SKILL-01** `graphify install excalidraw` installs `skill-excalidraw.md` to `.claude/skills/excalidraw-diagram/SKILL.md`. New `excalidraw` platform entry in `_PLATFORM_CONFIG` in `__main__.py`. *(Positional form per Phase 22 CONTEXT D-04, matching every other platform; the original `--excalidraw` flag wording was prose-shorthand, not a CLI contract.)*
+- [x] **SKILL-02** `graphify uninstall excalidraw` removes the installed skill file. *(Positional form per Phase 22 CONTEXT D-04.)*
+- [x] **SKILL-03** Install and uninstall are idempotent (running twice is safe).
 - [x] **SKILL-04** `skill-excalidraw.md` orchestrates the full pipeline: (1) `list_diagram_seeds` → show user available seeds; (2) user selects seed; (3) `get_diagram_seed(seed_id)` → SeedDict; (4) read matching template from vault via mcp-obsidian; (5) build diagram in mcp_excalidraw using SeedDict nodes/edges + template style; (6) export scene → write to vault at `Excalidraw/Diagrams/{naming_pattern}.excalidraw.md`; (7) report: seed_id, node count, template used, vault path written.
 - [x] **SKILL-05** `skill-excalidraw.md` includes a `.mcp.json` snippet for obsidian + excalidraw servers, vault convention rules (folder layout, naming), style-matching rules, and a "do not" guard list.
 - [x] **SKILL-06** mcp_excalidraw is optional. When unavailable, the skill falls back to generating a `.excalidraw.md` file directly using the seed JSON and built-in template. The pure-Python output path must be complete before mcp_excalidraw integration.

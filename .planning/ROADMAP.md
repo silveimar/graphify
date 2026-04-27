@@ -204,7 +204,7 @@ rank, confidence tags) and enforce naming conventions across all vault output.
 - [x] Phase 19: Vault Promotion Script (Layer B) — `graphify/vault_promote.py` reads `graph.json` + `GRAPH_REPORT.md`, classifies/scores nodes, writes promoted Obsidian markdown notes directly to the user's vault at correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy. Scope expanded to VAULT-01..07 (adds VAULT-06 profile write-back + VAULT-07 hybrid 3-layer tag taxonomy). Pulled in from v1.4 scope-reconciliation 2026-04-23. (4 plans) (completed 2026-04-23)
 - [x] Phase 20: Diagram Seed Engine — `analyze.py` auto-tagging + `detect_user_seeds(G)`; new `seed.py` module with `build_seed` / `build_all_seeds` / layout heuristics / >60% overlap dedup / max_seeds=20 cap; `--diagram-seeds` CLI; `list_diagram_seeds` + `get_diagram_seed` MCP tools. (3 plans) (completed 2026-04-23)
 - [x] Phase 21: Profile Extension & Template Bootstrap — `profile.yaml` `diagram_types:` section (ATOMIC with first reader); 6 built-in diagram type defaults; `--init-diagram-templates` CLI command writing real `.excalidraw.md` JSON stubs; `gen-diagram-seed` tag write-back via vault adapter. (2 plans) ✅ 2026-04-23
-- [ ] Phase 22: Excalidraw Skill & Vault Bridge — `skill-excalidraw.md` full orchestration (list seeds → get seed → read template → mcp_excalidraw → vault); `graphify install --excalidraw`; pure-Python `.excalidraw.md` fallback path complete before mcp_excalidraw integration. (2 plans)
+- [x] Phase 22: Excalidraw Skill & Vault Bridge — `skill-excalidraw.md` full orchestration (list seeds → get seed → read template → mcp_excalidraw → vault); `graphify install --excalidraw`; pure-Python `.excalidraw.md` fallback path complete before mcp_excalidraw integration. (2 plans) (completed 2026-04-27)
 
 ---
 
@@ -273,7 +273,7 @@ Plans:
   5. `_PLATFORM_CONFIG` in `__main__.py` contains an `excalidraw` entry; `graphify install --excalidraw` and `graphify uninstall --excalidraw` are registered paths (idempotent, no side-effects on other platform entries).
 **Plans**: 2 plans.
 - [x] 22-01-PLAN.md — `graphify/skill-excalidraw.md`: full 7-step orchestration sequence; `.mcp.json` snippet (obsidian + excalidraw servers); vault conventions (folder layout: `Excalidraw/Templates/`, `Excalidraw/Diagrams/`; naming: `{topic}-{layout_type}.excalidraw.md`); style rules (Excalifont font family 5; `strokeColor: "#1e1e2e"`; `backgroundColor: "transparent"`); guard list (`compress: false` assertion, no label-derived IDs, no direct frontmatter writes, no multi-seed in v1.5); pure-Python `.excalidraw.md` fallback path (complete before mcp_excalidraw section); mcp_excalidraw integration section (optional, guarded by availability check). (SKILL-04, SKILL-05, SKILL-06)
-- [ ] 22-02-PLAN.md — Install/uninstall wiring in `__main__.py`: new `excalidraw` entry in `_PLATFORM_CONFIG` with `skill_src: "skill-excalidraw.md"`, `skill_dst: ".claude/skills/excalidraw-diagram/SKILL.md"`; `graphify install --excalidraw` handler (idempotent mkdir + copy); `graphify uninstall --excalidraw` handler (idempotent remove); `skill-excalidraw.md` packaged via `MANIFEST.in` + `pyproject.toml` `package_data`; `tests/test_install.py` additions (install/uninstall/idempotency). (SKILL-01, SKILL-02, SKILL-03)
+- [x] 22-02-PLAN.md — Install/uninstall wiring in `__main__.py`: new `excalidraw` entry in `_PLATFORM_CONFIG` with `skill_src: "skill-excalidraw.md"`, `skill_dst: ".claude/skills/excalidraw-diagram/SKILL.md"`; `graphify install --excalidraw` handler (idempotent mkdir + copy); `graphify uninstall --excalidraw` handler (idempotent remove); `skill-excalidraw.md` packaged via `MANIFEST.in` + `pyproject.toml` `package_data`; `tests/test_install.py` additions (install/uninstall/idempotency). (SKILL-01, SKILL-02, SKILL-03)
 **UI hint**: no
 
 
@@ -309,7 +309,7 @@ Plans:
 | 19. Vault Promotion Script (Layer B) | v1.5 | 4/4 | Complete   | 2026-04-23 |
 | 20. Diagram Seed Engine | v1.5 | 3/3 | Complete   | 2026-04-23 |
 | 21. Profile Extension & Template Bootstrap | v1.5 | 0/2 | Not started | — |
-| 22. Excalidraw Skill & Vault Bridge | v1.5 | 1/2 | In Progress|  |
+| 22. Excalidraw Skill & Vault Bridge | v1.5 | 2/2 | Complete   | 2026-04-27 |
 
 ---
 *Last updated: 2026-04-23 — Phase 19 (Vault Promotion Script Layer B, VAULT-01..05) moved from v1.4 to v1.5 per scope reconciliation; v1.4 scope corrected to Phases 12–18.2 (86 REQ-IDs); v1.5 now Phases 19–22 (32 REQ-IDs: VAULT-01..05, SEED-01..11, PROF-01..04, TMPL-01..06, SKILL-01..06). v1.5 Diagram Intelligence & Excalidraw Bridge opened 2026-04-22.*
