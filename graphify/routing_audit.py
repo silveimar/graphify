@@ -42,8 +42,16 @@ class RoutingAudit:
                 f"routing audit output path {out_dir} escapes working directory {cwd}"
             ) from e
         out_dir.mkdir(parents=True, exist_ok=True)
-        payload = {"version": 1, "files": dict(sorted(self._files.items()))}
         dest = out_dir / "routing.json"
+        # MANIFEST-09/10: read existing routing.json, merge new run's files on top (last-write-wins by path).
+        existing: dict[str, Any] = {}
+        if dest.exists():
+            try:
+                existing = json.loads(dest.read_text(encoding="utf-8")).get("files", {}) or {}
+            except (json.JSONDecodeError, OSError):
+                existing = {}
+        merged_files = {**existing, **self._files}
+        payload = {"version": 1, "files": dict(sorted(merged_files.items()))}
         tmp = dest.with_suffix(".json.tmp")
         try:
             tmp.write_text(
