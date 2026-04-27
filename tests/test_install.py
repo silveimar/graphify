@@ -590,14 +590,12 @@ def _read_excalidraw_skill() -> str:
 # --- Skill content tests (Task 5) ------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
 def test_excalidraw_skill_in_package():
     import graphify
     pkg = Path(graphify.__file__).parent
     assert (pkg / "skill-excalidraw.md").exists()
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
 def test_excalidraw_skill_has_seven_steps():
     body = _read_excalidraw_skill()
     # Either 7 numbered list items at line start, or an explicit
@@ -606,20 +604,17 @@ def test_excalidraw_skill_has_seven_steps():
     assert len(numbered) >= 7, f"expected >=7 numbered steps, got {len(numbered)}"
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
 def test_excalidraw_skill_calls_seed_tools():
     body = _read_excalidraw_skill()
     assert "list_diagram_seeds" in body
     assert "get_diagram_seed" in body
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
 def test_excalidraw_skill_has_mcp_json():
     body = _read_excalidraw_skill()
     assert "mcpServers" in body
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
 def test_excalidraw_skill_has_style_rules():
     body = _read_excalidraw_skill()
     assert "fontFamily: 5" in body
@@ -628,7 +623,6 @@ def test_excalidraw_skill_has_style_rules():
     assert "compress: false" in body
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — skill file authored in Task 5")
 def test_excalidraw_skill_has_guard_list():
     body = _read_excalidraw_skill().lower()
     # Forbidden mentions in guard list
