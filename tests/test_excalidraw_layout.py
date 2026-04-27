@@ -117,12 +117,4 @@ def test_write_diagram_compress_false(tmp_path):
     assert scene["type"] == "excalidraw" and scene["version"] == 2
 
 
-# Wave 0 → Wave 1 transition: layout_for tests now pass (Task 3).
-# write_diagram tests remain xfail until Task 4 implementation lands.
-_WD_XFAIL = pytest.mark.xfail(
-    reason="Wave 0 stub — write_diagram implementation lands in Task 4",
-    strict=True,
-)
-test_write_diagram_collision_refuses = _WD_XFAIL(test_write_diagram_collision_refuses)
-test_write_diagram_path_confined = _WD_XFAIL(test_write_diagram_path_confined)
-test_write_diagram_compress_false = _WD_XFAIL(test_write_diagram_compress_false)
+# Wave 1 complete: layout_for (Task 3) + write_diagram (Task 4) implemented.

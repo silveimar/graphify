@@ -21,9 +21,10 @@ land in the frontmatter ``tags:`` line (T-21-12).
 from __future__ import annotations
 
 
+import copy
 import json
 import math
-
+import re
 from pathlib import Path
 
 from graphify.profile import safe_frontmatter_value, validate_vault_path
@@ -296,6 +297,109 @@ def layout_for(
 
 
 
-def write_diagram(*args, **kwargs) -> Path:  # pragma: no cover — Task 4 stub
-    """Stub — full implementation lands in Task 4."""
-    raise NotImplementedError("write_diagram lands in Task 4")
+def _render_excalidraw_md(name: str, scene: dict) -> str:
+    """Shared renderer used by both ``render_stub`` and ``write_diagram``.
+
+    Sorts JSON keys for byte-determinism across runs (D-02).
+    """
+    safe_name = safe_frontmatter_value(str(name))
+    scene_json = json.dumps(scene, indent=2, sort_keys=True)
+    return (
+        "---\n"
+        "excalidraw-plugin: parsed\n"
+        "compress: false\n"
+        f"tags: [excalidraw, graphify, {safe_name}]\n"
+        "---\n\n"
+        "## Text Elements\n\n"
+        "## Drawing\n"
+        "```json\n"
+        f"{scene_json}\n"
+        "```\n"
+    )
+
+
+def write_diagram(
+    vault_dir: str | Path,
+    seed: dict,
+    profile: dict,
+    force: bool = False,
+) -> Path:
+    """Render a SeedDict + profile to a deterministic ``.excalidraw.md`` file.
+
+    Pipeline:
+      1. Resolve ``layout_type`` from ``seed.suggested_layout_type``;
+         fall back to ``mind-map`` if missing or unknown.
+      2. Look up matching ``profile.diagram_types`` entry (by layout_type
+         then by name) to read ``output_path`` (default ``Excalidraw/Diagrams/``).
+      3. Slugify topic from ``seed.main_node_label`` → filename
+         ``{topic}-{layout_type}.excalidraw.md``.
+      4. **Path confinement (T-22-V12)**: every relative path passes through
+         ``validate_vault_path`` BEFORE any mkdir/write. Profile-traversal
+         (``output_path: ../../etc``) raises ``ValueError``.
+      5. Collision: target.exists() and not force → ``FileExistsError``.
+      6. Build elements via ``layout_for`` and inject into a deepcopy of
+         ``SCENE_JSON_SKELETON``. Render via the shared template
+         (``compress: false``, font family 5).
+
+    Args:
+        vault_dir: Root of the Obsidian vault.
+        seed: SeedDict from ``get_diagram_seed`` MCP tool.
+        profile: Parsed ``.graphify/profile.yaml``.
+        force: Overwrite existing target if True (D-08).
+
+    Returns:
+        Path to the file written.
+    """
+    layout_type = seed.get("suggested_layout_type", "mind-map")
+    if layout_type not in _VALID_LAYOUT_TYPES:
+        layout_type = "mind-map"
+
+    diagram_types = profile.get("diagram_types", []) or []
+    dt = next(
+        (
+            d for d in diagram_types
+            if d.get("layout_type") == layout_type or d.get("name") == layout_type
+        ),
+        {},
+    )
+
+    output_dir = dt.get("output_path") or "Excalidraw/Diagrams/"
+    raw_topic = seed.get("main_node_label") or seed.get("seed_id") or "diagram"
+    topic = re.sub(
+        r"[^a-z0-9-]+",
+        "-",
+        safe_frontmatter_value(str(raw_topic)).lower(),
+    ).strip("-") or "diagram"
+    filename = f"{topic}-{layout_type}.excalidraw.md"
+    rel = f"{output_dir.rstrip('/')}/{filename}"
+
+    # T-22-V12: path confinement BEFORE mkdir/write_text. Re-raise with the
+    # canonical "escape vault directory" message expected by the tests.
+    target = validate_vault_path(rel, vault_dir)
+
+    if target.exists() and not force:
+        raise FileExistsError(
+            f"Refusing to overwrite existing diagram: {target}. "
+            "Re-run with force=True to overwrite."
+        )
+
+    # Compose nodes, mint element_ids deterministically if absent.
+    main_nodes = seed.get("main_nodes", []) or []
+    supporting_nodes = seed.get("supporting_nodes", []) or []
+    raw_nodes = list(main_nodes) + list(supporting_nodes)
+    nodes: list[dict] = []
+    for i, node in enumerate(raw_nodes):
+        n = dict(node)
+        n["element_id"] = _ensure_element_id(n, i)
+        nodes.append(n)
+    edges = seed.get("relations", []) or []
+
+    elements = layout_for(layout_type, nodes, edges)
+
+    scene = copy.deepcopy(SCENE_JSON_SKELETON)
+    scene["elements"] = elements
+
+    body = _render_excalidraw_md(layout_type, scene)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+    return target
