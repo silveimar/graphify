@@ -252,7 +252,7 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
   3. `graphify install <platform>` on a fresh install for each `_PLATFORM_CONFIG` entry emits a skill file containing the persistence canary string at its `skill_dst`
   4. A regression test in `tests/` grep-asserts the persistence canary in every emitted skill file across all `_PLATFORM_CONFIG[*].skill_dst` paths
 **Plans**: 1 plan
-  - [ ] 23-01-PLAN.md — Patch dedup.py edge-merge to flatten source_file via _iter_sources; add 2 regression tests
+  - [ ] 25-01-PLAN.md — Insert verbatim persistence contract block into 9 skill files + pytest canary/drift-lock (SKILLMEM-01..04)
 
 ### Phase 26: v1.5 Configuration Guide & Walkthrough Docs
 **Goal**: A new user can configure and run the v1.5 pipeline (`vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → invoke skill) end-to-end on a sample vault using docs alone, including MCP tool integration.
