@@ -4,7 +4,7 @@ milestone: v1.6
 milestone_name: Hardening & Onboarding
 status: verifying
 stopped_at: Completed 24-02-PLAN.md — AUDIT.md created (MANIFEST-12)
-last_updated: "2026-04-27T21:40:29.478Z"
+last_updated: "2026-04-27T21:45:13.020Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 4
@@ -44,8 +44,8 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: 24 (Manifest Writer Audit + Atomic Read-Merge-Write Hardening) — EXECUTING
-Plan: 2 of 2
+Phase: 25
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-04-27
 
@@ -53,7 +53,7 @@ Last activity: 2026-04-27
 
 **Velocity (v1.0):**
 
-- Total plans completed: 44
+- Total plans completed: 46
 - Total tests: 872 passing
 - Timeline: 2 days (2026-04-09 → 2026-04-11)
 - Commits in milestone: ~172

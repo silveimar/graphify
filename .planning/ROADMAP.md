@@ -301,7 +301,7 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
 | 22. Excalidraw Skill & Vault Bridge | v1.5 | 2/2 | Complete | 2026-04-27 |
 
 | 23. Dedup `source_file` List-Handling Fix | v1.6 | 1/1 | Complete   | 2026-04-27 |
-| 24. Manifest Writer Audit + Atomic Read-Merge-Write | v1.6 | 2/2 | Complete   | 2026-04-27 |
+| 24. Manifest Writer Audit + Atomic Read-Merge-Write | v1.6 | 2/2 | Complete    | 2026-04-27 |
 | 25. Mandatory Dual-Artifact Persistence in Skill Files | v1.6 | 0/0 | Not started | — |
 | 26. v1.5 Configuration Guide & Walkthrough Docs | v1.6 | 0/0 | Not started | — |
 
