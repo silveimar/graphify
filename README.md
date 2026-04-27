@@ -396,6 +396,10 @@ User-modified notes are preserved and recorded in `graphify-out/import-log.md`.
 **Coexists with `graphify approve`:** pick `approve` for merge-with-review,
 `vault-promote` for direct write-only. See `.planning/notes/layer-b-vault-promotion-design.md`.
 
+### v1.5 Configuration Guide
+
+End-to-end walkthrough of the v1.5 pipeline (`vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → skill invocation), the `.graphify/profile.yaml` `diagram_types:` schema, and the `list_diagram_seeds` / `get_diagram_seed` MCP tools. See [CONFIGURING_V1_5.md](CONFIGURING_V1_5.md).
+
 ## Worked examples
 
 | Corpus | Files | Reduction | Output |
