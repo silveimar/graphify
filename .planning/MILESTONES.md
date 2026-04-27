@@ -1,5 +1,24 @@
 # Milestones
 
+## v1.5 Diagram Intelligence & Excalidraw Bridge (Shipped: 2026-04-27)
+
+**Phases completed:** 4 phases, 11 plans, 4 tasks
+
+**Key accomplishments:**
+
+- Extracted `knowledge_gaps()` from `report.py` into `analyze.py`, added verbatim 4-namespace `tag_taxonomy` + `profile_sync` to `profile.py`, shipped `question.md` + `quote.md` templates, and scaffolded 13-stub `test_vault_promote.py` — all 1449 tests green.
+- Implemented pure in-memory `vault_promote.py` with 7-folder classifier (claimed-set priority dispatch, Questions bypass, code filter), full Ideaverse frontmatter renderer with EXTRACTED-only `related:`, and 3-layer taxonomy merge with auto-detected tech tags — 611 lines, 9 tests green, 1458 total suite passing.
+- Atomic note writer with SHA-256 manifest, D-13 overwrite-self-skip-foreign policy, append-first import-log, and PyYAML-optional profile write-back wired to `graphify vault-promote` CLI.
+- README.md
+- Added `possible_diagram_seed` auto-tagging to `god_nodes()` and `_cross_community_surprises()`, introduced `detect_user_seeds()` reader for the `gen-diagram-seed[/type]` tag contract, and locked tag write-back to `graphify.merge.compute_merge_plan` via a grep denylist test.
+- Shipped `graphify/seed.py` (13-step `build_all_seeds` orchestrator, 6-predicate D-05 layout heuristic, >60%-Jaccard single-pass dedup, max-20 auto-seed cap-before-I/O, deterministic sha256 element IDs, atomic-write + manifest-last lifecycle) and the `graphify --diagram-seeds [--graph <path>] [--vault <path>]` CLI flag; 27 new unit tests cover every must-have truth; full suite 1512 passed.
+- Added `list_diagram_seeds` + `get_diagram_seed` as the MANIFEST-05 atomic pair — module-level never-raise cores, closure-local `_resolve_alias` per D-16, path-traversal defense via `_SEED_ID_RE`, budget-capped truncation, 12 unit tests, capability_tool_meta.yaml + server.json refreshed; full suite 1524 passed.
+- Extended `profile.py` schema with a `diagram_types:` section (6 built-in defaults — architecture, workflow, repository-components, mind-map, cuadro-sinoptico, glossary-graph) and wired `seed.py::build_seed` as the first consumer — all four hunks landed atomically in one commit per PROF-02, with D-06 gating (`min_main_nodes` threshold) and D-07 tiebreak (highest-min wins; declaration-order fallback) both covered by tests.
+- Added `graphify --init-diagram-templates [--force]` CLI and a new `graphify/excalidraw.py` module that writes one `.excalidraw.md` stub per profile `diagram_types` entry (6 built-in defaults from Plan 21-01). Every stub hardcodes `compress: false` with a valid Excalidraw scene JSON; every target passes through `validate_vault_path`. A new TMPL-06 denylist test enforces that `seed.py`, `export.py`, and `__main__.py` never write directly to vault `.md` files, and a lzstring-import scan locks the `compress: false` one-way door across the entire `graphify/` tree.
+- 1. [Rule 3 — blocking] write_diagram stub during Task 3 commit
+
+---
+
 ## v1.4 Agent Discoverability & Obsidian Workflows (Shipped: 2026-04-22)
 
 **Delivered:** Graphify transitioned from a tool you run to a tool agents can find, trust, compose with, and improve in the background. Agent discoverability lands via an introspection-driven MCP capability manifest (static `server.json` + live `manifest.json` with drift detection) plus SEED-002 harness-memory export (SOUL/HEARTBEAT/USER triplet for the Claude harness). Obsidian workflow depth arrives through vault-scoped thinking commands (`/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind`) enforced behind a `propose_vault_note + approve` trust boundary. Graph quality over time comes from heterogeneous extraction routing (cheap/mid/expensive classes with cost ceiling), async background enrichment (four-pass overlay-only `enrichment.json` coordinated via `fcntl.flock`), focus-aware context zoom (`get_focus_context` BFS ego-graph), grounded two-stage chat with `{node_id, label, source_file}` citations, and SPAR-Kit graph-argumentation (4-lens rotation, blind-label shuffle, Jaccard early-stop).

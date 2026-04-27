@@ -8,25 +8,15 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge
+## Current Milestone: (none — v1.5 shipped 2026-04-27, v1.6 unscoped)
 
-**Goal:** Turn graphify's knowledge graph into a diagram generation pipeline — auto-detect and user-tag seed nodes, produce structured diagram seeds, bootstrap vault templates from profile, and wire a skill that orchestrates the full seeds → Excalidraw → vault flow.
+**Prior milestone (v1.5) shipped 2026-04-27:** Phases 19–22 (4 phases, 11 plans). Vault Promotion Script (Layer B), Diagram Seed Engine, Profile Extension & Template Bootstrap, Excalidraw Skill & Vault Bridge. 34/34 requirements. Full detail archived to `.planning/milestones/v1.5-*`.
 
 **Prior milestone (v1.4) shipped 2026-04-22:** Phases 12–18 (7 phases, 32 plans). Heterogeneous Extraction Routing, Agent Capability Manifest + SEED-002 Harness Export, Async Background Enrichment, Focus-Aware Graph Context, Conversational Graph Chat, Graph Argumentation Mode, Obsidian Thinking Commands. 86/86 requirements. Full detail archived to `.planning/milestones/v1.4-*`.
 
-**Target features (v1.5 — scope confirmed 2026-04-22):**
-
-- Phase 20: Diagram Seed Engine — auto-tag god nodes + cross-community bridges as `possible-diagram-seed`; read vault `gen-diagram-seed` tags (Phase 8 round-trip); new `seed.py` builds structured seeds with layout heuristics; merge overlapping seeds (>60% node overlap → union); output to `graphify-out/seeds/`; `--diagram-seeds` CLI flag; MCP tools `list_diagram_seeds` + `get_diagram_seed`
-- Phase 21: Profile Extension & Template Bootstrap — `profile.yaml` gains `diagram_types:` section (template paths, trigger conditions, naming patterns for 6 layout types); graphify writes `gen-diagram-seed` tag back to auto-detected vault notes via vault adapter; `--init-diagram-templates` writes real `.excalidraw.md` JSON stubs to vault
-- Phase 22: Excalidraw Skill & Vault Bridge — `excalidraw-diagram` SKILL.md orchestrates seeds → mcp_excalidraw → vault; `graphify install --excalidraw` deploys skill
-
-**Key constraints carried forward from v1.4:**
-- D-02 MCP envelope on all new MCP tools (`get_diagram_seed`)
-- D-16 alias redirect on all MCP tools
-- D-18 compose don't plumb (`seed.py` composes `analyze.py` primitives; no new pure plumbing modules)
-
-**Seed activation for v1.5:**
-- SEED-001 (Tacit-to-Explicit Elicitation Engine) — remains planted. Trigger is onboarding/upstream features; v1.5 is diagram intelligence. Re-evaluate at v1.6.
+**Seed carryover into v1.6 backlog:**
+- SEED-001 (Tacit-to-Explicit Elicitation Engine) — dormant. Trigger: onboarding/discovery becomes a milestone theme.
+- SEED-002 (Harness Memory Export) — dormant. claude.yaml shipped in v1.4; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses.
 
 ## Requirements
 
@@ -98,9 +88,16 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - ✓ Two-stage structurally-enforced conversational chat — `chat(query, session_id)` Stage 1 tool-call only / Stage 2 compose-from-results with `{node_id, label, source_file}` citations, recursion guard, `/graphify-ask` command — CHAT-01..09
 - ✓ Focus-aware graph context — `get_focus_context(focus_hint)` BFS ego-graph + community summary, pull-model, codifies v1.3 CR-01 via `snapshot.py::root` → `project_root` rename — FOCUS-01..09
 
+**v1.5 — Diagram Intelligence & Excalidraw Bridge:** *(Shipped 2026-04-27, phases 19 + 20 + 21 + 22; 34/34 requirements)*
+- ✓ Vault Promotion Script (Layer B) — `graphify vault-promote` CLI writes 7-folder Ideaverse-Pro 2.5 notes (Atlas/Dots/{Things,Statements,People,Quotes,Questions}, Atlas/Maps, Atlas/Sources) with full frontmatter, atomic SHA-256 manifest, append-first import-log, D-13 overwrite-self-skip-foreign policy, and 3-layer taxonomy merge — VAULT-01..07
+- ✓ Diagram Seed Engine — `possible_diagram_seed` auto-tagging (god nodes + cross-community surprises), `detect_user_seeds()` reader for `gen-diagram-seed[/type]` vault tag contract, `graphify/seed.py` 13-step `build_all_seeds` orchestrator with 6-predicate D-05 layout heuristic, >60%-Jaccard single-pass dedup, max-20 cap, deterministic sha256 element IDs, atomic-write + manifest-last lifecycle, `graphify --diagram-seeds` CLI, and MANIFEST-05 atomic MCP pair `list_diagram_seeds` + `get_diagram_seed` (closure-local `_resolve_alias` per D-16, `_SEED_ID_RE` traversal defense) — SEED-01..11
+- ✓ Profile Extension & Template Bootstrap — `profile.yaml` `diagram_types:` schema with 6 built-in defaults (architecture, workflow, repository-components, mind-map, cuadro-sinoptico, glossary-graph), D-06 gating + D-07 tiebreak, `graphify --init-diagram-templates [--force]` writes `.excalidraw.md` stubs with hardcoded `compress: false` (one-way door enforced via lzstring-import denylist), TMPL-06 vault-write denylist test — PROF-01..04, TMPL-01..06
+- ✓ Excalidraw Skill & Vault Bridge — deployable `excalidraw-diagram` skill orchestrates seeds → Excalidraw → vault pipeline with pure-Python `graphify/excalidraw.py` fallback (`write_diagram`, `layout_for`, `SCENE_JSON_SKELETON`), `graphify install excalidraw` unified dispatcher, `_PLATFORM_CONFIG` 12-key entry — SKILL-01..06
+- ✓ End-to-end flow verified: `vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → skill invocation. All 7 cross-phase wires confirmed by `gsd-integration-checker`. Nyquist compliance: all 4 phases formally signed off.
+
 ### Active
 
-Milestone **v1.5 Diagram Intelligence & Excalidraw Bridge** opened 2026-04-22; scope confirmed via `/gsd-new-milestone v1.5` on 2026-04-22. Three phases (20–22): Diagram Seed Engine, Profile Extension & Template Bootstrap, Excalidraw Skill & Vault Bridge. Requirements being defined.
+(none — v1.5 shipped 2026-04-27; v1.6 not yet scoped)
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -208,13 +205,20 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Shipped v1.3** (2026-04-17) — Intelligent analysis continuation. 3 phases (9.2, 10, 11), 19 plans, 14/15 requirements satisfied (TOKEN-04 Bloom filter stretch deferred per D-09). Progressive Graph Retrieval (token-aware 3-layer MCP `query_graph` + bidirectional BFS), Cross-File Semantic Extraction with Entity Deduplication (import-cluster batching + fuzzy/embedding entity merge with alias redirect), Narrative Mode as Interactive Slash Commands (7 `.claude/commands/*.md` files + 5 new MCP tools). 2 production-breaking bugs caught by post-execution code review and auto-fixed before shipping. See `.planning/milestones/v1.3-*`.
 
-**Codebase:** Python 3.10/3.12; `graphify/` ~16,481 LOC across modules; `tests/` ~16,529 LOC with 1,234 tests passing (up from 1,023 at v1.2 close). 108 files changed in v1.3, +24,057 / −161 lines.
+**Shipped v1.4** (2026-04-22) — Agent Discoverability & Obsidian Workflows. 7 phases (12–18), 32 plans, 86/86 requirements (72/86 P1+P2; 14 P2 carve-outs deferred). Heterogeneous Extraction Routing, MCP capability manifest + harness memory export, vault-scoped Obsidian commands, async enrichment, SPAR-Kit argumentation, conversational graph chat, focus-aware graph context. See `.planning/milestones/v1.4-*`.
 
-**v1.4 progress:** Phase 12 Heterogeneous Extraction Routing complete (2026-04-17) — `graphify/routing.py`, model-isolated cache keys (`ROUTE-04`), optional `extract(..., router=...)`, `routing.json` audit, P2 cost/canary/vision, `graphify run --router`. Verified: full `pytest` suite green.
+**Shipped v1.5** (2026-04-27) — Diagram Intelligence & Excalidraw Bridge. 4 phases (19–22), 11 plans, 34/34 requirements. Vault-promotion CLI writing 7-folder Ideaverse Pro 2.5 notes; diagram seed engine with auto-tagging + MCP `list_diagram_seeds`/`get_diagram_seed` pair; profile `diagram_types:` schema with 6 built-in defaults + `--init-diagram-templates` Excalidraw stubs (compress=false one-way door); deployable `excalidraw-diagram` skill orchestrating seeds → Excalidraw → vault with pure-Python fallback. End-to-end flow verified across 7 cross-phase wires. Nyquist compliance: all 4 phases signed off. See `.planning/milestones/v1.5-*`.
+
+**Codebase at v1.5 close:** Python 3.10/3.12. v1.5 added +5,977 / −5 LOC across 23 files in `graphify/` + `tests/`. Full test suite green at 1,524+ passing. Timeline: 2026-04-22 → 2026-04-27 (~5 days).
 
 ## Next Milestone Goals
 
-v1.5 milestone opened 2026-04-22; scope confirmed and requirements being defined (see Current Milestone section above). v1.6+ is unscoped — revisit after v1.5 ships. SEED-001 (Tacit Elicitation) remains a candidate for v1.6+ if onboarding/discovery becomes the milestone theme.
+v1.6 unscoped as of 2026-04-27. Carryover into v1.6 backlog:
+- SEED-001 (Tacit-to-Explicit Elicitation Engine) — dormant; trigger is onboarding/discovery becoming the milestone theme
+- SEED-002 (Harness Memory Export) — dormant; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses
+- Deferred template-engine extensions (TMPL-01..03, CFG-02..03) carried since v1.0
+
+Re-scope via `/gsd-new-milestone` when next direction is clear.
 
 ---
-*Last updated: 2026-04-22 — v1.4 complete (7 phases, 32 plans); v1.5 Diagram Intelligence & Excalidraw Bridge opened*
+*Last updated: 2026-04-27 — v1.5 Diagram Intelligence & Excalidraw Bridge complete (4 phases, 11 plans, 34/34 requirements)*

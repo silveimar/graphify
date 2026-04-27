@@ -7,7 +7,7 @@
 - ✅ **v1.2 Intelligent Analysis & Cross-File Extraction** — Phases 9, 9.1 (+ 9.1.1 gap closure) (shipped 2026-04-15)
 - ✅ **v1.3 Intelligent Analysis Continuation** — Phases 9.2, 10, 11 (shipped 2026-04-17)
 - ✅ **v1.4 Agent Discoverability & Obsidian Workflows** — Phases 12–18.2 (shipped 2026-04-22)
-- 🚧 **v1.5 Diagram Intelligence & Excalidraw Bridge** — Phases 19–22 (4 phases; 32 REQ-IDs)
+- ✅ **v1.5 Diagram Intelligence & Excalidraw Bridge** — Phases 19–22 (shipped 2026-04-27)
 
 ## Phases
 
@@ -184,98 +184,26 @@ rank, confidence tags) and enforce naming conventions across all vault output.
 
 ---
 
-### 🚧 v1.5 Diagram Intelligence & Excalidraw Bridge
+<details>
+<summary>✅ v1.5 Diagram Intelligence & Excalidraw Bridge (Phases 19–22) — SHIPPED 2026-04-27</summary>
 
-**Theme:** Turn graphify's knowledge graph into a diagram generation pipeline. Auto-detect and user-tag seed nodes from the analyzed graph, produce structured diagram seeds with layout heuristics, bootstrap vault Excalidraw templates from a new `diagram_types` profile section, and deploy a SKILL.md that orchestrates the full seeds → mcp_excalidraw → vault flow. No new required Python dependencies.
-
-**Origin:** Scope confirmed 2026-04-22 via `/gsd-new-milestone v1.5`. Research completed 2026-04-22 (`.planning/research/SUMMARY.md`). Phase 19 (Vault Promotion Script Layer B, VAULT-01..05) pulled in from v1.4 scope-reconciliation 2026-04-23. 32 atomic REQ-IDs across 4 phases (VAULT-01..05, SEED-01..11, PROF-01..04, TMPL-01..06, SKILL-01..06).
-
-**Milestone-level invariants carried forward from v1.4:**
-- **D-02 MCP envelope** — `list_diagram_seeds` + `get_diagram_seed` emit `text_body + "\n---GRAPHIFY-META---\n" + json(meta)`.
-- **D-16 alias threading** — all new MCP tools thread node IDs through `_resolve_alias`.
-- **D-18 compose don't plumb** — `seed.py` composes `analyze.py` primitives (`god_nodes`, `detect_user_seeds`) only; no new pure plumbing modules.
-- **MANIFEST-05 atomic pair** — `mcp_tool_registry.py` + `serve.py` extensions land in the same plan.
-- **`_VALID_TOP_LEVEL_KEYS` atomicity** — `profile.py` update lands with its first `diagram_types` reader.
-- **`compress: false` one-way door** — all `.excalidraw.md` stubs use `compress: false` frontmatter; LZ-String is forbidden.
-- **Tag write-back trust boundary** — `gen-diagram-seed` tags written via `vault_adapter.py::compute_merge_plan` with `tags: "union"` only; direct frontmatter writes are forbidden.
+Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promotion script writing 7-folder Ideaverse Pro 2.5 notes, diagram seed engine with auto-tagging + MCP `list_diagram_seeds`/`get_diagram_seed` pair, profile `diagram_types:` schema with 6 built-in defaults + `--init-diagram-templates` Excalidraw stubs (compress=false one-way door), and a deployable `excalidraw-diagram` skill with pure-Python fallback.
 
 **Phases:**
 
-- [x] Phase 19: Vault Promotion Script (Layer B) — `graphify/vault_promote.py` reads `graph.json` + `GRAPH_REPORT.md`, classifies/scores nodes, writes promoted Obsidian markdown notes directly to the user's vault at correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy. Scope expanded to VAULT-01..07 (adds VAULT-06 profile write-back + VAULT-07 hybrid 3-layer tag taxonomy). Pulled in from v1.4 scope-reconciliation 2026-04-23. (4 plans) (completed 2026-04-23)
-- [x] Phase 20: Diagram Seed Engine — `analyze.py` auto-tagging + `detect_user_seeds(G)`; new `seed.py` module with `build_seed` / `build_all_seeds` / layout heuristics / >60% overlap dedup / max_seeds=20 cap; `--diagram-seeds` CLI; `list_diagram_seeds` + `get_diagram_seed` MCP tools. (3 plans) (completed 2026-04-23)
-- [x] Phase 21: Profile Extension & Template Bootstrap — `profile.yaml` `diagram_types:` section (ATOMIC with first reader); 6 built-in diagram type defaults; `--init-diagram-templates` CLI command writing real `.excalidraw.md` JSON stubs; `gen-diagram-seed` tag write-back via vault adapter. (2 plans) ✅ 2026-04-23
-- [x] Phase 22: Excalidraw Skill & Vault Bridge — `skill-excalidraw.md` full orchestration (list seeds → get seed → read template → mcp_excalidraw → vault); `graphify install --excalidraw`; pure-Python `.excalidraw.md` fallback path complete before mcp_excalidraw integration. (2 plans) (completed 2026-04-27)
+- [x] Phase 19: Vault Promotion Script (Layer B) — `graphify vault-promote` CLI; 7-folder classifier; SHA-256 manifest; D-13 overwrite-self-skip-foreign; profile write-back; 3-layer taxonomy merge (4/4 plans, completed 2026-04-23)
+- [x] Phase 20: Diagram Seed Engine — `analyze.py` auto-tagging; `seed.py` orchestrator with D-05 layout heuristic + Jaccard dedup + max-20 cap; `--diagram-seeds` CLI; MANIFEST-05 atomic MCP pair (3/3 plans, completed 2026-04-23)
+- [x] Phase 21: Profile Extension & Template Bootstrap — `diagram_types:` schema + 6 built-in defaults; `--init-diagram-templates` writing `compress: false` Excalidraw stubs; lzstring-import denylist (2/2 plans, completed 2026-04-23)
+- [x] Phase 22: Excalidraw Skill & Vault Bridge — `excalidraw-diagram` skill with 7-step pipeline; `graphify install excalidraw`; pure-Python `.excalidraw.md` fallback (2/2 plans, completed 2026-04-27)
 
----
+**Totals:** 4 phases, 11 plans, 34/34 requirements (VAULT-01..07, SEED-01..11, PROF-01..04, TMPL-01..06, SKILL-01..06). All 4 phases Nyquist-compliant. End-to-end flow verified across 7 cross-phase wires.
 
-### Phase 19: Vault Promotion Script (Layer B)
-**Goal**: A Python script (`graphify/vault_promote.py`) that reads `graphify-out/graph.json` and `GRAPH_REPORT.md`, classifies and scores nodes, then writes promoted Obsidian markdown notes directly into the user's vault at the correct Ideaverse Pro 2.5 destination folders with full frontmatter, wikilinks, and tag taxonomy.
-**Depends on**: Phase 12 (graph.json schema stable), Phase 18 (graph.json read patterns established). No `serve.py` changes — pure file I/O.
-**Requirements**: VAULT-01, VAULT-02, VAULT-03, VAULT-04, VAULT-05, VAULT-06, VAULT-07 — 7 REQ-IDs (VAULT-06 and VAULT-07 added via CONTEXT.md D-01 scope expansion 2026-04-22).
-**Success Criteria** (what must be TRUE):
-  1. Running `graphify vault-promote --vault /path/to/vault --threshold 3` reads `graphify-out/graph.json` and writes notes to correct Ideaverse folders without touching any existing vault file it did not create.
-  2. Every promoted note has valid Ideaverse frontmatter: `up`, `related`, `created`, `collections`, `graphifyProject`, `graphifyRun`, `graphifyScore`, `graphifyThreshold`, and at minimum one tag from each of: `garden/*`, `source/*`, `graph/*`.
-  3. Node type dispatch is correct: a god-node domain concept lands in `Atlas/Dots/Things/`, a knowledge gap lands in `Atlas/Dots/Questions/`, a cluster becomes `Atlas/Maps/<slug>.md` with `stateMaps: 🟥`.
-  4. `related:` links are populated only from EXTRACTED-confidence edges; INFERRED and AMBIGUOUS edges are omitted from wikilinks.
-  5. `graphify-out/import-log.md` is written after each run with vault path, run timestamp, promoted-count by type, threshold, and skipped-count.
-**Plans:** 4/4 plans complete
-Plans:
-- [x] 19-01-PLAN.md — Wave 0 foundations: extract analyze.knowledge_gaps(), add profile.tag_taxonomy + profile_sync keys, ship question.md + quote.md templates, scaffold tests/test_vault_promote.py, register VAULT-06/07 in REQUIREMENTS.md
-- [x] 19-02-PLAN.md — Wave 1: core vault_promote.py (graph loader, 7-folder classifier, render pipeline with EXTRACTED-only related, Layer-3 tech-tag detection)
-- [x] 19-03-PLAN.md — Wave 2: atomic writer + vault-manifest.json decision table + import-log.md journal + profile write-back + CLI subcommand registration
-- [x] 19-04-PLAN.md — Wave 3: integration fixture + end-to-end/heuristic tests + README + skill.md docs + REQUIREMENTS.md traceability closure
+**Archives:**
+- Full phase detail: `.planning/milestones/v1.5-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.5-REQUIREMENTS.md`
+- Audit: `.planning/milestones/v1.5-MILESTONE-AUDIT.md`
 
----
-
-### Phase 20: Diagram Seed Engine
-**Goal**: graphify auto-detects diagram-worthy nodes from the analyzed graph and exposes structured seeds — both via the filesystem and as MCP tools — so agents can select and consume them in the Excalidraw pipeline.
-**Depends on**: Nothing new (extends existing `analyze.py`, `serve.py`, `mcp_tool_registry.py`).
-**Requirements**: SEED-01, SEED-02, SEED-03, SEED-04, SEED-05, SEED-06, SEED-07, SEED-08, SEED-09, SEED-10, SEED-11 — 11 REQ-IDs.
-**Cross-phase rules**: D-18 hard invariant — `seed.py` calls only `god_nodes()` and `detect_user_seeds()` from `analyze.py`; never reimplements detection. MANIFEST-05 — `mcp_tool_registry.py` + `serve.py` extensions land in the same plan (Plan 20-03). D-02 envelope on both MCP tools. D-16 alias threading on both MCP tools.
-**Success Criteria** (what must be TRUE):
-  1. User runs `graphify --diagram-seeds` and `graphify-out/seeds/` is populated with one `{node_id}-seed.json` per auto-detected seed (god nodes + cross-community bridges) plus one per vault-tagged `gen-diagram-seed` node; auto seeds are capped at 20 before any file I/O.
-  2. User inspects a seed JSON and finds: `main_nodes` (ego-graph radius-1), `supporting_nodes` (radius-2 minus radius-1), `relations` (all edges in subgraph), `suggested_layout_type` (selected by NetworkX heuristic or overridden by `gen-diagram-seed/<type>` tag), `suggested_template`, and `trigger` (`"auto"` or `"user"`).
-  3. Two seeds with >60% node overlap are merged into a single union seed (single-pass, sorted by degree descending, no recursive re-merge); element IDs are `sha256(node_id)[:16]` — never label-derived.
-  4. Agent calls `list_diagram_seeds` MCP tool and receives a D-02 envelope listing seed summaries (seed_id, main_node_label, suggested_layout_type, trigger, node_count) — alias-resolved via D-16.
-  5. Agent calls `get_diagram_seed(seed_id)` and receives the full SeedDict in a D-02 envelope; a non-existent seed_id returns an error status in the envelope without crashing.
-**Plans**: 3 plans.
-- [x] 20-01-PLAN.md — `analyze.py` extension: `god_nodes()` + `_cross_community_surprises()` emit `possible_diagram_seed: true` node attribute; new `detect_user_seeds(G)` reads `tags` attribute for `gen-diagram-seed` / `gen-diagram-seed/<type>` patterns, returns `auto_seeds` + `user_seeds` lists with extracted type hints. Tag write-back via `graphify.merge.compute_merge_plan` (CONTEXT.md vault_adapter.py reference is stale — confirmed in PATTERNS.md) with `tags: "union"` policy at merge.py:70. (SEED-02, SEED-03)
-- [x] 20-02-PLAN.md — New `graphify/seed.py` module: `build_seed(G, node_id, trigger, layout_hint=None) → SeedDict`; `build_all_seeds(G, analysis, profile)`; layout heuristic (6 NetworkX predicates: `is_tree`, DAG topo-gens, community count, degree distribution, edge directionality, node file_types); >60% overlap dedup (single-pass, degree-sorted, union merge); `max_seeds=20` cap before file I/O; element IDs `sha256(node_id)[:16]`; deterministic `versionNonce`; file output to `graphify-out/seeds/{node_id}-seed.json`; `graphify --diagram-seeds` CLI flag in `__main__.py`. (SEED-01, SEED-04, SEED-05, SEED-06, SEED-07, SEED-08)
-- [x] 20-03-PLAN.md — MCP exposure (ATOMIC PAIR per MANIFEST-05): `list_diagram_seeds` + `get_diagram_seed` tools in `mcp_tool_registry.py` + `serve.py` (`_tool_list_diagram_seeds`, `_tool_get_diagram_seed`, `_run_list_diagram_seeds_core`, `_run_get_diagram_seed_core`); D-02 envelope on both; D-16 `_resolve_alias` threading on both; `tests/test_serve.py` additions (8+ cases). (SEED-09, SEED-10, SEED-11)
-**UI hint**: no
-
-### Phase 21: Profile Extension & Template Bootstrap
-**Goal**: `profile.yaml` gains a `diagram_types` section (with graceful fallback to 6 built-in defaults), and `graphify --init-diagram-templates` writes real `.excalidraw.md` JSON stubs to the vault — locking in `compress: false` as the one-way format decision.
-**Depends on**: Phase 20 (`seed.py` `build_seed` for template recommender call path; `detect_user_seeds` for tag write-back).
-**Requirements**: PROF-01, PROF-02, PROF-03, PROF-04, TMPL-01, TMPL-02, TMPL-03, TMPL-04, TMPL-05, TMPL-06 — 10 REQ-IDs.
-**Cross-phase rules**: PROF-02 atomicity — `_VALID_TOP_LEVEL_KEYS` (profile.py line 67), `_DEFAULT_PROFILE`, `validate_profile()`, and the first code reading `diagram_types` all land in the same plan (Plan 21-01). `compress: false` one-way door — all stubs use frontmatter `compress: false`; LZ-String (`lzstring` package) is never used. Tag write-back test-time grep denylist — `Path.write_text`, `write_note_directly`, `open('w')` on vault notes are forbidden; only `vault_adapter.py::compute_merge_plan` is allowed.
-**Success Criteria** (what must be TRUE):
-  1. User adds a `diagram_types:` section to `.graphify/profile.yaml`; graphify validates it without error and uses the declared template paths, trigger conditions, and naming patterns. When `diagram_types:` is absent, graphify falls back to 6 built-in defaults (architecture, workflow, repository-components, mind-map, cuadro-sinoptico, glossary-graph) without erroring.
-  2. Template recommender in `seed.py` resolves in order: profile `diagram_types` match → layout heuristic default → built-in fallback; never throws on a missing profile section.
-  3. User runs `graphify --init-diagram-templates` and 6 `.excalidraw.md` stubs appear at vault paths from profile (or `Excalidraw/Templates/` by default). Each stub has `excalidraw-plugin: parsed`, `compress: false`, a `## Text Elements` block, and a `## Drawing` block with raw scene JSON (`type: excalidraw, version: 2, source: graphify`). Running the command twice without `--force` produces no changes.
-  4. User runs `graphify --init-diagram-templates --force` and all 6 stubs are overwritten. If `profile.yaml` has a `diagram_types:` section listing only 3 types, only those 3 stubs are written.
-  5. A test-time grep denylist asserts no production code in `seed.py`, `export.py`, or `__main__.py` calls `Path.write_text` / `write_note_directly` / `open('w')` directly on vault note paths — all tag write-backs route through `vault_adapter.py::compute_merge_plan`.
-**Plans**: 2 plans.
-- [ ] 21-01-PLAN.md — ATOMIC profile update: extend `_VALID_TOP_LEVEL_KEYS` + `_DEFAULT_PROFILE` + `validate_profile()` in `profile.py` for `diagram_types:` section (6 built-in defaults: architecture, workflow, repository-components, mind-map, cuadro-sinoptico, glossary-graph; each entry: `name`, `template_path`, `trigger_node_types`, `trigger_tags`, `min_main_nodes`, `naming_pattern`; all fields gracefully default when absent); template recommender in `seed.py` reads `diagram_types` via `load_profile()`; `tests/test_profile.py` additions (PROF-02 atomicity guard, fallback behavior, missing-field defaults). (PROF-01, PROF-02, PROF-03, PROF-04)
-- [ ] 21-02-PLAN.md — `graphify --init-diagram-templates [--force]` CLI command in `__main__.py`: writes 6 `.excalidraw.md` stubs (or only profile-listed types if `diagram_types:` present); frontmatter: `excalidraw-plugin: parsed` + `compress: false`; `## Text Elements` block; `## Drawing` block with raw scene JSON (`{"type":"excalidraw","version":2,"source":"graphify","elements":[...],"appState":{"viewBackgroundColor":"#ffffff","gridSize":null},"files":{}}`); font family 5 (Excalifont); idempotent without `--force`; `gen-diagram-seed` tag write-back for auto-detected nodes via `vault_adapter.py::compute_merge_plan`; grep denylist test. (TMPL-01, TMPL-02, TMPL-03, TMPL-04, TMPL-05, TMPL-06)
-**UI hint**: no
-
-### Phase 22: Excalidraw Skill & Vault Bridge
-**Goal**: A deployable `excalidraw-diagram` skill orchestrates the full seeds → Excalidraw → vault pipeline, with a pure-Python `.excalidraw.md` fallback path that works without mcp_excalidraw.
-**Depends on**: Phase 20 (MCP tools `list_diagram_seeds` + `get_diagram_seed`) + Phase 21 (`.excalidraw.md` stubs + template paths from profile).
-**Requirements**: SKILL-01, SKILL-02, SKILL-03, SKILL-04, SKILL-05, SKILL-06 — 6 REQ-IDs.
-**Cross-phase rules**: Pure-Python output path must be complete and tested before mcp_excalidraw integration (SKILL-06 ordering invariant). mcp_excalidraw is never a required Python import — graphify's Python code never imports it. Skill install/uninstall are idempotent.
-**Success Criteria** (what must be TRUE):
-  1. User runs `graphify install --excalidraw` and `.claude/skills/excalidraw-diagram/SKILL.md` is written (idempotent; running twice is safe). User runs `graphify uninstall --excalidraw` and the file is removed.
-  2. An agent invokes the `excalidraw-diagram` skill and it executes the full 7-step pipeline: (1) `list_diagram_seeds` → show user seeds; (2) user selects; (3) `get_diagram_seed` → SeedDict; (4) read matching template from vault; (5) build diagram via mcp_excalidraw using SeedDict nodes/edges + template style; (6) export scene → write to vault at `Excalidraw/Diagrams/{naming_pattern}.excalidraw.md`; (7) report seed_id, node count, template used, vault path written.
-  3. mcp_excalidraw is unavailable — the skill falls back to the pure-Python `.excalidraw.md` generation path (SeedDict nodes/edges → scene JSON → stub file written directly) and completes without error.
-  4. The skill file includes: a `.mcp.json` snippet for obsidian + excalidraw servers, vault folder layout rules, naming conventions, style-matching rules (Excalifont for node labels, font family 5), and a "do not" guard list (no LZ-String, no label-derived IDs, no direct frontmatter writes).
-  5. `_PLATFORM_CONFIG` in `__main__.py` contains an `excalidraw` entry; `graphify install --excalidraw` and `graphify uninstall --excalidraw` are registered paths (idempotent, no side-effects on other platform entries).
-**Plans**: 2 plans.
-- [x] 22-01-PLAN.md — `graphify/skill-excalidraw.md`: full 7-step orchestration sequence; `.mcp.json` snippet (obsidian + excalidraw servers); vault conventions (folder layout: `Excalidraw/Templates/`, `Excalidraw/Diagrams/`; naming: `{topic}-{layout_type}.excalidraw.md`); style rules (Excalifont font family 5; `strokeColor: "#1e1e2e"`; `backgroundColor: "transparent"`); guard list (`compress: false` assertion, no label-derived IDs, no direct frontmatter writes, no multi-seed in v1.5); pure-Python `.excalidraw.md` fallback path (complete before mcp_excalidraw section); mcp_excalidraw integration section (optional, guarded by availability check). (SKILL-04, SKILL-05, SKILL-06)
-- [x] 22-02-PLAN.md — Install/uninstall wiring in `__main__.py`: new `excalidraw` entry in `_PLATFORM_CONFIG` with `skill_src: "skill-excalidraw.md"`, `skill_dst: ".claude/skills/excalidraw-diagram/SKILL.md"`; `graphify install --excalidraw` handler (idempotent mkdir + copy); `graphify uninstall --excalidraw` handler (idempotent remove); `skill-excalidraw.md` packaged via `MANIFEST.in` + `pyproject.toml` `package_data`; `tests/test_install.py` additions (install/uninstall/idempotency). (SKILL-01, SKILL-02, SKILL-03)
-**UI hint**: no
-
+</details>
 
 ## Progress
 
@@ -304,12 +232,12 @@ Plans:
 | 16. Graph Argumentation Mode | v1.4 | 3/3 | Complete   | 2026-04-23 |
 | 17. Conversational Graph Chat | v1.4 | 3/3 | Complete   | 2026-04-22 |
 | 18. Focus-Aware Graph Context | v1.4 | 4/4 | Complete | 2026-04-20 |
-| 18.1 v1.4 Gap Closure — Phase 13 Verification Artifacts | v1.4 | 0/3 | Not started | — |
-| 18.2 v1.4 Gap Closure — Manifest Metadata + Tech Debt Cleanup | v1.4 | 0/3 | Not started | — |
-| 19. Vault Promotion Script (Layer B) | v1.5 | 4/4 | Complete   | 2026-04-23 |
-| 20. Diagram Seed Engine | v1.5 | 3/3 | Complete   | 2026-04-23 |
-| 21. Profile Extension & Template Bootstrap | v1.5 | 0/2 | Not started | — |
-| 22. Excalidraw Skill & Vault Bridge | v1.5 | 2/2 | Complete   | 2026-04-27 |
+| 18.1 v1.4 Gap Closure — Phase 13 Verification Artifacts | v1.4 | 3/3 | Complete | 2026-04-22 |
+| 18.2 v1.4 Gap Closure — Manifest Metadata + Tech Debt Cleanup | v1.4 | 3/3 | Complete | 2026-04-22 |
+| 19. Vault Promotion Script (Layer B) | v1.5 | 4/4 | Complete | 2026-04-23 |
+| 20. Diagram Seed Engine | v1.5 | 3/3 | Complete | 2026-04-23 |
+| 21. Profile Extension & Template Bootstrap | v1.5 | 2/2 | Complete | 2026-04-23 |
+| 22. Excalidraw Skill & Vault Bridge | v1.5 | 2/2 | Complete | 2026-04-27 |
 
 ---
-*Last updated: 2026-04-23 — Phase 19 (Vault Promotion Script Layer B, VAULT-01..05) moved from v1.4 to v1.5 per scope reconciliation; v1.4 scope corrected to Phases 12–18.2 (86 REQ-IDs); v1.5 now Phases 19–22 (32 REQ-IDs: VAULT-01..05, SEED-01..11, PROF-01..04, TMPL-01..06, SKILL-01..06). v1.5 Diagram Intelligence & Excalidraw Bridge opened 2026-04-22.*
+*Last updated: 2026-04-27 — v1.5 Diagram Intelligence & Excalidraw Bridge SHIPPED (4 phases, 11 plans, 34/34 requirements). v1.6 unscoped — re-open via `/gsd-new-milestone`.*

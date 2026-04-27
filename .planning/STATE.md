@@ -4,7 +4,7 @@ milestone: v1.5
 milestone_name: Diagram Intelligence & Excalidraw Bridge
 status: verifying
 stopped_at: Phase 22 context gathered
-last_updated: "2026-04-27T18:01:13.749Z"
+last_updated: "2026-04-27T18:40:44.040Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 4
@@ -25,16 +25,22 @@ See: .planning/PROJECT.md (updated 2026-04-23 at v1.4 milestone close)
 
 ## Deferred Items
 
-Items acknowledged and deferred at v1.4 milestone close on 2026-04-23:
+Items resolved or carried forward at v1.5 milestone close on 2026-04-27:
 
 | Category | Item | Status |
 |----------|------|--------|
-| verification | 13-VALIDATION.md `nyquist_compliant: false` frontmatter | cosmetic — guard test exists (commit `59298c8`); rerun `/gsd-validate-phase 13` to flip flag |
-| quick_task | 260416-okg-add-graphify-analyze-entries-to-usage-ch | missing |
-| quick_task | 260422-jdj-fix-manifest-json-path-collision-between | missing |
-| todo | create-master-keys-work-vault.md | pending — files exist in vault; move to `completed/` when verified |
-| seed | SEED-001-tacit-knowledge-elicitation-engine | dormant — re-evaluate at v1.6 if onboarding/discovery becomes the theme |
-| seed | SEED-002-harness-memory-export | dormant — claude.yaml shipped in v1.4; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses |
+| seed | SEED-001-tacit-knowledge-elicitation-engine | dormant — carry into v1.6; re-evaluate if onboarding/discovery becomes the theme |
+| seed | SEED-002-harness-memory-export | dormant — carry into v1.6; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses |
+
+Resolved during v1.5 close (removed via `git rm`):
+
+- quick_task `260416-okg-add-graphify-analyze-entries-to-usage-ch` — work shipped, PLAN/SUMMARY removed
+- quick_task `260422-jdj-fix-manifest-json-path-collision-between` — work shipped, PLAN/SUMMARY removed
+- todo `create-master-keys-work-vault.md` — all 4 master key files created 2026-04-22, todo file removed
+
+Prior carryover from v1.4 close (2026-04-23) — now superseded:
+
+- verification: 13-VALIDATION.md `nyquist_compliant` frontmatter (cosmetic; not blocking v1.5)
 
 ## Current Position
 
