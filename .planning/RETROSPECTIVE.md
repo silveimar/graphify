@@ -214,6 +214,52 @@
 
 ---
 
+## Milestone: v1.5 — Diagram Intelligence & Excalidraw Bridge
+
+**Shipped:** 2026-04-27
+**Phases:** 4 (19, 20, 21, 22) | **Plans:** 11
+
+### What Was Built
+
+- **Phase 19 — Vault Promotion (Layer B):** `graphify vault-promote` CLI writes 7-folder Ideaverse Pro 2.5 notes (Atlas/Dots/{Things,Statements,People,Quotes,Questions} + Atlas/Maps + Atlas/Sources). SHA-256 manifest, append-first import-log, D-13 overwrite-self-skip-foreign policy, 3-layer taxonomy merge. 4 plans.
+- **Phase 20 — Diagram Seed Engine:** `analyze.py` auto-tagging (god nodes + cross-community surprises) + `detect_user_seeds()` reader. New `graphify/seed.py` (13-step orchestrator, 6-predicate D-05 layout heuristic, >60%-Jaccard dedup, max-20 cap, sha256 element IDs, atomic-write + manifest-last). MANIFEST-05 atomic MCP pair `list_diagram_seeds` + `get_diagram_seed` (D-02 envelope, D-16 alias resolution, `_SEED_ID_RE` traversal defense). 3 plans.
+- **Phase 21 — Profile Extension & Template Bootstrap:** `profile.yaml` `diagram_types:` schema + 6 built-in defaults. D-06 `min_main_nodes` gating, D-07 highest-min tiebreak. `graphify --init-diagram-templates [--force]` writes `.excalidraw.md` stubs with hardcoded `compress: false`. lzstring-import denylist locks the one-way door. TMPL-06 vault-write denylist test. 2 plans.
+- **Phase 22 — Excalidraw Skill & Vault Bridge:** Deployable `excalidraw-diagram` skill. `graphify install excalidraw` unified dispatcher. Pure-Python `graphify/excalidraw.py` fallback (`write_diagram`, `layout_for`, `SCENE_JSON_SKELETON`). `_PLATFORM_CONFIG` 12-key entry. 2 plans.
+
+### What Worked
+
+- **Goal-backward planning paid off again.** Each phase's CONTEXT.md locked decisions (D-01..D-18) before plans were written. No mid-execution architectural drift.
+- **Atomic D-rules tested at the grep level.** PROF-02 atomicity, TMPL-06 vault-write denylist, SEED-09 alias-threading — all enforced by tests that fail at commit time, not by manual review. Cheap insurance.
+- **Pure-Python fallback shipped first.** Phase 22's pure-Python `.excalidraw.md` writer landed before the mcp_excalidraw integration code path. The skill works regardless of MCP availability — and the audit picked up zero coupling between the two paths.
+- **MANIFEST-05 atomic-pair pattern.** Both new MCP tools (`list_diagram_seeds` + `get_diagram_seed`) landed in a single plan (20-03), keeping registry + handler + tests in lockstep. Prior milestones split MCP rollouts across plans and paid for it in drift.
+
+### What Was Inefficient
+
+- **Validation contracts drifted from execution.** Phases 21 and 22 had VALIDATION.md files in draft state for days after the phase verified PASS (frontmatter `nyquist_compliant: false`). The Nyquist sign-off should be part of execute-phase, not a separate `/gsd-validate-phase` retrofit pass.
+- **SUMMARY.md `requirements-completed` frontmatter coverage is poor.** 9 of 10 plan summaries omitted it. Coverage was fully evidenced via VERIFICATION.md tables, but the milestone audit had to fall back to two-source cross-reference instead of three.
+- **SEED-10 was a 2-line fix that almost shipped broken.** The list/get round-trip used different filename conventions for merged seeds (`{node_id}-seed.json` vs `{seed_id}-seed.json`). Caught only in post-execution forensic audit, not in original Plan 20-02 testing. RED→GREEN regression added in commit `7e9f880`.
+
+### Patterns Established
+
+- **One-way doors enforced by denylist tests.** `compress: false` in Excalidraw stubs + lzstring-import scan across `graphify/`. Future format decisions should follow the same pattern: pick the irreversible direction explicitly, anchor with a denylist test.
+- **Vault writes route through `vault_adapter.py::compute_merge_plan` only.** TMPL-06 grep denylist locks `seed.py`, `export.py`, and `__main__.py` out of direct `Path.write_text` on vault `.md` files. New modules touching vault content inherit the same fence.
+- **`_PLATFORM_CONFIG` entries are structural peers.** Phase 22's `excalidraw` entry replicates the existing antigravity shape exactly (skill_file, skill_dst, claude_md, commands_*). Adding a new platform = pattern-copy + skill file, no logic changes.
+
+### Key Lessons
+
+- **Validation sign-off is part of "done", not a separate ceremony.** Carry the VALIDATION.md frontmatter flip into execute-phase so the milestone audit doesn't have to flag it as tech debt.
+- **Always check for filename-encoding round-trips.** SEED-10 was a string-mismatch bug between writer and reader. Whenever two code paths share a path/key/ID convention, write a test that round-trips through both.
+- **Dormant seeds don't auto-clear.** SEED-001 and SEED-002 will keep flagging `audit-open` at every milestone close until promoted or retired. The acknowledge path (record in STATE.md Deferred Items) is the right resolution for parked-but-not-dead ideas.
+
+### Cost Observations
+
+- **Sessions:** ~6 (Apr 22–27, mostly self-routed via gsd-progress)
+- **Timeline:** 5 days (2026-04-22 → 2026-04-27)
+- **Code delta:** +5,977 / −5 LOC across 23 files in `graphify/` + `tests/`
+- **Notable:** Phase 22 was the smallest by plan count (2 plans) but had the most cross-phase wiring to verify (7/7 wires confirmed by gsd-integration-checker against live source code).
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
