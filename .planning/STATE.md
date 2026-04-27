@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-04-27T19:14:50.519Z"
 last_activity: 2026-04-27
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -43,10 +43,10 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 23 (next) — Dedup `source_file` List-Handling Fix
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-27 — Milestone v1.6 started
+Status: Roadmap drafted (4 phases, 15 REQ-IDs mapped); ready for /gsd-plan-phase 23
+Last activity: 2026-04-27 — v1.6 ROADMAP.md written: Phases 23–26 across DEDUP, MANIFEST, SKILLMEM, DOCS tracks (all phases independent, no hard dependency chain)
 
 ## Performance Metrics
 

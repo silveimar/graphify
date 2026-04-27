@@ -57,4 +57,18 @@
 
 | REQ-ID | Phase | Plan |
 |--------|-------|------|
-| (filled in by roadmap) | | |
+| DEDUP-01 | Phase 23 | TBD |
+| DEDUP-02 | Phase 23 | TBD |
+| DEDUP-03 | Phase 23 | TBD |
+| MANIFEST-09 | Phase 24 | TBD |
+| MANIFEST-10 | Phase 24 | TBD |
+| MANIFEST-11 | Phase 24 | TBD |
+| MANIFEST-12 | Phase 24 | TBD |
+| SKILLMEM-01 | Phase 25 | TBD |
+| SKILLMEM-02 | Phase 25 | TBD |
+| SKILLMEM-03 | Phase 25 | TBD |
+| SKILLMEM-04 | Phase 25 | TBD |
+| DOCS-01 | Phase 26 | TBD |
+| DOCS-02 | Phase 26 | TBD |
+| DOCS-03 | Phase 26 | TBD |
+| DOCS-04 | Phase 26 | TBD |

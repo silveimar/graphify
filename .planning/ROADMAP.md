@@ -8,6 +8,7 @@
 - ✅ **v1.3 Intelligent Analysis Continuation** — Phases 9.2, 10, 11 (shipped 2026-04-17)
 - ✅ **v1.4 Agent Discoverability & Obsidian Workflows** — Phases 12–18.2 (shipped 2026-04-22)
 - ✅ **v1.5 Diagram Intelligence & Excalidraw Bridge** — Phases 19–22 (shipped 2026-04-27)
+- 🔄 **v1.6 Hardening & Onboarding** — Phases 23–26 (planning 2026-04-27)
 
 ## Phases
 
@@ -205,6 +206,61 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
 
 </details>
 
+
+---
+
+## v1.6 Hardening & Onboarding (Phases 23–26) — IN PLANNING
+
+**Theme:** Close known stability gaps from v1.5 (dedup crash on `list[str]` source_file, manifest writers that overwrite siblings on subpath runs, persistence-block drift across platform skill variants) and produce the first end-to-end onboarding doc that lets a new user run the v1.5 diagram-intelligence pipeline from documentation alone — no source reading required.
+
+**Origin:** Issue #4 surfaced the dedup `TypeError: unhashable type: 'list'` after v1.5 closed; manifest audit thread on 2026-04-27 confirmed multiple writers (`vault-manifest.json`, `seeds-manifest.json`, `routing.json`, MCP `manifest.json`) lack uniform read-merge-write semantics; SKILLMEM gap discovered when persistence contract present in working agent prompt did not survive `graphify install` round-trip.
+
+**Phase independence:** All four phases are independent. No phase blocks another. Order is by risk priority (DEDUP first since it's a live crash) but execution can interleave.
+
+### Phase 23: Dedup `source_file` List-Handling Fix
+**Goal**: `graphify --dedup --dedup-cross-type` no longer crashes on extractions whose edges already carry `list[str]` `source_file` values; merged shape stays compatible with `export.py` consumers.
+**Depends on**: —
+**Requirements**: DEDUP-01, DEDUP-02, DEDUP-03
+**Success Criteria** (what must be TRUE):
+  1. `graphify --dedup --dedup-cross-type` completes on a fixture extraction whose edges already carry `list[str]` `source_file` values, with no `TypeError: unhashable type: 'list'`
+  2. After dedup, an edge contributed by ≥2 sources has `source_file` equal to the sorted unique union of its inputs; an edge with exactly 1 contributor preserves the scalar shape
+  3. `pytest tests/test_dedup.py -q` includes a regression case exercising the cross-type path on the list-shaped fixture and is green
+  4. `export.py` consumers (HTML, JSON, GraphML, Obsidian) handle the merged `source_file` shape without raising
+**Plans**: TBD
+
+### Phase 24: Manifest Writer Audit + Atomic Read-Merge-Write Hardening
+**Goal**: All on-disk manifest writers in graphify use uniform read-merge-write semantics scoped by row identity, so subpath runs on a shared vault never erase sibling-subpath rows.
+**Depends on**: —
+**Requirements**: MANIFEST-09, MANIFEST-10, MANIFEST-11, MANIFEST-12
+**Success Criteria** (what must be TRUE):
+  1. Phase 24 ships an `AUDIT.md` (under `.planning/phases/24-*/`) enumerating every manifest writer in the codebase, its pre-v1.6 merge policy, and its post-fix policy
+  2. `vault-manifest.json`, `seeds-manifest.json`, `routing.json`, and the MCP `manifest.json` all commit via `.tmp` + `os.replace` after read-merge-write keyed by row identity (path/id), not by run
+  3. Two sequential runs against `vault/sub_a/` then `vault/sub_b/` produce a single manifest containing rows from both subpaths (regression test asserts both row sets present)
+  4. `pytest tests/ -q` is green; subpath isolation regression test added under existing test conventions
+**Plans**: TBD
+
+### Phase 25: Mandatory Dual-Artifact Persistence in Skill Files
+**Goal**: Every platform skill file emitted by `graphify install` carries the "Mandatory response persistence" contract verbatim (or platform-correct paraphrase), so interactive `query` / `path` / `explain` / `analyze` responses always write `graphify-out/memory/CMD_<TS>_<SLUG>.{graph,human}.md` regardless of which AI harness invokes the skill.
+**Depends on**: —
+**Requirements**: SKILLMEM-01, SKILLMEM-02, SKILLMEM-03, SKILLMEM-04
+**Success Criteria** (what must be TRUE):
+  1. Source `graphify/skill.md` contains a "Mandatory response persistence" section requiring dual-artifact writes for every interactive `query`/`path`/`explain`/`analyze` response
+  2. All platform variants in `_PLATFORM_CONFIG` (claude, codex, opencode, openclaw, droid, trae, trae-cn, plus copilot/antigravity derivations — 8 entries total) carry the persistence contract verbatim or as a platform-correct paraphrase
+  3. `graphify install <platform>` on a fresh install for each `_PLATFORM_CONFIG` entry emits a skill file containing the persistence canary string at its `skill_dst`
+  4. A regression test in `tests/` grep-asserts the persistence canary in every emitted skill file across all `_PLATFORM_CONFIG[*].skill_dst` paths
+**Plans**: TBD
+
+### Phase 26: v1.5 Configuration Guide & Walkthrough Docs
+**Goal**: A new user can configure and run the v1.5 pipeline (`vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → invoke skill) end-to-end on a sample vault using docs alone, including MCP tool integration.
+**Depends on**: —
+**Requirements**: DOCS-01, DOCS-02, DOCS-03, DOCS-04
+**Success Criteria** (what must be TRUE):
+  1. A guide file exists at `CONFIGURING_V1_5.md` (or `docs/v1.5-configuration.md`) walking the full pipeline end-to-end on a sample vault: `vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → skill invocation
+  2. The guide ships a complete example `.graphify/profile.yaml` with `diagram_types:` showing at least one custom type beyond the 6 built-ins, plus annotated frontmatter explaining D-06 gating and D-07 tiebreak
+  3. The guide documents `list_diagram_seeds` and `get_diagram_seed` MCP tools — invocation shape, return schema, and `_resolve_alias` traversal-defense behavior — sufficient for an agent author to integrate without reading source
+  4. `README.md` links to the guide via a "v1.5 Configuration" entry in the docs/getting-started area
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -239,5 +295,10 @@ Turn graphify's knowledge graph into a diagram generation pipeline. Vault-promot
 | 21. Profile Extension & Template Bootstrap | v1.5 | 2/2 | Complete | 2026-04-23 |
 | 22. Excalidraw Skill & Vault Bridge | v1.5 | 2/2 | Complete | 2026-04-27 |
 
+| 23. Dedup `source_file` List-Handling Fix | v1.6 | 0/0 | Not started | — |
+| 24. Manifest Writer Audit + Atomic Read-Merge-Write | v1.6 | 0/0 | Not started | — |
+| 25. Mandatory Dual-Artifact Persistence in Skill Files | v1.6 | 0/0 | Not started | — |
+| 26. v1.5 Configuration Guide & Walkthrough Docs | v1.6 | 0/0 | Not started | — |
+
 ---
-*Last updated: 2026-04-27 — v1.5 Diagram Intelligence & Excalidraw Bridge SHIPPED (4 phases, 11 plans, 34/34 requirements). v1.6 unscoped — re-open via `/gsd-new-milestone`.*
+*Last updated: 2026-04-27 — v1.6 Hardening & Onboarding scoped: 4 phases (23–26), 14 REQ-IDs across DEDUP/MANIFEST/SKILLMEM/DOCS, 14/14 mapped, all phases independent.*
