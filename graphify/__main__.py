@@ -137,6 +137,16 @@ _PLATFORM_CONFIG: dict[str, dict] = {
         "commands_enabled": False,
         "supports": ["code"],
     },
+    # D-04/D-05: excalidraw skill platform — claude_md=False (no CLAUDE.md anchor needed)
+    "excalidraw": {
+        "skill_file": "skill-excalidraw.md",
+        "skill_dst": Path(".claude") / "skills" / "excalidraw-diagram" / "SKILL.md",
+        "claude_md": False,
+        "commands_src_dir": "commands",
+        "commands_dst": None,
+        "commands_enabled": False,
+        "supports": ["obsidian", "code"],
+    },
     "windows": {
         "skill_file": "skill-windows.md",
         "skill_dst": Path(".claude") / "skills" / "graphify" / "SKILL.md",

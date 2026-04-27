@@ -636,7 +636,6 @@ def test_excalidraw_skill_has_guard_list():
 # --- Install/uninstall/idempotency tests (Plan 22-02) ----------------------
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
 def test_install_excalidraw(tmp_path):
     _install(tmp_path, "excalidraw")
     assert (
@@ -644,7 +643,6 @@ def test_install_excalidraw(tmp_path):
     ).exists()
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
 def test_uninstall_excalidraw(tmp_path):
     from graphify.__main__ import install, uninstall
     with patch("graphify.__main__.Path.home", return_value=tmp_path):
@@ -655,7 +653,6 @@ def test_uninstall_excalidraw(tmp_path):
     ).exists()
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
 def test_install_excalidraw_idempotent(tmp_path):
     _install(tmp_path, "excalidraw")
     target = tmp_path / ".claude" / "skills" / "excalidraw-diagram" / "SKILL.md"
@@ -665,7 +662,6 @@ def test_install_excalidraw_idempotent(tmp_path):
     assert first == second
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
 def test_uninstall_excalidraw_idempotent(tmp_path):
     from graphify.__main__ import uninstall
     with patch("graphify.__main__.Path.home", return_value=tmp_path):
@@ -673,7 +669,6 @@ def test_uninstall_excalidraw_idempotent(tmp_path):
         uninstall(platform="excalidraw")  # absent again → still no-op
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
 def test_install_excalidraw_does_not_touch_claude_skill(tmp_path):
     _install(tmp_path, "claude")
     _install(tmp_path, "excalidraw")
@@ -683,7 +678,6 @@ def test_install_excalidraw_does_not_touch_claude_skill(tmp_path):
     ).exists()
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — install wiring in Plan 22-02")
 def test_platform_config_has_excalidraw():
     from graphify.__main__ import _PLATFORM_CONFIG
     assert "excalidraw" in _PLATFORM_CONFIG
