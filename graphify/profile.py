@@ -70,26 +70,34 @@ _DEFAULT_PROFILE: dict = {
         "tech": ["python", "typescript", "javascript", "go", "rust", "java", "sql", "graphql", "docker", "k8s"],
     },
     "profile_sync": {"auto_update": True},
-    # Phase 21 extensions (PROF-01..PROF-04): 6 built-in diagram type defaults
+    # Phase 21 extensions (PROF-01..PROF-04): 6 built-in diagram type defaults.
+    # Phase 22 (D-05): each entry carries layout_type (1:1 with name) and
+    # output_path so the Excalidraw skill / pure-Python fallback can dispatch.
     "diagram_types": [
         {"name": "architecture", "template_path": "Excalidraw/Templates/architecture.excalidraw.md",
          "trigger_node_types": ["module", "service"], "trigger_tags": ["architecture"],
-         "min_main_nodes": 3, "naming_pattern": "{topic}-architecture"},
+         "min_main_nodes": 3, "naming_pattern": "{topic}-architecture",
+         "layout_type": "architecture", "output_path": "Excalidraw/Diagrams/"},
         {"name": "workflow", "template_path": "Excalidraw/Templates/workflow.excalidraw.md",
          "trigger_node_types": ["function", "process"], "trigger_tags": ["workflow", "pipeline"],
-         "min_main_nodes": 3, "naming_pattern": "{topic}-workflow"},
+         "min_main_nodes": 3, "naming_pattern": "{topic}-workflow",
+         "layout_type": "workflow", "output_path": "Excalidraw/Diagrams/"},
         {"name": "repository-components", "template_path": "Excalidraw/Templates/repository-components.excalidraw.md",
          "trigger_node_types": ["module", "file"], "trigger_tags": ["repo", "components"],
-         "min_main_nodes": 3, "naming_pattern": "{topic}-repository-components"},
+         "min_main_nodes": 3, "naming_pattern": "{topic}-repository-components",
+         "layout_type": "repository-components", "output_path": "Excalidraw/Diagrams/"},
         {"name": "mind-map", "template_path": "Excalidraw/Templates/mind-map.excalidraw.md",
          "trigger_node_types": ["concept"], "trigger_tags": ["mind-map", "brainstorm"],
-         "min_main_nodes": 3, "naming_pattern": "{topic}-mind-map"},
+         "min_main_nodes": 3, "naming_pattern": "{topic}-mind-map",
+         "layout_type": "mind-map", "output_path": "Excalidraw/Diagrams/"},
         {"name": "cuadro-sinoptico", "template_path": "Excalidraw/Templates/cuadro-sinoptico.excalidraw.md",
          "trigger_node_types": ["concept", "category"], "trigger_tags": ["synoptic", "cuadro-sinoptico"],
-         "min_main_nodes": 3, "naming_pattern": "{topic}-cuadro-sinoptico"},
+         "min_main_nodes": 3, "naming_pattern": "{topic}-cuadro-sinoptico",
+         "layout_type": "cuadro-sinoptico", "output_path": "Excalidraw/Diagrams/"},
         {"name": "glossary-graph", "template_path": "Excalidraw/Templates/glossary-graph.excalidraw.md",
          "trigger_node_types": ["concept", "term"], "trigger_tags": ["glossary", "definitions"],
-         "min_main_nodes": 3, "naming_pattern": "{topic}-glossary-graph"},
+         "min_main_nodes": 3, "naming_pattern": "{topic}-glossary-graph",
+         "layout_type": "glossary-graph", "output_path": "Excalidraw/Diagrams/"},
     ],
 }
 
@@ -362,8 +370,11 @@ def validate_profile(profile: dict) -> list[str]:
         if not isinstance(diagram_types, list):
             errors.append("diagram_types must be a list")
         else:
+            # Phase 22 (D-05, T-22-V5): added layout_type + output_path
+            # for the Excalidraw skill / pure-Python fallback to dispatch on.
             _VALID_DT_KEYS = {"name", "template_path", "trigger_node_types",
-                              "trigger_tags", "min_main_nodes", "naming_pattern"}
+                              "trigger_tags", "min_main_nodes", "naming_pattern",
+                              "layout_type", "output_path"}
             for i, entry in enumerate(diagram_types):
                 if not isinstance(entry, dict):
                     errors.append(f"diagram_types[{i}] must be a dict")
@@ -383,6 +394,11 @@ def validate_profile(profile: dict) -> list[str]:
                     errors.append(f"diagram_types[{i}].min_main_nodes must be int")
                 if "naming_pattern" in entry and not isinstance(entry["naming_pattern"], str):
                     errors.append(f"diagram_types[{i}].naming_pattern must be str")
+                # Phase 22 (T-22-V5): per-key validators for new fields.
+                if "layout_type" in entry and not isinstance(entry["layout_type"], str):
+                    errors.append(f"diagram_types[{i}].layout_type must be str")
+                if "output_path" in entry and not isinstance(entry["output_path"], str):
+                    errors.append(f"diagram_types[{i}].output_path must be str")
                 for key in entry:
                     if key not in _VALID_DT_KEYS:
                         errors.append(f"diagram_types[{i}] unknown key '{key}'")

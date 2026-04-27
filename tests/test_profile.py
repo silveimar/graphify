@@ -1172,7 +1172,6 @@ def test_profile_diagram_types_unknown_key_rejected():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — schema extension in Task 2")
 def test_diagram_types_layout_type_accepted():
     errors = validate_profile(
         {"diagram_types": [{"name": "mind-map", "layout_type": "mind-map"}]}
@@ -1180,7 +1179,6 @@ def test_diagram_types_layout_type_accepted():
     assert errors == []
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — schema extension in Task 2")
 def test_diagram_types_output_path_accepted():
     errors = validate_profile(
         {"diagram_types": [{"name": "mind-map", "output_path": "Excalidraw/Diagrams/"}]}
@@ -1188,7 +1186,6 @@ def test_diagram_types_output_path_accepted():
     assert errors == []
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — schema extension in Task 2")
 def test_diagram_types_layout_type_must_be_str():
     errors = validate_profile(
         {"diagram_types": [{"name": "x", "layout_type": 123}]}
@@ -1197,7 +1194,6 @@ def test_diagram_types_layout_type_must_be_str():
     assert any("layout_type must be str" in e for e in errors)
 
 
-@pytest.mark.xfail(strict=True, reason="Wave 0 stub — schema extension in Task 2")
 def test_diagram_types_output_path_must_be_str():
     errors = validate_profile(
         {"diagram_types": [{"name": "x", "output_path": ["not", "a", "string"]}]}
