@@ -4,14 +4,14 @@ milestone: v1.6
 milestone_name: Hardening & Onboarding
 status: executing
 stopped_at: Phase 24 context gathered
-last_updated: "2026-04-27T21:29:11.815Z"
-last_activity: 2026-04-27 -- Phase 24 planning complete
+last_updated: "2026-04-27T21:36:07.690Z"
+last_activity: 2026-04-27
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-27 at v1.5 milestone close)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking-command depth + graph-quality-over-time) and now v1.5 (vault promotion CLI + diagram intelligence: auto-detected diagram seeds, profile-driven Excalidraw template bootstrap, deployable excalidraw-diagram skill).
-**Current focus:** Phase 23 — dedup-source-file-list-handling-fix
+**Current focus:** Phase 24 — Manifest Writer Audit + Atomic Read-Merge-Write Hardening
 
 ## Deferred Items
 
@@ -44,10 +44,10 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: 23 (dedup-source-file-list-handling-fix) — EXECUTING
-Plan: 1 of 1
+Phase: 24 (Manifest Writer Audit + Atomic Read-Merge-Write Hardening) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-04-27 -- Phase 24 planning complete
+Last activity: 2026-04-27
 
 ## Performance Metrics
 
@@ -175,6 +175,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-27T21:06:22.401Z
+Last session: 2026-04-27T21:36:07.687Z
 Stopped at: Phase 24 context gathered
 Next action: /gsd-plan-phase 20 to plan Phase 20 (Diagram Seed Engine).

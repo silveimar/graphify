@@ -16,9 +16,9 @@
 
 ### Manifest Hardening (MANIFEST)
 
-- [ ] **MANIFEST-09**: Running `graphify` on a subpath of a vault/output directory does not erase manifest entries belonging to siblings or previous runs on other subpaths
-- [ ] **MANIFEST-10**: All on-disk manifest writers (`vault-manifest.json`, `seeds-manifest.json`, `routing.json`, MCP `manifest.json`) follow read-merge-write semantics with atomic `.tmp` + `os.replace` commit, scoped by row identity (path/id), not by run
-- [ ] **MANIFEST-11**: Subpath isolation regression test: two sequential runs on `vault/sub_a/` then `vault/sub_b/` yield a single manifest containing rows from both subpaths
+- [x] **MANIFEST-09**: Running `graphify` on a subpath of a vault/output directory does not erase manifest entries belonging to siblings or previous runs on other subpaths
+- [x] **MANIFEST-10**: All on-disk manifest writers (`vault-manifest.json`, `seeds-manifest.json`, `routing.json`, MCP `manifest.json`) follow read-merge-write semantics with atomic `.tmp` + `os.replace` commit, scoped by row identity (path/id), not by run
+- [x] **MANIFEST-11**: Subpath isolation regression test: two sequential runs on `vault/sub_a/` then `vault/sub_b/` yield a single manifest containing rows from both subpaths
 - [ ] **MANIFEST-12**: Audit document (`.planning/phases/24-*/AUDIT.md` or equivalent) enumerates every manifest writer in the codebase, its merge policy before v1.6, and its merge policy after the fix — anchors future manifest additions
 
 ### Skill Memory Persistence (SKILLMEM)
