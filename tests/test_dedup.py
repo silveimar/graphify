@@ -406,3 +406,68 @@ def test_corpus_hash_changes_on_added_file(tmp_path):
     f2 = tmp_path / "b.py"; f2.write_text("b")
     h2 = corpus_hash([str(f1), str(f2)])
     assert h1 != h2
+
+
+def test_cross_type_merges_list_shaped_source_file():
+    """DEDUP-01 / DEDUP-03: cross-type dedup must accept edges whose source_file
+    is already list[str] (the natural output of a prior dedup pass / Issue #4
+    reproduction) and produce a sorted unique union without raising TypeError."""
+    extraction = {
+        "nodes": [
+            {"id": "a1", "label": "AuthService", "file_type": "code",     "source_file": "a.py"},
+            {"id": "a2", "label": "auth_service", "file_type": "document", "source_file": "b.md"},
+            {"id": "h",  "label": "handler",     "file_type": "code",     "source_file": "c.py"},
+        ],
+        "edges": [
+            # NOTE: source_file is already list[str] — this is the failure mode from Issue #4
+            {"source": "a1", "target": "h", "relation": "calls",
+             "confidence": "EXTRACTED", "source_file": ["a.py", "x.py"], "weight": 1.0},
+            {"source": "a2", "target": "h", "relation": "calls",
+             "confidence": "EXTRACTED", "source_file": "b.md", "weight": 1.0},
+        ],
+    }
+    # Must not raise TypeError: unhashable type: 'list'
+    result, _ = dedup(extraction, encoder=_forced_merge_encoder,
+                      cross_type=True, embed_threshold=0.85)
+    # After cross-type node-merge collapses a1+a2, the two edges share endpoints
+    # and merge. Their source_files (one list, one scalar) flatten + union + sort.
+    merged = [e for e in result["edges"] if e["target"] == "h"]
+    assert len(merged) == 1, f"expected single merged edge, got {len(merged)}: {merged}"
+    assert merged[0]["source_file"] == ["a.py", "b.md", "x.py"], (
+        f"expected sorted unique union ['a.py','b.md','x.py'], got {merged[0]['source_file']!r}"
+    )
+
+
+def test_dedup_is_idempotent_on_source_file_shape():
+    """DEDUP-01 (idempotency facet): running dedup() twice must not raise on the
+    second pass and must preserve the source_file shape contract (scalar-when-1,
+    sorted-unique-list-when->=2). Dedup output is valid dedup input."""
+    extraction = {
+        "nodes": [
+            {"id": "a1", "label": "AuthService", "file_type": "code", "source_file": "a.py"},
+            {"id": "a2", "label": "auth_service", "file_type": "code", "source_file": "b.py"},
+            {"id": "h",  "label": "handler",     "file_type": "code", "source_file": "c.py"},
+        ],
+        "edges": [
+            {"source": "a1", "target": "h", "relation": "calls",
+             "confidence": "EXTRACTED", "source_file": "a.py", "weight": 1.0},
+            {"source": "a2", "target": "h", "relation": "calls",
+             "confidence": "EXTRACTED", "source_file": "b.py", "weight": 1.0},
+        ],
+    }
+    pass1, _ = dedup(extraction, encoder=_forced_merge_encoder,
+                     cross_type=True, embed_threshold=0.85)
+    # pass1 now carries at least one edge whose source_file is list[str]
+    # (the merged a1/a2 -> h edge). Re-dedup'ing must not crash.
+    pass2, _ = dedup(pass1, encoder=_forced_merge_encoder,
+                     cross_type=True, embed_threshold=0.85)
+    # Shape contract holds for every edge after the second pass
+    for e in pass2["edges"]:
+        sf = e.get("source_file", "")
+        assert isinstance(sf, (str, list)), (
+            f"source_file must be str or list, got {type(sf).__name__}: {sf!r}"
+        )
+        if isinstance(sf, list):
+            assert sf == sorted(sf), f"list source_file must be sorted, got {sf!r}"
+            assert len(sf) == len(set(sf)), f"list source_file must be unique, got {sf!r}"
+            assert len(sf) >= 2, f"list source_file must only be used for >=2 contributors, got {sf!r}"
