@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Diagram Intelligence & Excalidraw Bridge
-status: executing
-stopped_at: Phase 21 verified PASS
-last_updated: "2026-04-23T16:10:00.000Z"
-last_activity: 2026-04-23 -- Phase 21 executed + verified (profile extension + template bootstrap)
+status: Phase 21 shipped (PROF-01..04 + TMPL-01..06, 1554 tests green)
+stopped_at: Phase 22 context gathered
+last_updated: "2026-04-27T17:11:01.215Z"
+last_activity: 2026-04-23 -- Phase 21 executed + verified PASS
 progress:
   total_phases: 4
   completed_phases: 3
@@ -190,6 +190,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-23T15:08:22.381Z
-Stopped at: Phase 21 context gathered
+Last session: 2026-04-27T17:11:01.205Z
+Stopped at: Phase 22 context gathered
 Next action: /gsd-plan-phase 20 to plan Phase 20 (Diagram Seed Engine).
