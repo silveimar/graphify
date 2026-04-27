@@ -39,6 +39,64 @@ Turn any folder of files into a navigable knowledge graph with community detecti
 /graphify analyze for <lens>                           # single-lens tournament (~6 LLM calls vs ~24 for all 4)
 ```
 
+<!-- graphify:persistence-contract:v1 -->
+
+## Mandatory response persistence
+
+Every interactive `query`, `path`, `explain`, and `analyze` invocation in any
+LLM harness MUST write a paired pair of files under `graphify-out/memory/`
+before responding to the user. This applies to errors and empty results too.
+
+### Filenames
+
+```
+graphify-out/memory/CMD_<TS>_<SLUG>.human.md
+graphify-out/memory/CMD_<TS>_<SLUG>.graph.md
+```
+
+- `<TS>` = UTC compact ISO-8601: `YYYYMMDDTHHMMSSZ` (no colons, lex-sortable)
+- `<SLUG>` = `<command>-<first-6-tokens-of-prompt>`, lowercased, hyphen-joined,
+  non-alphanumerics stripped, total filename ≤ 64 chars
+- `<command>` ∈ {`query`, `path`, `explain`, `analyze`}
+- On collision (sub-second repeat), append `-1`, `-2`, … to `<SLUG>`
+- Both files of a pair share identical `<TS>_<SLUG>`
+
+### `<base>.human.md` — prose response
+
+Plain markdown of the answer shown to the user. No required frontmatter; this
+file is the human-readable transcript and reads naturally on its own.
+
+### `<base>.graph.md` — structured artifact
+
+YAML frontmatter (all keys required) followed by a single fenced ` ```json `
+block containing the sub-extraction the response was built from:
+
+```yaml
+---
+command: query | path | explain | analyze
+prompt: "<verbatim user prompt>"
+timestamp: "2026-04-27T15:42:00Z"
+graph_path: "<relative path to the graph JSON read>"
+status: ok | error | empty
+nodes_touched: ["<node-id>", ...]
+edges_touched: ["<edge-id>", ...]
+communities_touched: [<community-id>, ...]
+---
+```
+
+Body: a single fenced JSON block with `{"nodes": [...], "edges": [...],
+"communities": [...]}`. Empty arrays are permitted on `status: error` or
+`status: empty`; the JSON body must remain well-formed (`{}` is acceptable
+on errors).
+
+### Why
+
+Persisting paired prose + graph artifacts grows the corpus: subsequent
+`graphify run --update` extracts these files back into the graph, closing
+the feedback loop. Always write them — even on failure — so the audit trail
+is complete and reproducible.
+
+
 ## Available slash commands
 
 After `graphify install`, these commands are available in Claude Code:
