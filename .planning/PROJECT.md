@@ -8,7 +8,17 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: (none — v1.5 shipped 2026-04-27, v1.6 unscoped)
+## Current Milestone: v1.6 Hardening & Onboarding
+
+**Goal:** Close known stability gaps and make v1.5's diagram intelligence + Excalidraw pipeline learnable from documentation alone.
+
+**Target features:**
+- **Bugfix — Issue #4 dedup `source_file` list crash** (`graphify/dedup.py:493`): `_sf_flatten` helper + cross-type regression test
+- **Bugfix — Manifest overwrite on subpath runs**: audit every manifest writer (`vault-manifest.json`, `seeds-manifest.json`, `routing.json`, `manifest.json`) for read-merge-write semantics; add subpath isolation tests
+- **Skill feature — Mandatory dual-artifact response persistence**: upstream the local `~/.claude/skills/graphify/SKILL.md:1076` edit into source skill files (`graphify/skill.md` + 7 platform variants); enforce `graphify-out/memory/CMD_<TS>_<SLUG>.{graph,human}.md` after every `query`/`path`/`explain`/`analyze`; regression-grep all `_PLATFORM_CONFIG` outputs
+- **Docs — v1.5 step-by-step configuration guide**: end-to-end walkthrough covering `diagram_types:` profile, `vault-promote`, `--diagram-seeds`, `--init-diagram-templates`, `install excalidraw`, and the MCP `list_diagram_seeds` / `get_diagram_seed` tools
+
+**Key context:** Bugfix #2 starts with an audit (broader blast radius than just vault-manifest); skill change must round-trip cleanly through `graphify install` on all 8 platforms; SEED-001/SEED-002 remain dormant (their triggers aren't met by this theme).
 
 **Prior milestone (v1.5) shipped 2026-04-27:** Phases 19–22 (4 phases, 11 plans). Vault Promotion Script (Layer B), Diagram Seed Engine, Profile Extension & Template Bootstrap, Excalidraw Skill & Vault Bridge. 34/34 requirements. Full detail archived to `.planning/milestones/v1.5-*`.
 
@@ -97,7 +107,11 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 ### Active
 
-(none — v1.5 shipped 2026-04-27; v1.6 not yet scoped)
+**v1.6 — Hardening & Onboarding:** *(in progress, started 2026-04-27)*
+- [ ] Dedup `source_file` list-handling fix + regression test (Issue #4) — DEDUP-01
+- [ ] Manifest writer audit + atomic read-merge-write hardening across vault/seeds/routing/manifest paths — MANIFEST-09..N (count finalized in roadmap)
+- [ ] Mandatory dual-artifact response persistence baked into source skill files; verified via `graphify install` round-trip on all 8 platforms — SKILL-MEM-01..N
+- [ ] v1.5 step-by-step configuration guide + end-to-end walkthrough doc — DOCS-V15-01..N
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -221,4 +235,4 @@ v1.6 unscoped as of 2026-04-27. Carryover into v1.6 backlog:
 Re-scope via `/gsd-new-milestone` when next direction is clear.
 
 ---
-*Last updated: 2026-04-27 — v1.5 Diagram Intelligence & Excalidraw Bridge complete (4 phases, 11 plans, 34/34 requirements)*
+*Last updated: 2026-04-27 — v1.6 Hardening & Onboarding milestone started (planning)*

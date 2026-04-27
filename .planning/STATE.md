@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.5
-milestone_name: Diagram Intelligence & Excalidraw Bridge
-status: verifying
-stopped_at: Phase 22 context gathered
-last_updated: "2026-04-27T18:40:44.040Z"
+milestone: v1.6
+milestone_name: Hardening & Onboarding
+status: planning
+last_updated: "2026-04-27T19:14:50.519Z"
 last_activity: 2026-04-27
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -44,35 +43,10 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: — (no active phase)
+Phase: Not started (defining requirements)
 Plan: —
-Next: Run `/gsd-new-milestone` to scope v1.6
-Milestone: v1.5 Diagram Intelligence & Excalidraw Bridge — ✅ SHIPPED 2026-04-27 (phases 19–22, 11 plans, 34/34 requirements)
-Previous milestone: v1.4 Agent Discoverability & Obsidian Workflows — ✅ SHIPPED 2026-04-22 (phases 12–18, 32 plans, 86/86 requirements)
-Status: Between milestones — v1.6 unscoped
-Last activity: 2026-04-27
-
-Progress: [██████████] 100% (4/4 phases complete)
-
-**Build order (locked in SUMMARY.md):**
-
-1. Phase 12 Routing — HARD gates `cache.py` key format — ✅ COMPLETE
-2. Phase 18 Focus — parallel with 12, no code overlap — ✅ COMPLETE (4/4 plans, verified 2026-04-20)
-3. Phase 13 Wave A — plumbing (manifest generator + CLI + `capability_describe` tool) — ✅ COMPLETE
-4. Phase 15 Enrichment — soft-depends on 12 routing.json — ⏳ next candidate
-5. Phase 17 Chat — soft-depends on 18 + 15
-6. Phase 16 Argumentation — soft-depends on 17 citation format; MUST NOT call 17
-7. Phase 14 Obsidian Commands — HARD-depends on 18 + Plan 00 whitelist refactor
-8. Phase 13 Wave B final regen — manifest final sweep after 14–18 land (no new plan IDs; just a regeneration pass)
-9. SEED-002 hardening — ✅ COMPLETE (shipped with Phase 13 Plan 03 + Plan 04)
-
-**Seeds activated in v1.4:**
-
-- SEED-002 Harness Memory Export — bundled under Phase 13 Wave B (claude.yaml only; export-only)
-
-**Seeds still planted:**
-
-- SEED-001 Tacit Elicitation Engine — re-evaluate at v1.5 if onboarding/discovery becomes the milestone theme
+Status: Defining requirements
+Last activity: 2026-04-27 — Milestone v1.6 started
 
 ## Performance Metrics
 
