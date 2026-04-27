@@ -32,6 +32,7 @@ try:
 except ImportError:
     _HAS_SENTENCE_TRANSFORMERS = False
 
+from graphify.analyze import _iter_sources
 from graphify.security import sanitize_label, sanitize_label_md
 
 # ---------- Constants ----------
@@ -490,11 +491,20 @@ def _merge_extraction(
             group,
             key=lambda e: CONFIDENCE_ORDER.get(e.get("confidence", "AMBIGUOUS"), 0),
         )["confidence"]
-        sf_set = {e["source_file"] for e in group if e.get("source_file")}
+        # DEDUP-01 / Issue #4: edges may carry source_file as str OR list[str]
+        # (the latter is the natural output of a prior dedup pass — see node path
+        # at ~line 459). Flatten through _iter_sources before set-folding so the
+        # set comprehension never sees an unhashable list. Output shape contract
+        # preserved per DEDUP-02: sorted list for >=2, scalar for ==1, "" for 0.
+        sf_set: set[str] = set()
+        for e in group:
+            sf_set.update(_iter_sources(e.get("source_file")))
         if len(sf_set) > 1:
             merged["source_file"] = sorted(sf_set)
         elif sf_set:
             merged["source_file"] = next(iter(sf_set))
+        else:
+            merged["source_file"] = ""
         merged_edges.append(merged)
 
     return {
