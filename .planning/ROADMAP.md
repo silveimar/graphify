@@ -157,7 +157,7 @@ Full details: [.planning/milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md)
 - [x] **Phase 28: Self-Ingestion Hardening** — Profile-aware exclusions, recursive nesting guard, manifest-based ignore for prior runs (completed 2026-04-28)
 - [x] **Phase 29: Doctor Diagnostics & Dry-Run Preview** — `graphify doctor` command + `--dry-run` preview of vault-aware behavior (3/3 plans, completed 2026-04-28)
 - [x] **Phase 30: Profile Composition** — `extends:`/`includes:` mechanism with cycle detection; per-community template overrides (completed 2026-04-28)
-- [ ] **Phase 31: Template Engine Extensions** — Conditional `{{#if_*}}` blocks, `{{#connections}}` loops, per-note-type Dataview query templates
+- [x] **Phase 31: Template Engine Extensions** — Conditional `{{#if_*}}` blocks, `{{#connections}}` loops, per-note-type Dataview query templates
 
 ## Phase Details
 
@@ -276,7 +276,7 @@ Plans:
 | 28. Self-Ingestion Hardening | v1.7 | 3/3 | Complete   | 2026-04-28 |
 | 29. Doctor Diagnostics & Dry-Run Preview | v1.7 | 0/0 | Not started | — |
 | 30. Profile Composition | v1.7 | 3/3 | Complete   | 2026-04-28 |
-| 31. Template Engine Extensions | v1.7 | 0/0 | Not started | — |
+| 31. Template Engine Extensions | v1.7 | 2/2 | Complete   | 2026-04-28 |
 
 ---
 *Last updated: 2026-04-27 — v1.7 Vault Adapter UX & Template Polish roadmap landed: 5 phases (27–31), 13/13 REQ-IDs mapped across VAULT-08..15, TMPL-01..03, CFG-02..03.*
