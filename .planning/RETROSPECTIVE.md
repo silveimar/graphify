@@ -304,6 +304,54 @@
 
 ---
 
+## Milestone: v1.7 — Vault Adapter UX & Template Polish
+
+**Shipped:** 2026-04-28
+**Phases:** 5 (27–31) | **Plans:** 14 | **Tests:** 1801 passing / 1 xfailed | **Commits:** ~173 | **Timeline:** ~2 days
+
+### What Was Built
+
+- **Phase 27 — Vault Detection & Profile-Driven Output Routing:** `is_obsidian_vault()` + `ResolvedOutput` contract; CWD vault auto-adoption (SEED-vault-root-aware-cli Option C); `output:` profile block with sibling/relative/absolute path support and `--output` CLI override.
+- **Phase 28 — Self-Ingestion Hardening:** Profile-aware exclusion globs in `detect.py`; `**/graphify-out/**` nesting guard; atomic `output-manifest.json` with FIFO N=5 + GC + cross-run renamed-output recovery; D-26 stable `artifacts_dir` anchor.
+- **Phase 29 — Doctor Diagnostics & Dry-Run Preview:** New `graphify/doctor.py` pipeline-stage module; `graphify doctor` + `graphify doctor --dry-run` reporting profile resolution, output destination, ignore list, would-self-ingest with actionable fix hints; additive `skipped` return key from `detect.detect()` as single source of truth.
+- **Phase 30 — Profile Composition:** `extends:` / `includes:` resolver with deterministic deep-merge, cycle detection (depth cap), path-confined includes, `_deep_merge_with_provenance` per-key tracking, and full `--validate-profile` provenance dump (merge chain + per-field provenance + resolved community templates).
+- **Phase 31 — Template Engine Extensions:** `_BlockTemplate` subclass with `{{#if_X}}` conditionals (4-member catalog + `if_attr_<name>` escape hatch) and `{{#connections}}` iteration loops (6 fields, dotted + flat forms, deterministic sort); per-note-type `dataview_queries` profile key gated by 6-member `_KNOWN_NOTE_TYPES`; D-16 single-pass FSM block expansion BEFORE substitution as the layered defense for block-syntax injection; `_sanitize_wikilink_alias` applied to loop iteration values; verbatim D-08 nested-blocks rejection message.
+
+### What Worked
+
+- **VALIDATION.md as forward-written contract:** Phase 31's VALIDATION.md was authored *during* discuss-phase before any test code existed. The `/gsd-validate-phase` audit at close time used it as a checklist and surfaced 3 category bullets that the SUMMARY's 56-test count had quietly skipped — exactly the drift the workflow exists to catch.
+- **Per-phase Nyquist gate:** Forcing each phase to ratify VALIDATION.md before milestone close meant the milestone audit found zero functional surprises — only 1 cosmetic frontmatter label and 1 environmental shebang issue.
+- **Decision-locked errors:** Phase 31 asserted the verbatim D-08 nested-blocks rejection message with `==` equality (not `in`) — the locked phrasing cannot drift undetected.
+- **Layered security model:** Phase 31 split block-injection defense between *temporal ordering* (D-16: expand → substitute) and *char-stripping* (`_sanitize_wikilink_alias`). Audit explicitly tested both layers — a regression in either would now fail.
+
+### What Was Inefficient
+
+- **Test fixture proliferation across phases:** Plans 30-01/02/03 each created their own profile fixtures in `tests/fixtures/profiles/` (10+ subdirectories) before settling on the final composition pattern. Some are now redundant.
+- **Acceptance criteria grep brittleness:** Plan 31-02 had two acceptance grep regexes that didn't match the actual call shape (multi-line `_render_moc_like(... note_type=...)` vs single-line grep). Resolved with Rule-3 deviations but indicates the criteria need to anticipate code formatting.
+- **`.planning/` gitignore friction:** Phase 31 plan files repeatedly hit the global `~/.gitignore` `.planning/` rule, forcing `git add -f` on every artifact commit. Worth deciding whether `.planning/` belongs in the global ignore or whether the project should override it.
+- **Stale post-mid-milestone audit memory:** Memory entry "Phase 31 Nyquist Non-Compliant" was written from `nyquist_compliant: false` frontmatter without cross-referencing the SUMMARY's actual fixture inventory — Wave 0 was in fact complete. Memory entries that summarize derivative state can lag actual state.
+
+### Patterns Established
+
+- **`_KNOWN_*` frozensets in profile.py (not templates.py)** — avoids the templates↔profile import cycle and matches the `_REQUIRED_PER_TYPE` precedent (D-12).
+- **Top-level `_VALID_TOP_LEVEL_KEYS` whitelist for new profile keys** — every new top-level key (e.g. `dataview_queries`, `output`, `extends`) must be added explicitly; unknown keys raise at `validate_profile`.
+- **`_DEFAULT_PROFILE` seeded with empty containers** for any key that participates in deep-merge provenance — otherwise per-key provenance entries don't materialize on multi-file extends chains (D-14).
+- **Single-pass FSM block parsers** — no recursion, predictable iteration count = T-31-03 mitigation.
+
+### Key Lessons
+
+- **Forward-written validation contracts catch drift that test-counting cannot.** A SUMMARY can show "56 new tests" while a specific category bullet has zero coverage. Lock categories before counting tests.
+- **Decompose security guarantees by layer and test each layer independently.** Block-syntax injection vs char-injection have different mitigations (ordering vs stripping). One test cannot cover both — and conflating them obscures which guarantee actually held when a regression surfaces.
+- **`gsd-sdk milestone.complete` archives but does not synthesize** — accomplishment one-liners get extracted as the first line of the SUMMARY which is often a "Deviations" header. Manual MILESTONES.md entry rewrite remains required.
+- **Memory entries summarizing frontmatter state can lie.** When a memory says "X is incomplete" based on a flag, verify against the underlying artifact (test files, fixtures) before acting.
+
+### Cost Observations
+
+- Sessions: ~6 across two days
+- Notable: full milestone (5 phases, 14 plans, 13 requirements, audit, validation, close) executed in ~2 wall-clock days — Nyquist + audit + close-out workflow added <1 hour overhead beyond raw execute time.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution

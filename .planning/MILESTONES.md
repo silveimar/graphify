@@ -1,5 +1,25 @@
 # Milestones
 
+## v1.7 Vault Adapter UX & Template Polish (Shipped: 2026-04-28)
+
+**Phases completed:** 5 phases (27–31), 14 plans
+**Requirements:** 13/13 satisfied (VAULT-08..15, TMPL-01..03, CFG-02..03)
+**Audit verdict:** passed (5/5 phases verified, 5/5 Nyquist ratified)
+**Tests:** 1801 passing / 1 xfailed
+**Timeline:** 2026-04-27 → 2026-04-28 (~2 days, 173 commits)
+
+**Key accomplishments:**
+
+- **Phase 27 — Vault Detection & Profile-Driven Output Routing:** Lazy per-mode profile loader, `output.ResolvedOutput` contract consumed across the pipeline, profile-declared destination for `graphify-out/` instead of vault-root dump (VAULT-08/09/10).
+- **Phase 28 — Self-Ingestion Hardening:** Atomic `output-manifest.json` with FIFO N=5 + GC + renamed-notes-dir recovery wired post-export in both CLI branches; D-26 stable `artifacts_dir` anchor across notes_dir rename (VAULT-11/12/13).
+- **Phase 29 — Doctor Diagnostics & Dry-Run Preview:** New `graphify/doctor.py` pipeline-stage module + `graphify doctor --dry-run` reporting profile detection, output destination, ignore-list, would_self_ingest hint; additive `skipped` return from `detect.detect()` as single source of truth (VAULT-14/15).
+- **Phase 30 — Profile Composition:** `extends:` / `includes:` with deterministic deep-merge, cycle detection, path-confined includes, and full `--validate-profile` provenance (CFG-02/03).
+- **Phase 31 — Template Engine Extensions:** `_BlockTemplate` subclass with `{{#if_X}}` conditional sections (TMPL-01), `{{#connections}}` iteration loops (TMPL-02), per-note-type `dataview_queries` profile key with `_KNOWN_NOTE_TYPES` validation + per-key provenance (TMPL-03); D-16 single-pass FSM expansion BEFORE substitution as the layered defense for block-syntax injection.
+
+**Known deferred items at close:** 4 (see STATE.md Deferred Items)
+
+---
+
 ## v1.6 Hardening & Onboarding (Shipped: 2026-04-28)
 
 **Phases completed:** 4 phases, 5 plans, 0 tasks

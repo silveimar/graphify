@@ -8,27 +8,9 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: v1.7 Vault Adapter UX & Template Polish
+## Current Milestone: (between milestones — v1.7 shipped 2026-04-28; v1.8 unscoped)
 
-**Goal:** Make graphify safe and ergonomic to run from inside an Obsidian vault — profile-driven output placement, vault-CWD detection with auto-adopt (SEED-vault-root-aware-cli Option C), hardened self-ingestion defenses, onboarding diagnostics — and close out the long-deferred template/profile composition backlog from v1.0.
-
-**Target features:**
-
-*Vault Adapter UX & Self-Ingestion Hardening:*
-- Vault-CWD detection with profile-driven auto-adopt (SEED-vault-root-aware-cli Option C)
-- Profile-driven output placement (`.graphify/profile.yaml` declares where `graphify-out/` lives)
-- Self-ingestion hardening (defense in depth beyond v1.6's `_SELF_OUTPUT_DIRS`): profile-aware exclusions, recursive nesting guard, manifest-based ignore
-- `graphify doctor` onboarding diagnostics (vault detection, profile validation, output destination, ignore-list)
-- Dry-run preview for vault-root-aware behavior
-
-*Template & Profile Polish (deferred from v1.0):*
-- TMPL-01: conditional template sections
-- TMPL-02: loop blocks for connections
-- TMPL-03: custom Dataview templates per note type
-- CFG-02: profile includes/extends
-- CFG-03: per-community template overrides
-
-**Seeds activated:** SEED-vault-root-aware-cli (planted 2026-04-27)
+**Last shipped (v1.7) — Vault Adapter UX & Template Polish:** Make graphify safe and ergonomic to run from inside an Obsidian vault. Profile-driven output placement, vault-CWD detection with auto-adopt (SEED-vault-root-aware-cli Option C), hardened self-ingestion defenses, `graphify doctor` onboarding + dry-run preview, profile composition (`extends:`/`includes:` with cycle detection + per-key provenance), and the long-deferred template engine extensions (`{{#if_*}}` conditionals, `{{#connections}}` loops, per-note-type Dataview queries). Audit verdict: **passed** (13/13 requirements, 5/5 Nyquist, 1801 tests).
 
 **Deferred to later milestones:**
 - v1.8 candidate: Onboarding & Tacit-to-Explicit Elicitation Engine (SEED-001)
@@ -38,6 +20,8 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 ---
 
 ## Prior Milestones
+
+**Prior milestone (v1.7) shipped 2026-04-28:** Phases 27–31 (5 phases, 14 plans). Vault detection + profile-driven output routing (VAULT-08/09/10), self-ingestion hardening with output-manifest cross-run recovery (VAULT-11/12/13), `graphify doctor` + `--dry-run` (VAULT-14/15), profile composition with `extends:`/`includes:` + cycle detection + per-community templates (CFG-02/03), template engine extensions with `{{#if_*}}`/`{{#connections}}` blocks + per-note-type `dataview_queries` (TMPL-01/02/03). 13/13 requirements, 5/5 Nyquist ratified, 1801 tests passing. Full detail archived to `.planning/milestones/v1.7-*`.
 
 **Prior milestone (v1.6) shipped 2026-04-27:** Phases 23–26 (4 phases, 5 plans). Dedup `source_file` list-crash fix, atomic manifest read-merge-write across 5 writers + AUDIT.md, mandatory dual-artifact persistence baked into all 9 platform skill variants, single-file `CONFIGURING_V1_5.md` walkthrough. 15/15 requirements. Full detail archived to `.planning/milestones/v1.6-*`.
 

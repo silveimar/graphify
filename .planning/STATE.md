@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Vault Adapter UX & Template Polish
-status: executing
-stopped_at: Phase 31 context gathered
-last_updated: "2026-04-28T19:24:19.402Z"
-last_activity: 2026-04-28 -- Phase 31 execution started
+status: shipped
+stopped_at: v1.7 milestone closed 2026-04-28
+last_updated: "2026-04-28T20:55:00.000Z"
+last_activity: 2026-04-28 -- v1.7 milestone shipped, archived, tagged
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 14
-  completed_plans: 12
-  percent: 86
+  completed_plans: 14
+  percent: 100
 ---
 
 # Project State
@@ -20,10 +20,21 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-04-27 at v1.6 milestone close)
 
-**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking-command depth + graph-quality-over-time), v1.5 (vault promotion CLI + diagram intelligence), and now v1.6 (stability hardening: list-form source_file dedup fix, atomic read-merge-write across 5 manifest writers, drift-locked dual-artifact persistence in all 9 platform skill variants, end-to-end v1.5 walkthrough doc).
-**Current focus:** Phase 31 — template-engine-extensions
+**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking depth), v1.5 (vault promotion CLI + diagram intelligence), v1.6 (stability hardening), and now v1.7 (vault-CWD detection + profile-driven output routing, self-ingestion hardening with cross-run manifest recovery, `graphify doctor` onboarding + `--dry-run`, profile composition with `extends:`/`includes:`, and the long-deferred template engine extensions: `{{#if_*}}` conditionals, `{{#connections}}` loops, per-note-type Dataview queries).
+**Current focus:** v1.8 unscoped — run `/gsd-new-milestone` to begin scoping
 
 ## Deferred Items
+
+Items acknowledged and deferred at v1.7 milestone close on 2026-04-28:
+
+| Category | Item | Status |
+|----------|------|--------|
+| seed | SEED-001-tacit-knowledge-elicitation-engine | dormant — v1.8 candidate; trigger: onboarding/discovery becomes the milestone theme |
+| seed | SEED-002-harness-memory-export | dormant — v1.9 candidate; gated on prompt-injection defenses |
+| seed | SEED-vault-root-aware-cli | partially-shipped — Option C (auto-adopt CWD vault) delivered in Phase 27; remaining surface (explicit `--vault` flag, multi-vault selector) deferred |
+| quick_task | 260427-rc7-fix-detect-self-ingestion | superseded — work shipped as Phase 28 (Self-Ingestion Hardening); slug remains as historical artifact |
+| baseline-test | tests/test_detect.py::test_detect_skips_dotfiles | pre-existing failure on base 24810ec — recommend dedicated /gsd-debug session in v1.8 |
+| baseline-test | tests/test_extract.py::test_collect_files_from_dir | pre-existing failure on base 24810ec — recommend dedicated /gsd-debug session in v1.8 |
 
 Items acknowledged and deferred at v1.6 milestone close on 2026-04-27:
 
@@ -56,7 +67,7 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 Phase: 31 (template-engine-extensions) — EXECUTING
 Plan: 1 of 2
 Status: Executing Phase 31
-Last activity: 2026-04-28 -- Phase 31 execution started
+Last activity: 2026-04-28
 
 ## Performance Metrics
 
