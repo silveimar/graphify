@@ -131,10 +131,16 @@ class DoctorReport:
 # ---------------------------------------------------------------------------
 
 def _compute_would_self_ingest(cwd: Path, resolved: Optional[ResolvedOutput]) -> bool:
-    """Return True if the resolved destination falls under the input scan area.
+    """Return True if the resolved destination would be re-ingested by detect().
 
-    D-12 backcompat: returns False when resolved is None or resolved.source == "default"
-    (no vault adoption → byte-identical v1.0 behavior, no self-ingest concern).
+    Triggers only when a destination path contains a literal _SELF_OUTPUT_DIRS
+    component (`graphify-out` / `graphify_out`) AND lives inside the input scan
+    (cwd). Vault-relative destinations like `Atlas/Generated` do NOT trip this —
+    only paths that overlap with graphify's canonical self-output directory
+    names (typical misconfiguration: pointing notes_dir at graphify-out/notes).
+
+    D-12 backcompat: returns False when resolved is None or resolved.source ==
+    "default" (no vault adoption → byte-identical v1.0 behavior, no concern).
     """
     if resolved is None:
         return False
@@ -142,12 +148,10 @@ def _compute_would_self_ingest(cwd: Path, resolved: Optional[ResolvedOutput]) ->
         return False
 
     cwd_resolved = cwd.resolve()
-    # Build the union of basenames the nesting guard checks (D-18)
-    extra_basenames = {resolved.notes_dir.name, resolved.artifacts_dir.name}
-    resolved_basenames = frozenset(_SELF_OUTPUT_DIRS | extra_basenames)
+    # Only the literal self-output dirs — NOT resolved.notes_dir.name itself
+    # (which would be circular: every nested destination would trip).
+    self_dirs = frozenset(_SELF_OUTPUT_DIRS)
 
-    # For each destination, check if any of its path parts (relative to cwd
-    # when nested, or after relative_to attempt) trip the nesting guard.
     for dest in (resolved.notes_dir, resolved.artifacts_dir):
         try:
             dest_resolved = dest.resolve() if dest.is_absolute() else (cwd_resolved / dest).resolve()
@@ -158,9 +162,8 @@ def _compute_would_self_ingest(cwd: Path, resolved: Optional[ResolvedOutput]) ->
         except ValueError:
             # Destination lives outside the input scan — safe.
             continue
-        # Destination is inside cwd; does any part trip the nesting guard?
         for part in rel.parts:
-            if _is_nested_output(part, resolved_basenames):
+            if _is_nested_output(part, self_dirs):
                 return True
     return False
 
