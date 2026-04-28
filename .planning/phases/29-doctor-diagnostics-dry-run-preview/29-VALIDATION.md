@@ -1,9 +1,9 @@
 ---
 phase: 29
 slug: doctor-diagnostics-dry-run-preview
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: ratified
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-28
 ---
 
@@ -85,11 +85,11 @@ created: 2026-04-28
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (3 new test files / additions)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (test creation folded into Plan 29-01/29-02/29-03 Task 1 via TDD)
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-04-28

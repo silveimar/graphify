@@ -624,7 +624,9 @@ def test_run_doctor_dry_run_includes_preview(tmp_path):
 | A4 | The 4-source ignore-list display is a `dict[str, list[str]]` keyed by source label, not a flat `list[str]` | Pattern 1 example, `_build_ignore_list` | Low — D-37 says "grouped by source"; dict-of-lists is the natural shape. Planner may prefer a list of `(source, entry)` tuples for ordered display |
 | A5 | `_load_graphifyignore` walking up to filesystem root requires test fixtures to place a `.git` halt marker | Pitfall 6 | Low — empirically required by reading `detect.py:323` |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> RESOLVED: Each numbered question below carries an inline `RESOLVED:` marker pointing to the CONTEXT.md decision and/or plan must_have where the recommendation was locked.
 
 1. **Should `would_self_ingest` apply when `resolved.source == "default"`?**
    - What we know: D-12 mandates v1.0 backcompat with `notes_dir=graphify-out/obsidian` inside scan_root.

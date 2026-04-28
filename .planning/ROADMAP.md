@@ -200,7 +200,11 @@ Plans:
   2. `graphify doctor` exits non-zero when the profile is invalid, the output destination is unresolvable, or the configuration would cause self-ingestion
   3. `graphify --dry-run` (and/or `graphify doctor --dry-run`) shows which input files would be ingested, which would be skipped, and which output files would be written — all without touching disk
   4. The doctor report ends with concrete, actionable "recommended fixes" lines for each detected misconfiguration
-**Plans:** TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 29-01-PLAN.md — graphify/doctor.py module: DoctorReport, run_doctor (non-dry-run), format_report, _FIX_HINTS + 12 unit tests (VAULT-14)
+- [ ] 29-02-PLAN.md — graphify/detect.py additive skipped[reason] return key + 2 backcompat tests (VAULT-15)
+- [ ] 29-03-PLAN.md — doctor.py dry-run preview branch + __main__.py doctor subcommand wiring + 7 tests (VAULT-14, VAULT-15)
 
 ### Phase 30: Profile Composition
 **Goal:** Users can compose profiles from fragments and override templates per community without duplicating profile content, with deterministic merge order and cycle detection.
