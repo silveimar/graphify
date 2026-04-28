@@ -2458,6 +2458,40 @@ def test_if_attr_falsy_value_omits():
     assert _expand(template, ctx_missing) == "XY"
 
 
+def test_if_attr_disjoint_from_catalog_name():
+    """TMPL-01 disjointness: {{#if_attr_god_node}} reads the raw node attribute
+    'god_node' independently of the catalog's `if_god_node` topology predicate.
+    Catalog name `if_god_node` must NOT short-circuit the `if_attr_*` form, and
+    `{{#if_god_node}}` must always use the catalog evaluator, never an attr lookup.
+    """
+    from graphify.templates import BlockContext
+
+    # Case 1: attr god_node=True, but topology says NOT a god node (degree 0,
+    # no graph['god_nodes']). Catalog → false; attr → true.
+    G1 = nx.Graph()
+    G1.add_node("n", label="N", god_node=True)
+    ctx1 = BlockContext(graph=G1, node_id="n", edges=[], dataview_nonempty=False)
+    out1 = _expand(
+        "{{#if_god_node}}CAT{{/if}}|{{#if_attr_god_node}}ATTR{{/if}}", ctx1
+    )
+    assert out1 == "|ATTR"
+
+    # Case 2: topology god node (via graph['god_nodes']), no god_node attr.
+    # Catalog → true; attr → false.
+    G2 = nx.Graph()
+    G2.add_node("hub", label="Hub")
+    for i in range(3):
+        peer = f"p{i}"
+        G2.add_node(peer, label=f"P{i}")
+        G2.add_edge("hub", peer)
+    G2.graph["god_nodes"] = ["hub"]
+    ctx2 = BlockContext(graph=G2, node_id="hub", edges=[], dataview_nonempty=False)
+    out2 = _expand(
+        "{{#if_god_node}}CAT{{/if}}|{{#if_attr_god_node}}ATTR{{/if}}", ctx2
+    )
+    assert out2 == "CAT|"
+
+
 # --- TMPL-02: connection loops ---
 
 
@@ -2638,6 +2672,24 @@ def test_nested_blocks_rejected_with_specific_error():
     # Verbatim D-08 message — exact equality assertion so the locked phrasing
     # cannot drift undetected (one line for greppability per acceptance criterion).
     assert "validate_template: nested template blocks are not supported (found '{{#if_god_node}}' inside '{{#connections}}'). Flatten the template or pre-compute the predicate." in errs
+
+
+def test_nested_if_in_if_rejected():
+    """TMPL-02: {{#if_X}}…{{#if_Y}}…{{/if}}…{{/if}} (if-in-if) must be rejected
+    at preflight, mirroring the D-08 nested-blocks message style.
+    """
+    from graphify.templates import validate_template
+
+    text = (
+        "${frontmatter}\n# ${label}\n"
+        "{{#if_god_node}}{{#if_isolated}}X{{/if}}{{/if}}"
+    )
+    errs = validate_template(text, {"frontmatter", "label"})
+    assert errs
+    assert any(
+        "nested" in e and "if_isolated" in e and "if_god_node" in e
+        for e in errs
+    )
 
 
 def test_unknown_predicate_rejected():
@@ -2891,6 +2943,67 @@ def test_label_injection_newline():
     assert "evil\nlabel" not in out
     # And exactly one bullet line emitted
     assert out.count("- ") == 1
+
+
+def test_connection_field_sanitization_blocks_label_injection():
+    """Loop iteration values (${conn.label}, ${conn.target}) are passed through
+    `_sanitize_wikilink_alias` inside `_build_edge_records` BEFORE landing in
+    the rendered loop body. Verify the sanitization actually applies to peer
+    labels surfaced via the connection loop — not just to wikilinks emitted
+    elsewhere.
+
+    Note: `_sanitize_wikilink_alias` escapes `]]`, `|`, newlines, and control
+    chars; it does NOT strip `{{` / `${` / `#`. The block-syntax injection
+    case (`{{#`) is locked separately by D-16 single-pass expansion ordering
+    (see test_block_expansion_runs_before_substitution).
+    """
+    from tests.fixtures.template_context import make_block_context
+
+    # Newline in peer label → must be replaced (not preserved as a literal \n
+    # that could break the surrounding callout/list/frontmatter block)
+    G_nl = nx.Graph()
+    G_nl.add_node("center", label="Center")
+    G_nl.add_node("peer", label="evil\nlabel")
+    G_nl.add_edge("center", "peer", relation="r", confidence="EXTRACTED")
+    ctx_nl = make_block_context(G_nl, "center")
+    out_nl = _expand(
+        "{{#connections}}L=${conn.label}|T=${conn.target}{{/connections}}",
+        ctx_nl,
+    )
+    # The literal newline-bearing peer label must NOT survive verbatim
+    assert "evil\nlabel" not in out_nl
+    # And both fields render the sanitized (newline → space) form
+    assert "L=evil label" in out_nl
+    assert "T=evil label" in out_nl
+
+    # Pipe in peer label → must be sanitized (raw `|` would corrupt wikilink alias)
+    G_pipe = nx.Graph()
+    G_pipe.add_node("center", label="Center")
+    G_pipe.add_node("peer", label="evil|label")
+    G_pipe.add_edge("center", "peer", relation="r", confidence="EXTRACTED")
+    ctx_pipe = make_block_context(G_pipe, "center")
+    out_pipe = _expand(
+        "{{#connections}}L=${conn.label};T=${conn.target}{{/connections}}",
+        ctx_pipe,
+    )
+    assert "evil|label" not in out_pipe
+    assert "L=evil-label" in out_pipe
+    assert "T=evil-label" in out_pipe
+
+    # `]]` in peer label → must be escaped (would close a wikilink early
+    # if surfaced inside `[[…]]` from the loop body)
+    G_brk = nx.Graph()
+    G_brk.add_node("center", label="Center")
+    G_brk.add_node("peer", label="evil]]label")
+    G_brk.add_edge("center", "peer", relation="r", confidence="EXTRACTED")
+    ctx_brk = make_block_context(G_brk, "center")
+    out_brk = _expand(
+        "{{#connections}}L=${conn.label};T=${conn.target}{{/connections}}",
+        ctx_brk,
+    )
+    assert "evil]]label" not in out_brk
+    assert "L=evil] ]label" in out_brk
+    assert "T=evil] ]label" in out_brk
 
 
 def test_block_expansion_runs_before_substitution():
