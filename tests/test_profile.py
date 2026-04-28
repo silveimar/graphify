@@ -1217,3 +1217,121 @@ def test_diagram_types_output_path_traversal():
     )
     assert errors
     assert any(".." in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# Phase 27: output: block schema validation (D-01, D-02, D-03, VAULT-10)
+# ---------------------------------------------------------------------------
+
+from graphify.profile import _VALID_OUTPUT_MODES, validate_sibling_path  # noqa: E402
+
+
+def test_validate_profile_output_block_valid_vault_relative():
+    assert validate_profile({"output": {"mode": "vault-relative", "path": "Atlas/Generated"}}) == []
+
+
+def test_validate_profile_output_block_valid_absolute(tmp_path):
+    assert validate_profile({"output": {"mode": "absolute", "path": str(tmp_path)}}) == []
+
+
+def test_validate_profile_output_block_valid_sibling_of_vault():
+    # sibling-of-vault validation deferred to use-time; schema only checks shape
+    assert validate_profile({"output": {"mode": "sibling-of-vault", "path": "graphify-notes"}}) == []
+
+
+def test_validate_profile_output_not_dict():
+    errs = validate_profile({"output": "string"})
+    assert any("must be a mapping" in e for e in errs)
+
+
+def test_validate_profile_output_missing_mode():
+    errs = validate_profile({"output": {"path": "x"}})
+    assert any("requires a 'mode' key" in e for e in errs)
+
+
+def test_validate_profile_output_invalid_mode():
+    errs = validate_profile({"output": {"mode": "bogus", "path": "x"}})
+    assert any("valid modes are" in e for e in errs)
+
+
+def test_validate_profile_output_missing_path():
+    errs = validate_profile({"output": {"mode": "vault-relative"}})
+    assert any("requires a 'path' key" in e for e in errs)
+
+
+def test_validate_profile_output_empty_path():
+    errs = validate_profile({"output": {"mode": "vault-relative", "path": "   "}})
+    assert any("non-empty string" in e for e in errs)
+
+
+def test_validate_profile_output_vault_relative_rejects_absolute():
+    errs = validate_profile({"output": {"mode": "vault-relative", "path": "/abs/path"}})
+    assert any("must be relative" in e for e in errs)
+
+
+def test_validate_profile_output_vault_relative_rejects_home():
+    errs = validate_profile({"output": {"mode": "vault-relative", "path": "~/notes"}})
+    assert any("'~'" in e for e in errs)
+
+
+def test_validate_profile_output_vault_relative_rejects_traversal():
+    errs = validate_profile({"output": {"mode": "vault-relative", "path": "a/../b"}})
+    assert any("'..'" in e for e in errs)
+
+
+def test_validate_profile_output_absolute_requires_absolute_path():
+    errs = validate_profile({"output": {"mode": "absolute", "path": "rel/path"}})
+    assert any("must be absolute" in e for e in errs)
+
+
+def test_default_profile_has_no_output_key():
+    # Pitfall 1 prevention — D-02 / D-05 missing-key refusal depends on this
+    assert _DEFAULT_PROFILE.get("output") is None
+
+
+def test_validate_profile_unknown_key_still_caught_after_output_added():
+    # Regression: ensure unknown-key check works after output added to _VALID_TOP_LEVEL_KEYS
+    errs = validate_profile({"foo": "bar"})
+    assert any("Unknown profile key 'foo'" in e for e in errs)
+
+
+# ---------------------------------------------------------------------------
+# Phase 27: validate_sibling_path() (D-03)
+# ---------------------------------------------------------------------------
+
+def test_validate_sibling_path_rejects_empty(tmp_path):
+    with pytest.raises(ValueError, match="non-empty string"):
+        validate_sibling_path("", tmp_path)
+    with pytest.raises(ValueError, match="non-empty string"):
+        validate_sibling_path("   ", tmp_path)
+
+
+def test_validate_sibling_path_rejects_home_expansion(tmp_path):
+    with pytest.raises(ValueError, match="'~'"):
+        validate_sibling_path("~/notes", tmp_path)
+
+
+def test_validate_sibling_path_rejects_absolute(tmp_path):
+    with pytest.raises(ValueError, match="must be relative"):
+        validate_sibling_path("/etc/notes", tmp_path)
+
+
+def test_validate_sibling_path_rejects_traversal(tmp_path):
+    with pytest.raises(ValueError, match="'\\.\\.'"):
+        validate_sibling_path("../foo", tmp_path)
+    with pytest.raises(ValueError, match="'\\.\\.'"):
+        validate_sibling_path("a/../b", tmp_path)
+
+
+def test_validate_sibling_path_rejects_filesystem_root_parent(tmp_path):
+    # On POSIX, Path("/").resolve().parent == Path("/").resolve()
+    if Path("/").resolve().parent == Path("/").resolve():
+        with pytest.raises(ValueError, match="no parent directory"):
+            validate_sibling_path("notes", "/")
+
+
+def test_validate_sibling_path_happy_path(tmp_path):
+    vault = tmp_path / "my-vault"
+    vault.mkdir()
+    result = validate_sibling_path("graphify-notes", vault)
+    assert result == (tmp_path / "graphify-notes").resolve()

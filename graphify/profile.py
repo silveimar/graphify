@@ -474,6 +474,47 @@ def validate_vault_path(candidate: str | Path, vault_dir: str | Path) -> Path:
     return resolved
 
 
+def validate_sibling_path(candidate: str, vault_dir: str | Path) -> Path:
+    """Resolve <vault>/../<candidate> with sane bounds (Phase 27, D-03).
+
+    Authorizes the deliberate one-parent escape for output mode=sibling-of-vault
+    while rejecting:
+      - empty / whitespace-only candidate
+      - candidate starting with '~' (home expansion)
+      - candidate that is absolute
+      - candidate containing '..' segments
+      - resolved path that escapes vault parent (defense-in-depth)
+      - filesystem-root corner case (vault_base.parent == vault_base)
+    """
+    if not isinstance(candidate, str) or not candidate.strip():
+        raise ValueError("output.path must be a non-empty string for mode=sibling-of-vault")
+    if candidate.startswith("~"):
+        raise ValueError("output.path must not start with '~' (home expansion blocked)")
+    if Path(candidate).is_absolute():
+        raise ValueError(
+            "output.path must be relative for mode=sibling-of-vault "
+            "(use mode=absolute for absolute paths)"
+        )
+    if ".." in Path(candidate).parts:
+        raise ValueError("output.path must not contain '..' segments for mode=sibling-of-vault")
+
+    vault_base = Path(vault_dir).resolve()
+    parent = vault_base.parent
+    if parent == vault_base:
+        raise ValueError(
+            f"vault {vault_base} has no parent directory — "
+            "mode=sibling-of-vault is not usable here; switch to mode=absolute"
+        )
+    resolved = (parent / candidate).resolve()
+    try:
+        resolved.relative_to(parent)
+    except ValueError:
+        raise ValueError(
+            f"output.path {candidate!r} escapes vault parent {parent}"
+        )
+    return resolved
+
+
 # ---------------------------------------------------------------------------
 # Safety helpers
 # ---------------------------------------------------------------------------
