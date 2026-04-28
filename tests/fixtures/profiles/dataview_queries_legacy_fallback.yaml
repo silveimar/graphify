@@ -1,0 +1,10 @@
+# Phase 31 (TMPL-03) — backward-compat: no `dataview_queries`, custom legacy
+# `obsidian.dataview.moc_query`. Renderer must use the legacy value.
+folder_mapping:
+  moc: Atlas/Maps/
+naming:
+  convention: title_case
+obsidian:
+  atlas_root: Atlas
+  dataview:
+    moc_query: "TABLE legacy_query FROM #community/${community_tag}"

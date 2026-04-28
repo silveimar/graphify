@@ -85,6 +85,12 @@ _DEFAULT_PROFILE: dict = {
             "moc_query": "TABLE file.folder as Folder, type, source_file\nFROM #community/${community_tag}\nSORT file.name ASC",
         },
     },
+    # Phase 31 (TMPL-03, D-11/D-14): per-note-type Dataview query overrides.
+    # Empty by default so backward-compatible profiles render exactly as today
+    # (legacy `obsidian.dataview.moc_query` fallback remains active inside
+    # `_build_dataview_block`). Present-as-dict so `_deep_merge_with_provenance`
+    # recurses to per-key leaves and records `dataview_queries.<note_type>`.
+    "dataview_queries": {},
     # Phase 3 extensions (D-48, D-52)
     "topology": {"god_node": {"top_n": 10}},
     "mapping": {"moc_threshold": 3},
@@ -132,7 +138,16 @@ _VALID_TOP_LEVEL_KEYS = {
     "topology", "mapping", "tag_taxonomy", "profile_sync", "diagram_types",
     "output",
     "extends", "includes", "community_templates",  # Phase 30 (CFG-02 / CFG-03)
+    "dataview_queries",  # Phase 31 (TMPL-03, D-11)
 }
+
+# Phase 31 (TMPL-03, D-12): per-note-type keys allowed under `dataview_queries:`.
+# Frozen to exactly six members. Defined in profile.py (not templates.py) to
+# avoid the templates.py ↔ profile.py import cycle — same precedent as
+# `_REQUIRED_PER_TYPE` (see validate_profile_preflight Layer 2 below).
+_KNOWN_NOTE_TYPES: frozenset[str] = frozenset(
+    {"moc", "community", "thing", "statement", "person", "source"}
+)
 
 _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
 
@@ -528,6 +543,35 @@ def validate_profile(profile: dict) -> list[str]:
                     errors.append(
                         f"{prefix}: unknown keys {sorted(extra)} — only "
                         f"'match', 'pattern', 'template' are supported"
+                    )
+
+    # Phase 31 (TMPL-03, D-11/D-12): dataview_queries top-level key.
+    # Restricted to per-note-type keys in _KNOWN_NOTE_TYPES; values must be
+    # non-empty strings. The graph-blind preflight rejects unknown keys at
+    # load time so a typo (`mocs:`) cannot silently slip through to render.
+    dvq = profile.get("dataview_queries")
+    if dvq is not None:
+        if not isinstance(dvq, dict):
+            errors.append(
+                f"dataview_queries must be a dict, got {type(dvq).__name__}"
+            )
+        else:
+            for key, value in dvq.items():
+                if not isinstance(key, str):
+                    errors.append(
+                        f"dataview_queries: key {key!r} must be a string "
+                        f"(got {type(key).__name__})"
+                    )
+                    continue
+                if key not in _KNOWN_NOTE_TYPES:
+                    errors.append(
+                        f"dataview_queries: unknown note_type {key!r} — "
+                        f"valid types are: {sorted(_KNOWN_NOTE_TYPES)}"
+                    )
+                    continue
+                if not isinstance(value, str) or not value.strip():
+                    errors.append(
+                        f"dataview_queries.{key}: query must be a non-empty string"
                     )
 
     # naming section

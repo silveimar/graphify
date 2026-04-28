@@ -1,0 +1,7 @@
+# Phase 31 (TMPL-03) — invalid profile: typo `mocs:` rejected at preflight.
+folder_mapping:
+  moc: Atlas/Maps/
+naming:
+  convention: title_case
+dataview_queries:
+  mocs: "TABLE typo FROM #community/${community_tag}"

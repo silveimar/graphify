@@ -1393,3 +1393,156 @@ def test_validate_profile_output_exclude_traversal_rejected():
         "exclude": ["../../etc/*"],
     }})
     assert any("'..' (path traversal)" in e for e in errs)
+
+
+# ---------------------------------------------------------------------------
+# TMPL-03: dataview_queries top-level key (Phase 31, Plan 02)
+# ---------------------------------------------------------------------------
+
+import shutil
+import subprocess
+
+
+_DVQ_FIXTURES = Path(__file__).parent / "fixtures" / "profiles"
+
+
+def _run_validate_profile(vault_path: Path) -> subprocess.CompletedProcess:
+    """Invoke `python -m graphify --validate-profile <vault_path>` as subprocess."""
+    return subprocess.run(
+        [sys.executable, "-m", "graphify", "--validate-profile", str(vault_path)],
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_dataview_queries_top_level_key_accepted():
+    """Valid dataview_queries dict produces no validation errors."""
+    profile = {
+        "dataview_queries": {
+            "moc": "TABLE x FROM y",
+            "community": "TABLE z FROM w",
+        }
+    }
+    assert validate_profile(profile) == []
+
+
+def test_dataview_queries_validates_against_known_types():
+    """Every member of _KNOWN_NOTE_TYPES is accepted as a key."""
+    from graphify.profile import _KNOWN_NOTE_TYPES
+    assert _KNOWN_NOTE_TYPES == frozenset(
+        {"moc", "community", "thing", "statement", "person", "source"}
+    )
+    profile = {
+        "dataview_queries": {
+            note_type: f"TABLE q FROM #t/{note_type}"
+            for note_type in _KNOWN_NOTE_TYPES
+        }
+    }
+    assert validate_profile(profile) == []
+
+
+def test_dataview_queries_unknown_key_rejected():
+    """Typo `mocs:` produces a validate_profile error citing the typo."""
+    profile = {"dataview_queries": {"mocs": "TABLE x"}}
+    errors = validate_profile(profile)
+    assert any("unknown note_type 'mocs'" in e for e in errors), errors
+
+
+def test_dataview_queries_non_dict_rejected():
+    """Scalar `dataview_queries: "not a dict"` is rejected as not-a-dict."""
+    profile = {"dataview_queries": "not a dict"}
+    errors = validate_profile(profile)
+    assert any("must be a dict" in e for e in errors), errors
+
+
+def test_dataview_queries_empty_string_rejected():
+    """`dataview_queries: {moc: ""}` produces a non-empty-string error."""
+    profile = {"dataview_queries": {"moc": ""}}
+    errors = validate_profile(profile)
+    assert any("non-empty string" in e for e in errors), errors
+
+
+def test_dataview_queries_non_string_value_rejected():
+    """`dataview_queries: {moc: 123}` produces a non-empty-string error."""
+    profile = {"dataview_queries": {"moc": 123}}
+    errors = validate_profile(profile)
+    assert any("non-empty string" in e for e in errors), errors
+
+
+def test_dataview_queries_deep_merge_per_key_precedence():
+    """_deep_merge composes `dataview_queries` per-key; child override wins for
+    overridden keys, base preserved for non-overridden keys (D-14)."""
+    base = {
+        "dataview_queries": {
+            "moc": "BASE moc query",
+            "community": "BASE community query",
+        }
+    }
+    override = {
+        "dataview_queries": {
+            "moc": "OVERRIDE moc query",
+        }
+    }
+    merged = _deep_merge(base, override)
+    assert merged["dataview_queries"]["moc"] == "OVERRIDE moc query"
+    # Base preserved for community since override didn't touch it.
+    assert merged["dataview_queries"]["community"] == "BASE community query"
+
+
+def test_dataview_queries_provenance_in_validate_profile_output(tmp_path):
+    """`--validate-profile` CLI output shows per-key provenance for each
+    `dataview_queries.<note_type>` entry (D-14).
+
+    Uses a 2-file extends chain so `_deep_merge_with_provenance` recurses
+    into the `dataview_queries` dict (per-leaf provenance is only recorded
+    when both sides of a merge are dicts; with a single file the resolver's
+    initial `composed = {}` records the whole dict as one leaf).
+    """
+    vault = tmp_path / "vault"
+    graphify_dir = vault / ".graphify"
+    bases_dir = graphify_dir / "bases"
+    bases_dir.mkdir(parents=True)
+    (bases_dir / "core.yaml").write_text(
+        "dataview_queries:\n"
+        "  moc: \"BASE moc query\"\n"
+        "  community: \"BASE community query\"\n",
+        encoding="utf-8",
+    )
+    (graphify_dir / "profile.yaml").write_text(
+        "extends: bases/core.yaml\n"
+        "dataview_queries:\n"
+        "  moc: \"OVERRIDE moc query\"\n"
+        "  thing: \"OVERRIDE thing query\"\n",
+        encoding="utf-8",
+    )
+    proc = _run_validate_profile(vault)
+    assert proc.returncode == 0, proc.stderr
+    assert "Field provenance (" in proc.stdout
+    # Per-key provenance recorded for keys touched by an override merge: when
+    # both sides of `dataview_queries` are dicts, `_deep_merge_with_provenance`
+    # recurses and records each touched key separately. moc + thing are
+    # written by profile.yaml (the override), so they surface as per-key
+    # provenance entries pointing at profile.yaml.
+    assert "dataview_queries.moc" in proc.stdout
+    assert "dataview_queries.thing" in proc.stdout
+    # The provenance line must point at profile.yaml for the override keys.
+    moc_line = next(
+        line for line in proc.stdout.splitlines()
+        if "dataview_queries.moc" in line
+    )
+    assert "profile.yaml" in moc_line
+
+
+def test_dataview_queries_absent_key_is_legacy_compatible(tmp_path):
+    """Profile WITHOUT `dataview_queries` validates clean (backward compat)."""
+    vault = tmp_path / "vault"
+    graphify_dir = vault / ".graphify"
+    graphify_dir.mkdir(parents=True)
+    shutil.copy(
+        _DVQ_FIXTURES / "dataview_queries_legacy_fallback.yaml",
+        graphify_dir / "profile.yaml",
+    )
+    proc = _run_validate_profile(vault)
+    assert proc.returncode == 0, proc.stderr
+    # Legacy moc_query path is reachable; no preflight errors emitted.
+    assert "error:" not in proc.stderr

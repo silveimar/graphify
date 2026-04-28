@@ -1,0 +1,10 @@
+# Phase 31 (TMPL-03) — minimal valid profile exercising dataview_queries.
+folder_mapping:
+  moc: Atlas/Maps/
+  thing: Atlas/Dots/Things/
+naming:
+  convention: title_case
+dataview_queries:
+  moc: "TABLE custom_moc FROM #community/${community_tag}"
+  community: "TABLE custom_community FROM #community/${community_tag}"
+  thing: "TABLE custom_thing FROM #community/${community_tag}"
