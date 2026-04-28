@@ -1234,7 +1234,7 @@ def test_build_dataview_block_substitutes_community_tag():
             }
         }
     }
-    result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/")
+    result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/", "moc")
     assert result.startswith("<!-- graphify:dataview:start -->\n")
     assert result.endswith("\n<!-- graphify:dataview:end -->")
     assert "```dataview\n" in result
@@ -1248,7 +1248,7 @@ def test_build_dataview_block_honors_custom_moc_query():
 
     custom_query = 'TABLE file.name, type\nFROM #community/${community_tag}\nWHERE type = "thing"\nLIMIT 20'
     profile = {"obsidian": {"dataview": {"moc_query": custom_query}}}
-    result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/")
+    result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/", "moc")
     assert "LIMIT 20" in result
     assert '#community/ml-architecture' in result
     assert 'WHERE type = "thing"' in result
@@ -1260,7 +1260,7 @@ def test_build_dataview_block_two_phase_isolation():
 
     # User's moc_query contains a literal ${label} token (made-up variable)
     profile = {"obsidian": {"dataview": {"moc_query": "TABLE ${label} FROM #community/${community_tag}"}}}
-    result = _build_dataview_block(profile, "foo", "Atlas/Maps/")
+    result = _build_dataview_block(profile, "foo", "Atlas/Maps/", "moc")
     # safe_substitute must leave ${label} unchanged (not in {community_tag, folder})
     assert "${label}" in result
     assert "#community/foo" in result
@@ -1272,7 +1272,7 @@ def test_build_dataview_block_missing_moc_query_uses_default():
 
     # profile has obsidian: {} (no dataview key)
     profile = {"obsidian": {}}
-    result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/")
+    result = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/", "moc")
     # Fallback must produce a non-empty dataview block wrapped in sentinels
     assert result.startswith("<!-- graphify:dataview:start -->\n```dataview")
     assert result.endswith("\n<!-- graphify:dataview:end -->")
@@ -1288,7 +1288,7 @@ def test_build_dataview_block_backtick_in_folder_stripped():
     from graphify.templates import _build_dataview_block
 
     profile = {}
-    result = _build_dataview_block(profile, "my-tag", "Atlas/Maps/`evil`/")
+    result = _build_dataview_block(profile, "my-tag", "Atlas/Maps/`evil`/", "moc")
     # Backtick must not appear anywhere in output (would break the fence)
     assert "`" not in result.replace("```dataview", "").replace("\n```", "")
 
@@ -1297,7 +1297,7 @@ def test_build_dataview_block_newline_in_folder_stripped():
     from graphify.templates import _build_dataview_block
 
     profile = {}
-    result = _build_dataview_block(profile, "my-tag", "Atlas/Maps/\nevil/")
+    result = _build_dataview_block(profile, "my-tag", "Atlas/Maps/\nevil/", "moc")
     # The injected newline must be stripped from the folder value
     assert "evil" not in result or "\nevil" not in result
 
@@ -1306,7 +1306,7 @@ def test_build_dataview_block_backtick_in_community_tag_stripped():
     from graphify.templates import _build_dataview_block
 
     profile = {}
-    result = _build_dataview_block(profile, "tag`injection", "Atlas/Maps/")
+    result = _build_dataview_block(profile, "tag`injection", "Atlas/Maps/", "moc")
     # Backtick in community_tag must be stripped
     inner = result.replace("```dataview\n", "").replace("\n```", "")
     assert "`" not in inner
@@ -1323,7 +1323,7 @@ def test_build_dataview_block_fence_not_broken_by_triple_backtick_in_query():
             }
         }
     }
-    result = _build_dataview_block(profile, "my-tag", "Atlas/")
+    result = _build_dataview_block(profile, "my-tag", "Atlas/", "moc")
     # Strip sentinel wrap, then check inner fence lines
     inner = result
     assert inner.startswith("<!-- graphify:dataview:start -->\n")
@@ -3010,3 +3010,209 @@ def test_render_does_not_revalidate_blocks():
     out = _expand_blocks(text, ctx)
     assert "G" in out
     assert "- P" in out
+
+
+# ---------------------------------------------------------------------------
+# TMPL-03: per-note-type Dataview queries (Phase 31, Plan 02)
+# ---------------------------------------------------------------------------
+
+
+def _tmpl03_min_moc_graph():
+    """Tiny graph + community sufficient for render_moc."""
+    import networkx as nx
+    G = nx.Graph()
+    G.add_node(
+        "n_a",
+        label="A",
+        file_type="code",
+        source_file="x.py",
+    )
+    return G, {0: ["n_a"]}
+
+
+def _tmpl03_moc_ctx():
+    return {
+        "note_type": "moc",
+        "folder": "Atlas/Maps/",
+        "community_name": "ML Architecture",
+        "community_tag": "ml-architecture",
+        "members_by_type": {"thing": [], "statement": [], "person": [], "source": []},
+        "sub_communities": [],
+        "sibling_labels": [],
+        "cohesion": 0.5,
+    }
+
+
+def test_dataview_queries_per_note_type_overrides_default():
+    """Profile with `dataview_queries: {moc: ...}` produces a rendered MOC
+    note whose Dataview block contains the custom query string."""
+    from graphify.templates import render_moc
+    profile = {
+        "naming": {"convention": "title_case"},
+        "obsidian": {"atlas_root": "Atlas"},
+        "dataview_queries": {
+            "moc": "TABLE custom FROM #x",
+        },
+    }
+    G, communities = _tmpl03_min_moc_graph()
+    _, text = render_moc(0, G, communities, profile, _tmpl03_moc_ctx())
+    assert "TABLE custom FROM #x" in text
+
+
+def test_dataview_queries_moc_override():
+    """When `dataview_queries.moc` is set, the legacy
+    `obsidian.dataview.moc_query` is NOT used."""
+    from graphify.templates import render_moc
+    profile = {
+        "naming": {"convention": "title_case"},
+        "obsidian": {
+            "atlas_root": "Atlas",
+            "dataview": {"moc_query": "TABLE legacy FROM #legacy"},
+        },
+        "dataview_queries": {"moc": "TABLE override FROM #override"},
+    }
+    G, communities = _tmpl03_min_moc_graph()
+    _, text = render_moc(0, G, communities, profile, _tmpl03_moc_ctx())
+    assert "TABLE override FROM #override" in text
+    assert "TABLE legacy FROM #legacy" not in text
+
+
+def test_dataview_queries_legacy_fallback():
+    """Profile WITHOUT `dataview_queries` falls back to legacy
+    `obsidian.dataview.moc_query` (loads dataview_queries_legacy_fallback.yaml)."""
+    import yaml
+    from pathlib import Path
+    from graphify.templates import render_moc
+    fixture = Path(__file__).parent / "fixtures" / "profiles" / "dataview_queries_legacy_fallback.yaml"
+    profile = yaml.safe_load(fixture.read_text(encoding="utf-8"))
+    # Sanity: fixture indeed lacks dataview_queries.
+    assert "dataview_queries" not in profile
+    G, communities = _tmpl03_min_moc_graph()
+    _, text = render_moc(0, G, communities, profile, _tmpl03_moc_ctx())
+    # community_tag substitution preserved through the legacy moc_query path.
+    assert "TABLE legacy_query FROM #community/ml-architecture" in text
+
+
+def test_dataview_queries_default_fallback():
+    """Neither key set → falls back to _FALLBACK_MOC_QUERY (no override and
+    no legacy moc_query)."""
+    from graphify.templates import render_moc, _FALLBACK_MOC_QUERY
+    profile = {
+        "naming": {"convention": "title_case"},
+        "obsidian": {"atlas_root": "Atlas"},
+        # Note: no `dataview` key at all.
+    }
+    G, communities = _tmpl03_min_moc_graph()
+    _, text = render_moc(0, G, communities, profile, _tmpl03_moc_ctx())
+    # Substitute the fallback's ${community_tag} for verification.
+    expected_substring = _FALLBACK_MOC_QUERY.split("\n")[0]  # first line of fallback query
+    assert expected_substring in text
+
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    "note_type",
+    ["moc", "community", "thing", "statement", "person", "source"],
+)
+def test_dataview_queries_each_note_type_routes_correctly(note_type):
+    """Every member of _KNOWN_NOTE_TYPES routes through `_build_dataview_block`
+    to its own per-note-type query string (D-13)."""
+    from graphify.templates import _build_dataview_block
+    profile = {
+        "dataview_queries": {
+            "moc": "TABLE for_moc",
+            "community": "TABLE for_community",
+            "thing": "TABLE for_thing",
+            "statement": "TABLE for_statement",
+            "person": "TABLE for_person",
+            "source": "TABLE for_source",
+        }
+    }
+    block = _build_dataview_block(profile, "tag", "Atlas/", note_type)
+    assert f"TABLE for_{note_type}" in block
+    # Cross-check: other note_types' strings do NOT appear.
+    for other in ("moc", "community", "thing", "statement", "person", "source"):
+        if other != note_type:
+            assert f"TABLE for_{other}" not in block
+
+
+def test_dataview_queries_two_phase_substitution_preserved():
+    """Custom query interpolates ${community_tag} and ${folder} via two-phase
+    substitution before the outer template's safe_substitute runs."""
+    from graphify.templates import _build_dataview_block
+    profile = {
+        "dataview_queries": {
+            "moc": "FROM #${community_tag} WHERE folder = ${folder}",
+        }
+    }
+    out = _build_dataview_block(profile, "ml-architecture", "Atlas/Maps/", "moc")
+    assert "FROM #ml-architecture WHERE folder = Atlas/Maps/" in out
+
+
+def test_dataview_block_omitted_when_resolved_query_empty():
+    """Post-substitution empty query → empty `_build_dataview_block` output
+    AND no ```dataview fence in the rendered MOC.
+
+    Direct path: pass empty community_tag/folder against a query of just
+    `${community_tag}` — strips to empty, so `_build_dataview_block` returns
+    "". Render path: route through legacy `moc_query: "   \\n   "` which is
+    not gated by validate_profile and exercises the same empty-output branch.
+    """
+    from graphify.templates import _build_dataview_block, render_moc
+    # Direct unit-level assertion: empty input yields empty output.
+    profile_direct = {"dataview_queries": {"moc": "${community_tag}"}}
+    direct = _build_dataview_block(profile_direct, "", "", "moc")
+    assert direct == ""
+
+    # Render-level: legacy whitespace-only moc_query → no ```dataview fence.
+    profile_render = {
+        "naming": {"convention": "title_case"},
+        "obsidian": {
+            "atlas_root": "Atlas",
+            "dataview": {"moc_query": "   \n   "},
+        },
+    }
+    G, communities = _tmpl03_min_moc_graph()
+    _, text = render_moc(0, G, communities, profile_render, _tmpl03_moc_ctx())
+    assert "```dataview" not in text
+
+
+def test_if_has_dataview_false_when_query_empty(tmp_path):
+    """Plan 01 cross-link: when `_build_dataview_block` returns empty (TMPL-03
+    Warning 7), `BlockContext.dataview_nonempty` is False and
+    `{{#if_has_dataview}}…{{/if}}` blocks omit cleanly.
+
+    Triggers the empty-output path via the legacy `obsidian.dataview.moc_query`
+    set to whitespace-only — `validate_profile` does not gate this legacy key,
+    so the empty-after-strip post-substitution branch in `_build_dataview_block`
+    is exercised end-to-end through the MOC render entry point.
+    """
+    from graphify.templates import render_moc
+    # Override moc.md template to include an if_has_dataview block.
+    override_dir = tmp_path / ".graphify" / "templates"
+    override_dir.mkdir(parents=True)
+    (override_dir / "moc.md").write_text(
+        "${frontmatter}\n# ${label}\n${members_section}\n"
+        "${dataview_block}\n"
+        "{{#if_has_dataview}}HAS-DV{{/if}}\n",
+        encoding="utf-8",
+    )
+    profile = {
+        "naming": {"convention": "title_case"},
+        "obsidian": {
+            "atlas_root": "Atlas",
+            # Whitespace-only legacy moc_query: not gated by validate_profile
+            # because the schema validates only `dataview_queries.<note_type>`
+            # entries, not the legacy single-string key.
+            "dataview": {"moc_query": "   \n   "},
+        },
+    }
+    G, communities = _tmpl03_min_moc_graph()
+    ctx = _tmpl03_moc_ctx()
+    _, text = render_moc(0, G, communities, profile, ctx, vault_dir=tmp_path)
+    assert "HAS-DV" not in text
+    assert "{{#" not in text
+    assert "{{/" not in text
+    assert "```dataview" not in text

@@ -887,8 +887,18 @@ _FALLBACK_MOC_QUERY: str = (
 )
 
 
-def _build_dataview_block(profile: dict, community_tag: str, folder: str) -> str:
-    """Render a ```dataview fence using the profile's moc_query template.
+def _build_dataview_block(
+    profile: dict,
+    community_tag: str,
+    folder: str,
+    note_type: str,
+) -> str:
+    """Render a ```dataview fence using the profile's per-note-type query.
+
+    Lookup order (Phase 31, TMPL-03, D-13):
+      1. profile["dataview_queries"][note_type]   — Phase 31 per-note-type override
+      2. profile["obsidian"]["dataview"]["moc_query"]  — legacy single-query
+      3. _FALLBACK_MOC_QUERY                       — built-in default
 
     Uses two-phase `string.Template` substitution (Pattern 5 in 02-RESEARCH.md):
       1. Substitute `${community_tag}` and `${folder}` INTO the user's
@@ -901,14 +911,26 @@ def _build_dataview_block(profile: dict, community_tag: str, folder: str) -> str
     Inputs are sanitized before substitution (WR-05): backticks and newlines
     in `folder` or `community_tag` would break the outer dataview fence.
     Post-substitution the query is also guarded against fence-breaking chars.
+
+    Empty-query empty-output (Phase 31, TMPL-03, Warning 7): when the resolved
+    query string is empty or whitespace-only after two-phase substitution, this
+    function returns the empty string `""` (no fence emitted). The downstream
+    `${dataview_block}` substitution slot is therefore empty, and Plan 01's
+    `BlockContext.dataview_nonempty` evaluates to False — `{{#if_has_dataview}}`
+    blocks omit cleanly.
     """
-    moc_query = (
-        profile.get("obsidian", {})
-        .get("dataview", {})
-        .get("moc_query")
-    )
-    if not moc_query:
-        moc_query = _FALLBACK_MOC_QUERY
+    # Phase 31 (D-13) per-note-type override wins over legacy moc_query.
+    per_type = (profile.get("dataview_queries") or {}).get(note_type)
+    if isinstance(per_type, str) and per_type.strip():
+        moc_query = per_type
+    else:
+        moc_query = (
+            profile.get("obsidian", {})
+            .get("dataview", {})
+            .get("moc_query")
+        )
+        if not moc_query:
+            moc_query = _FALLBACK_MOC_QUERY
 
     # Strip backticks and newlines from substitution values so they cannot
     # break the ``` fence or inject new lines into the query block (WR-05).
@@ -923,6 +945,13 @@ def _build_dataview_block(profile: dict, community_tag: str, folder: str) -> str
     # Guard post-substitution query: ``` anywhere in the query would prematurely
     # close the dataview fence in the rendered markdown.
     query = query.replace("```", "")
+
+    # Phase 31 (TMPL-03 / Warning 7): empty-query empty-output. When the
+    # resolved query strips to empty, emit no fence at all so the outer
+    # template's ${dataview_block} slot stays empty and {{#if_has_dataview}}
+    # blocks omit cleanly via BlockContext.dataview_nonempty=False.
+    if not query.strip():
+        return ""
 
     body = f"```dataview\n{query}\n```"
     return _wrap_sentinel("dataview", body)
@@ -1041,6 +1070,19 @@ def render_note(
         community=community_name,
     )
 
+    # Phase 31 (TMPL-03): consult per-note-type Dataview query for non-MOC
+    # notes. Built-in `thing/statement/person/source.md` templates do not
+    # currently expose a `${dataview_block}` slot, so the resolved value is
+    # only surfaced if a vault override template adds the slot — but the
+    # lookup itself runs unconditionally so all six note types participate
+    # in the dataview_queries.<note_type> resolution chain (D-13).
+    note_dataview_block = _build_dataview_block(
+        profile,
+        community_tag or "",
+        ctx.get("folder", "") if isinstance(ctx, dict) else "",
+        note_type,
+    )
+
     substitution_ctx = {
         "label": label,
         "frontmatter": frontmatter,
@@ -1051,7 +1093,10 @@ def render_note(
         # MOC-only vars provided as empty for safe_substitute idempotence
         "members_section": "",
         "sub_communities_callout": "",
-        "dataview_block": "",
+        # Phase 31 (TMPL-03): per-note-type Dataview block. Empty when the
+        # built-in template lacks `${dataview_block}` (today's thing/statement/
+        # person/source.md), populated when a vault override adds the slot.
+        "dataview_block": note_dataview_block,
     }
 
     if vault_dir is not None:
@@ -1068,7 +1113,10 @@ def render_note(
         graph=G,
         node_id=node_id,
         edges=_build_edge_records(G, node_id),
-        dataview_nonempty=False,  # render_note has no dataview block (D-31)
+        # Phase 31 (TMPL-03): non-empty when the per-note-type query resolves
+        # to a non-empty fence; empty otherwise (D-31 baseline preserved when
+        # no dataview_queries.<note_type> override is configured).
+        dataview_nonempty=bool(note_dataview_block.strip()),
     )
     expanded_source = _expand_blocks(template.template, block_ctx)
     text = _BlockTemplate(expanded_source).safe_substitute(substitution_ctx)
@@ -1178,6 +1226,8 @@ def _render_moc_like(
     template_key: str,  # "moc" or "community"
     vault_dir,
     created: "datetime.date | None" = None,
+    *,
+    note_type: str | None = None,
 ) -> tuple[str, str]:
     """Shared rendering body for MOC and Community Overview notes.
 
@@ -1252,7 +1302,13 @@ def _render_moc_like(
     )
     members_section = _build_members_section(members_by_type, convention)
     sub_communities_callout = _build_sub_communities_callout(sub_communities, convention)
-    dataview_block = _build_dataview_block(profile, community_tag, folder)
+    # Phase 31 (TMPL-03): note_type drives per-note-type Dataview query lookup.
+    # When the caller did not supply note_type, fall back to template_key
+    # (which is already "moc" or "community" — semantically equivalent here).
+    effective_note_type = note_type if note_type is not None else template_key
+    dataview_block = _build_dataview_block(
+        profile, community_tag, folder, effective_note_type,
+    )
     metadata = _build_metadata_callout(
         source_file=None,
         source_location=None,
@@ -1324,6 +1380,7 @@ def render_moc(
     return _render_moc_like(
         community_id, G, communities, profile, classification_context,
         template_key="moc", vault_dir=vault_dir, created=created,
+        note_type="moc",
     )
 
 
@@ -1350,4 +1407,5 @@ def render_community_overview(
     return _render_moc_like(
         community_id, G, communities, profile, classification_context,
         template_key="community", vault_dir=vault_dir, created=created,
+        note_type="community",
     )
