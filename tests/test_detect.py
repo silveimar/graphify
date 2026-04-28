@@ -298,3 +298,121 @@ def test_detect_skips_graphify_out_underscore_variant(tmp_path):
             assert "some.md" not in f, f"leaked underscore variant: {f}"
             assert "/graphify_out/" not in f, f"leaked underscore variant: {f}"
     assert any("main.py" in f for f in result["files"]["code"])
+
+
+# ---------------------------------------------------------------------------
+# Phase 28-02: nesting guard + exclude_globs tests (Wave 0 RED)
+# ---------------------------------------------------------------------------
+
+from graphify.output import ResolvedOutput
+
+
+def test_detect_nesting_guard_resolved_notes_dir_basename(tmp_path):
+    """VAULT-12: detect() prunes directories whose basename matches resolved.notes_dir.name."""
+    resolved = ResolvedOutput(False, None, tmp_path / "Atlas", tmp_path / "knowledge-graph-out", "profile", ())
+    atlas = tmp_path / "Atlas"
+    atlas.mkdir()
+    (atlas / "foo.md").write_text("# Exported note\n")
+    (tmp_path / "main.py").write_text("x = 1")
+
+    result = detect(tmp_path, resolved=resolved)
+    all_files = [f for fs in result["files"].values() for f in fs]
+    assert not any("Atlas" in f and "foo.md" in f for f in all_files), \
+        "Atlas/foo.md should be pruned by nesting guard"
+    assert any("main.py" in f for f in result["files"]["code"])
+
+
+def test_detect_nesting_guard_resolved_artifacts_dir_basename(tmp_path):
+    """VAULT-12: detect() prunes directories whose basename matches resolved.artifacts_dir.name."""
+    resolved = ResolvedOutput(False, None, tmp_path / "Atlas", tmp_path / "knowledge-graph-out", "profile", ())
+    kg_out = tmp_path / "knowledge-graph-out"
+    kg_out.mkdir()
+    (kg_out / "graph.json").write_text("{}")
+    (tmp_path / "main.py").write_text("x = 1")
+
+    result = detect(tmp_path, resolved=resolved)
+    all_files = [f for fs in result["files"].values() for f in fs]
+    assert not any("knowledge-graph-out" in f for f in all_files), \
+        "knowledge-graph-out/ should be pruned by nesting guard"
+    assert any("main.py" in f for f in result["files"]["code"])
+
+
+def test_detect_nesting_guard_summary_emits_once(tmp_path, capsys):
+    """VAULT-12 / D-20: exactly ONE summary warning line, not per-directory."""
+    resolved = ResolvedOutput(False, None, tmp_path / "Atlas", tmp_path / "knowledge-graph-out", "profile", ())
+    # Create three nested directories at different depths all matching the notes_dir basename
+    (tmp_path / "Atlas").mkdir()
+    (tmp_path / "Atlas" / "foo.md").write_text("# note\n")
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    (sub / "Atlas").mkdir()
+    (sub / "Atlas" / "bar.md").write_text("# note\n")
+    sub2 = tmp_path / "other" / "deep"
+    sub2.mkdir(parents=True)
+    (sub2 / "Atlas").mkdir()
+    (sub2 / "Atlas" / "baz.md").write_text("# note\n")
+    (tmp_path / "main.py").write_text("x = 1")
+
+    detect(tmp_path, resolved=resolved)
+    captured = capsys.readouterr()
+    warning_lines = [line for line in captured.err.splitlines() if "WARNING: skipped" in line]
+    assert len(warning_lines) == 1, \
+        f"Expected exactly 1 WARNING line, got {len(warning_lines)}: {warning_lines}"
+    assert "nested output path" in warning_lines[0]
+
+
+def test_detect_nesting_guard_no_warning_when_no_nesting(tmp_path, capsys):
+    """D-20: no WARNING emitted when no nested output paths are found."""
+    resolved = ResolvedOutput(False, None, tmp_path / "Atlas", tmp_path / "knowledge-graph-out", "profile", ())
+    # No Atlas/ or knowledge-graph-out/ directories — no nesting
+    (tmp_path / "main.py").write_text("x = 1")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "guide.md").write_text("# Guide\n")
+
+    detect(tmp_path, resolved=resolved)
+    captured = capsys.readouterr()
+    warning_lines = [line for line in captured.err.splitlines() if "WARNING: skipped" in line]
+    assert len(warning_lines) == 0, \
+        f"Expected no WARNING lines, got {len(warning_lines)}: {warning_lines}"
+
+
+def test_detect_exclude_globs_prunes_files(tmp_path):
+    """VAULT-11: exclude_globs from resolved are applied via _is_ignored()."""
+    resolved = ResolvedOutput(False, None, tmp_path / "Atlas", tmp_path / "artifacts", "profile", ("**/cache/**", "*.tmp"))
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "big.bin").write_text("binary")
+    (tmp_path / "foo.tmp").write_text("temp file")
+    (tmp_path / "keep.md").write_text("# Keep me\n\nReal document.\n")
+
+    result = detect(tmp_path, resolved=resolved)
+    all_files = [f for fs in result["files"].values() for f in fs]
+    assert any("keep.md" in f for f in all_files), "keep.md should be included"
+    assert not any("big.bin" in f for f in all_files), "cache/big.bin should be excluded"
+    assert not any("foo.tmp" in f for f in all_files), "foo.tmp should be excluded"
+
+
+def test_detect_exclude_globs_with_cli_flag(tmp_path):
+    """D-15: exclusions apply even when source='cli-flag' (--output overrides destination only)."""
+    resolved = ResolvedOutput(False, None, tmp_path / "notes", tmp_path / "artifacts", "cli-flag", ("private/**",))
+    private_dir = tmp_path / "private"
+    private_dir.mkdir()
+    (private_dir / "secret.md").write_text("# Secret\n")
+    (tmp_path / "public.md").write_text("# Public\n\nVisible content.\n")
+
+    result = detect(tmp_path, resolved=resolved)
+    all_files = [f for fs in result["files"].values() for f in fs]
+    assert any("public.md" in f for f in all_files), "public.md should be included"
+    assert not any("secret.md" in f for f in all_files), "private/secret.md should be excluded"
+
+
+def test_detect_exclude_globs_empty_tuple_no_op(tmp_path):
+    """VAULT-11: empty exclude_globs=() does not suppress any files."""
+    resolved = ResolvedOutput(False, None, tmp_path / "Atlas", tmp_path / "artifacts", "profile", ())
+    (tmp_path / "keep.md").write_text("# Keep\n\nContent.\n")
+    (tmp_path / "also_keep.py").write_text("x = 1")
+
+    result = detect(tmp_path, resolved=resolved)
+    all_files = [f for fs in result["files"].values() for f in fs]
+    assert any("keep.md" in f for f in all_files)
+    assert any("also_keep.py" in f for f in all_files)
