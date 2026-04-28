@@ -1,0 +1,4 @@
+extends: bases/partial.yaml
+folder_mapping:
+  thing: 01-Things
+  statement: 02-Statements

@@ -1,0 +1,5 @@
+folder_mapping:
+  thing: from-fusion/Things
+  statement: from-fusion/Statements
+naming:
+  convention: kebab-case

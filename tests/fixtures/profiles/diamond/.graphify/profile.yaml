@@ -1,0 +1,3 @@
+extends: fusion.yaml
+includes:
+  - c.yaml

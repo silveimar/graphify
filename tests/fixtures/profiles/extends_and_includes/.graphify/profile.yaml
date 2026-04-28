@@ -1,0 +1,5 @@
+extends: bases/fusion.yaml
+includes:
+  - mixins/team-tags.yaml
+folder_mapping:
+  thing: from-profile/Things

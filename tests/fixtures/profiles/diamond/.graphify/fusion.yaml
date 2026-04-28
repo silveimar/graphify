@@ -1,0 +1,3 @@
+extends: core.yaml
+naming:
+  convention: kebab-case

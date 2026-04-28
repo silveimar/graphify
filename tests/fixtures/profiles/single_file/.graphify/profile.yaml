@@ -1,0 +1,5 @@
+folder_mapping:
+  thing: 01-Things
+  statement: 02-Statements
+naming:
+  convention: kebab-case

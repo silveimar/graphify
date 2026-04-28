@@ -1,0 +1,5 @@
+extends: core.yaml
+folder_mapping:
+  thing: from-fusion/Things
+naming:
+  convention: snake_case
