@@ -81,6 +81,7 @@ def test_templates_module_is_pure_stdlib():
     allowed_stdlib_roots = {
         "__future__",
         "datetime",
+        "fnmatch",  # Phase 30 / CFG-03: community_templates label-glob matching
         "importlib",
         "re",
         "string",

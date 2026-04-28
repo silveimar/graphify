@@ -12,6 +12,7 @@ functional template engine running against `_DEFAULT_PROFILE`.
 from __future__ import annotations
 
 import datetime
+import fnmatch
 import importlib.resources as ilr
 import re
 import string
@@ -706,6 +707,94 @@ def render_note(
 # Public: render_moc + render_community_overview (D-31, D-41)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Phase 30 / CFG-03: community_templates runtime dispatch (D-11..D-13)
+# ---------------------------------------------------------------------------
+
+def _load_override_template(rel_path: str, vault_dir, default_template):
+    """Load an override template from <vault_dir>/.graphify/<rel_path>.
+
+    On any failure (path escape, missing file, unreadable, invalid placeholders)
+    emit a stderr warning and return *default_template* (graceful fallback per
+    D-22 / T-30-01 mitigation).
+    """
+    # Function-local import to dodge potential circular import with profile.py
+    from graphify.profile import validate_vault_path
+
+    if vault_dir is None:
+        # Built-in defaults context — overrides require a real vault.
+        return default_template
+    try:
+        graphify_dir = Path(vault_dir) / ".graphify"
+        canonical = validate_vault_path(rel_path, graphify_dir)
+    except (ValueError, OSError) as exc:
+        print(
+            f"[graphify] community_templates override path rejected ({rel_path}): {exc} — using default",
+            file=sys.stderr,
+        )
+        return default_template
+    if not canonical.exists():
+        print(
+            f"[graphify] community_templates override missing ({rel_path}) — using default",
+            file=sys.stderr,
+        )
+        return default_template
+    try:
+        text = canonical.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(
+            f"[graphify] community_templates override unreadable ({rel_path}): {exc} — using default",
+            file=sys.stderr,
+        )
+        return default_template
+    errors = validate_template(text, _REQUIRED_PER_TYPE["moc"])
+    if errors:
+        for err in errors:
+            print(
+                f"[graphify] community_templates override invalid ({rel_path}): {err} — using default",
+                file=sys.stderr,
+            )
+        return default_template
+    return string.Template(text)
+
+
+def _pick_community_template(
+    community_id: int,
+    community_name: str,
+    profile: dict,
+    vault_dir,
+    default_template: "string.Template",
+) -> "string.Template":
+    """Return an override template if community_templates matches; else default.
+
+    Rule evaluation: first-match-wins (D-13). label-match uses fnmatchcase
+    (portable, case-sensitive — D-11). id-match uses exact int compare and
+    rejects bool (R5).
+    """
+    rules = profile.get("community_templates") or []
+    if not isinstance(rules, list):
+        return default_template
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        match = rule.get("match")
+        pattern = rule.get("pattern")
+        template_path = rule.get("template")
+        if not isinstance(template_path, str) or not template_path:
+            continue
+        if match == "label":
+            if not isinstance(pattern, str) or not isinstance(community_name, str):
+                continue
+            if fnmatch.fnmatchcase(community_name, pattern):
+                return _load_override_template(template_path, vault_dir, default_template)
+        elif match == "id":
+            if isinstance(pattern, bool) or not isinstance(pattern, int):
+                continue
+            if pattern == community_id:
+                return _load_override_template(template_path, vault_dir, default_template)
+    return default_template
+
+
 def _render_moc_like(
     community_id: int,
     G,
@@ -816,7 +905,10 @@ def _render_moc_like(
             for nt in ("thing", "statement", "person", "source", "moc", "community")
         }
     )
-    template = templates[template_key]
+    default_template = templates[template_key]
+    template = _pick_community_template(
+        community_id, community_name, profile, vault_dir, default_template
+    )
     text = template.safe_substitute(substitution_ctx)
     filename = resolve_filename(community_name, convention) + ".md"
     return filename, text
