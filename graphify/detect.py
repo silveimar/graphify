@@ -244,6 +244,13 @@ _SKIP_DIRS = {
     ".tox", ".eggs", "*.egg-info",
 }
 
+# graphify's own output directory — always pruned by default to prevent
+# self-ingestion loops (e.g. re-running --obsidian from a vault root would
+# otherwise re-ingest prior exported notes as fresh document inputs).
+# The graphify-out/memory/ subtree is RE-included explicitly in detect()
+# via the scan_paths allow-list below.
+_SELF_OUTPUT_DIRS = {"graphify-out", "graphify_out"}
+
 # Large generated files that are never useful to extract
 _SKIP_FILES = {
     "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
@@ -254,6 +261,8 @@ _SKIP_FILES = {
 def _is_noise_dir(part: str) -> bool:
     """Return True if this directory name looks like a venv, cache, or dep dir."""
     if part in _SKIP_DIRS:
+        return True
+    if part in _SELF_OUTPUT_DIRS:
         return True
     # Catch *_venv, *_repo/site-packages patterns
     if part.endswith("_venv") or part.endswith("_env"):
