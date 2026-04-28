@@ -223,6 +223,7 @@ def test_resolved_output_namedtuple_field_order():
         "notes_dir",
         "artifacts_dir",
         "source",
+        "exclude_globs",  # Phase 28 D-14
     )
 
 
@@ -234,10 +235,11 @@ def test_resolved_output_is_immutable():
 
 def test_resolved_output_unpacks_to_tuple():
     # Phase 29 doctor may want positional unpacking
-    r = ResolvedOutput(True, Path("/v"), Path("/v/n"), Path("/g"), "profile")
-    vault_detected, vault_path, notes_dir, artifacts_dir, source = r
+    r = ResolvedOutput(True, Path("/v"), Path("/v/n"), Path("/g"), "profile", ("*.tmp",))
+    vault_detected, vault_path, notes_dir, artifacts_dir, source, exclude_globs = r
     assert vault_detected is True
     assert source == "profile"
+    assert exclude_globs == ("*.tmp",)
 
 
 # ---------------------------------------------------------------------------
@@ -267,3 +269,33 @@ def test_resolve_output_sibling_at_filesystem_root_refuses(tmp_path):
     from graphify.profile import validate_sibling_path
     with pytest.raises(ValueError):
         validate_sibling_path("anything", Path("/").resolve())
+
+
+# ---------------------------------------------------------------------------
+# Phase 28 D-14: exclude_globs field
+# ---------------------------------------------------------------------------
+
+def test_resolved_output_exclude_globs_defaults_to_empty_tuple():
+    r = ResolvedOutput(False, None, Path("a"), Path("b"), "default")
+    assert r.exclude_globs == ()
+
+
+def test_resolve_output_exclude_globs_populated_from_profile(tmp_path):
+    pytest.importorskip("yaml")
+    vault = _setup_vault(
+        tmp_path,
+        "output:\n  mode: vault-relative\n  path: Atlas\n"
+        "  exclude:\n    - '**/cache/**'\n    - '*.tmp'\n",
+    )
+    result = resolve_output(vault)
+    assert result.exclude_globs == ("**/cache/**", "*.tmp")
+
+
+def test_resolve_output_exclude_globs_empty_when_cli_flag(tmp_path):
+    result = resolve_output(tmp_path, cli_output=str(tmp_path / "out"))
+    assert result.exclude_globs == ()
+
+
+def test_resolve_output_exclude_globs_empty_when_default(tmp_path):
+    result = resolve_output(tmp_path)
+    assert result.exclude_globs == ()

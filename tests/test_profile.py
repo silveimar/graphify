@@ -1335,3 +1335,55 @@ def test_validate_sibling_path_happy_path(tmp_path):
     vault.mkdir()
     result = validate_sibling_path("graphify-notes", vault)
     assert result == (tmp_path / "graphify-notes").resolve()
+
+
+# ---------------------------------------------------------------------------
+# Phase 28 D-17: output.exclude validation
+# ---------------------------------------------------------------------------
+
+def test_validate_profile_output_exclude_valid_glob_list():
+    errs = validate_profile({"output": {
+        "mode": "vault-relative", "path": "Atlas",
+        "exclude": ["**/cache/**", "*.tmp"],
+    }})
+    assert errs == []
+
+
+def test_validate_profile_output_exclude_not_a_list():
+    errs = validate_profile({"output": {
+        "mode": "vault-relative", "path": "Atlas",
+        "exclude": "*.tmp",
+    }})
+    assert any("output.exclude must be a list" in e for e in errs)
+
+
+def test_validate_profile_output_exclude_empty_string_rejected():
+    errs = validate_profile({"output": {
+        "mode": "vault-relative", "path": "Atlas",
+        "exclude": [""],
+    }})
+    assert any("must not be empty" in e for e in errs)
+
+
+def test_validate_profile_output_exclude_non_string_rejected():
+    errs = validate_profile({"output": {
+        "mode": "vault-relative", "path": "Atlas",
+        "exclude": [42],
+    }})
+    assert any("must be a string" in e for e in errs)
+
+
+def test_validate_profile_output_exclude_absolute_path_rejected():
+    errs = validate_profile({"output": {
+        "mode": "vault-relative", "path": "Atlas",
+        "exclude": ["/etc/*"],
+    }})
+    assert any("must not be an absolute path" in e for e in errs)
+
+
+def test_validate_profile_output_exclude_traversal_rejected():
+    errs = validate_profile({"output": {
+        "mode": "vault-relative", "path": "Atlas",
+        "exclude": ["../../etc/*"],
+    }})
+    assert any("'..' (path traversal)" in e for e in errs)
