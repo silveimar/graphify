@@ -4,8 +4,13 @@ import fnmatch
 import json
 import os
 import re
+import sys
 from enum import Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from graphify.output import ResolvedOutput
 
 
 class FileType(str, Enum):
@@ -258,6 +263,19 @@ _SKIP_FILES = {
     "composer.lock", "go.sum", "go.work.sum",
 }
 
+def _is_nested_output(part: str, resolved_basenames: frozenset[str]) -> bool:
+    """Return True if dirname matches any known graphify output location (D-18).
+
+    Covers the literal _SELF_OUTPUT_DIRS set plus any basenames from the
+    current run's ResolvedOutput (notes_dir, artifacts_dir).
+    """
+    if part in _SELF_OUTPUT_DIRS:
+        return True
+    if part in resolved_basenames:
+        return True
+    return False
+
+
 def _is_noise_dir(part: str) -> bool:
     """Return True if this directory name looks like a venv, cache, or dep dir."""
     if part in _SKIP_DIRS:
@@ -335,7 +353,12 @@ def _is_ignored(path: Path, root: Path, patterns: list[str]) -> bool:
     return False
 
 
-def detect(root: Path, *, follow_symlinks: bool = False) -> dict:
+def detect(
+    root: Path,
+    *,
+    follow_symlinks: bool = False,
+    resolved: "ResolvedOutput | None" = None,
+) -> dict:
     files: dict[FileType, list[str]] = {
         FileType.CODE: [],
         FileType.DOCUMENT: [],
@@ -347,6 +370,19 @@ def detect(root: Path, *, follow_symlinks: bool = False) -> dict:
 
     skipped_sensitive: list[str] = []
     ignore_patterns = _load_graphifyignore(root)
+
+    # Phase 28: compute resolved-aware basenames and combined exclude patterns
+    resolved_basenames: frozenset[str] = frozenset()
+    if resolved is not None:
+        resolved_basenames = frozenset({
+            resolved.notes_dir.name,
+            resolved.artifacts_dir.name,
+        }) - _SELF_OUTPUT_DIRS
+
+    exclude_globs: list[str] = list(resolved.exclude_globs) if resolved else []
+    all_ignore_patterns: list[str] = list(ignore_patterns) + exclude_globs
+
+    nested_paths: list[str] = []
 
     # Always include graphify-out/memory/ - query results filed back into the graph
     memory_dir = root / "graphify-out" / "memory"
@@ -368,13 +404,18 @@ def detect(root: Path, *, follow_symlinks: bool = False) -> dict:
                     dirnames.clear()
                     continue
             if not in_memory_tree:
-                # Prune noise dirs in-place so os.walk never descends into them
-                dirnames[:] = [
-                    d for d in dirnames
-                    if not d.startswith(".")
-                    and not _is_noise_dir(d)
-                    and not _is_ignored(dp / d, root, ignore_patterns)
-                ]
+                # Prune noise dirs in-place so os.walk never descends into them.
+                # Accumulate nesting paths separately for the D-20 single-line warning.
+                pruned: set[str] = set()
+                for d in dirnames:
+                    if (d.startswith(".")
+                            or _is_noise_dir(d)
+                            or _is_ignored(dp / d, root, all_ignore_patterns)):
+                        pruned.add(d)
+                    elif _is_nested_output(d, resolved_basenames):
+                        nested_paths.append(str(dp / d))
+                        pruned.add(d)
+                dirnames[:] = [d for d in dirnames if d not in pruned]
             for fname in filenames:
                 if fname in _SKIP_FILES:
                     continue
@@ -382,6 +423,15 @@ def detect(root: Path, *, follow_symlinks: bool = False) -> dict:
                 if p not in seen:
                     seen.add(p)
                     all_files.append(p)
+
+    # D-20: emit a single summary warning if any nesting paths were pruned
+    if nested_paths:
+        deepest = max(nested_paths, key=lambda p: p.count(os.sep))
+        print(
+            f"[graphify] WARNING: skipped {len(nested_paths)} nested output path(s) "
+            f"(deepest: {deepest})",
+            file=sys.stderr,
+        )
 
     converted_dir = root / "graphify-out" / "converted"
 
@@ -396,7 +446,7 @@ def detect(root: Path, *, follow_symlinks: bool = False) -> dict:
             # Skip files inside our own converted/ dir (avoid re-processing sidecars)
             if str(p).startswith(str(converted_dir)):
                 continue
-        if _is_ignored(p, root, ignore_patterns):
+        if _is_ignored(p, root, all_ignore_patterns):
             continue
         if _is_sensitive(p):
             skipped_sensitive.append(str(p))
