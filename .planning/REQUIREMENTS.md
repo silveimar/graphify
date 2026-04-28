@@ -10,9 +10,9 @@
 
 ### Vault Adapter UX & Self-Ingestion Hardening
 
-- [ ] **VAULT-08**: graphify detects when CWD is itself an Obsidian vault (presence of `.obsidian/` at CWD)
-- [ ] **VAULT-09**: When CWD is a vault with `.graphify/profile.yaml`, graphify auto-adopts profile-driven placement (SEED-vault-root-aware-cli Option C) — CWD is both input corpus and output target
-- [ ] **VAULT-10**: `.graphify/profile.yaml` declares output destination (vault-relative path, absolute path, or sibling-of-vault) via a profile field; CLI `--output` flag overrides
+- [x] **VAULT-08**: graphify detects when CWD is itself an Obsidian vault (presence of `.obsidian/` at CWD)
+- [x] **VAULT-09**: When CWD is a vault with `.graphify/profile.yaml`, graphify auto-adopts profile-driven placement (SEED-vault-root-aware-cli Option C) — CWD is both input corpus and output target
+- [x] **VAULT-10**: `.graphify/profile.yaml` declares output destination (vault-relative path, absolute path, or sibling-of-vault) via a profile field; CLI `--output` flag overrides
 - [x] **VAULT-11**: Profile-aware self-ingestion exclusions — `detect.py` reads profile output destination + declared exclusion globs and prunes them from input scan
 - [x] **VAULT-12**: Recursive nesting guard — `detect.py` refuses to ingest paths matching `**/graphify-out/**` at any depth and warns the user about prior nesting if found
 - [x] **VAULT-13**: Manifest-based ignore — current run's manifest records output paths so subsequent runs skip them even if profile changes
@@ -65,9 +65,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VAULT-08    | Phase 27   | Planned |
-| VAULT-09    | Phase 27   | Planned |
-| VAULT-10    | Phase 27   | Planned |
+| VAULT-08    | Phase 27   | Complete |
+| VAULT-09    | Phase 27   | Complete |
+| VAULT-10    | Phase 27   | Complete |
 | VAULT-11    | Phase 28   | Complete |
 | VAULT-12    | Phase 28   | Complete |
 | VAULT-13    | Phase 28   | Complete |
@@ -76,8 +76,8 @@
 | TMPL-01     | Phase 31   | Planned |
 | TMPL-02     | Phase 31   | Planned |
 | TMPL-03     | Phase 31   | Planned |
-| CFG-02      | Phase 30   | Planned |
-| CFG-03      | Phase 30   | Planned |
+| CFG-02      | Phase 30   | Complete |
+| CFG-03      | Phase 30   | Complete |
 
 (Phase column populated by `gsd-roadmapper` during `/gsd-new-milestone` roadmap step.)
 
