@@ -104,9 +104,15 @@ _DEFAULT_PROFILE: dict = {
 _VALID_TOP_LEVEL_KEYS = {
     "folder_mapping", "naming", "merge", "mapping_rules", "obsidian",
     "topology", "mapping", "tag_taxonomy", "profile_sync", "diagram_types",
+    "output",
 }
 
 _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
+
+# Phase 27 (D-01, VAULT-10): valid modes for the output: block. Schema-only
+# check; sibling-of-vault paths are further validated at use-time via
+# validate_sibling_path() since vault_dir is unknown at static-validation time.
+_VALID_OUTPUT_MODES = {"vault-relative", "absolute", "sibling-of-vault"}
 
 _VALID_MERGE_STRATEGIES = {"update", "skip", "replace"}
 
@@ -412,6 +418,37 @@ def validate_profile(profile: dict) -> list[str]:
             auto_update = profile_sync.get("auto_update")
             if auto_update is not None and not isinstance(auto_update, bool):
                 errors.append("'profile_sync.auto_update' must be a boolean")
+
+    # output section (Phase 27, D-01, D-03, VAULT-10)
+    output = profile.get("output")
+    if output is not None:
+        if not isinstance(output, dict):
+            errors.append("'output' must be a mapping (dict)")
+        else:
+            mode = output.get("mode")
+            if mode is None:
+                errors.append("'output' requires a 'mode' key")
+            elif mode not in _VALID_OUTPUT_MODES:
+                errors.append(
+                    f"output.mode {mode!r} invalid — valid modes are: "
+                    f"{sorted(_VALID_OUTPUT_MODES)}"
+                )
+            path_val = output.get("path")
+            if path_val is None:
+                errors.append("'output' requires a 'path' key")
+            elif not isinstance(path_val, str) or not path_val.strip():
+                errors.append("output.path must be a non-empty string")
+            elif mode == "vault-relative":
+                if Path(path_val).is_absolute():
+                    errors.append("output.path must be relative when mode=vault-relative")
+                elif path_val.startswith("~"):
+                    errors.append("output.path must not start with '~' when mode=vault-relative")
+                elif ".." in Path(path_val).parts:
+                    errors.append("output.path must not contain '..' when mode=vault-relative")
+            elif mode == "absolute":
+                if not Path(path_val).is_absolute():
+                    errors.append("output.path must be absolute when mode=absolute")
+            # mode == "sibling-of-vault": deferred to validate_sibling_path() at use-time
 
     return errors
 
