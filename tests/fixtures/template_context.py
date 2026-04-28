@@ -202,3 +202,80 @@ def make_classification_fixture() -> tuple[nx.Graph, dict[int, list[str]]]:
         2: ["n_isolate"],
     }
     return G, communities
+
+
+# ---------------------------------------------------------------------------
+# Phase 31: Block context fixture helpers (TMPL-01 / TMPL-02)
+# ---------------------------------------------------------------------------
+
+
+def make_block_context(graph, node_id, *, dataview_nonempty: bool = False):
+    """Build a `BlockContext` from a graph + node id, calling `_build_edge_records`.
+
+    Used by `_expand_blocks` unit tests so the fixture matches what the
+    production render path constructs.
+    """
+    from graphify.templates import BlockContext, _build_edge_records
+
+    return BlockContext(
+        graph=graph,
+        node_id=node_id,
+        edges=_build_edge_records(graph, node_id),
+        dataview_nonempty=dataview_nonempty,
+    )
+
+
+def make_graph_with_god_node(node_id: str = "god1") -> nx.Graph:
+    """Tiny graph where the node is flagged as a god node via attribute.
+
+    Includes one peer node + edge so degree > 0 (so `if_god_node` and
+    `if_has_connections` are both True; `if_isolated` is False).
+    """
+    G = nx.Graph()
+    G.add_node(node_id, label="God Node", file_type="code", is_god_node=True)
+    G.add_node("peer1", label="Peer", file_type="code")
+    G.add_edge(node_id, "peer1", relation="contains", confidence="EXTRACTED")
+    return G
+
+
+def make_graph_with_isolated(node_id: str = "iso1") -> nx.Graph:
+    """Graph with an isolated (degree-0) node — `if_isolated` True."""
+    G = nx.Graph()
+    G.add_node(node_id, label="Isolated", file_type="code")
+    # Add unrelated nodes so the graph is not empty
+    G.add_node("other", label="Other", file_type="code")
+    return G
+
+
+def make_graph_with_edges(node_id: str, edge_specs: list[dict]) -> nx.Graph:
+    """Build a graph with a center node connected to N peers per edge_specs.
+
+    Each `edge_spec` is a dict with keys matching the six conn fields:
+      - label (target node label)
+      - relation (edge data)
+      - target (ignored — populated from target node's label per D-06)
+      - confidence (edge data)
+      - community (target node attr)
+      - source_file (edge data)
+
+    The target node id is derived from the spec's label, slugified.
+    """
+    G = nx.Graph()
+    G.add_node(node_id, label=node_id, file_type="code")
+    for i, spec in enumerate(edge_specs):
+        peer_label = spec.get("label", f"peer{i}")
+        peer_id = f"peer_{i}_{peer_label.lower().replace(' ', '_')}"
+        G.add_node(
+            peer_id,
+            label=peer_label,
+            file_type="code",
+            community=spec.get("community", ""),
+        )
+        G.add_edge(
+            node_id,
+            peer_id,
+            relation=spec.get("relation", "related"),
+            confidence=spec.get("confidence", "EXTRACTED"),
+            source_file=spec.get("source_file", ""),
+        )
+    return G

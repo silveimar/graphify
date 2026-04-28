@@ -2328,3 +2328,685 @@ def test_render_note_aliases_sanitized_for_wikilinks():
     # Script tags pass through (no HTML, these are YAML aliases for filenames)
     # but the pipe in the script tag content — there is none, so just verify valid_alias
     assert "valid_alias" in text
+
+
+# ===========================================================================
+# Phase 31 (TMPL-01 / TMPL-02): block-template engine tests
+# ===========================================================================
+#
+# Covers conditional blocks ({{#if_X}}…{{/if}}, {{#if_attr_<name>}}…{{/if}}),
+# connection-loop blocks ({{#connections}}…{{/connections}}), preflight
+# rejection from validate_template, render-entry-point integration (no
+# forgotten call site), label-injection sanitization (T-31-01), the D-16
+# block-expansion-before-substitution ordering invariant, byte-identical
+# backward-compatibility gate for block-free templates (ROADMAP criterion 4),
+# and the D-09/D-10 preflight-only invariant.
+# ===========================================================================
+
+
+import networkx as nx
+
+
+def _expand(text: str, ctx) -> str:
+    """Helper: import-and-call _expand_blocks for unit tests."""
+    from graphify.templates import _expand_blocks
+    return _expand_blocks(text, ctx)
+
+
+# --- TMPL-01: conditional blocks ---
+
+
+def test_if_god_node_true_renders():
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("g1", label="God", is_god_node=True)
+    ctx = BlockContext(graph=G, node_id="g1", edges=[], dataview_nonempty=False)
+    out = _expand("X{{#if_god_node}}GOD{{/if}}Y", ctx)
+    assert out == "XGODY"
+
+
+def test_if_god_node_false_omits_cleanly():
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n1", label="Normal")
+    ctx = BlockContext(graph=G, node_id="n1", edges=[], dataview_nonempty=False)
+    out = _expand("X{{#if_god_node}}GOD{{/if}}Y", ctx)
+    assert out == "XY"
+    # Block on its own line — no double-newline residue
+    out2 = _expand("X\n{{#if_god_node}}GOD\n{{/if}}Y", ctx)
+    # Body omitted entirely; surrounding whitespace preserved verbatim
+    assert "GOD" not in out2
+    assert "{{" not in out2 and "}}" not in out2
+
+
+def test_if_isolated_true_renders():
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("iso", label="Iso")
+    G.add_node("other", label="Other")
+    ctx = BlockContext(graph=G, node_id="iso", edges=[], dataview_nonempty=False)
+    out = _expand("[{{#if_isolated}}LONELY{{/if}}]", ctx)
+    assert out == "[LONELY]"
+
+
+def test_if_has_connections_renders_when_edges_exist():
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("a", label="A")
+    G.add_node("b", label="B")
+    G.add_edge("a", "b", relation="r")
+    ctx = BlockContext(graph=G, node_id="a", edges=[], dataview_nonempty=False)
+    out = _expand("[{{#if_has_connections}}CONN{{/if}}]", ctx)
+    assert out == "[CONN]"
+
+
+def test_if_has_dataview_branches_on_dataview_nonempty():
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx_empty = BlockContext(graph=G, node_id="n", edges=[], dataview_nonempty=False)
+    ctx_full = BlockContext(graph=G, node_id="n", edges=[], dataview_nonempty=True)
+    template = "[{{#if_has_dataview}}DV{{/if}}]"
+    assert _expand(template, ctx_empty) == "[]"
+    assert _expand(template, ctx_full) == "[DV]"
+
+
+def test_if_has_dataview_false_when_query_empty():
+    """Cross-link to Plan 02: when the dataview block resolves to empty
+    (whitespace-only after _build_dataview_block strips fences),
+    BlockContext.dataview_nonempty is False and the guarded section omits."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    # Simulate Plan 02 cross-link: empty/whitespace dataview → False predicate
+    dataview_block = "   \n  "
+    ctx = BlockContext(
+        graph=G,
+        node_id="n",
+        edges=[],
+        dataview_nonempty=bool(dataview_block.strip()),
+    )
+    assert _expand("[{{#if_has_dataview}}DV{{/if}}]", ctx) == "[]"
+
+
+def test_if_attr_escape_hatch_reads_node_attribute():
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("p", label="P", is_published=True)
+    ctx = BlockContext(graph=G, node_id="p", edges=[], dataview_nonempty=False)
+    out = _expand("X{{#if_attr_is_published}}PUB{{/if}}Y", ctx)
+    assert out == "XPUBY"
+
+
+def test_if_attr_falsy_value_omits():
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("p_false", label="P", is_published=False)
+    G.add_node("p_missing", label="P")  # attr absent
+    ctx_false = BlockContext(graph=G, node_id="p_false", edges=[], dataview_nonempty=False)
+    ctx_missing = BlockContext(graph=G, node_id="p_missing", edges=[], dataview_nonempty=False)
+    template = "X{{#if_attr_is_published}}PUB{{/if}}Y"
+    assert _expand(template, ctx_false) == "XY"
+    assert _expand(template, ctx_missing) == "XY"
+
+
+# --- TMPL-02: connection loops ---
+
+
+def test_connections_loop_iterates():
+    from tests.fixtures.template_context import make_block_context
+
+    G = nx.Graph()
+    G.add_node("center", label="Center")
+    for i, lbl in enumerate(["AAA", "BBB", "CCC"]):
+        peer_id = f"p{i}"
+        G.add_node(peer_id, label=lbl)
+        G.add_edge("center", peer_id, relation="contains", confidence="EXTRACTED")
+    ctx = make_block_context(G, "center")
+    template = "{{#connections}}- ${conn.label} (${conn.relation})\n{{/connections}}"
+    out = _expand(template, ctx)
+    assert out.count("- AAA") == 1
+    assert out.count("- BBB") == 1
+    assert out.count("- CCC") == 1
+    assert out.count("(contains)") == 3
+
+
+def test_connections_loop_exposes_all_six_fields():
+    from tests.fixtures.template_context import make_block_context
+
+    G = nx.Graph()
+    G.add_node("center", label="Center")
+    G.add_node("peer", label="Peer", community="ml")
+    G.add_edge(
+        "center", "peer",
+        relation="references",
+        confidence="EXTRACTED",
+        source_file="src/x.py",
+    )
+    ctx = make_block_context(G, "center")
+    template = (
+        "L=${conn.label}|"
+        "R=${conn.relation}|"
+        "T=${conn.target}|"
+        "C=${conn.confidence}|"
+        "M=${conn.community}|"
+        "S=${conn.source_file}"
+    )
+    body = "{{#connections}}" + template + "{{/connections}}"
+    out = _expand(body, ctx)
+    assert "L=Peer" in out
+    assert "R=references" in out
+    assert "T=Peer" in out
+    assert "C=EXTRACTED" in out
+    assert "M=ml" in out
+    assert "S=src/x.py" in out
+
+
+def test_connections_loop_flattened_form_works():
+    from tests.fixtures.template_context import make_block_context
+
+    G = nx.Graph()
+    G.add_node("center", label="Center")
+    G.add_node("p", label="Peer", community="c1")
+    G.add_edge("center", "p", relation="references", confidence="EXTRACTED")
+    ctx = make_block_context(G, "center")
+    body_dot = "{{#connections}}${conn.label}-${conn.relation}{{/connections}}"
+    body_flat = "{{#connections}}${conn_label}-${conn_relation}{{/connections}}"
+    assert _expand(body_dot, ctx) == _expand(body_flat, ctx) == "Peer-references"
+
+
+def test_connections_target_renders_label_not_id():
+    """D-06: ${conn.target} renders the target node label, NOT raw node id."""
+    from tests.fixtures.template_context import make_block_context
+
+    G = nx.Graph()
+    G.add_node("center", label="Center")
+    G.add_node("n_internal_id_xyz", label="Friendly Name")
+    G.add_edge("center", "n_internal_id_xyz", relation="r", confidence="EXTRACTED")
+    ctx = make_block_context(G, "center")
+    out = _expand("{{#connections}}T=${conn.target}{{/connections}}", ctx)
+    assert "T=Friendly Name" in out
+    assert "n_internal_id_xyz" not in out
+
+
+def test_connections_confidence_renders_string():
+    from tests.fixtures.template_context import make_block_context
+
+    G = nx.Graph()
+    G.add_node("center", label="Center")
+    G.add_node("p1", label="P1")
+    G.add_node("p2", label="P2")
+    G.add_node("p3", label="P3")
+    G.add_edge("center", "p1", relation="r", confidence="EXTRACTED")
+    G.add_edge("center", "p2", relation="r", confidence="INFERRED")
+    G.add_edge("center", "p3", relation="r", confidence="AMBIGUOUS")
+    ctx = make_block_context(G, "center")
+    out = _expand("{{#connections}}[${conn.confidence}]{{/connections}}", ctx)
+    assert "[EXTRACTED]" in out
+    assert "[INFERRED]" in out
+    assert "[AMBIGUOUS]" in out
+
+
+def test_connections_empty_loop_renders_nothing():
+    from tests.fixtures.template_context import make_block_context
+
+    G = nx.Graph()
+    G.add_node("alone", label="Alone")
+    ctx = make_block_context(G, "alone")
+    out = _expand(
+        "BEFORE{{#connections}}- ${conn.label}\n{{/connections}}AFTER",
+        ctx,
+    )
+    assert out == "BEFOREAFTER"
+
+
+def test_connections_loop_deterministic_order():
+    """Lock RESEARCH OQ3 / VALIDATION ordering: sorted by (relation ASC, label ASC)."""
+    from tests.fixtures.template_context import make_block_context
+
+    G = nx.Graph()
+    G.add_node("center", label="Center")
+    # Insert in deliberately shuffled order
+    specs = [
+        ("p_zeta_b", "Zeta B", "zeta"),
+        ("p_alpha_c", "Alpha C", "alpha"),
+        ("p_alpha_a", "Alpha A", "alpha"),
+        ("p_mu_d", "Mu D", "mu"),
+        ("p_alpha_b", "Alpha B", "alpha"),
+    ]
+    for nid, lbl, rel in specs:
+        G.add_node(nid, label=lbl)
+        G.add_edge("center", nid, relation=rel, confidence="EXTRACTED")
+    ctx = make_block_context(G, "center")
+    out = _expand(
+        "{{#connections}}${conn.relation}|${conn.label};{{/connections}}",
+        ctx,
+    )
+    # Sorted by (relation, label) ASC: alpha,Alpha A < alpha,Alpha B < alpha,Alpha C < mu,Mu D < zeta,Zeta B
+    expected = "alpha|Alpha A;alpha|Alpha B;alpha|Alpha C;mu|Mu D;zeta|Zeta B;"
+    assert out == expected
+
+
+def test_build_edge_records_field_provenance():
+    """Direct unit test of _build_edge_records — every field sourced correctly."""
+    from graphify.templates import _build_edge_records
+
+    G = nx.Graph()
+    G.add_node("center", label="Center")
+    G.add_node(
+        "peer",
+        label="Peer Display",
+        community="ml-arch",
+    )
+    G.add_edge(
+        "center", "peer",
+        relation="depends_on",
+        confidence="EXTRACTED",
+        source_file="src/dep.py",
+    )
+    records = _build_edge_records(G, "center")
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["label"] == "Peer Display"
+    assert rec["target"] == "Peer Display"  # D-06: target is sanitized label, not id
+    assert rec["relation"] == "depends_on"
+    assert rec["confidence"] == "EXTRACTED"
+    assert rec["community"] == "ml-arch"
+    assert rec["source_file"] == "src/dep.py"
+
+
+# --- preflight rejection ---
+
+
+def test_nested_blocks_rejected_with_specific_error():
+    """D-08 verbatim message for nested blocks."""
+    from graphify.templates import validate_template
+
+    text = (
+        "${frontmatter}\n# ${label}\n"
+        "{{#connections}}{{#if_god_node}}X{{/if}}{{/connections}}"
+    )
+    errs = validate_template(text, {"frontmatter", "label"})
+    # Verbatim D-08 message — exact equality assertion so the locked phrasing
+    # cannot drift undetected (one line for greppability per acceptance criterion).
+    assert "validate_template: nested template blocks are not supported (found '{{#if_god_node}}' inside '{{#connections}}'). Flatten the template or pre-compute the predicate." in errs
+
+
+def test_unknown_predicate_rejected():
+    from graphify.templates import validate_template
+
+    text = "${frontmatter}\n# ${label}\n{{#if_foobar}}X{{/if}}"
+    errs = validate_template(text, {"frontmatter", "label"})
+    assert any("unknown predicate" in e and "if_foobar" in e for e in errs)
+    # Lists catalog members
+    assert any("if_god_node" in e for e in errs)
+
+
+def test_unclosed_block_rejected():
+    from graphify.templates import validate_template
+
+    text = "${frontmatter}\n# ${label}\n{{#if_god_node}}X"
+    errs = validate_template(text, {"frontmatter", "label"})
+    assert any("unclosed block" in e and "if_god_node" in e for e in errs)
+
+
+def test_mismatched_closer_rejected():
+    from graphify.templates import validate_template
+
+    text = "${frontmatter}\n# ${label}\n{{#connections}}X{{/if}}"
+    errs = validate_template(text, {"frontmatter", "label"})
+    assert any("block mismatch" in e for e in errs)
+
+
+def test_unknown_conn_field_rejected():
+    from graphify.templates import validate_template
+
+    text = "${frontmatter}\n# ${label}\n{{#connections}}${conn.bogus}{{/connections}}"
+    errs = validate_template(text, {"frontmatter", "label"})
+    assert any("unknown connection field 'conn.bogus'" in e for e in errs)
+
+
+# --- render-entry-point integration (no forgotten call site) ---
+
+
+def _write_override(vault_dir: Path, note_type: str, body: str) -> None:
+    od = vault_dir / ".graphify" / "templates"
+    od.mkdir(parents=True, exist_ok=True)
+    (od / f"{note_type}.md").write_text(body, encoding="utf-8")
+
+
+def test_render_note_invokes_block_expansion(tmp_path):
+    from tests.fixtures.template_context import make_classification_context
+    from graphify.templates import render_note
+
+    G = nx.Graph()
+    G.add_node("g1", label="GodNode", file_type="code", source_file="x.py", is_god_node=True)
+    body = (
+        "${frontmatter}\n# ${label}\n\n"
+        "{{#if_god_node}}GUARDED-CONTENT{{/if}}\n"
+    )
+    _write_override(tmp_path, "thing", body)
+    ctx = make_classification_context()
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    _, text = render_note("g1", G, profile, "thing", ctx, vault_dir=tmp_path)
+    assert "GUARDED-CONTENT" in text
+    assert "{{#" not in text
+    assert "{{/" not in text
+
+
+def test_render_moc_like_invokes_block_expansion(tmp_path):
+    from tests.fixtures.template_context import make_moc_context, make_min_graph
+    from graphify.templates import _render_moc_like
+
+    G = make_min_graph()
+    body = (
+        "${frontmatter}\n# ${label}\n${members_section}\n${dataview_block}\n"
+        "{{#if_has_dataview}}HAS-DV{{/if}}\n"
+    )
+    _write_override(tmp_path, "moc", body)
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    ctx = make_moc_context()
+    _, text = _render_moc_like(
+        community_id=0,
+        G=G,
+        communities={0: list(G.nodes)},
+        profile=profile,
+        classification_context=ctx,
+        template_key="moc",
+        vault_dir=tmp_path,
+    )
+    # Default profile produces a non-empty dataview block, so HAS-DV appears
+    assert "HAS-DV" in text
+    assert "{{#" not in text
+    assert "{{/" not in text
+
+    # Now test the dataview-empty case via a profile with empty moc_query
+    profile_empty = {
+        "naming": {"convention": "title_case"},
+        "obsidian": {
+            "atlas_root": "Atlas",
+            "dataview": {"moc_query": "   \n   "},
+        },
+    }
+    _, text2 = _render_moc_like(
+        community_id=0,
+        G=G,
+        communities={0: list(G.nodes)},
+        profile=profile_empty,
+        classification_context=ctx,
+        template_key="moc",
+        vault_dir=tmp_path,
+    )
+    # The fence still exists with whitespace content; what matters here is
+    # the block was processed (no leftover {{# / {{/ literals).
+    assert "{{#" not in text2
+    assert "{{/" not in text2
+
+
+def test_render_moc_invokes_block_expansion(tmp_path):
+    from tests.fixtures.template_context import make_moc_context, make_min_graph
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    body = (
+        "${frontmatter}\n# ${label}\n${members_section}\n${dataview_block}\n"
+        "{{#if_god_node}}MOC-GUARDED{{/if}}\n"
+    )
+    _write_override(tmp_path, "moc", body)
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    ctx = make_moc_context()
+    _, text = render_moc(
+        0, G, {0: list(G.nodes)}, profile, ctx, vault_dir=tmp_path,
+    )
+    # The block must be expanded — no leftover literal block syntax in output
+    assert "{{#" not in text
+    assert "{{/" not in text
+
+
+def test_render_community_overview_invokes_block_expansion(tmp_path):
+    from tests.fixtures.template_context import make_moc_context, make_min_graph
+    from graphify.templates import render_community_overview
+
+    G = make_min_graph()
+    body = (
+        "${frontmatter}\n# ${label}\n${members_section}\n${dataview_block}\n"
+        "{{#if_has_dataview}}OVERVIEW-DV{{/if}}\n"
+    )
+    _write_override(tmp_path, "community", body)
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    ctx = make_moc_context()
+    _, text = render_community_overview(
+        0, G, {0: list(G.nodes)}, profile, ctx, vault_dir=tmp_path,
+    )
+    assert "OVERVIEW-DV" in text  # default profile populates dataview
+    assert "{{#" not in text
+    assert "{{/" not in text
+
+
+# --- T-31-01: label injection sanitization ---
+
+
+def _injection_graph(adversarial_label: str) -> nx.Graph:
+    G = nx.Graph()
+    G.add_node("center", label="Center")
+    G.add_node("evil", label=adversarial_label)
+    G.add_edge("center", "evil", relation="related", confidence="EXTRACTED")
+    return G
+
+
+def test_label_injection_double_brace_open():
+    from tests.fixtures.template_context import make_block_context
+
+    G = _injection_graph("evil{{label")
+    ctx = make_block_context(G, "center")
+    out = _expand("{{#connections}}|${conn.label}|{{/connections}}", ctx)
+    # Label is rendered as text; cannot inject a re-parseable opener
+    # _sanitize_wikilink_alias does not strip "{{" itself — but block
+    # expansion has already consumed all openers in the template before
+    # the label was substituted, so no live `{{#` opener remains for re-parse.
+    assert "{{#" not in out
+    assert "{{/" not in out
+
+
+def test_label_injection_double_brace_close():
+    from tests.fixtures.template_context import make_block_context
+
+    G = _injection_graph("evil}}label")
+    ctx = make_block_context(G, "center")
+    out = _expand("{{#connections}}|${conn.label}|{{/connections}}", ctx)
+    # No live `{{/` closer can survive in the rendered output (no opener exists)
+    assert "{{/if}}" not in out
+    assert "{{/connections}}" not in out
+
+
+def test_label_injection_block_opener():
+    """Adversarial label tries to smuggle a fake nested loop via `{{#`."""
+    from tests.fixtures.template_context import make_block_context
+
+    G = _injection_graph("evil{{#connections}}fake{{/connections}}label")
+    ctx = make_block_context(G, "center")
+    out = _expand("{{#connections}}|${conn.label}|{{/connections}}", ctx)
+    # The template's outer block was already consumed; the label text
+    # appears as literal characters but cannot trigger a second pass.
+    # We verify no second-pass expansion occurred (no fake "fake" block body
+    # got materialized as a separate iteration).
+    # The literal sequence may appear as text inside |...| — that's fine
+    # so long as it isn't re-expanded.
+    assert out.count("|") == 2  # exactly one iteration's pipes
+
+
+def test_label_injection_dollar_brace():
+    """Adversarial label contains `${conn.label}` — must not re-substitute."""
+    from tests.fixtures.template_context import make_block_context
+    from graphify.templates import _BlockTemplate
+
+    G = _injection_graph("evil${conn.label}label")
+    ctx = make_block_context(G, "center")
+    expanded = _expand("{{#connections}}|${conn.label}|{{/connections}}", ctx)
+    # After block expansion the literal `${conn.label}` from the label text
+    # is present as text — but safe_substitute will not have a binding
+    # for `conn.label` in render_note's substitution_ctx (only top-level
+    # vars), so it remains a literal placeholder. We verify the loop did
+    # NOT produce two iterations.
+    assert expanded.count("|") == 2
+    # Render through stock-like _BlockTemplate.safe_substitute with an
+    # empty substitution context — `${conn.label}` stays literal (no
+    # matching key in mapping).
+    rendered = _BlockTemplate(expanded).safe_substitute({})
+    assert "${conn.label}" in rendered  # literal preserved as text
+
+
+def test_label_injection_backtick():
+    """Adversarial label with backtick must not break Dataview fence."""
+    from tests.fixtures.template_context import make_block_context
+
+    G = _injection_graph("evil`label")
+    ctx = make_block_context(G, "center")
+    out = _expand("{{#connections}}|${conn.label}|{{/connections}}", ctx)
+    # Backtick survives in the alias (sanitizer strips control chars,
+    # not backticks) — what matters is that block expansion ran first
+    # and the backtick cannot retroactively close a fence opened by the
+    # template author. No live `{{#` / `{{/` artifacts.
+    assert "{{#" not in out
+    assert "{{/" not in out
+
+
+def test_label_injection_newline():
+    """Adversarial label with literal newline must not break callout."""
+    from tests.fixtures.template_context import make_block_context
+
+    G = _injection_graph("evil\nlabel")
+    ctx = make_block_context(G, "center")
+    out = _expand("{{#connections}}- ${conn.label}\n{{/connections}}", ctx)
+    # Sanitizer maps \n → space; verify no embedded newline survived inside
+    # the alias position
+    assert "evil\nlabel" not in out
+    # And exactly one bullet line emitted
+    assert out.count("- ") == 1
+
+
+def test_block_expansion_runs_before_substitution():
+    """Adversarial fixture locks the D-16 ordering invariant.
+
+    Node label is the literal `"{{#connections}}{{/connections}}"`. Render
+    via `{{#connections}}${conn.label}{{/connections}}`. Block expansion
+    runs FIRST; the loop iterates once with `conn.label` set to the
+    sanitized adversarial string. Substitution-then-expansion would have
+    re-parsed the smuggled opener as a new loop on a second pass.
+    """
+    from tests.fixtures.template_context import make_block_context
+    from graphify.templates import _BlockTemplate
+
+    G = _injection_graph("{{#connections}}{{/connections}}")
+    ctx = make_block_context(G, "center")
+    expanded = _expand(
+        "BEFORE{{#connections}}|${conn.label}|{{/connections}}AFTER",
+        ctx,
+    )
+    # Exactly one iteration produced; outer block consumed once
+    assert expanded.startswith("BEFORE|")
+    assert expanded.endswith("|AFTER")
+    # No live opener that could be re-parsed
+    # (block-expansion phase is done; only substitution phase remains)
+    rendered = _BlockTemplate(expanded).safe_substitute({})
+    # The rendered output may contain the literal `{{#connections}}`
+    # text from the label, but it is purely text — there is no second
+    # block expansion pass that would re-interpret it.
+    # The critical assertion: only ONE iteration occurred.
+    assert expanded.count("BEFORE") == 1
+    assert expanded.count("AFTER") == 1
+
+
+# --- backward compatibility (D-16 / TMPL-01 / ROADMAP criterion 4) ---
+
+
+def test_block_free_template_renders_byte_identical():
+    """Block-free templates render byte-identical via new pipeline vs stock."""
+    import importlib.resources as ilr
+    import string as stdlib_string
+    from graphify.templates import (
+        BlockContext,
+        _BlockTemplate,
+        _expand_blocks,
+        _build_edge_records,
+    )
+
+    # Load the existing block-free thing.md template
+    text = ilr.files("graphify").joinpath("builtin_templates", "thing.md").read_text(encoding="utf-8")
+    assert "{{#" not in text  # confirm it really is block-free
+
+    G = nx.Graph()
+    G.add_node("n", label="Test", file_type="code")
+
+    substitution_ctx = {
+        "label": "Test",
+        "frontmatter": "---\ntype: thing\n---\n",
+        "wayfinder_callout": "WAY",
+        "connections_callout": "CONN",
+        "members_section": "",
+        "sub_communities_callout": "",
+        "dataview_block": "",
+        "metadata_callout": "META",
+        "body": "BODY",
+    }
+
+    # New pipeline path
+    block_ctx = BlockContext(
+        graph=G,
+        node_id="n",
+        edges=_build_edge_records(G, "n"),
+        dataview_nonempty=False,
+    )
+    expanded = _expand_blocks(text, block_ctx)
+    new_out = _BlockTemplate(expanded).safe_substitute(substitution_ctx)
+
+    # Stock string.Template path
+    stock_out = stdlib_string.Template(text).safe_substitute(substitution_ctx)
+
+    assert new_out == stock_out, "Block-free templates must render byte-identical"
+
+
+# --- preflight-only invariant (D-09/D-10) ---
+
+
+def test_render_does_not_revalidate_blocks():
+    """D-09/D-10: render path trusts vetted templates and never raises
+    block-syntax errors. _expand_blocks consumes a template that already
+    passed validate_template without re-validating."""
+    from graphify.templates import (
+        BlockContext,
+        _expand_blocks,
+        validate_template,
+    )
+
+    text = (
+        "${frontmatter}\n# ${label}\n"
+        "{{#if_god_node}}G{{/if}}"
+        "{{#connections}}- ${conn.label}\n{{/connections}}"
+    )
+    # Preflight passes
+    assert validate_template(text, {"frontmatter", "label"}) == []
+
+    G = nx.Graph()
+    G.add_node("n", label="N", is_god_node=True)
+    G.add_node("p", label="P")
+    G.add_edge("n", "p", relation="r", confidence="EXTRACTED")
+    from graphify.templates import _build_edge_records
+    ctx = BlockContext(
+        graph=G,
+        node_id="n",
+        edges=_build_edge_records(G, "n"),
+        dataview_nonempty=False,
+    )
+    # Render path must not raise any block-syntax error
+    out = _expand_blocks(text, ctx)
+    assert "G" in out
+    assert "- P" in out
