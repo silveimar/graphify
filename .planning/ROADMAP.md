@@ -215,7 +215,11 @@ Plans:
   2. A profile field maps community ID/label patterns to custom templates, and the first matching pattern wins (consistent with the v1.0 mapping engine precedence)
   3. Running `graphify --validate-profile` against a composed profile reports the merge chain and the resolved per-community template assignments
   4. Removing an `extends:` reference and re-validating shows exactly which fields were lost — no silent drops
-**Plans:** TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 30-01-PLAN.md — [wave 1] Resolver + schema (extends/includes, cycle detection, depth cap, path confinement, _deep_merge_with_provenance, refactor load_profile, extend validate_profile + PreflightResult)
+- [ ] 30-02-PLAN.md — [wave 2, depends on 01] community_templates runtime dispatch in _render_moc_like (fnmatchcase, first-match-wins, MOC-only scope, fallback on failure)
+- [ ] 30-03-PLAN.md — [wave 3, depends on 01+02] Extend --validate-profile output: Merge chain + Field provenance + Resolved community templates sections (uses Plan 02 fixture; serial appends to test_profile_composition.py)
 
 ### Phase 31: Template Engine Extensions
 **Goal:** Markdown templates can express conditional sections, iterate over connections, and inject per-note-type Dataview queries — without leaving the `string.Template` block-parser surface or adding new required dependencies.

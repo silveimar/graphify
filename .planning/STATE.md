@@ -4,14 +4,14 @@ milestone: v1.7
 milestone_name: Vault Adapter UX & Template Polish
 status: executing
 stopped_at: Phase 30 context gathered
-last_updated: "2026-04-28T15:33:20.947Z"
-last_activity: 2026-04-28 -- Phase 29 planning complete
+last_updated: "2026-04-28T16:07:20.985Z"
+last_activity: 2026-04-28 -- Phase 30 planning complete
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 9
+  total_plans: 12
   completed_plans: 9
-  percent: 100
+  percent: 75
 ---
 
 # Project State
@@ -56,7 +56,7 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 Phase: 28 (self-ingestion-hardening) — EXECUTING
 Plan: 3 of 3
 Status: Ready to execute
-Last activity: 2026-04-28 -- Phase 29 planning complete
+Last activity: 2026-04-28 -- Phase 30 planning complete
 
 ## Performance Metrics
 
