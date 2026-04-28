@@ -170,7 +170,11 @@ Full details: [.planning/milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md)
   2. When the vault has `.graphify/profile.yaml`, graphify auto-adopts profile-driven placement (Option C) — CWD is treated as both input corpus and output target without an explicit flag
   3. The profile's output destination field (vault-relative path, absolute path, or sibling-of-vault) determines where notes are written
   4. The CLI `--output` flag overrides the profile's declared destination and the precedence is shown in stderr when both are present
-**Plans:** TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 27-01-PLAN.md — Profile schema extension: output: block + validate_sibling_path() (VAULT-10 schema half)
+- [ ] 27-02-PLAN.md — graphify/output.py: ResolvedOutput, is_obsidian_vault, resolve_output (VAULT-08, VAULT-09)
+- [ ] 27-03-PLAN.md — CLI wiring: --output flag in run + --obsidian, run_corpus out_dir kwarg, integration tests (VAULT-08, VAULT-09, VAULT-10)
 
 ### Phase 28: Self-Ingestion Hardening
 **Goal:** Re-running graphify inside a vault never re-ingests its own previous output, even across profile changes or unconventional output paths.
