@@ -154,7 +154,7 @@ Full details: [.planning/milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md)
 **Phases (summary):**
 
 - [x] **Phase 27: Vault Detection & Profile-Driven Output Routing** — Detect `.obsidian/` at CWD, auto-adopt vault profile, resolve output destination from profile field (3/3 plans, completed 2026-04-28)
-- [ ] **Phase 28: Self-Ingestion Hardening** — Profile-aware exclusions, recursive nesting guard, manifest-based ignore for prior runs
+- [x] **Phase 28: Self-Ingestion Hardening** — Profile-aware exclusions, recursive nesting guard, manifest-based ignore for prior runs (completed 2026-04-28)
 - [ ] **Phase 29: Doctor Diagnostics & Dry-Run Preview** — `graphify doctor` command + `--dry-run` preview of vault-aware behavior
 - [ ] **Phase 30: Profile Composition** — `extends:`/`includes:` mechanism with cycle detection; per-community template overrides
 - [ ] **Phase 31: Template Engine Extensions** — Conditional `{{#if_*}}` blocks, `{{#connections}}` loops, per-note-type Dataview query templates
@@ -185,11 +185,11 @@ Plans:
   2. Paths matching `**/graphify-out/**` at any nesting depth are refused as ingestion candidates and prior nesting is reported as a warning to the user
   3. The current run's manifest records every output path it wrote, and a subsequent run reads that manifest and skips those paths even when the profile output destination has changed since
   4. A user who renames their output directory in `profile.yaml` between two runs does not see the previous run's notes re-ingested as "documents"
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 Plans:
 - [x] 28-01-PLAN.md — Profile schema + ResolvedOutput.exclude_globs (VAULT-11 schema)
 - [x] 28-02-PLAN.md — detect.py nesting guard + exclude_globs application + pipeline threading (VAULT-11 detect-side, VAULT-12)
-- [ ] 28-03-PLAN.md — output-manifest.json read/write + cross-run renamed-output recovery (VAULT-13)
+- [x] 28-03-PLAN.md — output-manifest.json read/write + cross-run renamed-output recovery (VAULT-13)
 
 ### Phase 29: Doctor Diagnostics & Dry-Run Preview
 **Goal:** A new user can diagnose vault adapter misconfiguration and preview vault-aware behavior before any files are written.
@@ -262,7 +262,7 @@ Plans:
 | 25. Mandatory Dual-Artifact Persistence in Skill Files | v1.6 | 1/1 | Complete    | 2026-04-27 |
 | 26. v1.5 Configuration Guide & Walkthrough Docs | v1.6 | 1/1 | Complete   | 2026-04-27 |
 | 27. Vault Detection & Profile-Driven Output Routing | v1.7 | 0/0 | Not started | — |
-| 28. Self-Ingestion Hardening | v1.7 | 2/3 | In Progress|  |
+| 28. Self-Ingestion Hardening | v1.7 | 3/3 | Complete   | 2026-04-28 |
 | 29. Doctor Diagnostics & Dry-Run Preview | v1.7 | 0/0 | Not started | — |
 | 30. Profile Composition | v1.7 | 0/0 | Not started | — |
 | 31. Template Engine Extensions | v1.7 | 0/0 | Not started | — |

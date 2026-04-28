@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Vault Adapter UX & Template Polish
-status: executing
+status: verifying
 stopped_at: Phase 28 context gathered
-last_updated: "2026-04-28T05:31:56.050Z"
+last_updated: "2026-04-28T05:41:16.905Z"
 last_activity: 2026-04-28
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 83
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
@@ -55,7 +55,7 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 Phase: 28 (self-ingestion-hardening) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-28
 
 ## Performance Metrics
@@ -152,6 +152,8 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 - [Phase ?]: Phase 22 Plan 01: pure-Python Excalidraw fallback (write_diagram + 4 layout helpers + skill prompt) ships; profile schema gains layout_type/output_path; no new required deps; SKILL-06 ordering invariant honored
 - [Phase 26]: Phase 26-01 quoted MCP tool source verbatim (mcp_tool_registry.py + serve.py:1234-1250) rather than paraphrasing — guarantees DOCS-03 contract that an agent author can integrate without reading source. — Per RESEARCH §4: the loader's allowlist would reject any new diagram_types[*] keys, and CONTEXT D-05/D-06 thresholds are author policies not loader gates.
 - [Phase 26]: Phase 26-01 ships D-05/D-06 policy values (>=3 outbound branches, betweenness centrality) as inline YAML # comments rather than new schema keys. — Profile loader allowlist (graphify/profile.py:106-108 top-level + 367-404 diagram_types[*]) rejects any unknown keys; only min_main_nodes is the loader-enforced gate per seed.py:265-289.
+- [Phase ?]: D-29: manifest writes happen ONLY after successful export — --obsidian write in else block post-exit(1); run branch write on try-success path before finally
+- [Phase ?]: D-26: always read from resolved.artifacts_dir (stable anchor); notes_dir rename is transparent to prior_files prune (VAULT-13)
 
 ### Blockers/Concerns
 
@@ -186,9 +188,10 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | Phase 22 P02 | 5min | 1 tasks | 3 files |
 | Phase 24-manifest-writer-audit-atomic-read-merge-write-hardening P02 | 150 | 1 tasks | 1 files |
 | Phase 26 P01 | 237 | 3 tasks | 4 files |
+| Phase 28-self-ingestion-hardening P03 | 383 | 3 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-04-28T05:31:56.047Z
+Last session: 2026-04-28T05:41:08.974Z
 Stopped at: Phase 28 context gathered
 Next action: /gsd-plan-phase 20 to plan Phase 20 (Diagram Seed Engine).

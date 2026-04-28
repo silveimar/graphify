@@ -15,7 +15,7 @@
 - [ ] **VAULT-10**: `.graphify/profile.yaml` declares output destination (vault-relative path, absolute path, or sibling-of-vault) via a profile field; CLI `--output` flag overrides
 - [x] **VAULT-11**: Profile-aware self-ingestion exclusions — `detect.py` reads profile output destination + declared exclusion globs and prunes them from input scan
 - [x] **VAULT-12**: Recursive nesting guard — `detect.py` refuses to ingest paths matching `**/graphify-out/**` at any depth and warns the user about prior nesting if found
-- [ ] **VAULT-13**: Manifest-based ignore — current run's manifest records output paths so subsequent runs skip them even if profile changes
+- [x] **VAULT-13**: Manifest-based ignore — current run's manifest records output paths so subsequent runs skip them even if profile changes
 - [ ] **VAULT-14**: `graphify doctor` command — prints vault detection, profile validation status, resolved output destination, ignore-list, recommended fixes; non-zero exit on misconfiguration
 - [ ] **VAULT-15**: Dry-run preview for vault-root-aware behavior — `graphify --dry-run` (or `graphify doctor --dry-run`) shows what files would land where, which profile is detected, and which ingestion targets would be skipped, without writing
 
