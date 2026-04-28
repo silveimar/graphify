@@ -1,10 +1,11 @@
 ---
 phase: 31
 slug: template-engine-extensions
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-28
+audited: 2026-04-28
 ---
 
 # Phase 31 — Validation Strategy
@@ -39,7 +40,13 @@ created: 2026-04-28
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _populated by planner_ | _01 / 02_ | _1_ | TMPL-01 / TMPL-02 / TMPL-03 | T-31-* | _per-task_ | unit | `pytest tests/...` | _per-task_ | ⬜ pending |
+| 31-01-01 | 01 | 1 | TMPL-01 / TMPL-02 | T-31-01/02/03 | block engine + sanitization + preflight | unit | `pytest tests/test_templates.py -q` | ✅ | ✅ green (205) |
+| 31-01-02 | 01 | 1 | TMPL-01 / TMPL-02 | T-31-01/02/03 | adversarial label + ordering + entry-point integration | unit | `pytest tests/test_templates.py -q` | ✅ | ✅ green |
+| 31-02-01 | 02 | 2 | TMPL-03 (D-11/D-12) | — | top-level `dataview_queries` + `_KNOWN_NOTE_TYPES` validation | unit | `pytest tests/test_profile.py -q` | ✅ | ✅ green (173) |
+| 31-02-02 | 02 | 2 | TMPL-03 (D-13/D-14, W5/W7) | — | per-note-type lookup chain + empty-output gate + provenance | unit | `pytest tests/test_templates.py tests/test_profile.py -q` | ✅ | ✅ green |
+| audit | — | post | TMPL-01 disjointness | — | catalog vs `if_attr_*` are independent evaluators | unit | `pytest tests/test_templates.py::test_if_attr_disjoint_from_catalog_name -q` | ✅ | ✅ green |
+| audit | — | post | TMPL-02 nested-if-in-if | — | preflight rejects `{{#if}}…{{#if}}` | unit | `pytest tests/test_templates.py::test_nested_if_in_if_rejected -q` | ✅ | ✅ green |
+| audit | — | post | Sanitization on iteration | — | `_sanitize_wikilink_alias` applied to `${conn.label}`/`${conn.target}` | unit | `pytest tests/test_templates.py::test_connection_field_sanitization_blocks_label_injection -q` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -107,11 +114,11 @@ The planner MUST produce tasks covering every category below. Each row maps one 
 
 ## Wave 0 Requirements
 
-- [ ] `tests/test_templates.py` — extend with TMPL-01 / TMPL-02 / sanitization classes
-- [ ] `tests/test_profile.py` — extend with `dataview_queries` validation cases
-- [ ] `tests/fixtures/template_context.py` — NetworkX graph fixtures with god-node, isolated-node, connected-node (per RESEARCH.md L740–765)
-- [ ] `tests/fixtures/profiles/dataview_queries_*.yaml` — profile fixtures with/without `dataview_queries` (per RESEARCH.md L765–790)
-- [ ] `tests/fixtures/templates/blocks_*.md` — template fixtures exercising every block syntax + adversarial label cases (per RESEARCH.md L790–825)
+- [x] `tests/test_templates.py` — extended with TMPL-01 / TMPL-02 / sanitization classes (Plan 01: 34 new tests; audit: +3)
+- [x] `tests/test_profile.py` — extended with `dataview_queries` validation cases (Plan 02: 9 new tests)
+- [x] `tests/fixtures/template_context.py` — `make_block_context` helper present
+- [x] `tests/fixtures/profiles/dataview_queries_*.yaml` — `dataview_queries_valid.yaml`, `dataview_queries_unknown_key.yaml`, `dataview_queries_legacy_fallback.yaml`
+- [x] `tests/fixtures/templates/blocks_*.md` — `with_if_block.md`, `with_connections_block.md`, `with_if_attr.md`, `nested_blocks_invalid.md`
 
 ---
 
@@ -127,13 +134,32 @@ The planner MUST produce tasks covering every category below. Each row maps one 
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s (full suite ~12s wall-clock)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-04-28
+
+---
+
+## Validation Audit 2026-04-28
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 3 |
+| Resolved | 3 |
+| Escalated | 0 |
+
+**Gaps filled (added to `tests/test_templates.py`):**
+1. `test_if_attr_disjoint_from_catalog_name` — locks TMPL-01 catalog vs `if_attr_*` independence (catalog evaluator never short-circuits the attr escape hatch and vice-versa)
+2. `test_nested_if_in_if_rejected` — locks D-08-style preflight rejection for `{{#if}}…{{#if}}` (the previously-tested nested case was only `{{#if}}` inside `{{#connections}}`)
+3. `test_connection_field_sanitization_blocks_label_injection` — locks that `_sanitize_wikilink_alias` is applied to `${conn.label}` / `${conn.target}` iteration values for the chars it handles (`]]`, `|`, `\n`)
+
+**Auditor note:** Block-opener (`{{#`) injection on loop iteration values is held by D-16 single-pass ordering (block expansion runs *before* substitution), already locked by `test_block_expansion_runs_before_substitution` and `test_label_injection_block_opener`. The implementation deliberately layers the defense — char-stripping for wikilink/markdown breakers, ordering for block-syntax breakers — and the new sanitization test asserts the half not previously covered.
+
+**Suite status post-audit:** 1801 passed, 1 xfailed (was 1798 + 1 xfailed). Quick-run: `pytest tests/test_templates.py tests/test_profile.py -q` → 378 passed, 1 xfailed in <1s.
 </content>
 </invoke>
