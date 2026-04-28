@@ -626,3 +626,48 @@ def test_detect_no_manifest_lookup_when_resolved_none(tmp_path, capsys):
     # The file should still be detected normally
     all_files = [f for fs in result["files"].values() for f in fs]
     assert any("keep.md" in f for f in all_files)
+
+
+def test_detect_skip_reasons(tmp_path):
+    """Plan 29-02 (D-39): detect() returns a `skipped` dict with all 5 stable
+    reason buckets, each populated by the matching pruning site."""
+    # Create a corpus with at least one pruned noise dir + a normal file.
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "node_modules").mkdir()
+    (tmp_path / "node_modules" / "x.js").write_text("// noise")
+    (tmp_path / "main.py").write_text("x = 1\n")
+
+    result = detect(tmp_path)
+
+    assert "skipped" in result
+    assert isinstance(result["skipped"], dict)
+    # D-38 stable label set — downstream consumers (Plan 29-03 doctor.py) depend on these.
+    assert set(result["skipped"].keys()) >= {
+        "nesting",
+        "exclude-glob",
+        "manifest",
+        "sensitive",
+        "noise-dir",
+    }
+    # node_modules must be recorded under noise-dir (pruning site verified).
+    assert any("node_modules" in p for p in result["skipped"]["noise-dir"])
+
+
+def test_detect_return_shape_backcompat(tmp_path):
+    """Plan 29-02: ABI preservation — every pre-existing detect() return key
+    must remain present after the additive `skipped` extension."""
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "main.py").write_text("x = 1\n")
+
+    result = detect(tmp_path)
+
+    for key in (
+        "files",
+        "total_files",
+        "total_words",
+        "needs_graph",
+        "warning",
+        "skipped_sensitive",
+        "graphifyignore_patterns",
+    ):
+        assert key in result, f"detect() return is missing pre-existing key: {key}"

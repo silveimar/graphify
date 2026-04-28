@@ -457,6 +457,26 @@ def detect(
     skipped_sensitive: list[str] = []
     ignore_patterns = _load_graphifyignore(root)
 
+    # Plan 29-02 (D-39): single source of truth for skip decisions, surfaced
+    # via additive return key `skipped`. Each pruning site below also appends
+    # to skipped[reason]. T-29-05: cap each list at 10000 entries to bound
+    # memory on pathological inputs; overflow counts go to skipped_overflow.
+    _SKIP_CAP = 10000
+    skipped: dict[str, list[str]] = {
+        "nesting": [],
+        "exclude-glob": [],
+        "manifest": [],
+        "sensitive": [],
+        "noise-dir": [],
+    }
+    skipped_overflow: dict[str, int] = {k: 0 for k in skipped}
+
+    def _record_skip(reason: str, rel_path: str) -> None:
+        if len(skipped[reason]) < _SKIP_CAP:
+            skipped[reason].append(rel_path)
+        else:
+            skipped_overflow[reason] += 1
+
     # Phase 28: compute resolved-aware basenames and combined exclude patterns
     resolved_basenames: frozenset[str] = frozenset()
     if resolved is not None:
@@ -503,12 +523,15 @@ def detect(
                 # Accumulate nesting paths separately for the D-20 single-line warning.
                 pruned: set[str] = set()
                 for d in dirnames:
-                    if (d.startswith(".")
-                            or _is_noise_dir(d)
-                            or _is_ignored(dp / d, root, all_ignore_patterns)):
+                    if d.startswith(".") or _is_noise_dir(d):
+                        _record_skip("noise-dir", str(dp / d))
+                        pruned.add(d)
+                    elif _is_ignored(dp / d, root, all_ignore_patterns):
+                        _record_skip("exclude-glob", str(dp / d))
                         pruned.add(d)
                     elif _is_nested_output(d, resolved_basenames):
                         nested_paths.append(str(dp / d))
+                        _record_skip("nesting", str(dp / d))
                         pruned.add(d)
                 dirnames[:] = [d for d in dirnames if d not in pruned]
             for fname in filenames:
@@ -542,12 +565,15 @@ def detect(
             if str(p).startswith(str(converted_dir)):
                 continue
         if _is_ignored(p, root, all_ignore_patterns):
+            _record_skip("exclude-glob", str(p))
             continue
         # Phase 28 D-27: silent skip for files recorded in a prior output-manifest run
         if prior_files and str(p.resolve()) in prior_files:
+            _record_skip("manifest", str(p))
             continue
         if _is_sensitive(p):
             skipped_sensitive.append(str(p))
+            _record_skip("sensitive", str(p))
             continue
         ftype = classify_file(p)
         if ftype:
@@ -590,6 +616,7 @@ def detect(
         "warning": warning,
         "skipped_sensitive": skipped_sensitive,
         "graphifyignore_patterns": len(ignore_patterns),
+        "skipped": skipped,
     }
 
 
