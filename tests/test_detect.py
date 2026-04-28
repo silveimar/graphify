@@ -236,3 +236,65 @@ def test_detect_video_not_in_words(tmp_path):
     result = detect(tmp_path)
     # Only video file present — total_words should be 0
     assert result["total_words"] == 0
+
+
+def test_detect_skips_graphify_out_subtree(tmp_path):
+    """detect() must NOT re-ingest its own graphify-out/ output (self-ingestion bug)."""
+    out_dir = tmp_path / "graphify-out" / "obsidian"
+    out_dir.mkdir(parents=True)
+    (out_dir / "foo.md").write_text("# Some prior export\n\nA simple note.\n")
+    (tmp_path / "main.py").write_text("x = 1")
+
+    result = detect(tmp_path)
+    for ftype, file_list in result["files"].items():
+        for f in file_list:
+            assert "/graphify-out/obsidian" not in f, f"leaked self-output: {f}"
+            assert "foo.md" not in f, f"leaked self-output: {f}"
+    assert any("main.py" in f for f in result["files"]["code"])
+
+
+def test_detect_skips_graphify_out_at_any_depth(tmp_path):
+    """graphify-out/ should be pruned at any nesting depth, not just the root."""
+    nested = tmp_path / "sub" / "graphify-out" / "obsidian"
+    nested.mkdir(parents=True)
+    (nested / "note.md").write_text("# Nested export\n\nNote body.\n")
+    keeper = tmp_path / "sub" / "keeper.md"
+    keeper.write_text("# Keep me\n\nThis is a real document.\n")
+
+    result = detect(tmp_path)
+    for ftype, file_list in result["files"].items():
+        for f in file_list:
+            assert "/graphify-out/" not in f, f"leaked self-output: {f}"
+            assert "note.md" not in f, f"leaked self-output: {f}"
+    assert any("keeper.md" in f for f in result["files"]["document"])
+
+
+def test_detect_still_includes_graphify_out_memory(tmp_path):
+    """graphify-out/memory/ allow-list must be preserved after the fix."""
+    memory = tmp_path / "graphify-out" / "memory"
+    memory.mkdir(parents=True)
+    (memory / "recall.md").write_text("# recall content\n\nremembered fact\n")
+    obsidian = tmp_path / "graphify-out" / "obsidian"
+    obsidian.mkdir(parents=True)
+    (obsidian / "note.md").write_text("# excluded export\n")
+
+    result = detect(tmp_path)
+    all_files = [f for fs in result["files"].values() for f in fs]
+    assert any("recall.md" in f for f in all_files), "memory allow-list broken"
+    assert not any("obsidian" in f and "note.md" in f for f in all_files), \
+        "obsidian export leaked despite memory allow-list"
+
+
+def test_detect_skips_graphify_out_underscore_variant(tmp_path):
+    """The graphify_out/ underscore variant should also be pruned defensively."""
+    out_dir = tmp_path / "graphify_out"
+    out_dir.mkdir()
+    (out_dir / "some.md").write_text("# stale output\n")
+    (tmp_path / "main.py").write_text("y = 2")
+
+    result = detect(tmp_path)
+    for ftype, file_list in result["files"].items():
+        for f in file_list:
+            assert "some.md" not in f, f"leaked underscore variant: {f}"
+            assert "/graphify_out/" not in f, f"leaked underscore variant: {f}"
+    assert any("main.py" in f for f in result["files"]["code"])
