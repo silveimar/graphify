@@ -1270,18 +1270,84 @@ def main() -> None:
             print("Usage: graphify --validate-profile <vault-path>", file=sys.stderr)
             sys.exit(2)
         from graphify.profile import validate_profile_preflight
-        result = validate_profile_preflight(Path(sys.argv[2]))
+        vault_arg = Path(sys.argv[2])
+        result = validate_profile_preflight(vault_arg)
         for err in result.errors:
             print(f"error: {err}", file=sys.stderr)
         for warn in result.warnings:
             print(f"warning: {warn}", file=sys.stderr)
+
+        # Phase 30 (D-14, D-16, D-17): always print the three new sections to
+        # stdout, even on error, so users see what the resolver was able to
+        # compute. Exit code is determined ONLY by result.errors.
+
+        if not result.errors:
+            # D-77a literal kept verbatim for back-compat:
+            print(
+                f"profile ok \u2014 {result.rule_count} rules, "
+                f"{result.template_count} templates validated"
+            )
+            print()
+
+        # Anchor for relative-path display (best-effort; resolved vault may be
+        # absent on hard errors, in which case we fall back to .name).
+        try:
+            graphify_root = vault_arg.resolve() / ".graphify"
+        except Exception:
+            graphify_root = None
+
+        def _rel(path: Path) -> str:
+            if graphify_root is not None:
+                try:
+                    return str(path.relative_to(graphify_root))
+                except ValueError:
+                    pass
+            return path.name
+
+        # Section 1: Merge chain (root ancestor first)
+        print("Merge chain (root ancestor first):")
+        if result.chain:
+            for path in result.chain:
+                print(f"  {_rel(path)}")
+        else:
+            print("  (no chain \u2014 profile.yaml not found or unparseable)")
+        print()
+
+        # Section 2: Field provenance
+        if result.provenance:
+            print(f"Field provenance ({len(result.provenance)} leaf fields):")
+            for dotted in sorted(result.provenance):
+                src = result.provenance[dotted]
+                print(f"  {dotted:40s} \u2190 {_rel(src)}")
+        else:
+            print("Field provenance (0 leaf fields):")
+            print("  (none)")
+        print()
+
+        # Section 3: Resolved community templates (D-17 \u2014 graph-blind)
+        rules = result.community_template_rules
+        if rules:
+            print(f"Resolved community templates ({len(rules)} rules):")
+            for idx, rule in enumerate(rules, start=1):
+                match = rule.get("match")
+                pattern = rule.get("pattern")
+                template = rule.get("template")
+                if isinstance(pattern, str):
+                    pattern_repr = f'"{pattern}"'
+                else:
+                    pattern_repr = repr(pattern)
+                print(
+                    f"  [{idx}] match={match}  pattern={pattern_repr}  template={template}"
+                )
+            print(
+                "  (note: actual community-to-template assignments require a graph "
+                "\u2014 run after `graphify`)"
+            )
+        else:
+            print("Resolved community templates: (none)")
+
         if result.errors:
             sys.exit(1)
-        # D-77a literal: "profile ok — N rules, M templates validated"
-        print(
-            f"profile ok \u2014 {result.rule_count} rules, "
-            f"{result.template_count} templates validated"
-        )
         sys.exit(0)
 
     # --obsidian [--graph <path>] [--obsidian-dir <path>] [--dry-run] (D-78, MRG-03, MRG-05)

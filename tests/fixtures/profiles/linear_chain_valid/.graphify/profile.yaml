@@ -1,0 +1,3 @@
+extends: bases/fusion.yaml
+folder_mapping:
+  statement: from-profile/Statements
