@@ -1212,6 +1212,8 @@ def main() -> None:
         print("    --from <path>          compare FROM this snapshot (for delta generation)")
         print("    --to <path>            compare TO this snapshot (for delta generation)")
         print("    --delta                also generate GRAPH_DELTA.md comparing against previous snapshot")
+        print("  doctor                  diagnose vault/profile/output configuration (VAULT-14/15)")
+        print("    --dry-run               preview which files would be ingested/skipped, no writes")
         print("  enrich                 run background derivation passes over an existing graph (overlay only)")
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
         print("    --budget N              token budget cap (description → patterns → community; staleness compute-only)")
@@ -2286,6 +2288,26 @@ def main() -> None:
                 pass
         result = run_benchmark(graph_path, corpus_words=corpus_words)
         print_benchmark(result)
+    elif cmd == "doctor":
+        # graphify doctor [--dry-run]
+        # D-30: top-level subcommand. D-31: --dry-run lives ONLY here.
+        # D-35: exit 1 on invalid profile / unresolvable dest / would_self_ingest.
+        import argparse as _ap
+
+        _p_dr = _ap.ArgumentParser(
+            prog="graphify doctor",
+            description="Diagnose vault detection / profile / output destination / ignore-list (VAULT-14/15)",
+        )
+        _p_dr.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Preview which files would be ingested/skipped without writing",
+        )
+        opts = _p_dr.parse_args(sys.argv[2:])
+        from graphify.doctor import run_doctor, format_report
+        report = run_doctor(Path.cwd(), dry_run=opts.dry_run)
+        print(format_report(report))
+        sys.exit(1 if report.is_misconfigured() else 0)
     elif cmd == "vault-promote":
         # graphify vault-promote --vault PATH [--threshold N] [--graph PATH]
         import argparse as _ap

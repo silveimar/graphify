@@ -10,8 +10,20 @@ import pytest
 
 
 def _graphify(args: list[str], cwd: Path, env: dict | None = None) -> subprocess.CompletedProcess:
-    """Invoke `python -m graphify <args>` in cwd, return CompletedProcess."""
+    """Invoke `python -m graphify <args>` in cwd, return CompletedProcess.
+
+    Prepends the worktree root to PYTHONPATH so subprocesses pick up the
+    in-worktree graphify/ package rather than the editable install (which
+    points at the main repo checkout). Without this, parallel-executor
+    worktrees can't validate their own __main__.py changes via subprocess.
+    """
     full_env = os.environ.copy()
+    # Worktree root = three parents up from this test file (tests/test_main_flags.py).
+    worktree_root = Path(__file__).resolve().parent.parent
+    existing_pp = full_env.get("PYTHONPATH", "")
+    full_env["PYTHONPATH"] = (
+        f"{worktree_root}{os.pathsep}{existing_pp}" if existing_pp else str(worktree_root)
+    )
     if env:
         full_env.update(env)
     return subprocess.run(
@@ -156,3 +168,86 @@ def test_obsidian_output_flag_takes_precedence_over_obsidian_dir(tmp_path):
     )
     assert f"--output={custom} overrides profile output" in result.stderr
     assert "loser" not in result.stderr.split("overrides")[0]
+
+
+# ---------------------------------------------------------------------------
+# Phase 29 / VAULT-14 / VAULT-15: doctor subcommand wiring
+# ---------------------------------------------------------------------------
+
+_DOCTOR_VALID_PROFILE = (
+    "output:\n"
+    "  mode: vault-relative\n"
+    "  path: Atlas/Generated\n"
+)
+
+
+def _make_doctor_vault(tmp_path: Path, *, profile_text: str | None) -> Path:
+    """Mirror tests/test_doctor.py::_make_vault for CLI subprocess fixtures."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / ".obsidian").mkdir()
+    (vault / ".git").mkdir()
+    (vault / ".graphify").mkdir()
+    if profile_text is not None:
+        (vault / ".graphify" / "profile.yaml").write_text(profile_text)
+    return vault
+
+
+def test_doctor_clean_exit_zero(tmp_path):
+    pytest.importorskip("yaml")
+    vault = _make_doctor_vault(tmp_path, profile_text=_DOCTOR_VALID_PROFILE)
+    result = _graphify(["doctor"], cwd=vault)
+    assert result.returncode == 0, (
+        f"expected exit 0; got {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}"
+    )
+    for section in (
+        "Vault Detection",
+        "Profile Validation",
+        "Output Destination",
+        "Ignore-List",
+        "Recommended Fixes",
+    ):
+        assert section in result.stdout, f"missing section {section!r} in stdout"
+    assert "No issues detected." in result.stdout
+
+
+def test_doctor_misconfig_exit_one(tmp_path):
+    pytest.importorskip("yaml")
+    # Profile with invalid output.mode → resolve_output _refuse() → exit 1.
+    bad = (
+        "output:\n"
+        "  mode: nonsense\n"
+        "  path: Atlas/Generated\n"
+    )
+    vault = _make_doctor_vault(tmp_path, profile_text=bad)
+    result = _graphify(["doctor"], cwd=vault)
+    assert result.returncode == 1, (
+        f"expected exit 1; got {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}"
+    )
+    assert "Recommended Fixes" in result.stdout
+    assert "[graphify] FIX:" in result.stdout
+
+
+def test_doctor_dry_run_flag(tmp_path):
+    pytest.importorskip("yaml")
+    vault = _make_doctor_vault(tmp_path, profile_text=_DOCTOR_VALID_PROFILE)
+    (vault / "alpha.py").write_text("def a(): return 1\n")
+
+    def _snapshot(p: Path) -> set[Path]:
+        return {q for q in p.rglob("*") if q.is_file()}
+
+    before = _snapshot(tmp_path)
+    result = _graphify(["doctor", "--dry-run"], cwd=vault)
+    after = _snapshot(tmp_path)
+    assert "Would ingest:" in result.stdout, (
+        f"missing 'Would ingest:' in stdout\nstdout={result.stdout}"
+    )
+    assert "Would write notes to:" in result.stdout
+    new_files = after - before
+    assert new_files == set(), f"doctor --dry-run wrote files: {sorted(new_files)}"
+
+
+def test_doctor_in_help(tmp_path):
+    result = _graphify(["--help"], cwd=tmp_path)
+    assert "doctor" in result.stdout
+    assert "--dry-run" in result.stdout
