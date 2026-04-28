@@ -1,6 +1,8 @@
 # file discovery, type classification, and corpus health checks
 from __future__ import annotations
+import datetime
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -256,6 +258,11 @@ _SKIP_DIRS = {
 # via the scan_paths allow-list below.
 _SELF_OUTPUT_DIRS = {"graphify-out", "graphify_out"}
 
+# Phase 28 (VAULT-13): output-manifest constants
+_OUTPUT_MANIFEST_NAME = "output-manifest.json"
+_OUTPUT_MANIFEST_VERSION = 1
+_OUTPUT_MANIFEST_MAX_RUNS = 5
+
 # Large generated files that are never useful to extract
 _SKIP_FILES = {
     "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
@@ -353,6 +360,85 @@ def _is_ignored(path: Path, root: Path, patterns: list[str]) -> bool:
     return False
 
 
+def _load_output_manifest(artifacts_dir: Path) -> dict:
+    """Load output-manifest.json; return empty envelope on any failure (D-25).
+
+    Missing file → silent empty envelope (no warning).
+    Malformed JSON or unexpected shape → emit one warning to stderr, return empty envelope.
+    """
+    manifest_path = artifacts_dir / _OUTPUT_MANIFEST_NAME
+    if not manifest_path.exists():
+        return {"version": _OUTPUT_MANIFEST_VERSION, "runs": []}
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or "runs" not in data:
+            raise ValueError("unexpected shape")
+        return data
+    except Exception:
+        print(
+            "[graphify] WARNING: output-manifest.json unreadable, ignoring history",
+            file=sys.stderr,
+        )
+        return {"version": _OUTPUT_MANIFEST_VERSION, "runs": []}
+
+
+def _save_output_manifest(
+    artifacts_dir: Path,
+    notes_dir: Path,
+    written_files: list[str],
+    run_id: str | None = None,
+) -> None:
+    """Append a run entry and write output-manifest.json atomically (D-29).
+
+    - GC's stale file entries from prior runs (D-28: removes entries where path no longer exists)
+    - Appends new run entry with run_id, timestamp, notes_dir, artifacts_dir, files
+    - FIFO-trims runs list to N=5 (D-24)
+    - Writes atomically via tmp + fsync + os.replace; cleans tmp on OSError; re-raises
+    """
+    manifest_path = artifacts_dir / _OUTPUT_MANIFEST_NAME
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    existing = _load_output_manifest(artifacts_dir)
+    ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    if run_id is None:
+        h = hashlib.sha256(f"{notes_dir}{ts}".encode()).hexdigest()[:8]
+        run_id = f"{ts}-{h}"
+
+    new_run = {
+        "run_id": run_id,
+        "timestamp": ts,
+        "notes_dir": str(notes_dir.resolve()),
+        "artifacts_dir": str(artifacts_dir.resolve()),
+        "files": [str(Path(f).resolve()) for f in written_files],
+    }
+
+    runs: list[dict] = existing.get("runs", [])
+    # D-28: GC stale file entries from prior runs
+    for run in runs:
+        run["files"] = [f for f in run.get("files", []) if Path(f).exists()]
+    # Append and FIFO-trim to N=5 (D-24)
+    runs.append(new_run)
+    runs = runs[-_OUTPUT_MANIFEST_MAX_RUNS:]
+
+    manifest = {"version": _OUTPUT_MANIFEST_VERSION, "runs": runs}
+
+    # Atomic write: tmp + os.replace (D-29) — mirrors merge.py:_write_atomic
+    tmp = manifest_path.with_suffix(".json.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(manifest, indent=2, sort_keys=True))
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, manifest_path)
+    except OSError:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        raise
+
+
 def detect(
     root: Path,
     *,
@@ -383,6 +469,15 @@ def detect(
     all_ignore_patterns: list[str] = list(ignore_patterns) + exclude_globs
 
     nested_paths: list[str] = []
+
+    # Phase 28 (D-21/D-26/D-27): build prior_files set from output-manifest
+    # Only loaded when resolved is provided (stable artifacts_dir anchor).
+    # Silent skip — D-27: no warning emitted when a file is pruned.
+    prior_files: set[str] = set()
+    if resolved is not None:
+        manifest_data = _load_output_manifest(resolved.artifacts_dir)
+        for run in manifest_data.get("runs", []):
+            prior_files.update(run.get("files", []))
 
     # Always include graphify-out/memory/ - query results filed back into the graph
     memory_dir = root / "graphify-out" / "memory"
@@ -447,6 +542,9 @@ def detect(
             if str(p).startswith(str(converted_dir)):
                 continue
         if _is_ignored(p, root, all_ignore_patterns):
+            continue
+        # Phase 28 D-27: silent skip for files recorded in a prior output-manifest run
+        if prior_files and str(p.resolve()) in prior_files:
             continue
         if _is_sensitive(p):
             skipped_sensitive.append(str(p))
