@@ -185,7 +185,11 @@ Plans:
   2. Paths matching `**/graphify-out/**` at any nesting depth are refused as ingestion candidates and prior nesting is reported as a warning to the user
   3. The current run's manifest records every output path it wrote, and a subsequent run reads that manifest and skips those paths even when the profile output destination has changed since
   4. A user who renames their output directory in `profile.yaml` between two runs does not see the previous run's notes re-ingested as "documents"
-**Plans:** TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 28-01-PLAN.md — Profile schema + ResolvedOutput.exclude_globs (VAULT-11 schema)
+- [ ] 28-02-PLAN.md — detect.py nesting guard + exclude_globs application + pipeline threading (VAULT-11 detect-side, VAULT-12)
+- [ ] 28-03-PLAN.md — output-manifest.json read/write + cross-run renamed-output recovery (VAULT-13)
 
 ### Phase 29: Doctor Diagnostics & Dry-Run Preview
 **Goal:** A new user can diagnose vault adapter misconfiguration and preview vault-aware behavior before any files are written.
