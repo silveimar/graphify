@@ -21,9 +21,9 @@
 
 ### Template Engine Extensions (deferred from v1.0)
 
-- [ ] **TMPL-01**: Conditional template sections — `{{#if_god_node}}...{{/if}}` guards in markdown templates, evaluated against node attributes
-- [ ] **TMPL-02**: Loop blocks for connections — `{{#connections}}...{{/connections}}` iteration in templates, with per-iteration variable scope
-- [ ] **TMPL-03**: Custom Dataview query templates per note type — profile field allowing per-note-type Dataview query strings injected at render time
+- [x] **TMPL-01**: Conditional template sections — `{{#if_god_node}}...{{/if}}` guards in markdown templates, evaluated against node attributes
+- [x] **TMPL-02**: Loop blocks for connections — `{{#connections}}...{{/connections}}` iteration in templates, with per-iteration variable scope
+- [x] **TMPL-03**: Custom Dataview query templates per note type — profile field allowing per-note-type Dataview query strings injected at render time
 
 ### Profile Composition (deferred from v1.0)
 
@@ -73,9 +73,9 @@
 | VAULT-13    | Phase 28   | Complete |
 | VAULT-14    | Phase 29   | Complete |
 | VAULT-15    | Phase 29   | Complete |
-| TMPL-01     | Phase 31   | Planned |
-| TMPL-02     | Phase 31   | Planned |
-| TMPL-03     | Phase 31   | Planned |
+| TMPL-01     | Phase 31   | Complete |
+| TMPL-02     | Phase 31   | Complete |
+| TMPL-03     | Phase 31   | Complete |
 | CFG-02      | Phase 30   | Complete |
 | CFG-03      | Phase 30   | Complete |
 
