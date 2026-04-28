@@ -11,6 +11,7 @@ functional template engine running against `_DEFAULT_PROFILE`.
 """
 from __future__ import annotations
 
+import dataclasses
 import datetime
 import fnmatch
 import importlib.resources as ilr
@@ -18,7 +19,7 @@ import re
 import string
 import sys
 from pathlib import Path
-from typing import TypedDict
+from typing import Callable, TypedDict
 
 from graphify.profile import (
     _DEFAULT_PROFILE,
@@ -128,6 +129,241 @@ def resolve_filename(label: str, convention: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Phase 31: Block-template machinery (TMPL-01 / TMPL-02)
+# ---------------------------------------------------------------------------
+#
+# Block syntax (locked verbatim by ROADMAP success criteria 1 & 2):
+#   {{#if_<name>}}…{{/if}}            — conditional section (TMPL-01)
+#   {{#if_attr_<name>}}…{{/if}}       — raw-attribute escape hatch (D-01/D-03)
+#   {{#connections}}…{{/connections}} — per-edge iteration loop (TMPL-02)
+#
+# Ordering invariant (D-16): block expansion runs BEFORE `safe_substitute`
+# so node labels containing `{{`, `}}`, `#`, `${`, backticks, or newlines
+# cannot smuggle conditional logic, fake loops, or break Dataview fences.
+#
+# Validation invariant (D-09/D-10): all block syntax errors surface from
+# `validate_template` at preflight; render path never re-validates.
+# ---------------------------------------------------------------------------
+
+
+class _BlockTemplate(string.Template):
+    """string.Template subclass with one-segment dot-extended idpattern.
+
+    Per CPython, ``string.Template.__init_subclass__`` recompiles ``pattern``
+    when a subclass overrides ``idpattern``. Do NOT override ``pattern``.
+
+    The extended idpattern allows ``${conn.label}`` style identifiers used
+    by the TMPL-02 connection loop (D-04/D-05) while remaining a strict
+    superset of the stock identifier — block-free templates still render
+    byte-identical (D-16 / ROADMAP criterion 4).
+    """
+    idpattern = r"(?a:[_a-z][_a-z0-9]*(?:\.[_a-z][_a-z0-9]*)?)"
+
+
+_CONN_FIELDS: frozenset[str] = frozenset(
+    {"label", "relation", "target", "confidence", "community", "source_file"}
+)
+
+_IF_ATTR_RE = re.compile(r"^if_attr_([a-z_][a-z0-9_]*)$")
+
+# Block parser regexes — single-pass FSM, no recursion (T-31-03 mitigation)
+_BLOCK_OPEN_RE = re.compile(r"\{\{#([a-z_][a-z0-9_]*)\}\}")
+_BLOCK_CLOSE_RE = re.compile(r"\{\{/(if|connections)\}\}")
+
+# Recognize ${conn.<field>} and ${conn_<field>} during validation/scrubbing
+_CONN_FIELD_RE = re.compile(r"\$\{conn\.([a-z_][a-z0-9_]*)\}")
+_CONN_FLAT_FIELD_RE = re.compile(r"\$\{conn_([a-z_][a-z0-9_]*)\}")
+
+
+@dataclasses.dataclass(frozen=True)
+class BlockContext:
+    """Render-time context consumed by `_expand_blocks`.
+
+    Carries the graph + node id (for predicate evaluation), the pre-built
+    sorted+sanitized edge records (for `{{#connections}}` iteration), and
+    a precomputed boolean for `{{#if_has_dataview}}` so the predicate need
+    not re-render the dataview block.
+
+    `graph` is annotated as `Any` because templates.py is pure stdlib
+    (IN-10 — no networkx import) but the runtime value is always an
+    `nx.Graph` passed in by the caller.
+    """
+    graph: "object"  # nx.Graph at runtime; templates.py is stdlib-only (IN-10)
+    node_id: str
+    edges: list[dict]
+    dataview_nonempty: bool
+
+
+def _pred_god_node(ctx: BlockContext) -> bool:
+    node = ctx.graph.nodes.get(ctx.node_id, {})
+    if node.get("is_god_node"):
+        return True
+    return ctx.node_id in (ctx.graph.graph.get("god_nodes") or [])
+
+
+def _pred_isolated(ctx: BlockContext) -> bool:
+    return (
+        ctx.graph.degree(ctx.node_id) == 0
+        if ctx.node_id in ctx.graph
+        else False
+    )
+
+
+def _pred_has_connections(ctx: BlockContext) -> bool:
+    return (
+        ctx.graph.degree(ctx.node_id) > 0
+        if ctx.node_id in ctx.graph
+        else False
+    )
+
+
+def _pred_has_dataview(ctx: BlockContext) -> bool:
+    return ctx.dataview_nonempty
+
+
+_PREDICATE_CATALOG: dict[str, Callable[[BlockContext], bool]] = {
+    "if_god_node": _pred_god_node,
+    "if_isolated": _pred_isolated,
+    "if_has_connections": _pred_has_connections,
+    "if_has_dataview": _pred_has_dataview,
+}
+
+
+def _eval_predicate(name: str, ctx: BlockContext) -> bool:
+    """Dispatch a predicate name to its catalog handler or attr escape hatch.
+
+    Raises KeyError on unknown names — render path treats this defensively
+    (D-09/D-10): preflight should have caught it via `validate_template`.
+    """
+    if name in _PREDICATE_CATALOG:
+        return _PREDICATE_CATALOG[name](ctx)
+    m = _IF_ATTR_RE.match(name)
+    if m:
+        attr = m.group(1)
+        node = ctx.graph.nodes.get(ctx.node_id, {})
+        return bool(node.get(attr))
+    raise KeyError(name)
+
+
+def _build_edge_records(graph, node_id) -> list[dict]:
+    """Build deterministic, sanitized edge records for {{#connections}} loops.
+
+    Field provenance (D-04/D-06) — NetworkX edge data does NOT carry
+    label/community/source_file reliably; those must be sourced from the
+    target node's attributes:
+
+      - label:        target node attr 'label' (sanitized via
+                      `_sanitize_wikilink_alias`) — falls back to target id
+      - relation:     edge data 'relation' (default '')
+      - target:       D-06 — target node 'label' (sanitized), NOT raw node id
+      - confidence:   edge data 'confidence' (default '')
+      - community:    target node attr 'community' (str-coerced, default '')
+      - source_file:  edge data 'source_file' (default '')
+
+    Sort: (relation ASC, label ASC) — RESEARCH OQ3 / VALIDATION ordering
+    invariant. This sort is the single point that locks deterministic loop
+    output across NetworkX edge-iteration order changes.
+    """
+    records: list[dict] = []
+    if node_id not in graph:
+        return records
+    for u, v, data in graph.edges(node_id, data=True):
+        target = v if u == node_id else u
+        target_node = graph.nodes[target]
+        label = _sanitize_wikilink_alias(str(target_node.get("label", target)))
+        target_alias = _sanitize_wikilink_alias(str(target_node.get("label", target)))  # D-06
+        relation = _sanitize_wikilink_alias(str(data.get("relation", "")))
+        confidence = _sanitize_wikilink_alias(str(data.get("confidence", "")))
+        community = _sanitize_wikilink_alias(str(target_node.get("community", "")))
+        source_file = _sanitize_wikilink_alias(str(data.get("source_file", "")))
+        records.append({
+            "label": label,
+            "relation": relation,
+            "target": target_alias,
+            "confidence": confidence,
+            "community": community,
+            "source_file": source_file,
+        })
+    return sorted(records, key=lambda e: (e["relation"], e["label"]))
+
+
+def _expand_blocks(text: str, ctx: BlockContext) -> str:
+    """Single-pass FSM expansion of `{{#…}}…{{/…}}` blocks (D-16, D-09/D-10).
+
+    Pre-condition: `text` has already passed `validate_template` — this
+    function is preflight-only-trusting and does NOT re-validate. It will
+    raise `ValueError` only as a defensive invariant if it observes an
+    impossible state (nested opener) on input that should have been
+    rejected at preflight.
+
+    Each `{{#connections}}` block emits BOTH `${conn.<field>}` and
+    `${conn_<field>}` substituted forms (D-05) so stock `string.Template`
+    AND `_BlockTemplate` both render the resulting text correctly.
+    Per-iteration values are pre-sanitized inside `_build_edge_records`
+    (D-15).
+    """
+    out_parts: list[str] = []
+    pos = 0
+    while pos < len(text):
+        m_open = _BLOCK_OPEN_RE.search(text, pos)
+        if not m_open:
+            out_parts.append(text[pos:])
+            break
+        # Append literal text before the opener
+        out_parts.append(text[pos:m_open.start()])
+        opener = m_open.group(1)
+        # Find the matching closer
+        m_close_if = _BLOCK_CLOSE_RE.search(text, m_open.end())
+        if m_close_if is None:
+            # Should be unreachable on validated input
+            raise ValueError(
+                f"_expand_blocks: unclosed block '{{{{#{opener}}}}}' "
+                "(should have been caught by validate_template)"
+            )
+        # Defensive: detect nested opener inside the body
+        m_inner_open = _BLOCK_OPEN_RE.search(text, m_open.end(), m_close_if.start())
+        if m_inner_open is not None:
+            raise ValueError(
+                "_expand_blocks: nested blocks not supported "
+                "(should have been caught by validate_template)"
+            )
+        body = text[m_open.end():m_close_if.start()]
+        closer = m_close_if.group(1)
+        if opener == "connections":
+            if closer != "connections":
+                raise ValueError(
+                    "_expand_blocks: block mismatch "
+                    "(should have been caught by validate_template)"
+                )
+            # Iterate ctx.edges (already sorted via _build_edge_records)
+            iterations: list[str] = []
+            for record in ctx.edges:
+                rendered = body
+                for field in _CONN_FIELDS:
+                    value = record.get(field, "")
+                    rendered = rendered.replace(f"${{conn.{field}}}", value)
+                    rendered = rendered.replace(f"${{conn_{field}}}", value)
+                iterations.append(rendered)
+            out_parts.append("".join(iterations))
+        else:
+            if closer != "if":
+                raise ValueError(
+                    "_expand_blocks: block mismatch "
+                    "(should have been caught by validate_template)"
+                )
+            try:
+                cond = _eval_predicate(opener, ctx)
+            except KeyError:
+                # Defensive only: preflight should have rejected this.
+                cond = False
+            if cond:
+                out_parts.append(body)
+            # else: omit the body entirely (D-19 clean elision)
+        pos = m_close_if.end()
+    return "".join(out_parts)
+
+
+# ---------------------------------------------------------------------------
 # Template validation (D-22) — follows validate.py pattern: return error list
 # ---------------------------------------------------------------------------
 
@@ -135,16 +371,145 @@ def validate_template(text: str, required: set[str]) -> list[str]:
     """Validate a template string.
 
     Returns a list of error strings — empty means valid. Distinguishes:
-      - `${var}` → must be in KNOWN_VARS
+      - `${var}` → must be in KNOWN_VARS (or `conn.<field>` / `conn_<field>`
+        inside a `{{#connections}}` block — Phase 31 TMPL-02)
       - `$$` (escaped dollar) → correctly ignored (Template.pattern.escaped group)
       - `<% ... %>` Templater tokens → never matched (no `$` prefix), ignored
       - Missing placeholders from `required` → reported as errors
       - Malformed placeholders like `${bad name}` or a bare `$` → surfaced
         as errors (IN-08), not silently swallowed.
+      - Phase 31 TMPL-01/TMPL-02 block syntax `{{#name}}…{{/closer}}` →
+        rejected for nesting (D-07/D-08), unclosed openers, mismatched
+        closers, unknown predicate names, and unknown `conn.<field>`
+        references. All block validation happens at preflight (D-09/D-10).
     """
     errors: list[str] = []
+
+    # ------------------------------------------------------------------
+    # Phase 31: Block syntax validation (TMPL-01/TMPL-02)
+    #
+    # Block grammar (locked by ROADMAP success criteria 1 & 2):
+    #   {{#if_<name>}}…{{/if}}
+    #   {{#if_attr_<name>}}…{{/if}}
+    #   {{#connections}}…{{/connections}}
+    #
+    # Validation invariants (D-07..D-10):
+    #   - At most one block depth — nested openers are an error (D-07/D-08)
+    #   - Every `{{#X}}` must have a matching closer
+    #   - `{{#if_*}}` closes with `{{/if}}`; `{{#connections}}` with `{{/connections}}`
+    #   - Predicate names must be in `_PREDICATE_CATALOG` or match `_IF_ATTR_RE`
+    #   - `${conn.<field>}` references inside `{{#connections}}` must use a
+    #     known field from `_CONN_FIELDS`
+    # ------------------------------------------------------------------
+    block_errors: list[str] = []
+    body_segments: list[tuple[str, str | None]] = []  # (segment_text, opener_name_or_None)
+    pos = 0
+    open_name: str | None = None
+    open_kind: str | None = None  # "if" | "connections"
+    cursor_text_start = 0
+    while pos < len(text):
+        m_open = _BLOCK_OPEN_RE.search(text, pos)
+        m_close = _BLOCK_CLOSE_RE.search(text, pos)
+        if not m_open and not m_close:
+            break
+        # Pick whichever match comes first
+        if m_open and (not m_close or m_open.start() < m_close.start()):
+            opener = m_open.group(1)
+            if open_name is not None:
+                # D-08 verbatim message (with captured names)
+                block_errors.append(
+                    "validate_template: nested template blocks are not supported "
+                    f"(found '{{{{#{opener}}}}}' inside '{{{{#{open_name}}}}}'). "
+                    "Flatten the template or pre-compute the predicate."
+                )
+                # Fall through: skip this opener and keep searching to surface
+                # additional issues consistently. We do NOT change open_name.
+                pos = m_open.end()
+                continue
+            # capture text before the opener as a free segment
+            body_segments.append((text[cursor_text_start:m_open.start()], None))
+            open_name = opener
+            open_kind = "connections" if opener == "connections" else "if"
+            cursor_text_start = m_open.end()
+            pos = m_open.end()
+        else:
+            assert m_close is not None
+            closer = m_close.group(1)
+            if open_name is None:
+                block_errors.append(
+                    f"validate_template: unexpected closer '{{{{/{closer}}}}}' "
+                    "with no matching opener"
+                )
+                pos = m_close.end()
+                continue
+            if (open_kind == "if" and closer != "if") or (
+                open_kind == "connections" and closer != "connections"
+            ):
+                block_errors.append(
+                    f"validate_template: block mismatch — "
+                    f"'{{{{#{open_name}}}}}' closed by '{{{{/{closer}}}}}'"
+                )
+                # Reset state defensively
+                open_name = None
+                open_kind = None
+                cursor_text_start = m_close.end()
+                pos = m_close.end()
+                continue
+            # Successful close: capture the body
+            body_segments.append((text[cursor_text_start:m_close.start()], open_name))
+            open_name = None
+            open_kind = None
+            cursor_text_start = m_close.end()
+            pos = m_close.end()
+
+    if open_name is not None:
+        block_errors.append(
+            f"validate_template: unclosed block '{{{{#{open_name}}}}}'"
+        )
+    # tail
+    body_segments.append((text[cursor_text_start:], None))
+
+    # Validate predicate names + connection field references per segment
+    for body, opener in body_segments:
+        if opener is None:
+            continue
+        if opener == "connections":
+            for fm in _CONN_FIELD_RE.finditer(body):
+                field = fm.group(1)
+                if field not in _CONN_FIELDS:
+                    block_errors.append(
+                        f"validate_template: unknown connection field "
+                        f"'conn.{field}' — valid: {sorted(_CONN_FIELDS)}"
+                    )
+        else:
+            # Predicate name validation
+            if opener in _PREDICATE_CATALOG:
+                pass
+            elif _IF_ATTR_RE.match(opener):
+                pass
+            else:
+                block_errors.append(
+                    f"validate_template: unknown predicate '{{{{#{opener}}}}}' "
+                    f"— known: {sorted(_PREDICATE_CATALOG)} "
+                    "(or use {{#if_attr_<name>}} for raw node attributes)"
+                )
+
+    errors.extend(block_errors)
+
+    # ------------------------------------------------------------------
+    # Stock $-placeholder validation. Strip block syntax + dotted
+    # `${conn.<field>}` references first so they don't surface as
+    # "unknown placeholder" errors.
+    # ------------------------------------------------------------------
+    scrubbed = _BLOCK_OPEN_RE.sub("", text)
+    scrubbed = _BLOCK_CLOSE_RE.sub("", scrubbed)
+    # Strip ${conn.<field>} dotted forms (validated above when inside a block)
+    scrubbed = _CONN_FIELD_RE.sub("", scrubbed)
+    # Strip parallel ${conn_<field>} flat forms — accept them as known
+    scrubbed = _CONN_FLAT_FIELD_RE.sub("", scrubbed)
+
     found: set[str] = set()
-    for m in string.Template.pattern.finditer(text):
+    for m in string.Template.pattern.finditer(scrubbed):
         name = m.group("named") or m.group("braced")
         if name:
             found.add(name)
@@ -201,7 +566,7 @@ def _load_builtin_template(note_type: str) -> string.Template:
     """
     ref = _BUILTIN_TEMPLATES_ROOT.joinpath(f"{note_type}.md")
     text = ref.read_text(encoding="utf-8")
-    return string.Template(text)
+    return _BlockTemplate(text)
 
 
 def load_templates(vault_dir: Path) -> dict[str, string.Template]:
@@ -252,7 +617,7 @@ def load_templates(vault_dir: Path) -> dict[str, string.Template]:
                     )
                 templates[note_type] = _load_builtin_template(note_type)
             else:
-                templates[note_type] = string.Template(user_text)
+                templates[note_type] = _BlockTemplate(user_text)
         else:
             templates[note_type] = _load_builtin_template(note_type)
     return templates
@@ -697,7 +1062,16 @@ def render_note(
             for nt in ("thing", "statement", "person", "source", "moc", "community")
         }
     template = templates[note_type]
-    text = template.safe_substitute(substitution_ctx)
+    # Phase 31 (D-16): expand `{{#…}}…{{/…}}` blocks BEFORE safe_substitute so
+    # node labels containing `{{`, `}}`, `#`, `${`, etc. cannot inject syntax.
+    block_ctx = BlockContext(
+        graph=G,
+        node_id=node_id,
+        edges=_build_edge_records(G, node_id),
+        dataview_nonempty=False,  # render_note has no dataview block (D-31)
+    )
+    expanded_source = _expand_blocks(template.template, block_ctx)
+    text = _BlockTemplate(expanded_source).safe_substitute(substitution_ctx)
 
     filename = resolve_filename(label, convention) + ".md"
     return filename, text
@@ -755,7 +1129,7 @@ def _load_override_template(rel_path: str, vault_dir, default_template):
                 file=sys.stderr,
             )
         return default_template
-    return string.Template(text)
+    return _BlockTemplate(text)
 
 
 def _pick_community_template(
@@ -909,7 +1283,21 @@ def _render_moc_like(
     template = _pick_community_template(
         community_id, community_name, profile, vault_dir, default_template
     )
-    text = template.safe_substitute(substitution_ctx)
+    # Phase 31 (D-16): expand blocks BEFORE safe_substitute. MOCs and
+    # Community Overviews operate on a community context — the synthetic
+    # node_id is the community label and `{{#connections}}` blocks
+    # iterate an empty edge set (loop blocks in MOC templates are out of
+    # scope for these entry points; the wrapper still runs so any
+    # `{{#if_*}}` blocks evaluate correctly and block-free templates
+    # render unchanged).
+    block_ctx = BlockContext(
+        graph=G,
+        node_id=community_name,
+        edges=[],
+        dataview_nonempty=bool(dataview_block.strip()),
+    )
+    expanded_source = _expand_blocks(template.template, block_ctx)
+    text = _BlockTemplate(expanded_source).safe_substitute(substitution_ctx)
     filename = resolve_filename(community_name, convention) + ".md"
     return filename, text
 
@@ -928,6 +1316,10 @@ def render_moc(
 
     The `created` kwarg (IN-05) lets callers pin the `created:` frontmatter
     date for reproducible/deterministic output. Defaults to today.
+
+    Block expansion (Phase 31): `_render_moc_like` invokes `_expand_blocks`
+    before `safe_substitute` (D-16 ordering invariant). Edge iteration data
+    flows through `_build_edge_records` for deterministic ordering.
     """
     return _render_moc_like(
         community_id, G, communities, profile, classification_context,
@@ -950,6 +1342,10 @@ def render_community_overview(
 
     The `created` kwarg (IN-05) lets callers pin the `created:` frontmatter
     date for reproducible/deterministic output. Defaults to today.
+
+    Block expansion (Phase 31): `_render_moc_like` invokes `_expand_blocks`
+    before `safe_substitute` (D-16 ordering invariant). Edge iteration data
+    flows through `_build_edge_records` for deterministic ordering.
     """
     return _render_moc_like(
         community_id, G, communities, profile, classification_context,

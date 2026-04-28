@@ -80,6 +80,7 @@ def test_templates_module_is_pure_stdlib():
     # stdlib whitelist for templates.py — extend deliberately, not casually.
     allowed_stdlib_roots = {
         "__future__",
+        "dataclasses",  # Phase 31 / TMPL-01: BlockContext frozen dataclass
         "datetime",
         "fnmatch",  # Phase 30 / CFG-03: community_templates label-glob matching
         "importlib",
