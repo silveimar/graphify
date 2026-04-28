@@ -2,9 +2,19 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from graphify.output import ResolvedOutput
 
 
-def run_corpus(target: Path, *, use_router: bool, out_dir: Path | None = None) -> dict:
+def run_corpus(
+    target: Path,
+    *,
+    use_router: bool,
+    out_dir: Path | None = None,
+    resolved: "ResolvedOutput | None" = None,
+) -> dict:
     """detect → extract (optional Router + audit flush). AST-only structural pass.
 
     When out_dir is None, preserve the v1.0 default: target/'graphify-out' for
@@ -21,7 +31,7 @@ def run_corpus(target: Path, *, use_router: bool, out_dir: Path | None = None) -
     if target.is_file():
         paths = [target.resolve()]
     else:
-        det = detect(target)
+        det = detect(target, resolved=resolved)
         paths = [Path(p) for p in det["files"].get("code", [])]
 
     router = default_router() if use_router else None
