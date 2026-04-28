@@ -124,7 +124,7 @@ def resolve_output(cwd: Path, *, cli_output: str | None = None) -> ResolvedOutpu
             "Install with: pip install graphifyy[obsidian]"
         )
 
-    from graphify.profile import load_profile, validate_sibling_path, validate_vault_path
+    from graphify.profile import load_profile
 
     profile = load_profile(cwd_resolved)
     output_block = profile.get("output")
@@ -138,6 +138,8 @@ def resolve_output(cwd: Path, *, cli_output: str | None = None) -> ResolvedOutpu
     path_val = output_block.get("path")
 
     if mode == "vault-relative":
+        # Lazy import — Plan 27-01 is the source of truth for path validators.
+        from graphify.profile import validate_vault_path
         notes_dir = validate_vault_path(path_val, cwd_resolved)
     elif mode == "absolute":
         if not isinstance(path_val, str) or not Path(path_val).is_absolute():
@@ -146,6 +148,10 @@ def resolve_output(cwd: Path, *, cli_output: str | None = None) -> ResolvedOutpu
             )
         notes_dir = Path(path_val).resolve()
     elif mode == "sibling-of-vault":
+        # Lazy import — `validate_sibling_path` ships in Plan 27-01 (parallel wave).
+        # Keeping this import inside the branch lets the rest of resolve_output()
+        # function correctly when the sibling-of-vault mode is not exercised.
+        from graphify.profile import validate_sibling_path
         notes_dir = validate_sibling_path(path_val, cwd_resolved)
     else:
         raise _refuse(f"profile output.mode {mode!r} invalid")
