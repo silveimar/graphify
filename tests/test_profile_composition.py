@@ -380,3 +380,245 @@ def test_provenance_list_typed_leaves_record_at_list_level(tmp_path):
     assert "mapping_rules" in result.provenance
     # No indexed sub-keys allowed
     assert not any(k.startswith("mapping_rules[") for k in result.provenance)
+
+
+# ---------------------------------------------------------------------------
+# Plan 30-02 / CFG-03: community_templates runtime dispatch tests
+# ---------------------------------------------------------------------------
+
+
+def _ct_vault(tmp_path: Path) -> Path:
+    """Copy the community_templates fixture vault into tmp_path/vault."""
+    return _copy_fixture("community_templates", tmp_path)
+
+
+def _moc_ctx(community_name: str) -> dict:
+    """Minimal classification_context for MOC rendering."""
+    return {
+        "note_type": "moc",
+        "folder": "06-MOCs/",
+        "community_name": community_name,
+        "community_tag": "test-tag",
+        "members_by_type": {
+            "thing": [{"id": "n_a", "label": "A"}],
+            "statement": [],
+            "person": [],
+            "source": [],
+        },
+        "sub_communities": [],
+        "sibling_labels": [],
+        "cohesion": 0.5,
+    }
+
+
+def _render_moc_with_profile(vault: Path, profile_overrides: dict, community_id: int, community_name: str):
+    """Helper: load profile from vault and call _render_moc_like with overrides applied.
+
+    profile_overrides is merged into the loaded profile dict shallow-style; we
+    use this for the case-sensitivity and first-match-wins tests where we want
+    custom rules without touching the shared fixture.
+    """
+    import networkx as nx
+    from graphify.profile import load_profile
+    from graphify.templates import _render_moc_like
+
+    profile = load_profile(vault)
+    profile = dict(profile)
+    profile.update(profile_overrides)
+    G = nx.Graph()
+    G.add_node("n_a", label="A", file_type="code", source_file="x.py")
+    communities = {community_id: ["n_a"]}
+    return _render_moc_like(
+        community_id=community_id,
+        G=G,
+        communities=communities,
+        profile=profile,
+        classification_context=_moc_ctx(community_name),
+        template_key="moc",
+        vault_dir=vault,
+    )
+
+
+def test_community_templates_label_glob_match(tmp_path):
+    """`transformer*` rule matches 'transformer-stack' → renders override."""
+    vault = _ct_vault(tmp_path)
+    _, text = _render_moc_with_profile(vault, {}, community_id=5, community_name="transformer-stack")
+    assert "OVERRIDE_TEMPLATE_MARKER" in text
+    assert "BIG_OVERRIDE_MARKER" not in text
+
+
+def test_community_templates_id_exact_match(tmp_path):
+    """match=id pattern=0 matches community_id=0 → renders big-community override."""
+    vault = _ct_vault(tmp_path)
+    # Use a name that does NOT match transformer* so the id rule wins
+    _, text = _render_moc_with_profile(vault, {}, community_id=0, community_name="auth-flow")
+    assert "BIG_OVERRIDE_MARKER" in text
+    assert "OVERRIDE_TEMPLATE_MARKER" not in text
+
+
+def test_community_templates_first_match_wins(tmp_path):
+    """When two rules both match, the first listed wins (D-13)."""
+    vault = _ct_vault(tmp_path)
+    overrides = {
+        "community_templates": [
+            {"match": "label", "pattern": "transformer*", "template": "templates/transformer-moc.md"},
+            {"match": "label", "pattern": "*", "template": "templates/big-community-moc.md"},
+        ]
+    }
+    _, text = _render_moc_with_profile(vault, overrides, community_id=7, community_name="transformer-stack")
+    assert "OVERRIDE_TEMPLATE_MARKER" in text
+    assert "BIG_OVERRIDE_MARKER" not in text
+
+
+def test_community_templates_no_match_falls_back_to_default(tmp_path):
+    """No rule matches → default MOC template used (no override marker)."""
+    vault = _ct_vault(tmp_path)
+    _, text = _render_moc_with_profile(vault, {}, community_id=42, community_name="unrelated-thing")
+    assert "OVERRIDE_TEMPLATE_MARKER" not in text
+    assert "BIG_OVERRIDE_MARKER" not in text
+    # Default MOC has frontmatter delimiters
+    assert text.startswith("---\n")
+
+
+def test_community_templates_fnmatch_case_sensitive(tmp_path):
+    """`Transformer*` does NOT match `transformer-stack` (case-sensitive)."""
+    vault = _ct_vault(tmp_path)
+    overrides = {
+        "community_templates": [
+            {"match": "label", "pattern": "Transformer*", "template": "templates/transformer-moc.md"},
+        ]
+    }
+    _, text = _render_moc_with_profile(vault, overrides, community_id=3, community_name="transformer-stack")
+    assert "OVERRIDE_TEMPLATE_MARKER" not in text
+
+
+def test_community_templates_question_mark_glob(tmp_path):
+    """`auth-?` matches `auth-1`, NOT `auth-12`."""
+    vault = _ct_vault(tmp_path)
+    overrides = {
+        "community_templates": [
+            {"match": "label", "pattern": "auth-?", "template": "templates/transformer-moc.md"},
+        ]
+    }
+    _, text1 = _render_moc_with_profile(vault, overrides, community_id=11, community_name="auth-1")
+    assert "OVERRIDE_TEMPLATE_MARKER" in text1
+    _, text2 = _render_moc_with_profile(vault, overrides, community_id=12, community_name="auth-12")
+    assert "OVERRIDE_TEMPLATE_MARKER" not in text2
+
+
+def test_community_templates_id_pattern_bool_rejected():
+    """validate_profile rejects bool pattern under match='id'."""
+    profile = {
+        "community_templates": [
+            {"match": "id", "pattern": True, "template": "templates/x.md"}
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("pattern must be an integer" in e for e in errors)
+
+
+def test_community_templates_label_pattern_int_rejected():
+    """validate_profile rejects int pattern under match='label'."""
+    profile = {
+        "community_templates": [
+            {"match": "label", "pattern": 7, "template": "templates/x.md"}
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("pattern must be a string" in e for e in errors)
+
+
+def test_community_templates_unknown_keys_rejected():
+    """Extra keys in a rule → validate_profile error."""
+    profile = {
+        "community_templates": [
+            {"match": "label", "pattern": "x*", "template": "templates/x.md", "extra": 1}
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("unknown keys" in e for e in errors)
+
+
+def test_override_template_path_escape_falls_back(tmp_path, capsys):
+    """A template path with `..` segments falls back to default + emits stderr."""
+    vault = _ct_vault(tmp_path)
+    # Bypass validate_profile (which would catch the `..`) by injecting at runtime
+    overrides = {
+        "community_templates": [
+            {"match": "label", "pattern": "transformer*", "template": "../escape.md"},
+        ]
+    }
+    _, text = _render_moc_with_profile(vault, overrides, community_id=1, community_name="transformer-stack")
+    assert "OVERRIDE_TEMPLATE_MARKER" not in text
+    captured = capsys.readouterr()
+    assert "[graphify] community_templates override" in captured.err
+
+
+def test_override_template_missing_file_falls_back(tmp_path, capsys):
+    """Referenced override file does not exist → default used + stderr warning."""
+    vault = _ct_vault(tmp_path)
+    overrides = {
+        "community_templates": [
+            {"match": "label", "pattern": "transformer*", "template": "templates/missing-moc.md"},
+        ]
+    }
+    _, text = _render_moc_with_profile(vault, overrides, community_id=1, community_name="transformer-stack")
+    assert "OVERRIDE_TEMPLATE_MARKER" not in text
+    captured = capsys.readouterr()
+    assert "[graphify] community_templates override" in captured.err
+    assert "missing" in captured.err.lower()
+
+
+def test_override_template_invalid_placeholder_falls_back(tmp_path, capsys):
+    """Override template missing required placeholder ${label} → falls back."""
+    vault = _ct_vault(tmp_path)
+    overrides = {
+        "community_templates": [
+            {"match": "label", "pattern": "transformer*", "template": "templates/invalid-moc.md"},
+        ]
+    }
+    _, text = _render_moc_with_profile(vault, overrides, community_id=1, community_name="transformer-stack")
+    assert "OVERRIDE_TEMPLATE_MARKER" not in text
+    captured = capsys.readouterr()
+    assert "[graphify] community_templates override" in captured.err
+    assert "missing required placeholder" in captured.err
+    assert "${label}" in captured.err
+
+
+def test_override_scope_moc_only(tmp_path):
+    """Member nodes (rendered via render_note) use type-based templates,
+    regardless of community_templates rules (D-12 — MOC-only scope)."""
+    import networkx as nx
+    from graphify.profile import load_profile
+    from graphify.templates import render_note
+
+    vault = _ct_vault(tmp_path)
+    profile = load_profile(vault)
+    G = nx.Graph()
+    G.add_node(
+        "n_transformer",
+        label="Transformer",
+        file_type="code",
+        source_file="src/model.py",
+        source_location="L42",
+    )
+    ctx = {
+        "note_type": "thing",
+        "folder": "01-Things/",
+        "parent_moc_label": "transformer-stack",
+        "community_name": "transformer-stack",
+        "community_tag": "transformer-stack",
+        "members_by_type": {},
+        "sub_communities": [],
+        "sibling_labels": [],
+    }
+    fname, text = render_note(
+        "n_transformer", G, profile, "thing", ctx, vault_dir=vault
+    )
+    # The override marker must NEVER appear on a non-MOC node, even when the
+    # node belongs to a community that matches a community_templates rule.
+    assert "OVERRIDE_TEMPLATE_MARKER" not in text
+    assert "BIG_OVERRIDE_MARKER" not in text
+    # Standard thing render: frontmatter present + label heading
+    assert text.startswith("---\n")
+    assert "type: thing" in text
