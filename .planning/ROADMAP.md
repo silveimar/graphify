@@ -153,7 +153,7 @@ Full details: [.planning/milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md)
 
 **Phases (summary):**
 
-- [ ] **Phase 27: Vault Detection & Profile-Driven Output Routing** — Detect `.obsidian/` at CWD, auto-adopt vault profile, resolve output destination from profile field
+- [x] **Phase 27: Vault Detection & Profile-Driven Output Routing** — Detect `.obsidian/` at CWD, auto-adopt vault profile, resolve output destination from profile field (3/3 plans, completed 2026-04-28)
 - [ ] **Phase 28: Self-Ingestion Hardening** — Profile-aware exclusions, recursive nesting guard, manifest-based ignore for prior runs
 - [ ] **Phase 29: Doctor Diagnostics & Dry-Run Preview** — `graphify doctor` command + `--dry-run` preview of vault-aware behavior
 - [ ] **Phase 30: Profile Composition** — `extends:`/`includes:` mechanism with cycle detection; per-community template overrides
