@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.7
-milestone_name: Vault Adapter UX & Template Polish
-status: shipped
-stopped_at: v1.7 milestone closed 2026-04-28
-last_updated: "2026-04-28T20:55:00.000Z"
-last_activity: 2026-04-28 -- v1.7 milestone shipped, archived, tagged
+milestone: v1.8
+milestone_name: Output Taxonomy & Cluster Quality
+status: planning
+last_updated: "2026-04-28T22:16:40.834Z"
+last_activity: 2026-04-28
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 14
-  completed_plans: 14
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -64,10 +63,10 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: 31 (template-engine-extensions) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 31
-Last activity: 2026-04-28
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-28 — Milestone v1.8 started
 
 ## Performance Metrics
 

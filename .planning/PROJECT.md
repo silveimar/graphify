@@ -8,14 +8,18 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: (between milestones — v1.7 shipped 2026-04-28; v1.8 unscoped)
+## Current Milestone: v1.8 Output Taxonomy & Cluster Quality
 
-**Last shipped (v1.7) — Vault Adapter UX & Template Polish:** Make graphify safe and ergonomic to run from inside an Obsidian vault. Profile-driven output placement, vault-CWD detection with auto-adopt (SEED-vault-root-aware-cli Option C), hardened self-ingestion defenses, `graphify doctor` onboarding + dry-run preview, profile composition (`extends:`/`includes:` with cycle detection + per-key provenance), and the long-deferred template engine extensions (`{{#if_*}}` conditionals, `{{#connections}}` loops, per-note-type Dataview queries). Audit verdict: **passed** (13/13 requirements, 5/5 Nyquist, 1801 tests).
+**Goal:** Make graphify's vault output legible at a glance and give the real `work-vault` → `ls-vault` workflow a safe, step-by-step migration path.
 
-**Deferred to later milestones:**
-- v1.8 candidate: Onboarding & Tacit-to-Explicit Elicitation Engine (SEED-001)
-- v1.9 candidate: Multi-harness memory export + prompt-injection defenses (SEED-002)
-- 2 pre-existing baseline test failures — separate `/gsd-debug` session
+**Target features:**
+- Restructure the built-in/default vault output layout under Graphify-owned folders.
+- Deprecate legacy `_COMMUNITY_*` overview notes in favor of MOC-only community output.
+- Add a configurable cluster-quality floor for isolates and tiny connected clusters.
+- Add hybrid concept naming with deterministic cached fallbacks.
+- Split god-node output into code-derived `CODE_...` notes and concept MOCs with bidirectional links.
+- Add layered repo identity via CLI flag, profile key, then auto-derived fallback.
+- Add a Markdown migration/update guide for safely updating the real `work-vault` → `ls-vault` usage.
 
 ---
 
@@ -121,7 +125,15 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 ### Active
 
-**v1.7 — (unscoped):** *(scope TBD; re-scope via `/gsd-new-milestone`)*
+**v1.8 — Output Taxonomy & Cluster Quality:** *(scope being defined via `/gsd-new-milestone`)*
+
+- [ ] Built-in/default vault output layout moves generated notes under Graphify-owned folders.
+- [ ] Legacy `_COMMUNITY_*` overview notes are deprecated in favor of a single MOC community shape.
+- [ ] Community note generation applies a configurable cluster-quality floor for isolates and tiny clusters.
+- [ ] Concept MOCs use stable human-readable names via LLM naming with deterministic fallbacks.
+- [ ] Code-derived god nodes and concept MOCs use distinct note classes with bidirectional links.
+- [ ] Repo identity is configurable and propagated into code-note naming, tags, and manifests.
+- [ ] A migration/update guide documents the real `work-vault` → `ls-vault` workflow step by step.
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -239,12 +251,13 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-v1.7 scoped 2026-04-27 as **Vault Adapter UX & Template Polish** (see Current Milestone above).
+v1.8 scoped 2026-04-28 as **Output Taxonomy & Cluster Quality** (see Current Milestone above).
 
-Backlog beyond v1.7:
-- v1.8 candidate: Onboarding & Tacit-to-Explicit (SEED-001 trigger conditions met when discovery becomes a primary theme)
-- v1.9 candidate: Multi-harness memory expansion + prompt-injection defenses (SEED-002 follow-on)
+Backlog beyond v1.8:
+- Onboarding & Tacit-to-Explicit (SEED-001 trigger conditions met when discovery becomes a primary theme)
+- Multi-harness memory expansion + prompt-injection defenses (SEED-002 follow-on)
+- Remaining vault-root-aware CLI surface: explicit `--vault` flag and multi-vault selector
 - 2 pre-existing baseline test failures (`test_detect_skips_dotfiles`, `test_collect_files_from_dir`) — separate `/gsd-debug` session
 
 ---
-*Last updated: 2026-04-27 — v1.7 Vault Adapter UX & Template Polish scoped*
+*Last updated: 2026-04-28 — v1.8 Output Taxonomy & Cluster Quality scoped*
