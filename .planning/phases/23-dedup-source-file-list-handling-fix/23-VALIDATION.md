@@ -1,10 +1,11 @@
 ---
 phase: 23
 slug: dedup-source-file-list-handling-fix
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-27
+last_audited: 2026-04-27
 ---
 
 # Phase 23 — Validation Strategy
@@ -38,9 +39,9 @@ created: 2026-04-27
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 23-01-01 | 01 | 1 | DEDUP-01, DEDUP-02 | — | edges-merge accepts list-shaped `source_file` without `TypeError`; preserves scalar-when-1, sorted-list-when-≥2 contract | unit | `pytest tests/test_dedup.py -q` | ✅ existing | ⬜ pending |
-| 23-01-02 | 01 | 2 | DEDUP-03 | — | regression test asserts no `TypeError` + correct merge shape on pre-merged `list[str]` `source_file` fixture | unit | `pytest tests/test_dedup.py::test_cross_type_merges_list_shaped_source_file -q` | ❌ W0 | ⬜ pending |
-| 23-01-03 | 01 | 2 | DEDUP-03 | — | idempotency: running dedup twice on same extraction is a no-op on shape and raises no exception | unit | `pytest tests/test_dedup.py::test_dedup_is_idempotent_on_source_file_shape -q` | ❌ W0 | ⬜ pending |
+| 23-01-01 | 01 | 1 | DEDUP-01, DEDUP-02 | T-23-01 | edges-merge accepts list-shaped `source_file` without `TypeError`; preserves scalar-when-1, sorted-list-when-≥2 contract | unit | `pytest tests/test_dedup.py -q` | ✅ existing | ✅ green |
+| 23-01-02 | 01 | 2 | DEDUP-03 | T-23-01 | regression test asserts no `TypeError` + correct merge shape on pre-merged `list[str]` `source_file` fixture | unit | `pytest tests/test_dedup.py::test_cross_type_merges_list_shaped_source_file -q` | ✅ tests/test_dedup.py:411 | ✅ green |
+| 23-01-03 | 01 | 2 | DEDUP-03 | T-23-01 | idempotency: running dedup twice on same extraction is a no-op on shape and raises no exception | unit | `pytest tests/test_dedup.py::test_dedup_is_idempotent_on_source_file_shape -q` | ✅ tests/test_dedup.py:441 | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,7 +49,7 @@ created: 2026-04-27
 
 ## Wave 0 Requirements
 
-- [ ] `tests/test_dedup.py` — add two new test functions (Wave 0 = test stubs land before fix lands so RED→GREEN sequencing is observable)
+- [x] `tests/test_dedup.py` — two new test functions added (commit `8b7f4dc`, RED step) prior to the dedup.py patch (commit `8c67e1f`, GREEN step). RED→GREEN sequencing observed.
 
 *Existing infrastructure (pytest, test_dedup.py with 408 lines of fixtures and helpers) covers everything else — no new conftest, no new fixtures module needed.*
 
@@ -66,11 +67,24 @@ created: 2026-04-27
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s (≈4s for `test_dedup.py`)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** validated 2026-04-27 by `/gsd-validate-phase 23`
+
+---
+
+## Validation Audit 2026-04-27
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+| Bookkeeping fixes | 3 statuses ⬜→✅, frontmatter draft→validated, sign-off ticked |
+
+All three Per-Task Map entries (23-01-01..03) classify as **COVERED**. The two regression tests (`test_cross_type_merges_list_shaped_source_file`, `test_dedup_is_idempotent_on_source_file_shape`) re-confirmed green at audit time (`pytest ... -q` → `2 passed in 4.09s`). No auditor agent was spawned — the gap was bookkeeping-only (statuses left ⬜ pending after the phase completed).
