@@ -450,6 +450,31 @@ def validate_profile(profile: dict) -> list[str]:
                     errors.append("output.path must be absolute when mode=absolute")
             # mode == "sibling-of-vault": deferred to validate_sibling_path() at use-time
 
+            # Phase 28 D-17: validate output.exclude list
+            exclude = output.get("exclude")
+            if exclude is not None:
+                if not isinstance(exclude, list):
+                    errors.append("output.exclude must be a list")
+                else:
+                    for i, item in enumerate(exclude):
+                        if not isinstance(item, str):
+                            errors.append(
+                                f"output.exclude[{i}] must be a string "
+                                f"(got {type(item).__name__})"
+                            )
+                        elif not item.strip():
+                            errors.append(
+                                f"output.exclude[{i}] must not be empty or whitespace-only"
+                            )
+                        elif Path(item).is_absolute():
+                            errors.append(
+                                f"output.exclude[{i}] must not be an absolute path"
+                            )
+                        elif ".." in Path(item.lstrip("/")).parts:
+                            errors.append(
+                                f"output.exclude[{i}] must not contain '..' (path traversal)"
+                            )
+
     return errors
 
 
