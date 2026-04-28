@@ -28,7 +28,7 @@
 ### Profile Composition (deferred from v1.0)
 
 - [x] **CFG-02**: Profile includes/extends mechanism — compose profiles from fragments via `extends:` or `includes:` field; deterministic merge order; cycle detection
-- [ ] **CFG-03**: Per-community template overrides — profile field mapping community ID/label patterns to custom templates; first-match-wins precedence consistent with the v1.0 mapping engine
+- [x] **CFG-03**: Per-community template overrides — profile field mapping community ID/label patterns to custom templates; first-match-wins precedence consistent with the v1.0 mapping engine
 
 ---
 
