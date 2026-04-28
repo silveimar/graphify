@@ -10,6 +10,7 @@
 - ✅ **v1.5 Diagram Intelligence & Excalidraw Bridge** — Phases 19–22 (shipped 2026-04-27)
 - ✅ **v1.6 Hardening & Onboarding** — Phases 23–26 (shipped 2026-04-27)
 - ✅ **v1.7 Vault Adapter UX & Template Polish** — Phases 27–31 (shipped 2026-04-28)
+- 🚧 **v1.8 Output Taxonomy & Cluster Quality** — Phases 32–36 (planned)
 
 ## Phases
 
@@ -247,6 +248,75 @@ Plans:
 
 ---
 
+### 🚧 v1.8 Output Taxonomy & Cluster Quality (Planned)
+
+**Milestone Goal:** Make graphify's vault output legible at a glance and give the real `work-vault` → `ls-vault` workflow a safe, step-by-step migration path.
+
+- [ ] **Phase 32: Profile Contract & Defaults** - Lock the v1.8 default taxonomy, profile keys, validation, and compatibility behavior.
+- [ ] **Phase 33: Naming & Repo Identity Helpers** - Resolve stable concept names and repo identities before rendering or manifest writes depend on them.
+- [ ] **Phase 34: Mapping, Cluster Quality & Note Classes** - Apply MOC-only community semantics, the cluster-quality floor, and CODE-vs-concept note classes.
+- [ ] **Phase 35: Templates, Export Plumbing & Dry-Run/Migration Visibility** - Render the new taxonomy, expose repo identity in outputs, and make migration effects previewable.
+- [ ] **Phase 36: Migration Guide, Skill Alignment & Regression Sweep** - Document the real vault migration path and verify CLI, skill, security, and tests stay aligned.
+
+## Phase Details
+
+### Phase 32: Profile Contract & Defaults
+**Goal:** Users get a stable v1.8 default vault taxonomy and actionable profile validation before downstream export behavior changes.
+**Depends on:** Phase 31 (v1.7 template/profile foundation)
+**Requirements:** TAX-01, TAX-02, TAX-03, TAX-04, COMM-03, CLUST-01, CLUST-04
+**Success Criteria** (what must be TRUE):
+  1. User can run graphify with no vault profile and see generated notes routed into a Graphify-owned default subtree, including concept MOCs under `Atlas/Sources/Graphify/MOCs/`
+  2. User-authored vault profiles continue to override default folder placement without requiring profile rewrites
+  3. User can validate a v1.8 profile and receive actionable errors or warnings for unsupported taxonomy keys, invalid folder mappings, or hard-deprecated community overview output
+  4. User can set `clustering.min_community_size` and see it take deterministic precedence over legacy `mapping.moc_threshold` when both are present
+**Plans:** TBD
+
+### Phase 33: Naming & Repo Identity Helpers
+**Goal:** Users get stable human-readable concept names and deterministic repo identity resolution that downstream note paths can trust.
+**Depends on:** Phase 32
+**Requirements:** NAME-01, NAME-02, NAME-03, NAME-04, NAME-05, REPO-01, REPO-02, REPO-03
+**Success Criteria** (what must be TRUE):
+  1. User can provide repo identity through a CLI flag, through `profile.yaml`, or by deterministic fallback, and graphify reports which source won
+  2. User receives cached LLM concept MOC titles when concept naming is enabled, with deterministic fallback names when LLM naming is unavailable, disabled by budget, or rejected
+  3. User can rerun graphify on an unchanged community and keep the same concept MOC filename across runs
+  4. User can inspect concept naming provenance, and unsafe generated labels are sanitized for filenames, tags, wikilinks, Dataview, and frontmatter
+**Plans:** TBD
+
+### Phase 34: Mapping, Cluster Quality & Note Classes
+**Goal:** Users see clean MOC-only community output, low-quality clusters handled predictably, and code-derived hubs separated from concept MOCs.
+**Depends on:** Phase 33
+**Requirements:** COMM-01, CLUST-02, CLUST-03, GOD-01, GOD-02, GOD-03, GOD-04
+**Success Criteria** (what must be TRUE):
+  1. User receives MOC-only community output by default with no generated `_COMMUNITY_*` overview notes
+  2. User sees isolate communities omitted from standalone MOC generation while their nodes remain available in graph data and non-community exports
+  3. User sees tiny connected communities below the configured floor routed deterministically into an `_Unclassified` MOC
+  4. User sees code-derived god nodes exported as collision-safe `CODE_<repo>_<node>` notes with bidirectional navigation to their related concept MOCs
+**Plans:** TBD
+
+### Phase 35: Templates, Export Plumbing & Dry-Run/Migration Visibility
+**Goal:** Users can preview and run the new export/migration path without silent overwrites, hidden legacy artifacts, or repo identity drift.
+**Depends on:** Phase 34
+**Requirements:** COMM-02, REPO-04, MIG-01, MIG-02, MIG-03, MIG-04, MIG-06
+**Success Criteria** (what must be TRUE):
+  1. User sees the resolved repo identity recorded consistently in CODE note filenames, frontmatter, tags, and output manifests
+  2. User can run an automated migration command for the real `work-vault` to `ls-vault` update path and preview its effects in dry-run mode before vault writes
+  3. User sees old managed paths mapped to new Graphify-owned paths when note identity can be matched, with legacy `_COMMUNITY_*` files surfaced as migration candidates or orphans
+  4. User can review CREATE, UPDATE, SKIP_PRESERVE, SKIP_CONFLICT, REPLACE, and ORPHAN outcomes before committing, and migration never automatically deletes legacy vault notes
+**Plans:** TBD
+
+### Phase 36: Migration Guide, Skill Alignment & Regression Sweep
+**Goal:** Users and maintainers can trust the v1.8 behavior because docs, skill files, tests, and security checks all describe and verify the same export contract.
+**Depends on:** Phase 35
+**Requirements:** MIG-05, VER-01, VER-02, VER-03
+**Success Criteria** (what must be TRUE):
+  1. User receives a Markdown migration guide covering backup, validation, dry-run, migration command, review, cleanup, rollback, and rerun steps for the `work-vault` → `ls-vault` workflow
+  2. Maintainer can confirm skill files and CLI docs use the same v1.8 Obsidian export behavior
+  3. Maintainer can verify v1.8 behavior with pure unit tests that use `tmp_path` and perform no network calls
+  4. Maintainer can confirm all new path, template, profile, LLM-label, and repo-identity inputs pass through existing security and sanitization helpers
+**Plans:** TBD
+
+---
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -289,6 +359,11 @@ Plans:
 | 29. Doctor Diagnostics & Dry-Run Preview | v1.7 | 3/3 | Complete | 2026-04-28 |
 | 30. Profile Composition | v1.7 | 3/3 | Complete | 2026-04-28 |
 | 31. Template Engine Extensions | v1.7 | 2/2 | Complete | 2026-04-28 |
+| 32. Profile Contract & Defaults | v1.8 | 0/TBD | Not started | - |
+| 33. Naming & Repo Identity Helpers | v1.8 | 0/TBD | Not started | - |
+| 34. Mapping, Cluster Quality & Note Classes | v1.8 | 0/TBD | Not started | - |
+| 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 0/TBD | Not started | - |
+| 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 0/TBD | Not started | - |
 
 ---
-*Last updated: 2026-04-28 — v1.7 Vault Adapter UX & Template Polish SHIPPED: 5 phases (27–31), 14 plans, 13/13 requirements satisfied, 5/5 Nyquist ratified, 1801 tests passing.*
+*Last updated: 2026-04-28 — v1.8 Output Taxonomy & Cluster Quality planned: 5 phases (32–36), 33/33 requirements mapped, standard granularity.*

@@ -101,12 +101,45 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| TAX-01 | Phase 32 | Pending |
+| TAX-02 | Phase 32 | Pending |
+| TAX-03 | Phase 32 | Pending |
+| TAX-04 | Phase 32 | Pending |
+| COMM-01 | Phase 34 | Pending |
+| COMM-02 | Phase 35 | Pending |
+| COMM-03 | Phase 32 | Pending |
+| CLUST-01 | Phase 32 | Pending |
+| CLUST-02 | Phase 34 | Pending |
+| CLUST-03 | Phase 34 | Pending |
+| CLUST-04 | Phase 32 | Pending |
+| NAME-01 | Phase 33 | Pending |
+| NAME-02 | Phase 33 | Pending |
+| NAME-03 | Phase 33 | Pending |
+| NAME-04 | Phase 33 | Pending |
+| NAME-05 | Phase 33 | Pending |
+| GOD-01 | Phase 34 | Pending |
+| GOD-02 | Phase 34 | Pending |
+| GOD-03 | Phase 34 | Pending |
+| GOD-04 | Phase 34 | Pending |
+| REPO-01 | Phase 33 | Pending |
+| REPO-02 | Phase 33 | Pending |
+| REPO-03 | Phase 33 | Pending |
+| REPO-04 | Phase 35 | Pending |
+| MIG-01 | Phase 35 | Pending |
+| MIG-02 | Phase 35 | Pending |
+| MIG-03 | Phase 35 | Pending |
+| MIG-04 | Phase 35 | Pending |
+| MIG-05 | Phase 36 | Pending |
+| MIG-06 | Phase 35 | Pending |
+| VER-01 | Phase 36 | Pending |
+| VER-02 | Phase 36 | Pending |
+| VER-03 | Phase 36 | Pending |
 
 **Coverage:**
 - v1.8 requirements: 33 total
-- Mapped to phases: 0
-- Unmapped: 33
+- Mapped to phases: 33
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-28*
-*Last updated: 2026-04-28 after initial definition*
+*Last updated: 2026-04-28 after v1.8 roadmap creation*
