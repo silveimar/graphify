@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: Hardening & Onboarding
-status: verifying
-stopped_at: Completed 26-01-PLAN.md
-last_updated: "2026-04-28T00:40:55.938Z"
+milestone: v1.7
+milestone_name: Vault Adapter UX & Template Polish
+status: planning
+last_updated: "2026-04-28T02:02:59.091Z"
 last_activity: 2026-04-28
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -53,10 +52,10 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: 26 (v1-5-configuration-guide-walkthrough-docs) — COMPLETE
-Plan: 1 of 1
-Status: Phase verified (6/6 must-haves passed) — v1.6 milestone complete (4/4 phases)
-Last activity: 2026-04-28 - Completed quick task 260427-rc7: fix-detect-self-ingestion
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-28 — Milestone v1.7 started
 
 ## Performance Metrics
 

@@ -8,7 +8,36 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: v1.7 (unscoped)
+## Current Milestone: v1.7 Vault Adapter UX & Template Polish
+
+**Goal:** Make graphify safe and ergonomic to run from inside an Obsidian vault — profile-driven output placement, vault-CWD detection with auto-adopt (SEED-vault-root-aware-cli Option C), hardened self-ingestion defenses, onboarding diagnostics — and close out the long-deferred template/profile composition backlog from v1.0.
+
+**Target features:**
+
+*Vault Adapter UX & Self-Ingestion Hardening:*
+- Vault-CWD detection with profile-driven auto-adopt (SEED-vault-root-aware-cli Option C)
+- Profile-driven output placement (`.graphify/profile.yaml` declares where `graphify-out/` lives)
+- Self-ingestion hardening (defense in depth beyond v1.6's `_SELF_OUTPUT_DIRS`): profile-aware exclusions, recursive nesting guard, manifest-based ignore
+- `graphify doctor` onboarding diagnostics (vault detection, profile validation, output destination, ignore-list)
+- Dry-run preview for vault-root-aware behavior
+
+*Template & Profile Polish (deferred from v1.0):*
+- TMPL-01: conditional template sections
+- TMPL-02: loop blocks for connections
+- TMPL-03: custom Dataview templates per note type
+- CFG-02: profile includes/extends
+- CFG-03: per-community template overrides
+
+**Seeds activated:** SEED-vault-root-aware-cli (planted 2026-04-27)
+
+**Deferred to later milestones:**
+- v1.8 candidate: Onboarding & Tacit-to-Explicit Elicitation Engine (SEED-001)
+- v1.9 candidate: Multi-harness memory export + prompt-injection defenses (SEED-002)
+- 2 pre-existing baseline test failures — separate `/gsd-debug` session
+
+---
+
+## Prior Milestones
 
 **Prior milestone (v1.6) shipped 2026-04-27:** Phases 23–26 (4 phases, 5 plans). Dedup `source_file` list-crash fix, atomic manifest read-merge-write across 5 writers + AUDIT.md, mandatory dual-artifact persistence baked into all 9 platform skill variants, single-file `CONFIGURING_V1_5.md` walkthrough. 15/15 requirements. Full detail archived to `.planning/milestones/v1.6-*`.
 
@@ -226,13 +255,12 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-v1.7 unscoped as of 2026-04-27. Carryover into v1.7 backlog:
-- SEED-001 (Tacit-to-Explicit Elicitation Engine) — dormant; trigger is onboarding/discovery becoming the milestone theme
-- SEED-002 (Harness Memory Export) — dormant; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses
-- Deferred template-engine extensions (TMPL-01..03, CFG-02..03) carried since v1.0
-- 2 pre-existing baseline test failures (`test_detect_skips_dotfiles`, `test_collect_files_from_dir`) — recommend dedicated `/gsd-debug` session
+v1.7 scoped 2026-04-27 as **Vault Adapter UX & Template Polish** (see Current Milestone above).
 
-Re-scope via `/gsd-new-milestone` when next direction is clear.
+Backlog beyond v1.7:
+- v1.8 candidate: Onboarding & Tacit-to-Explicit (SEED-001 trigger conditions met when discovery becomes a primary theme)
+- v1.9 candidate: Multi-harness memory expansion + prompt-injection defenses (SEED-002 follow-on)
+- 2 pre-existing baseline test failures (`test_detect_skips_dotfiles`, `test_collect_files_from_dir`) — separate `/gsd-debug` session
 
 ---
-*Last updated: 2026-04-27 — v1.6 Hardening & Onboarding shipped*
+*Last updated: 2026-04-27 — v1.7 Vault Adapter UX & Template Polish scoped*
