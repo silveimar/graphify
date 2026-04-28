@@ -9,6 +9,7 @@
 - ✅ **v1.4 Agent Discoverability & Obsidian Workflows** — Phases 12–18.2 (shipped 2026-04-22)
 - ✅ **v1.5 Diagram Intelligence & Excalidraw Bridge** — Phases 19–22 (shipped 2026-04-27)
 - ✅ **v1.6 Hardening & Onboarding** — Phases 23–26 (shipped 2026-04-27)
+- 🟡 **v1.7 Vault Adapter UX & Template Polish** — Phases 27–31 (in planning, scoped 2026-04-27)
 
 ## Phases
 
@@ -91,97 +92,18 @@ LLM-assisted multi-perspective graph analysis via autoreason tournament (4 lense
 <details>
 <summary>✅ v1.3 Intelligent Analysis Continuation (Phases 9.2, 10, 11) — SHIPPED 2026-04-17</summary>
 
-**Theme:** Make graphify viable for real production use on multi-source codebases — agents can query without blowing their token budget, extraction produces dramatically better graphs via entity deduplication, and humans get an interactive thinking partner via Obsidian slash commands. Priority order locked a → b → c during 2026-04-16 exploration: Phase 9.2 first (agent viability), Phase 10 second (graph quality), Phase 11 third (human UX).
-
-**Origin:** Priority lock and scope decisions captured in `.planning/notes/april-2026-v1.3-priorities.md`. Research anchors: Your-GPUs-Just-Got-6x, Make-Knowledge-Graphs-Fast, Pied-Piper-Was-a-Documentary (cardinality estimation + bidirectional search signals for 9.2); Build-Agents-That-Never-Forget, Everything-Is-Connected, Cognee dedup patterns (entity fragmentation signals for 10); Obsidian-Claude-Codebook, Your-Harness-Your-Memory, memory-harness (static-to-interactive slash command pivot for 11). Phase 12 (Heterogeneous Extraction Routing) explicitly deferred to v1.4 — see Out of Scope in REQUIREMENTS.md.
-
-**Phases:**
-
-- [x] Phase 9.2: Progressive Graph Retrieval (3/3 plans, completed 2026-04-17)
-- [x] Phase 10: Cross-File Semantic Extraction with Entity Deduplication (9/9 plans, completed 2026-04-17)
-- [x] Phase 11: Narrative Mode as Interactive Slash Commands (7/7 plans, completed 2026-04-17)
-
-**Totals:** 3 phases, 19 plans, 14/15 requirements satisfied (TOKEN-04 Bloom filter stretch deferred per D-09).
-
-**Archives:**
-- Full phase detail: `.planning/milestones/v1.3-ROADMAP.md`
-- Requirements: `.planning/milestones/v1.3-REQUIREMENTS.md`
+Cross-file semantic extraction with entity dedup, progressive graph retrieval, and narrative-mode slash commands.
 
 </details>
+
+---
 
 <details>
-<summary>✅ v1.4 Agent Discoverability & Obsidian Workflows (Phases 12, 13, 14, 15, 16, 17, 18, 18.1, 18.2) — SHIPPED 2026-04-22</summary>
+<summary>✅ v1.4 Agent Discoverability & Obsidian Workflows (Phases 12–18.2) — SHIPPED 2026-04-22</summary>
 
-Agent discoverability via MCP capability manifest + harness-memory export (SEED-002), Obsidian workflow depth via vault-scoped thinking commands, and graph quality over time via heterogeneous routing, async enrichment, focus-aware zoom, grounded chat, and SPAR-Kit graph-argumentation. Phase 12 (Heterogeneous Extraction Routing) pulled forward from v1.3 deferral. Milestone audit passed after Phase 18.1 (Phase 13 verification artifact retrofill) and Phase 18.2 (MANIFEST-06 metadata closure + VALIDATION frontmatter refresh).
-
-**Phases:**
-
-- [x] Phase 12: Heterogeneous Extraction Routing — AST-complexity-classified routing to cheap/mid/expensive model classes with parallel fan-out, cost ceiling, model-isolated cache keys, `routing.json` sidecar. (6/6 plans, completed 2026-04-17)
-- [x] Phase 13: Agent Capability Manifest (+ SEED-002 Harness Memory Export) — Static `server.json` + runtime `manifest.json`, MCP `capability_describe`, manifest-hash drift detection, `graphify harness export` producing SOUL/HEARTBEAT/USER triplet. (4/4 plans, 18/18 REQ-IDs, completed 2026-04-17; verification retrofitted via Phase 18.1)
-- [x] Phase 14: Obsidian Thinking Commands — Vault-scoped `/graphify-moc`, `/graphify-related`, `/graphify-orphan`, `/graphify-wayfind` slash commands with `target:` frontmatter filtering + `propose_vault_note + approve` trust boundary. (6/6 plans, completed 2026-04-23)
-- [x] Phase 15: Async Background Enrichment — Four-pass background enricher writing overlay-only `enrichment.json`; event-driven via `watch.py`; `fcntl.flock`-coordinated; snapshot-pinned for determinism. (6/6 plans, completed 2026-04-22)
-- [x] Phase 16: Graph Argumentation Mode — `argue.py` SPAR-Kit-style `ArgumentPackage` + `argue_topic` MCP tool; `{claim, cites: [node_id]}` schema rejecting fabricated IDs; round cap 6; advisory-only `GRAPH_ARGUMENT.md`. (3/3 plans, completed 2026-04-23)
-- [x] Phase 17: Conversational Graph Chat — Two-stage structurally-enforced `chat(query, session_id)` MCP tool; every claim cited; templated fuzzy suggestions on empty; `/graphify-ask` slash command. (3/3 plans, completed 2026-04-22)
-- [x] Phase 18: Focus-Aware Graph Context — `get_focus_context(focus_hint)` MCP tool returning BFS ego-graph + community summary; codifies v1.3 CR-01 snapshot-root fix via `snapshot.py::root` → `project_root` rename. (4/4 plans, completed 2026-04-20)
-- [x] Phase 18.1: v1.4 Gap Closure — Produced retrofitted `13-VERIFICATION.md`, `13-SECURITY.md`, `13-VALIDATION.md` for Phase 13's shipped 18 REQ-IDs. (commits `33f9f84`, `63d2480`, `1eda4be`)
-- [x] Phase 18.2: v1.4 Gap Closure — Added `chat` + `get_focus_context` to `capability_tool_meta.yaml` closing MANIFEST-06; refreshed 15/18 VALIDATION frontmatter; audit re-stamped `passed`. (commits `59298c8`, `37aad87`, `012a90b`)
-
-**Totals:** 9 phase directories (7 core + 2 gap closure), 32 plans, 72/86 P1+P2 requirements satisfied, 14 P2 carve-outs intentionally deferred. 155 files changed, +35,754 / −2,481 lines across 165 commits over 2026-04-17 → 2026-04-22.
-
-**Deferred to v1.4.x / v1.5:**
-- SEED-002 inverse-import (CLAUDE.md → graph) — requires quarantine + prompt-injection defenses (OQ-4)
-- SEED-002 multi-harness schemas (codex.yaml, letta.yaml, honcho.yaml, AGENTS.md) — prove canonical on claude.yaml first (OQ-5)
-- SEED-001 Tacit-to-Explicit Elicitation Engine — revisit if onboarding/discovery becomes the theme
-- Phase 19 Vault Promotion Script Layer B — moved to v1.5 via scope reconciliation 2026-04-23 (commit `0f6304b`)
-
-**Archives:**
-- Full phase detail: `.planning/milestones/v1.4-ROADMAP.md`
-- Requirements: `.planning/milestones/v1.4-REQUIREMENTS.md`
-- Milestone audit: `.planning/milestones/v1.4-MILESTONE-AUDIT.md`
-- Per-phase artifacts: `.planning/milestones/v1.4-phases/`
+Heterogeneous routing, agent capability manifest, Obsidian thinking commands, async enrichment, argumentation, chat, focus, and gap-closure phases.
 
 </details>
-
-## Phase Details
-
-### 🌱 Candidate Phase: ACE-Aligned Vocabulary, Linking & Naming
-
-**Goal:** Replace graphify's hardcoded note-type vocabulary with an ACE-aligned,
-profile-driven system. Emit full Ideaverse-compatible frontmatter (backlinks, collections,
-rank, confidence tags) and enforce naming conventions across all vault output.
-
-**Scope:**
-
-- `project.yaml` — new `vocabulary:` section (note types, tags taxonomy, `diagrams:` with
-  `x/Excalidraw/` folder map and per-template stencil/palette config)
-- `profile.py` — parse and validate the `vocabulary:` section; expose typed dicts to all exporters
-- `templates.py` — replace hardcoded `_NOTE_TYPES` frozenset with `vocab.note_types.keys()`
-  loaded from profile; add `map`, `dot`, `work`, `question` built-in templates
-- `mapping.py` — `classify()` driven by profile vocabulary rules; emit `rank` score to frontmatter
-- `export.py` — emit full frontmatter: `up`, `related`, `down`, `collections`, `rank`,
-  `created`, and confidence tags (`extracted`/`inferred`/`ambiguous`) on all promoted notes;
-  all vault filenames use `safe_filename()` → `lowercase-hyphen` slugs with type prefix
-- `seeds.py` (new) — generate `-seed.md` files in `x/Excalidraw/seeds/` from promoted Dots
-  using `vocab.diagrams` template/stencil/palette config
-- `builtin_templates/` — add `map-template.md`, `dot-template.md`, `work-template.md`,
-  `question-template.md`; rename existing templates to `lowercase-hyphen-template` convention
-
-**Naming conventions enforced (all output):**
-- Tags: `lowercase-hyphen-separated`, no IDs/symbols/numbers
-- Master Keys: `PascalCase`, max 4 words
-- MD filenames: `lowercase-hyphen-separated` with type prefix
-- Wikilinks: always with human-readable alias `[[filename|Human Readable Alias]]`
-- Seeds: `name-seed.md` in `x/Excalidraw/seeds/`
-- Diagrams: `name.excalidraw.md` in `x/Excalidraw/diagrams/`
-
-**ACE folder targets:**
-`Atlas/Maps`, `Atlas/Dots`, `Atlas/Dots/Things`, `Atlas/Dots/Statements`,
-`Atlas/Dots/Questions`, `Atlas/Dots/People`, `Atlas/Sources`, `Efforts/Works`,
-`x/Excalidraw/{annotations,cropped,diagrams,palettes,templates,seeds,scripts/downloaded,scripts/custom}`
-
-**Design doc:** `.planning/notes/ace-vocabulary-naming-conventions.md`
-
-**Entry point:** Run `/gsd-add-phase` to formally scope and plan this phase.
 
 ---
 
@@ -223,6 +145,77 @@ Full details: [.planning/milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md)
 
 </details>
 
+---
+
+### 🟡 v1.7 Vault Adapter UX & Template Polish (Phases 27–31) — IN PLANNING
+
+**Theme:** Make graphify safe and ergonomic to run from inside an Obsidian vault. Profile-driven output placement, vault-CWD detection with auto-adopt (SEED-vault-root-aware-cli Option C), hardened self-ingestion defenses, onboarding diagnostics — and close out the long-deferred template/profile composition backlog from v1.0.
+
+**Phases (summary):**
+
+- [ ] **Phase 27: Vault Detection & Profile-Driven Output Routing** — Detect `.obsidian/` at CWD, auto-adopt vault profile, resolve output destination from profile field
+- [ ] **Phase 28: Self-Ingestion Hardening** — Profile-aware exclusions, recursive nesting guard, manifest-based ignore for prior runs
+- [ ] **Phase 29: Doctor Diagnostics & Dry-Run Preview** — `graphify doctor` command + `--dry-run` preview of vault-aware behavior
+- [ ] **Phase 30: Profile Composition** — `extends:`/`includes:` mechanism with cycle detection; per-community template overrides
+- [ ] **Phase 31: Template Engine Extensions** — Conditional `{{#if_*}}` blocks, `{{#connections}}` loops, per-note-type Dataview query templates
+
+## Phase Details
+
+### Phase 27: Vault Detection & Profile-Driven Output Routing
+**Goal:** When graphify runs from inside an Obsidian vault, it recognizes the vault and routes output to a profile-declared destination instead of dumping `graphify-out/` into the vault root.
+**Depends on:** Nothing (foundation for v1.7)
+**Requirements:** VAULT-08, VAULT-09, VAULT-10
+**Success Criteria** (what must be TRUE):
+  1. Running `graphify` from a directory containing `.obsidian/` is detected as a vault and reported in CLI output
+  2. When the vault has `.graphify/profile.yaml`, graphify auto-adopts profile-driven placement (Option C) — CWD is treated as both input corpus and output target without an explicit flag
+  3. The profile's output destination field (vault-relative path, absolute path, or sibling-of-vault) determines where notes are written
+  4. The CLI `--output` flag overrides the profile's declared destination and the precedence is shown in stderr when both are present
+**Plans:** TBD
+
+### Phase 28: Self-Ingestion Hardening
+**Goal:** Re-running graphify inside a vault never re-ingests its own previous output, even across profile changes or unconventional output paths.
+**Depends on:** Phase 27 (requires resolved profile output destination)
+**Requirements:** VAULT-11, VAULT-12, VAULT-13
+**Success Criteria** (what must be TRUE):
+  1. `detect.py` prunes the profile's resolved output destination plus any declared exclusion globs from the input scan
+  2. Paths matching `**/graphify-out/**` at any nesting depth are refused as ingestion candidates and prior nesting is reported as a warning to the user
+  3. The current run's manifest records every output path it wrote, and a subsequent run reads that manifest and skips those paths even when the profile output destination has changed since
+  4. A user who renames their output directory in `profile.yaml` between two runs does not see the previous run's notes re-ingested as "documents"
+**Plans:** TBD
+
+### Phase 29: Doctor Diagnostics & Dry-Run Preview
+**Goal:** A new user can diagnose vault adapter misconfiguration and preview vault-aware behavior before any files are written.
+**Depends on:** Phase 27, Phase 28 (consumes resolved detection state, output destination, and ignore-list)
+**Requirements:** VAULT-14, VAULT-15
+**Success Criteria** (what must be TRUE):
+  1. `graphify doctor` prints vault detection status, profile validation result, resolved output destination, and the active ignore-list in a single human-readable report
+  2. `graphify doctor` exits non-zero when the profile is invalid, the output destination is unresolvable, or the configuration would cause self-ingestion
+  3. `graphify --dry-run` (and/or `graphify doctor --dry-run`) shows which input files would be ingested, which would be skipped, and which output files would be written — all without touching disk
+  4. The doctor report ends with concrete, actionable "recommended fixes" lines for each detected misconfiguration
+**Plans:** TBD
+
+### Phase 30: Profile Composition
+**Goal:** Users can compose profiles from fragments and override templates per community without duplicating profile content, with deterministic merge order and cycle detection.
+**Depends on:** Nothing (independent surface from VAULT-* phases)
+**Requirements:** CFG-02, CFG-03
+**Success Criteria** (what must be TRUE):
+  1. A profile with `extends:` or `includes:` resolves into a single composed profile via deterministic merge order, and cycles are detected and reported as a clear error rather than infinite-looping
+  2. A profile field maps community ID/label patterns to custom templates, and the first matching pattern wins (consistent with the v1.0 mapping engine precedence)
+  3. Running `graphify --validate-profile` against a composed profile reports the merge chain and the resolved per-community template assignments
+  4. Removing an `extends:` reference and re-validating shows exactly which fields were lost — no silent drops
+**Plans:** TBD
+
+### Phase 31: Template Engine Extensions
+**Goal:** Markdown templates can express conditional sections, iterate over connections, and inject per-note-type Dataview queries — without leaving the `string.Template` block-parser surface or adding new required dependencies.
+**Depends on:** Phase 30 (per-community templates from CFG-03 are the natural delivery vehicle for TMPL-03's per-note-type Dataview queries)
+**Requirements:** TMPL-01, TMPL-02, TMPL-03
+**Success Criteria** (what must be TRUE):
+  1. A template containing `{{#if_god_node}}...{{/if}}` renders the guarded section only when the node attribute predicate is true and omits it cleanly otherwise
+  2. A template containing `{{#connections}}...{{/connections}}` iterates over each connection with per-iteration variable scope; nested loops are either supported or rejected with a clear error
+  3. A profile field declaring per-note-type Dataview query strings produces notes whose Dataview block content matches the profile-declared query at render time
+  4. All three template features are sanitized — node labels containing template syntax (`{{`, `}}`, `#`) cannot inject conditional logic or break out of loops
+**Plans:** TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -256,11 +249,15 @@ Full details: [.planning/milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md)
 | 20. Diagram Seed Engine | v1.5 | 3/3 | Complete | 2026-04-23 |
 | 21. Profile Extension & Template Bootstrap | v1.5 | 2/2 | Complete | 2026-04-23 |
 | 22. Excalidraw Skill & Vault Bridge | v1.5 | 2/2 | Complete | 2026-04-27 |
-
 | 23. Dedup `source_file` List-Handling Fix | v1.6 | 1/1 | Complete   | 2026-04-27 |
 | 24. Manifest Writer Audit + Atomic Read-Merge-Write | v1.6 | 2/2 | Complete    | 2026-04-27 |
 | 25. Mandatory Dual-Artifact Persistence in Skill Files | v1.6 | 1/1 | Complete    | 2026-04-27 |
 | 26. v1.5 Configuration Guide & Walkthrough Docs | v1.6 | 1/1 | Complete   | 2026-04-27 |
+| 27. Vault Detection & Profile-Driven Output Routing | v1.7 | 0/0 | Not started | — |
+| 28. Self-Ingestion Hardening | v1.7 | 0/0 | Not started | — |
+| 29. Doctor Diagnostics & Dry-Run Preview | v1.7 | 0/0 | Not started | — |
+| 30. Profile Composition | v1.7 | 0/0 | Not started | — |
+| 31. Template Engine Extensions | v1.7 | 0/0 | Not started | — |
 
 ---
-*Last updated: 2026-04-27 — v1.6 Hardening & Onboarding shipped: 4 phases (23–26), 5 plans, 15/15 REQ-IDs satisfied across DEDUP/MANIFEST/SKILLMEM/DOCS.*
+*Last updated: 2026-04-27 — v1.7 Vault Adapter UX & Template Polish roadmap landed: 5 phases (27–31), 13/13 REQ-IDs mapped across VAULT-08..15, TMPL-01..03, CFG-02..03.*

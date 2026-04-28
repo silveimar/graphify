@@ -65,19 +65,19 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VAULT-08    | TBD   | Planned |
-| VAULT-09    | TBD   | Planned |
-| VAULT-10    | TBD   | Planned |
-| VAULT-11    | TBD   | Planned |
-| VAULT-12    | TBD   | Planned |
-| VAULT-13    | TBD   | Planned |
-| VAULT-14    | TBD   | Planned |
-| VAULT-15    | TBD   | Planned |
-| TMPL-01     | TBD   | Planned |
-| TMPL-02     | TBD   | Planned |
-| TMPL-03     | TBD   | Planned |
-| CFG-02      | TBD   | Planned |
-| CFG-03      | TBD   | Planned |
+| VAULT-08    | Phase 27   | Planned |
+| VAULT-09    | Phase 27   | Planned |
+| VAULT-10    | Phase 27   | Planned |
+| VAULT-11    | Phase 28   | Planned |
+| VAULT-12    | Phase 28   | Planned |
+| VAULT-13    | Phase 28   | Planned |
+| VAULT-14    | Phase 29   | Planned |
+| VAULT-15    | Phase 29   | Planned |
+| TMPL-01     | Phase 31   | Planned |
+| TMPL-02     | Phase 31   | Planned |
+| TMPL-03     | Phase 31   | Planned |
+| CFG-02      | Phase 30   | Planned |
+| CFG-03      | Phase 30   | Planned |
 
 (Phase column populated by `gsd-roadmapper` during `/gsd-new-milestone` roadmap step.)
 

@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Vault Adapter UX & Template Polish
-status: planning
-last_updated: "2026-04-28T02:02:59.091Z"
+status: ready-to-execute
+last_updated: "2026-04-28T02:08:00.000Z"
 last_activity: 2026-04-28
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,7 +20,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-27 at v1.6 milestone close)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking-command depth + graph-quality-over-time), v1.5 (vault promotion CLI + diagram intelligence), and now v1.6 (stability hardening: list-form source_file dedup fix, atomic read-merge-write across 5 manifest writers, drift-locked dual-artifact persistence in all 9 platform skill variants, end-to-end v1.5 walkthrough doc).
-**Current focus:** Planning v1.7 (unscoped)
+**Current focus:** v1.7 Vault Adapter UX & Template Polish — roadmap landed (Phases 27–31, 13/13 REQ-IDs mapped); ready to execute Phase 27.
 
 ## Deferred Items
 
@@ -52,10 +52,10 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 27 — Vault Detection & Profile-Driven Output Routing (not yet started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-28 — Milestone v1.7 started
+Status: Roadmap landed; awaiting `/gsd-plan-phase 27`
+Last activity: 2026-04-28 — v1.7 ROADMAP.md committed; 5 phases scoped (27–31)
 
 ## Performance Metrics
 
