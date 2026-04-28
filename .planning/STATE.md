@@ -4,14 +4,14 @@ milestone: v1.7
 milestone_name: Vault Adapter UX & Template Polish
 status: executing
 stopped_at: Phase 30 context gathered
-last_updated: "2026-04-28T16:07:20.985Z"
-last_activity: 2026-04-28 -- Phase 30 planning complete
+last_updated: "2026-04-28T16:22:23.653Z"
+last_activity: 2026-04-28
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 12
-  completed_plans: 9
-  percent: 75
+  completed_plans: 10
+  percent: 83
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-27 at v1.6 milestone close)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking-command depth + graph-quality-over-time), v1.5 (vault promotion CLI + diagram intelligence), and now v1.6 (stability hardening: list-form source_file dedup fix, atomic read-merge-write across 5 manifest writers, drift-locked dual-artifact persistence in all 9 platform skill variants, end-to-end v1.5 walkthrough doc).
-**Current focus:** Phase 28 — self-ingestion-hardening
+**Current focus:** Phase 30 — profile-composition
 
 ## Deferred Items
 
@@ -53,10 +53,10 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: 28 (self-ingestion-hardening) — EXECUTING
-Plan: 3 of 3
+Phase: 30 (profile-composition) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-04-28 -- Phase 30 planning complete
+Last activity: 2026-04-28
 
 ## Performance Metrics
 
@@ -154,6 +154,8 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 - [Phase 26]: Phase 26-01 ships D-05/D-06 policy values (>=3 outbound branches, betweenness centrality) as inline YAML # comments rather than new schema keys. — Profile loader allowlist (graphify/profile.py:106-108 top-level + 367-404 diagram_types[*]) rejects any unknown keys; only min_main_nodes is the loader-enforced gate per seed.py:265-289.
 - [Phase ?]: D-29: manifest writes happen ONLY after successful export — --obsidian write in else block post-exit(1); run branch write on try-success path before finally
 - [Phase ?]: D-26: always read from resolved.artifacts_dir (stable anchor); notes_dir rename is transparent to prior_files prune (VAULT-13)
+- [Phase ?]: Phase 30 Plan 01: Stack-local frame_chain + descending cleared in try/finally for cycle-error rendering
+- [Phase ?]: Phase 30 Plan 01: PreflightResult extended with 3 trailing default fields (chain, provenance, community_template_rules); star-rest unpacking preserves back-compat
 
 ### Blockers/Concerns
 
@@ -189,9 +191,10 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | Phase 24-manifest-writer-audit-atomic-read-merge-write-hardening P02 | 150 | 1 tasks | 1 files |
 | Phase 26 P01 | 237 | 3 tasks | 4 files |
 | Phase 28-self-ingestion-hardening P03 | 383 | 3 tasks | 3 files |
+| Phase 30 P01 | 600 | 2 tasks | 23 files |
 
 ## Session Continuity
 
-Last session: 2026-04-28T15:33:20.939Z
+Last session: 2026-04-28T16:22:23.650Z
 Stopped at: Phase 30 context gathered
 Next action: /gsd-plan-phase 20 to plan Phase 20 (Diagram Seed Engine).
