@@ -1,0 +1,14 @@
+folder_mapping:
+  thing: 01-Things
+  statement: 02-Statements
+  moc: 06-MOCs
+  community: 07-Communities
+naming:
+  convention: kebab-case
+community_templates:
+  - match: label
+    pattern: "transformer*"
+    template: templates/transformer-moc.md
+  - match: id
+    pattern: 0
+    template: templates/big-community-moc.md
