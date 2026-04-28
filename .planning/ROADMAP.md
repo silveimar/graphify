@@ -156,7 +156,7 @@ Full details: [.planning/milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md)
 - [x] **Phase 27: Vault Detection & Profile-Driven Output Routing** — Detect `.obsidian/` at CWD, auto-adopt vault profile, resolve output destination from profile field (3/3 plans, completed 2026-04-28)
 - [x] **Phase 28: Self-Ingestion Hardening** — Profile-aware exclusions, recursive nesting guard, manifest-based ignore for prior runs (completed 2026-04-28)
 - [ ] **Phase 29: Doctor Diagnostics & Dry-Run Preview** — `graphify doctor` command + `--dry-run` preview of vault-aware behavior
-- [ ] **Phase 30: Profile Composition** — `extends:`/`includes:` mechanism with cycle detection; per-community template overrides
+- [x] **Phase 30: Profile Composition** — `extends:`/`includes:` mechanism with cycle detection; per-community template overrides (completed 2026-04-28)
 - [ ] **Phase 31: Template Engine Extensions** — Conditional `{{#if_*}}` blocks, `{{#connections}}` loops, per-note-type Dataview query templates
 
 ## Phase Details
@@ -215,11 +215,11 @@ Plans:
   2. A profile field maps community ID/label patterns to custom templates, and the first matching pattern wins (consistent with the v1.0 mapping engine precedence)
   3. Running `graphify --validate-profile` against a composed profile reports the merge chain and the resolved per-community template assignments
   4. Removing an `extends:` reference and re-validating shows exactly which fields were lost — no silent drops
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 Plans:
 - [x] 30-01-PLAN.md — [wave 1] Resolver + schema (extends/includes, cycle detection, depth cap, path confinement, _deep_merge_with_provenance, refactor load_profile, extend validate_profile + PreflightResult)
 - [x] 30-02-PLAN.md — [wave 2, depends on 01] community_templates runtime dispatch in _render_moc_like (fnmatchcase, first-match-wins, MOC-only scope, fallback on failure)
-- [ ] 30-03-PLAN.md — [wave 3, depends on 01+02] Extend --validate-profile output: Merge chain + Field provenance + Resolved community templates sections (uses Plan 02 fixture; serial appends to test_profile_composition.py)
+- [x] 30-03-PLAN.md — [wave 3, depends on 01+02] Extend --validate-profile output: Merge chain + Field provenance + Resolved community templates sections (uses Plan 02 fixture; serial appends to test_profile_composition.py)
 
 ### Phase 31: Template Engine Extensions
 **Goal:** Markdown templates can express conditional sections, iterate over connections, and inject per-note-type Dataview queries — without leaving the `string.Template` block-parser surface or adding new required dependencies.
@@ -272,7 +272,7 @@ Plans:
 | 27. Vault Detection & Profile-Driven Output Routing | v1.7 | 0/0 | Not started | — |
 | 28. Self-Ingestion Hardening | v1.7 | 3/3 | Complete   | 2026-04-28 |
 | 29. Doctor Diagnostics & Dry-Run Preview | v1.7 | 0/0 | Not started | — |
-| 30. Profile Composition | v1.7 | 2/3 | In Progress|  |
+| 30. Profile Composition | v1.7 | 3/3 | Complete   | 2026-04-28 |
 | 31. Template Engine Extensions | v1.7 | 0/0 | Not started | — |
 
 ---

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Vault Adapter UX & Template Polish
-status: executing
+status: verifying
 stopped_at: Phase 30 context gathered
-last_updated: "2026-04-28T16:32:47.680Z"
+last_updated: "2026-04-28T16:44:11.882Z"
 last_activity: 2026-04-28
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
-  percent: 92
+  completed_plans: 12
+  percent: 100
 ---
 
 # Project State
@@ -55,7 +55,7 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 Phase: 30 (profile-composition) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-28
 
 ## Performance Metrics
@@ -158,6 +158,8 @@ Key v1.4-origin resolutions (from REQUIREMENTS.md OQ locks 2026-04-17):
 - [Phase ?]: Phase 30 Plan 01: PreflightResult extended with 3 trailing default fields (chain, provenance, community_template_rules); star-rest unpacking preserves back-compat
 - [Phase ?]: Use fnmatch.fnmatchcase (case-sensitive) for community_templates label matching
 - [Phase ?]: Function-local import of validate_vault_path inside _load_override_template to dodge circular import with graphify.profile
+- [Phase ?]: Plan 30-03: linear_chain_valid fixture for output tests
+- [Phase ?]: Plan 30-03: lost-fields asserts on folder_mapping leaf (matches resolver semantics)
 
 ### Blockers/Concerns
 
@@ -195,9 +197,10 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 | Phase 28-self-ingestion-hardening P03 | 383 | 3 tasks | 3 files |
 | Phase 30 P01 | 600 | 2 tasks | 23 files |
 | Phase 30 P02 | 50min | 2 tasks | 5 files |
+| Phase 30 P03 | 453 | 2 tasks | 10 files |
 
 ## Session Continuity
 
-Last session: 2026-04-28T16:32:40.084Z
+Last session: 2026-04-28T16:43:56.948Z
 Stopped at: Phase 30 context gathered
 Next action: /gsd-plan-phase 20 to plan Phase 20 (Diagram Seed Engine).
