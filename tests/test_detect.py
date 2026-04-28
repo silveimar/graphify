@@ -416,3 +416,213 @@ def test_detect_exclude_globs_empty_tuple_no_op(tmp_path):
     all_files = [f for fs in result["files"].values() for f in fs]
     assert any("keep.md" in f for f in all_files)
     assert any("also_keep.py" in f for f in all_files)
+
+
+# ---------------------------------------------------------------------------
+# Phase 28-03: output-manifest tests (VAULT-13)
+# ---------------------------------------------------------------------------
+
+
+def test_save_and_load_output_manifest_round_trip(tmp_path):
+    """VAULT-13: _save_output_manifest then _load_output_manifest round-trips correctly."""
+    from graphify.detect import _save_output_manifest, _load_output_manifest
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    notes_dir = tmp_path / "notes"
+    notes_dir.mkdir()
+    f = tmp_path / "notes" / "note.md"
+    f.write_text("# Note\n")
+
+    _save_output_manifest(artifacts_dir, notes_dir, [str(f)])
+    data = _load_output_manifest(artifacts_dir)
+
+    assert data["version"] == 1
+    assert len(data["runs"]) == 1
+    run = data["runs"][0]
+    assert str(f.resolve()) in run["files"]
+    assert "run_id" in run
+    assert "timestamp" in run
+    assert run["notes_dir"] == str(notes_dir.resolve())
+    assert run["artifacts_dir"] == str(artifacts_dir.resolve())
+
+
+def test_load_output_manifest_missing_returns_silent_empty(tmp_path, capsys):
+    """VAULT-13: no manifest file → empty envelope; NO warning on stderr."""
+    from graphify.detect import _load_output_manifest
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+
+    data = _load_output_manifest(artifacts_dir)
+    captured = capsys.readouterr()
+
+    assert data == {"version": 1, "runs": []}
+    assert captured.err == ""
+
+
+def test_load_output_manifest_malformed_warns_once(tmp_path, capsys):
+    """VAULT-13: malformed JSON → empty envelope + exactly one warning line."""
+    from graphify.detect import _load_output_manifest
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "output-manifest.json").write_text("not json{{")
+
+    data = _load_output_manifest(artifacts_dir)
+    captured = capsys.readouterr()
+
+    assert data == {"version": 1, "runs": []}
+    warning_lines = [l for l in captured.err.splitlines() if "output-manifest.json unreadable" in l]
+    assert len(warning_lines) == 1
+
+
+def test_load_output_manifest_wrong_shape_warns_once(tmp_path, capsys):
+    """VAULT-13: valid JSON but wrong shape (missing 'runs') → empty envelope + warning."""
+    from graphify.detect import _load_output_manifest
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "output-manifest.json").write_text('{"version": 1}')
+
+    data = _load_output_manifest(artifacts_dir)
+    captured = capsys.readouterr()
+
+    assert data == {"version": 1, "runs": []}
+    warning_lines = [l for l in captured.err.splitlines() if "output-manifest.json unreadable" in l]
+    assert len(warning_lines) == 1
+
+
+def test_save_output_manifest_fifo_caps_at_5(tmp_path):
+    """VAULT-13 D-24: rolling N=5 cap; oldest entries dropped FIFO after 7 saves."""
+    from graphify.detect import _save_output_manifest, _load_output_manifest
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+
+    for i in range(7):
+        nd = tmp_path / f"notes_{i}"
+        nd.mkdir(exist_ok=True)
+        _save_output_manifest(artifacts_dir, nd, [])
+
+    data = _load_output_manifest(artifacts_dir)
+    assert len(data["runs"]) == 5
+    # Oldest two should be gone; most recent notes_dir should be notes_6
+    notes_dirs_in_manifest = [r["notes_dir"] for r in data["runs"]]
+    assert not any("notes_0" in d for d in notes_dirs_in_manifest)
+    assert not any("notes_1" in d for d in notes_dirs_in_manifest)
+    assert any("notes_6" in d for d in notes_dirs_in_manifest)
+
+
+def test_save_output_manifest_gc_removes_missing_files(tmp_path):
+    """VAULT-13 D-28: GC removes file entries whose paths no longer exist on disk."""
+    from graphify.detect import _save_output_manifest, _load_output_manifest
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    notes_dir = tmp_path / "notes"
+    notes_dir.mkdir()
+
+    f1 = notes_dir / "gone.md"
+    f1.write_text("# Gone\n")
+    _save_output_manifest(artifacts_dir, notes_dir, [str(f1)])
+    # Delete f1 to simulate a file that was exported and then removed
+    f1.unlink()
+
+    f2 = notes_dir / "present.md"
+    f2.write_text("# Present\n")
+    _save_output_manifest(artifacts_dir, notes_dir, [str(f2)])
+
+    data = _load_output_manifest(artifacts_dir)
+    assert len(data["runs"]) == 2
+    # Run 1's files should no longer contain f1 (GC'd)
+    assert str(f1.resolve()) not in data["runs"][0]["files"]
+    # Run 2's files should contain f2
+    assert str(f2.resolve()) in data["runs"][1]["files"]
+
+
+def test_save_output_manifest_atomic_no_partial_on_oserror(tmp_path, monkeypatch):
+    """VAULT-13 D-29: OSError during os.replace leaves no partial file; .tmp cleaned up."""
+    import pytest
+    from graphify.detect import _save_output_manifest
+
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    notes_dir = tmp_path / "notes"
+    notes_dir.mkdir()
+
+    monkeypatch.setattr("os.replace", lambda *a, **kw: (_ for _ in ()).throw(OSError("simulated")))
+
+    with pytest.raises(OSError):
+        _save_output_manifest(artifacts_dir, notes_dir, [])
+
+    # No partial .tmp should be left
+    assert not list(artifacts_dir.glob("*.tmp"))
+    # Original manifest should not exist (first write attempted)
+    assert not (artifacts_dir / "output-manifest.json").exists()
+
+
+def test_detect_skips_prior_files_from_manifest(tmp_path):
+    """VAULT-13 D-27: detect() prunes files listed in output-manifest.json prior runs."""
+    from graphify.detect import _save_output_manifest
+
+    # Simulate a prior run that exported old_notes/note.md
+    old_notes = tmp_path / "old_notes"
+    old_notes.mkdir()
+    prior_note = old_notes / "note.md"
+    prior_note.write_text("# Prior note\n\nContent.\n")
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    _save_output_manifest(artifacts_dir, old_notes, [str(prior_note)])
+
+    # New run with a different notes_dir
+    new_notes = tmp_path / "new_notes"
+    new_notes.mkdir()
+    resolved = ResolvedOutput(False, None, new_notes, artifacts_dir, "profile", ())
+
+    result = detect(tmp_path, resolved=resolved)
+    all_files = [f for fs in result["files"].values() for f in fs]
+
+    assert not any(str(prior_note.resolve()) == f for f in all_files), (
+        "Prior note should have been pruned by manifest lookup"
+    )
+
+
+def test_detect_renamed_notes_dir_no_re_ingest(tmp_path):
+    """VAULT-13 D-26/D-27: renaming notes_dir between runs does not re-ingest old files."""
+    from graphify.detect import _save_output_manifest
+
+    # Simulate run-1 with notes at Atlas/Graph
+    old_notes = tmp_path / "Atlas" / "Graph"
+    old_notes.mkdir(parents=True)
+    old_file = old_notes / "foo.md"
+    old_file.write_text("# Foo\n\nContent.\n")
+    artifacts_dir = tmp_path / "knowledge-graph-out"
+    artifacts_dir.mkdir()
+    _save_output_manifest(artifacts_dir, old_notes, [str(old_file)])
+
+    # Run-2: notes_dir renamed to Spaces/Graph (same artifacts_dir)
+    new_notes = tmp_path / "Spaces" / "Graph"
+    new_notes.mkdir(parents=True)
+    resolved = ResolvedOutput(False, None, new_notes, artifacts_dir, "profile", ())
+
+    result = detect(tmp_path, resolved=resolved)
+    all_files = [f for fs in result["files"].values() for f in fs]
+
+    assert not any(str(old_file.resolve()) == f for f in all_files), (
+        "Old file from renamed notes_dir should be pruned via manifest"
+    )
+
+
+def test_detect_no_manifest_lookup_when_resolved_none(tmp_path, capsys):
+    """VAULT-13 D-21: when resolved=None, no manifest access occurs (no error, no warning)."""
+    (tmp_path / "keep.md").write_text("# Keep\n\nContent.\n")
+
+    result = detect(tmp_path)
+    captured = capsys.readouterr()
+
+    # No manifest-related warnings should appear
+    assert "output-manifest.json" not in captured.err
+    # The file should still be detected normally
+    all_files = [f for fs in result["files"].values() for f in fs]
+    assert any("keep.md" in f for f in all_files)
