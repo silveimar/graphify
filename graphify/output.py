@@ -27,6 +27,7 @@ class ResolvedOutput(NamedTuple):
     notes_dir: Path
     artifacts_dir: Path
     source: Literal["profile", "cli-flag", "default"]
+    exclude_globs: tuple[str, ...] = ()   # Phase 28 D-14
 
 
 def is_obsidian_vault(path: Path) -> bool:
@@ -165,4 +166,6 @@ def resolve_output(cwd: Path, *, cli_output: str | None = None) -> ResolvedOutpu
         f"output: {notes_dir} (source=profile)",
         file=sys.stderr,
     )
-    return ResolvedOutput(True, cwd_resolved, notes_dir, artifacts_dir, "profile")
+    _raw_exclude = profile.get("output", {}).get("exclude", [])
+    _exclude_globs: tuple[str, ...] = tuple(_raw_exclude) if isinstance(_raw_exclude, list) else ()
+    return ResolvedOutput(True, cwd_resolved, notes_dir, artifacts_dir, "profile", _exclude_globs)
