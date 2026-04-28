@@ -2092,24 +2092,54 @@ def main() -> None:
             print(str(p))
         sys.exit(0)
     elif cmd == "run":
-        # graphify run [path] [--router]
+        # graphify run [path] [--router] [--output <path>]
+        # Phase 27 (VAULT-08, VAULT-09, VAULT-10): vault-aware output resolution.
         # ENRICH-07: foreground always wins. Acquire .enrichment.lock before
         # the graph write path; SIGTERM any active enrichment PID; block until
         # the lock releases cleanly. See _foreground_acquire_enrichment_lock.
         from graphify.pipeline import run_corpus
+        from graphify.output import resolve_output
 
         rest = list(sys.argv[2:])
         use_router = "--router" in rest
         rest = [a for a in rest if a != "--router"]
+
+        # Parse --output / --output=<path> (D-08 unified override flag)
+        cli_output: str | None = None
+        filtered: list[str] = []
+        i = 0
+        while i < len(rest):
+            if rest[i] == "--output" and i + 1 < len(rest):
+                cli_output = rest[i + 1]; i += 2
+            elif rest[i].startswith("--output="):
+                cli_output = rest[i].split("=", 1)[1]; i += 1
+            else:
+                filtered.append(rest[i]); i += 1
+        rest = filtered
         raw_target = rest[0] if rest else "."
-        target = Path(raw_target).resolve()
+
+        # Resolve output BEFORE pipeline starts (emits VAULT-08 detection report + D-09 if applicable)
+        resolved = resolve_output(Path.cwd(), cli_output=cli_output)
+
+        # D-07: when vault auto-adopts profile, input corpus is forced to CWD
+        if resolved.vault_detected and resolved.source == "profile":
+            target = Path.cwd().resolve()
+        else:
+            target = Path(raw_target).resolve()
+
         if not target.exists():
             print(f"error: path not found: {target}", file=sys.stderr)
             sys.exit(2)
-        out_dir = target / "graphify-out" if target.is_dir() else target.parent / "graphify-out"
+
+        # Determine artifacts out_dir per ResolvedOutput contract (D-11, D-12)
+        if resolved.source == "default":
+            out_dir = target / "graphify-out" if target.is_dir() else target.parent / "graphify-out"
+        else:
+            out_dir = resolved.artifacts_dir
+
         lock_fd = _foreground_acquire_enrichment_lock(out_dir, timeout_seconds=30.0)
         try:
-            run_corpus(target, use_router=use_router)
+            run_corpus(target, use_router=use_router, out_dir=out_dir)
         finally:
             _foreground_release_enrichment_lock(lock_fd)
     elif cmd == "enrich":
