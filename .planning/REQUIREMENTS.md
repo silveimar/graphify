@@ -68,9 +68,9 @@
 | VAULT-08    | Phase 27   | Planned |
 | VAULT-09    | Phase 27   | Planned |
 | VAULT-10    | Phase 27   | Planned |
-| VAULT-11    | Phase 28   | Planned |
-| VAULT-12    | Phase 28   | Planned |
-| VAULT-13    | Phase 28   | Planned |
+| VAULT-11    | Phase 28   | Complete |
+| VAULT-12    | Phase 28   | Complete |
+| VAULT-13    | Phase 28   | Complete |
 | VAULT-14    | Phase 29   | Planned |
 | VAULT-15    | Phase 29   | Planned |
 | TMPL-01     | Phase 31   | Planned |
