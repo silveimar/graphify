@@ -260,6 +260,50 @@
 
 ---
 
+## Milestone: v1.6 — Hardening & Onboarding
+
+**Shipped:** 2026-04-27
+**Phases:** 4 (23–26) | **Plans:** 5
+
+### What Was Built
+
+- **Phase 23** — `dedup.py` edge-merge patched (+11/−1) to delegate `source_file` list-handling to `analyze._iter_sources`, preventing `TypeError: unhashable type: 'list'` on `--dedup-cross-type` over re-merged extractions; cross-type regression test added (Issue #4)
+- **Phase 24** — `RoutingAudit.flush` and `write_manifest_atomic` patched to perform read-merge-write keyed by row identity (file path / tool name) before atomic `.tmp + os.replace`; subpath sibling-row erasure eliminated; AUDIT.md enumerates all 5 on-disk manifest writers with PATCHED/LOCKED/DEFERRED dispositions, anchoring future additions
+- **Phase 25** — Mandatory dual-artifact persistence sentinel block emitted byte-equal across all 9 platform skill variants (claude/codex/opencode/openclaw/droid/trae/trae-cn/copilot/antigravity); 12 parametrized tests over `_PLATFORM_CONFIG` enforce drift-lock
+- **Phase 26** — Single-file `CONFIGURING_V1_5.md` (414 lines) walks `vault-promote → --diagram-seeds → --init-diagram-templates → install excalidraw → /excalidraw-diagram` end-to-end with annotated `.graphify/profile.yaml` + verbatim MCP `list_diagram_seeds` / `get_diagram_seed` / `_resolve_alias` quotes; README cross-link added
+
+### What Worked
+
+- **Decoupled phase parallelism:** All four phases were intentionally independent with no cross-phase dependencies, enabling completion in a single day. The `gsd-integration-checker` confirmed 0 cross-phase wiring gaps post-hoc — when phases are truly independent the audit is fast and clean.
+- **Code reuse over reimplementation:** P23 reused `analyze._iter_sources` rather than introducing a new `_sf_flatten` helper as originally scoped; the smaller diff matched a pattern already established in Plan 18-01.
+- **Reference-quality docs by quotation:** P26 quoted MCP tool source verbatim (`mcp_tool_registry.py` + `serve.py:1234-1250`) rather than paraphrasing — guarantees the DOCS-03 contract that an agent author can integrate without reading source, and survives source drift better than prose.
+
+### What Was Inefficient
+
+- **Tracker checkbox lag:** 7 of 15 REQUIREMENTS.md checkboxes (DEDUP-01..03, SKILLMEM-01..04) remained `[ ]` despite passing verification; required manual flip at milestone close. Pattern: phase verification artifacts don't reach back to milestone-level traceability.
+- **VALIDATION.md frontmatter promotion lag:** Phases 23, 24, 25 all needed retroactive `status: draft → validated` promotion via `/gsd-validate-phase` after execution. The `nyquist_compliant: true` content was correct on first write — only the `status` field stayed stale.
+
+### Patterns Established
+
+- **Audit-document deliverables for cross-cutting refactors:** P24's AUDIT.md (5-row writer enumeration with merge policy diff) became the anchor artifact for future manifest additions. Pattern: when a refactor touches multiple call sites with non-uniform semantics, ship an enumeration document alongside the code patch so future contributors find the canonical contract.
+- **Sentinel-block drift-lock via parametrized tests:** P25's approach of asserting byte-equal sentinel blocks across all `_PLATFORM_CONFIG` entries via a single parametrized test is reusable for any future "this contract must appear in every variant" requirement.
+- **Single-file walkthrough doc beats split-doc structure:** P26 chose a single `CONFIGURING_V1_5.md` over `docs/v1.5-configuration/*.md` directory. New users get one file to read; the doc tracks one cohesive end-to-end flow rather than fragmenting context across cross-references.
+
+### Key Lessons
+
+- **Hardening milestones are short and decoupled by design.** v1.6's single-day completion (4 phases, 5 plans, +3,159/−65 LOC) reflects that `--theme: stability + onboarding` produces phases that don't need each other. Don't fight this with artificial dependencies.
+- **`/gsd-validate-phase` should be the default close-step for execute-phase, not a separate manual step.** Three of four phases needed retroactive promotion — moving it inline would eliminate the tech-debt cluster.
+- **Pre-existing baseline test failures are not milestone debt — they're inherited debt that should be made visible.** v1.6 surfaces 2 such failures (deferred to v1.7); the audit's `tech_debt` status correctly distinguishes "this milestone introduced X" from "this milestone inherited X."
+
+### Cost Observations
+
+- **Sessions:** ~3 (Apr 27, mostly self-routed via gsd-progress + gsd-validate-phase + gsd-audit-milestone)
+- **Timeline:** 1 day (2026-04-27 — same-day milestone)
+- **Code delta:** +3,159 / −65 LOC across 27 files (16 commits)
+- **Notable:** v1.6 is the smallest milestone by every metric (phases, plans, LOC, days). Confirms the hardening/docs sprint scoping pattern.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -336,6 +380,7 @@ Agent-discoverable MCP surface (introspection-driven capability manifest + harne
 | v1.2 | 3 | 9 | Narrow-scope milestone close pattern; planning-only lifecycle-cleanup phase (9.1.1); atomic sidecar writes enforced across all agent state; blind Borda tournament with "no finding" as first-class option |
 | v1.3 | 3 | 19 | D-02 hybrid response envelope contract established; D-16 alias-redirect for dedup transparency; D-18 compose-don't-plumb design principle; cross-source ontology alignment; gsd-code-reviewer as critical-bug-catching gate |
 | v1.4 | 9 (7+2) | 32 | Milestone-level HARD-gates; cross-cutting decisions-as-constraints (D-02/D-16/D-18 checked every phase review); audit-driven decimal gap-closure (18.1, 18.2); manifest-as-metadata-source-of-truth; out-of-order milestone close pattern |
+| v1.6 | 4 | 5 | Hardening + docs sprint completed in a single day; 4 fully-decoupled phases (0 cross-phase wires); audit-document deliverable pattern (P24 AUDIT.md) and sentinel drift-lock pattern (P25) established |
 
 ### Top Lessons (Verified Across Milestones)
 

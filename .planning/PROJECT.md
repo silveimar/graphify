@@ -8,25 +8,20 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: v1.6 Hardening & Onboarding
+## Current Milestone: v1.7 (unscoped)
 
-**Goal:** Close known stability gaps and make v1.5's diagram intelligence + Excalidraw pipeline learnable from documentation alone.
-
-**Target features:**
-- **Bugfix — Issue #4 dedup `source_file` list crash** (`graphify/dedup.py:493`): `_sf_flatten` helper + cross-type regression test
-- **Bugfix — Manifest overwrite on subpath runs**: audit every manifest writer (`vault-manifest.json`, `seeds-manifest.json`, `routing.json`, `manifest.json`) for read-merge-write semantics; add subpath isolation tests
-- **Skill feature — Mandatory dual-artifact response persistence**: upstream the local `~/.claude/skills/graphify/SKILL.md:1076` edit into source skill files (`graphify/skill.md` + 7 platform variants); enforce `graphify-out/memory/CMD_<TS>_<SLUG>.{graph,human}.md` after every `query`/`path`/`explain`/`analyze`; regression-grep all `_PLATFORM_CONFIG` outputs
-- **Docs — v1.5 step-by-step configuration guide**: end-to-end walkthrough covering `diagram_types:` profile, `vault-promote`, `--diagram-seeds`, `--init-diagram-templates`, `install excalidraw`, and the MCP `list_diagram_seeds` / `get_diagram_seed` tools
-
-**Key context:** Bugfix #2 starts with an audit (broader blast radius than just vault-manifest); skill change must round-trip cleanly through `graphify install` on all 8 platforms; SEED-001/SEED-002 remain dormant (their triggers aren't met by this theme).
+**Prior milestone (v1.6) shipped 2026-04-27:** Phases 23–26 (4 phases, 5 plans). Dedup `source_file` list-crash fix, atomic manifest read-merge-write across 5 writers + AUDIT.md, mandatory dual-artifact persistence baked into all 9 platform skill variants, single-file `CONFIGURING_V1_5.md` walkthrough. 15/15 requirements. Full detail archived to `.planning/milestones/v1.6-*`.
 
 **Prior milestone (v1.5) shipped 2026-04-27:** Phases 19–22 (4 phases, 11 plans). Vault Promotion Script (Layer B), Diagram Seed Engine, Profile Extension & Template Bootstrap, Excalidraw Skill & Vault Bridge. 34/34 requirements. Full detail archived to `.planning/milestones/v1.5-*`.
 
 **Prior milestone (v1.4) shipped 2026-04-22:** Phases 12–18 (7 phases, 32 plans). Heterogeneous Extraction Routing, Agent Capability Manifest + SEED-002 Harness Export, Async Background Enrichment, Focus-Aware Graph Context, Conversational Graph Chat, Graph Argumentation Mode, Obsidian Thinking Commands. 86/86 requirements. Full detail archived to `.planning/milestones/v1.4-*`.
 
-**Seed carryover into v1.6 backlog:**
+**Seed carryover into v1.7 backlog:**
 - SEED-001 (Tacit-to-Explicit Elicitation Engine) — dormant. Trigger: onboarding/discovery becomes a milestone theme.
 - SEED-002 (Harness Memory Export) — dormant. claude.yaml shipped in v1.4; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses.
+
+**Carryover tech debt:**
+- 2 baseline test failures (`tests/test_detect.py::test_detect_skips_dotfiles`, `tests/test_extract.py::test_collect_files_from_dir`) — pre-existing on base 24810ec; deferred to v1.7 `/gsd-debug` session.
 
 ## Requirements
 
@@ -105,13 +100,15 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - ✓ Excalidraw Skill & Vault Bridge — deployable `excalidraw-diagram` skill orchestrates seeds → Excalidraw → vault pipeline with pure-Python `graphify/excalidraw.py` fallback (`write_diagram`, `layout_for`, `SCENE_JSON_SKELETON`), `graphify install excalidraw` unified dispatcher, `_PLATFORM_CONFIG` 12-key entry — SKILL-01..06
 - ✓ End-to-end flow verified: `vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → skill invocation. All 7 cross-phase wires confirmed by `gsd-integration-checker`. Nyquist compliance: all 4 phases formally signed off.
 
+**v1.6 — Hardening & Onboarding:** *(Shipped 2026-04-27, phases 23 + 24 + 25 + 26; 15/15 requirements)*
+- ✓ Dedup `source_file` list-handling fix — `dedup.py` edge-merge delegates list-shape handling to `analyze._iter_sources`; cross-type regression test green (Issue #4) — DEDUP-01..03
+- ✓ Manifest writer hardening — `RoutingAudit.flush` + `write_manifest_atomic` perform read-merge-write keyed by row identity (path/tool name) before atomic `.tmp` + `os.replace`; subpath isolation regression tests assert sibling rows preserved; AUDIT.md enumerates all 5 on-disk writers with PATCHED/LOCKED/DEFERRED dispositions — MANIFEST-09..12
+- ✓ Mandatory dual-artifact persistence — sentinel "Mandatory response persistence" block emitted byte-equal across all 9 platform skill variants (`skill.md`, `skill-codex.md`, `skill-opencode.md`, `skill-openclaw.md`, `skill-droid.md`, `skill-trae.md`, `skill-trae-cn.md`, copilot/antigravity); 12 parametrized tests over `_PLATFORM_CONFIG` enforce drift-lock — SKILLMEM-01..04
+- ✓ v1.5 configuration walkthrough — single-file `CONFIGURING_V1_5.md` (414 lines) covers `vault-promote → --diagram-seeds → --init-diagram-templates → install excalidraw → /excalidraw-diagram` end-to-end with annotated `.graphify/profile.yaml` (6 built-ins + custom `decision-tree`) and verbatim MCP `list_diagram_seeds` / `get_diagram_seed` / `_resolve_alias` quotes; README cross-link added — DOCS-01..04
+
 ### Active
 
-**v1.6 — Hardening & Onboarding:** *(in progress, started 2026-04-27)*
-- [ ] Dedup `source_file` list-handling fix + regression test (Issue #4) — DEDUP-01
-- [ ] Manifest writer audit + atomic read-merge-write hardening across vault/seeds/routing/manifest paths — MANIFEST-09..N (count finalized in roadmap)
-- [ ] Mandatory dual-artifact response persistence baked into source skill files; verified via `graphify install` round-trip on all 8 platforms — SKILL-MEM-01..N
-- [ ] v1.5 step-by-step configuration guide + end-to-end walkthrough doc — DOCS-V15-01..N
+**v1.7 — (unscoped):** *(scope TBD; re-scope via `/gsd-new-milestone`)*
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -223,16 +220,19 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Shipped v1.5** (2026-04-27) — Diagram Intelligence & Excalidraw Bridge. 4 phases (19–22), 11 plans, 34/34 requirements. Vault-promotion CLI writing 7-folder Ideaverse Pro 2.5 notes; diagram seed engine with auto-tagging + MCP `list_diagram_seeds`/`get_diagram_seed` pair; profile `diagram_types:` schema with 6 built-in defaults + `--init-diagram-templates` Excalidraw stubs (compress=false one-way door); deployable `excalidraw-diagram` skill orchestrating seeds → Excalidraw → vault with pure-Python fallback. End-to-end flow verified across 7 cross-phase wires. Nyquist compliance: all 4 phases signed off. See `.planning/milestones/v1.5-*`.
 
-**Codebase at v1.5 close:** Python 3.10/3.12. v1.5 added +5,977 / −5 LOC across 23 files in `graphify/` + `tests/`. Full test suite green at 1,524+ passing. Timeline: 2026-04-22 → 2026-04-27 (~5 days).
+**Shipped v1.6** (2026-04-27) — Hardening & Onboarding. 4 phases (23–26), 5 plans, 15/15 requirements. Dedup `--dedup-cross-type` no longer crashes on list-form `source_file` (Issue #4); 5 on-disk manifest writers patched to atomic read-merge-write by row identity preventing subpath sibling-row erasure; mandatory dual-artifact response-persistence sentinel baked byte-equal into all 9 platform skill variants with parametrized drift-lock; single-file `CONFIGURING_V1_5.md` walkthrough lets a new user run the v1.5 pipeline end-to-end from docs alone. All 4 phases Nyquist-compliant. Status `tech_debt` (no blockers; 2 pre-existing baseline test failures deferred to v1.7). See `.planning/milestones/v1.6-*`.
+
+**Codebase at v1.6 close:** Python 3.10/3.12. v1.6 added +3,159 / −65 LOC across 27 files (16 commits, single-day milestone 2026-04-27). Full test suite still green at 1,524+ passing (excluding 2 pre-existing baseline failures inherited from base 24810ec).
 
 ## Next Milestone Goals
 
-v1.6 unscoped as of 2026-04-27. Carryover into v1.6 backlog:
+v1.7 unscoped as of 2026-04-27. Carryover into v1.7 backlog:
 - SEED-001 (Tacit-to-Explicit Elicitation Engine) — dormant; trigger is onboarding/discovery becoming the milestone theme
 - SEED-002 (Harness Memory Export) — dormant; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses
 - Deferred template-engine extensions (TMPL-01..03, CFG-02..03) carried since v1.0
+- 2 pre-existing baseline test failures (`test_detect_skips_dotfiles`, `test_collect_files_from_dir`) — recommend dedicated `/gsd-debug` session
 
 Re-scope via `/gsd-new-milestone` when next direction is clear.
 
 ---
-*Last updated: 2026-04-27 — v1.6 Hardening & Onboarding milestone started (planning)*
+*Last updated: 2026-04-27 — v1.6 Hardening & Onboarding shipped*

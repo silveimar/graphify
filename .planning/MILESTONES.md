@@ -1,5 +1,18 @@
 # Milestones
 
+## v1.6 Hardening & Onboarding (Shipped: 2026-04-28)
+
+**Phases completed:** 4 phases, 5 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Patched `RoutingAudit.flush` and `write_manifest_atomic` to perform read-merge-write keyed by row identity (file path / tool name) before atomic `.tmp + os.replace` commit, preventing subpath-scoped runs from erasing sibling manifest rows.
+- Created AUDIT.md at the phase directory enumerating all 5 on-disk manifest writers with D-06 column shape, contract preamble, D-08 migration policy, and PATCHED/LOCKED/DEFERRED dispositions for MANIFEST-12 acceptance.
+- None.
+- Authored CONFIGURING_V1_5.md as a single-file root-level guide walking the v1.5 pipeline end-to-end (vault-promote → --diagram-seeds → --init-diagram-templates → install excalidraw → /excalidraw-diagram), including a complete annotated `.graphify/profile.yaml` with all six built-in `diagram_types` plus a custom `decision-tree` entry, a reference-quality MCP tool integration section quoting `list_diagram_seeds` / `get_diagram_seed` / `_resolve_alias` verbatim from source, plus a one-line README cross-link and tracker-hygiene fixes for REQUIREMENTS.md and ROADMAP.md.
+
+---
+
 ## v1.5 Diagram Intelligence & Excalidraw Bridge (Shipped: 2026-04-27)
 
 **Phases completed:** 4 phases, 11 plans, 4 tasks

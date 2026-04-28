@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Hardening & Onboarding
-status: complete
-stopped_at: Phase 26 verified — v1.6 milestone complete
-last_updated: "2026-04-27T23:43:16.148Z"
-last_activity: 2026-04-27
+status: verifying
+stopped_at: Completed 26-01-PLAN.md
+last_updated: "2026-04-28T00:40:55.938Z"
+last_activity: 2026-04-28
 progress:
   total_phases: 4
   completed_phases: 4
@@ -18,19 +18,28 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-27 at v1.5 milestone close)
+See: .planning/PROJECT.md (updated 2026-04-27 at v1.6 milestone close)
 
-**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking-command depth + graph-quality-over-time) and now v1.5 (vault promotion CLI + diagram intelligence: auto-detected diagram seeds, profile-driven Excalidraw template bootstrap, deployable excalidraw-diagram skill).
-**Current focus:** Phase 26 — v1-5-configuration-guide-walkthrough-docs
+**Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking-command depth + graph-quality-over-time), v1.5 (vault promotion CLI + diagram intelligence), and now v1.6 (stability hardening: list-form source_file dedup fix, atomic read-merge-write across 5 manifest writers, drift-locked dual-artifact persistence in all 9 platform skill variants, end-to-end v1.5 walkthrough doc).
+**Current focus:** Planning v1.7 (unscoped)
 
 ## Deferred Items
 
-Items resolved or carried forward at v1.5 milestone close on 2026-04-27:
+Items acknowledged and deferred at v1.6 milestone close on 2026-04-27:
 
 | Category | Item | Status |
 |----------|------|--------|
-| seed | SEED-001-tacit-knowledge-elicitation-engine | dormant — carry into v1.6; re-evaluate if onboarding/discovery becomes the theme |
-| seed | SEED-002-harness-memory-export | dormant — carry into v1.6; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses |
+| seed | SEED-001-tacit-knowledge-elicitation-engine | dormant — carry into v1.7; re-evaluate if onboarding/discovery becomes the theme |
+| seed | SEED-002-harness-memory-export | dormant — carry into v1.7; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses |
+| baseline-test | tests/test_detect.py::test_detect_skips_dotfiles | pre-existing failure on base 24810ec, predates v1.6 — recommend dedicated /gsd-debug session in v1.7 |
+| baseline-test | tests/test_extract.py::test_collect_files_from_dir | pre-existing failure on base 24810ec, predates v1.6 — recommend dedicated /gsd-debug session in v1.7 |
+
+Items resolved or carried forward at v1.5 milestone close on 2026-04-27 (historical):
+
+| Category | Item | Status |
+|----------|------|--------|
+| seed | SEED-001-tacit-knowledge-elicitation-engine | dormant at v1.5 close — carried to v1.6, deferred again |
+| seed | SEED-002-harness-memory-export | dormant at v1.5 close — carried to v1.6, deferred again |
 
 Resolved during v1.5 close (removed via `git rm`):
 
@@ -47,7 +56,7 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 Phase: 26 (v1-5-configuration-guide-walkthrough-docs) — COMPLETE
 Plan: 1 of 1
 Status: Phase verified (6/6 must-haves passed) — v1.6 milestone complete (4/4 phases)
-Last activity: 2026-04-27
+Last activity: 2026-04-28
 
 ## Performance Metrics
 
