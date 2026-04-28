@@ -4,14 +4,14 @@ milestone: v1.7
 milestone_name: Vault Adapter UX & Template Polish
 status: executing
 stopped_at: Phase 28 context gathered
-last_updated: "2026-04-28T05:17:49.266Z"
-last_activity: 2026-04-28 -- Phase 28 planning complete
+last_updated: "2026-04-28T05:24:44.253Z"
+last_activity: 2026-04-28
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 6
-  completed_plans: 3
-  percent: 50
+  completed_plans: 4
+  percent: 67
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-27 at v1.6 milestone close)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile — extended through v1.4 (agent discoverability + Obsidian thinking-command depth + graph-quality-over-time), v1.5 (vault promotion CLI + diagram intelligence), and now v1.6 (stability hardening: list-form source_file dedup fix, atomic read-merge-write across 5 manifest writers, drift-locked dual-artifact persistence in all 9 platform skill variants, end-to-end v1.5 walkthrough doc).
-**Current focus:** Phase 27 — vault-detection-profile-driven-output-routing
+**Current focus:** Phase 28 — self-ingestion-hardening
 
 ## Deferred Items
 
@@ -53,10 +53,10 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 
 ## Current Position
 
-Phase: 27 (vault-detection-profile-driven-output-routing) — COMPLETE
-Plan: 3 of 3
+Phase: 28 (self-ingestion-hardening) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-04-28 -- Phase 28 planning complete
+Last activity: 2026-04-28
 
 ## Performance Metrics
 
@@ -189,6 +189,6 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 
 ## Session Continuity
 
-Last session: 2026-04-28T04:49:57.854Z
+Last session: 2026-04-28T05:24:44.250Z
 Stopped at: Phase 28 context gathered
 Next action: /gsd-plan-phase 20 to plan Phase 20 (Diagram Seed Engine).

@@ -13,7 +13,7 @@
 - [ ] **VAULT-08**: graphify detects when CWD is itself an Obsidian vault (presence of `.obsidian/` at CWD)
 - [ ] **VAULT-09**: When CWD is a vault with `.graphify/profile.yaml`, graphify auto-adopts profile-driven placement (SEED-vault-root-aware-cli Option C) — CWD is both input corpus and output target
 - [ ] **VAULT-10**: `.graphify/profile.yaml` declares output destination (vault-relative path, absolute path, or sibling-of-vault) via a profile field; CLI `--output` flag overrides
-- [ ] **VAULT-11**: Profile-aware self-ingestion exclusions — `detect.py` reads profile output destination + declared exclusion globs and prunes them from input scan
+- [x] **VAULT-11**: Profile-aware self-ingestion exclusions — `detect.py` reads profile output destination + declared exclusion globs and prunes them from input scan
 - [ ] **VAULT-12**: Recursive nesting guard — `detect.py` refuses to ingest paths matching `**/graphify-out/**` at any depth and warns the user about prior nesting if found
 - [ ] **VAULT-13**: Manifest-based ignore — current run's manifest records output paths so subsequent runs skip them even if profile changes
 - [ ] **VAULT-14**: `graphify doctor` command — prints vault detection, profile validation status, resolved output destination, ignore-list, recommended fixes; non-zero exit on misconfiguration
