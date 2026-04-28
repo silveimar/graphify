@@ -56,7 +56,7 @@ Prior carryover from v1.4 close (2026-04-23) — now superseded:
 Phase: 26 (v1-5-configuration-guide-walkthrough-docs) — COMPLETE
 Plan: 1 of 1
 Status: Phase verified (6/6 must-haves passed) — v1.6 milestone complete (4/4 phases)
-Last activity: 2026-04-28
+Last activity: 2026-04-28 - Completed quick task 260427-rc7: fix-detect-self-ingestion
 
 ## Performance Metrics
 
@@ -163,6 +163,7 @@ None. `gsd-sdk` unavailable in last execution environment — ROADMAP/STATE upda
 |---|-------------|------|--------|-----------|
 | 260416-okg | Add /graphify analyze entries to Usage cheat-sheet in all skill variants | 2026-04-16 | 058152b | [260416-okg-add-graphify-analyze-entries-to-usage-ch](./quick/260416-okg-add-graphify-analyze-entries-to-usage-ch/) |
 | 260422-jdj | Fix manifest.json path collision between capability.py and detect.py | 2026-04-22 | 9a52fa7 | [260422-jdj-fix-manifest-json-path-collision-between](./quick/260422-jdj-fix-manifest-json-path-collision-between/) |
+| 260427-rc7 | Fix detect.py self-ingestion: prune graphify-out/ from default scan to stop nested obsidian export loop | 2026-04-28 | 59d8b2f | [260427-rc7-fix-detect-self-ingestion](./quick/260427-rc7-fix-detect-self-ingestion/) |
 | Phase 15 P04 | 18 | 2 tasks | 2 files |
 | Phase 15 P05 | 15 | 2 tasks | 4 files |
 | Phase 15 P06 | 15 | 2 tasks | 5 files (3 new tests + enrich.py + test_enrich.py) |
