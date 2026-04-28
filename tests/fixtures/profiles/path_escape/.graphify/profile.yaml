@@ -1,0 +1,3 @@
+extends: ../../etc/passwd
+folder_mapping:
+  thing: 01-Things

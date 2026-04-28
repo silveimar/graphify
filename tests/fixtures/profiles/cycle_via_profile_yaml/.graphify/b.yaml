@@ -1,0 +1,3 @@
+extends: profile.yaml
+folder_mapping:
+  thing: from-b/Things

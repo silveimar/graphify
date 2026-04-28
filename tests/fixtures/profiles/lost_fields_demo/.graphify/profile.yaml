@@ -1,0 +1,4 @@
+extends: bases/parent.yaml
+folder_mapping:
+  thing: from-child/Things
+  statement: from-child/Statements

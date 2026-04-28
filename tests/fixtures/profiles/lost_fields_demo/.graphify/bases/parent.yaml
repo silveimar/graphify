@@ -1,0 +1,4 @@
+folder_mapping:
+  thing: from-parent/Things
+naming:
+  convention: kebab-case
