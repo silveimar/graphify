@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import fnmatch  # noqa: F401  # used by Plan 30-02 community-template matcher
 import hashlib
 import re
 import sys
@@ -27,6 +28,31 @@ class PreflightResult(NamedTuple):
     warnings: list[str]
     rule_count: int
     template_count: int
+    chain: list[Path] = []                     # Phase 30, D-14
+    provenance: dict[str, Path] = {}           # Phase 30, D-14, D-15
+    community_template_rules: list[dict] = []  # Phase 30, D-14, D-17
+
+
+class ResolvedProfile(NamedTuple):
+    """Output of `_resolve_profile_chain` — composed profile + provenance.
+
+    Phase 30 / CFG-02. Distinct from `PreflightResult` because the resolver
+    runs BEFORE schema validation and BEFORE merge with `_DEFAULT_PROFILE`;
+    its `composed` is the user's intent expressed as a single dict, not yet
+    layered onto graphify's defaults.
+
+    Fields:
+      composed:                  fully-merged profile dict (NOT yet merged with _DEFAULT_PROFILE)
+      chain:                     resolution order, root-ancestor first (post-order append)
+      provenance:                dotted-key -> Path of the file that contributed the leaf
+      errors:                    cycle/depth/path/parse errors (empty -> success)
+      community_template_rules:  echo of composed["community_templates"] or []
+    """
+    composed: dict
+    chain: list[Path]
+    provenance: dict[str, Path]
+    errors: list[str]
+    community_template_rules: list[dict]
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +131,7 @@ _VALID_TOP_LEVEL_KEYS = {
     "folder_mapping", "naming", "merge", "mapping_rules", "obsidian",
     "topology", "mapping", "tag_taxonomy", "profile_sync", "diagram_types",
     "output",
+    "extends", "includes", "community_templates",  # Phase 30 (CFG-02 / CFG-03)
 }
 
 _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
@@ -164,6 +191,211 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
+def _deep_merge_with_provenance(
+    base: dict,
+    override: dict,
+    source_path: Path,
+    provenance: dict[str, Path],
+    _prefix: str = "",
+) -> dict:
+    """Like ``_deep_merge`` but records ``source_path`` for every leaf write.
+
+    Phase 30 (CFG-02). Mirrors the recursion structure of ``_deep_merge``
+    line-for-line; the only addition is the ``provenance`` side-effect at
+    leaf-level writes. Dict-typed leaves recurse with a dotted prefix; every
+    other type (scalar, list, None) records under the dotted key as a single
+    leaf — list-typed leaves are NOT indexed (R7).
+
+    Contract: never mutates ``base`` (R3). The ``result = base.copy()``
+    first line preserves the same shallow-copy guarantee as ``_deep_merge``.
+    """
+    result = base.copy()
+    for key, value in override.items():
+        dotted = f"{_prefix}{key}" if _prefix else key
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge_with_provenance(
+                result[key], value, source_path, provenance, _prefix=f"{dotted}."
+            )
+        else:
+            result[key] = value
+            provenance[dotted] = source_path
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Profile composition resolver (Phase 30, CFG-02)
+# ---------------------------------------------------------------------------
+
+# Hard cap on extends/includes recursion depth (D-05). 8 layers covers any
+# realistic vault-framework fusion (Ideaverse → fusion → mixin × 5) while
+# bounding stack growth and keeping cycle-error messages legible.
+_MAX_PROFILE_DEPTH = 8
+
+
+def _resolve_profile_chain(entry_path: Path, vault_dir: Path) -> "ResolvedProfile":
+    """Walk an extends/includes chain rooted at *entry_path* and return a composed profile.
+
+    Phase 30 / CFG-02. Resolution order per fragment:
+        1. extends parent (single, recursive — root ancestor processed first)
+        2. includes list (left-to-right, last-wins)
+        3. own fields (override everything above)
+
+    Failure modes (each appends to ``errors`` and aborts that branch — caller
+    receives a partial composition + the error list):
+        * recursion depth exceeded ``_MAX_PROFILE_DEPTH``
+        * fragment path escapes ``vault_dir/.graphify/`` (absolute, ../, symlink)
+        * extends/includes cycle (direct or indirect)
+        * fragment file missing
+        * YAML parse error
+        * fragment top-level not a mapping
+
+    Path resolution is sibling-relative (D-06): ``extends: foo.yaml`` from
+    ``.graphify/bases/fusion.yaml`` resolves to ``.graphify/bases/foo.yaml``,
+    NOT ``.graphify/foo.yaml``.
+
+    Two stack-local structures track the descending path (R8):
+        * ``descending`` — set, O(1) cycle membership test
+        * ``frame_chain`` — list, ordered names rendered in cycle errors
+    Both are populated/cleared at the same site under try/finally.
+    """
+    try:
+        import yaml  # type: ignore[import-untyped]
+    except ImportError:
+        return ResolvedProfile(
+            composed={},
+            chain=[],
+            provenance={},
+            errors=[
+                "PyYAML not installed — cannot read profile.yaml. "
+                "Install with: pip install graphifyy[obsidian]"
+            ],
+            community_template_rules=[],
+        )
+
+    errors: list[str] = []
+    chain: list[Path] = []
+    provenance: dict[str, Path] = {}
+    graphify_root = (Path(vault_dir) / ".graphify").resolve()
+
+    def _is_inside_graphify(canonical: Path) -> bool:
+        # Path.is_relative_to is 3.9+ but raises on some odd inputs in 3.10
+        # (non-existent paths handle fine post-resolve, but we wrap defensively).
+        try:
+            return canonical.is_relative_to(graphify_root)
+        except (ValueError, TypeError):
+            return False
+
+    def _load_one(
+        path: Path,
+        depth: int,
+        descending: set[Path],
+        frame_chain: list[Path],
+    ) -> dict | None:
+        # 1. Depth check
+        if depth > _MAX_PROFILE_DEPTH:
+            errors.append(
+                f"extends/includes recursion depth exceeded 8 levels at {path.name}"
+            )
+            return None
+
+        # 2. Path confinement (T-30-01)
+        try:
+            canonical = path.resolve()
+        except (OSError, RuntimeError) as exc:
+            errors.append(f"failed to resolve fragment path {path}: {exc}")
+            return None
+        if not _is_inside_graphify(canonical):
+            errors.append(f"fragment path {path} escapes .graphify/")
+            return None
+
+        # 3. Cycle check (uses frame_chain for the rendered error chain)
+        if canonical in descending:
+            chain_arrows = " → ".join(p.name for p in frame_chain + [canonical])
+            errors.append(f"extends/includes cycle detected: {chain_arrows}")
+            return None
+
+        # 4. Existence
+        if not canonical.exists():
+            errors.append(f"fragment not found: {canonical.name}")
+            return None
+
+        # 5. YAML parse
+        try:
+            data = yaml.safe_load(canonical.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            errors.append(f"YAML parse error in {canonical.name}: {exc}")
+            return None
+        if not isinstance(data, dict):
+            errors.append(f"{canonical.name}: top-level must be a mapping")
+            return None
+
+        composed: dict = {}
+
+        # 6. Push frame BEFORE descending; pop in finally to guarantee cleanup
+        descending.add(canonical)
+        frame_chain.append(canonical)
+        try:
+            # 7. extends (single string, recurse)
+            ext = data.pop("extends", None)
+            if ext is not None:
+                if not isinstance(ext, str):
+                    errors.append(
+                        f"{canonical.name}: 'extends' must be a string "
+                        f"(got {type(ext).__name__})"
+                    )
+                else:
+                    parent_path = (canonical.parent / ext).resolve()
+                    parent_data = _load_one(parent_path, depth + 1, descending, frame_chain)
+                    if parent_data is not None:
+                        composed = _deep_merge_with_provenance(
+                            composed, parent_data, parent_path, provenance
+                        )
+
+            # 8. includes (list of strings, left-to-right)
+            incs = data.pop("includes", None)
+            if incs is not None:
+                if not isinstance(incs, list):
+                    errors.append(f"{canonical.name}: 'includes' must be a list")
+                else:
+                    for entry in incs:
+                        if not isinstance(entry, str):
+                            errors.append(
+                                f"{canonical.name}: 'includes' entry must be a string "
+                                f"(got {type(entry).__name__})"
+                            )
+                            continue
+                        inc_path = (canonical.parent / entry).resolve()
+                        inc_data = _load_one(inc_path, depth + 1, descending, frame_chain)
+                        if inc_data is not None:
+                            composed = _deep_merge_with_provenance(
+                                composed, inc_data, inc_path, provenance
+                            )
+
+            # 9. Apply own fields LAST (own wins over extends + includes)
+            composed = _deep_merge_with_provenance(
+                composed, data, canonical, provenance
+            )
+        finally:
+            descending.discard(canonical)
+            frame_chain.pop()
+
+        # 10. Append to OUTPUT chain (post-order — root ancestor first naturally)
+        chain.append(canonical)
+        return composed
+
+    composed = _load_one(entry_path, 0, set(), []) or {}
+    community_template_rules = composed.get("community_templates") or []
+    if not isinstance(community_template_rules, list):
+        community_template_rules = []
+    return ResolvedProfile(
+        composed=composed,
+        chain=chain,
+        provenance=provenance,
+        errors=errors,
+        community_template_rules=community_template_rules,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Profile loading (PROF-01, PROF-02, D-04)
 # ---------------------------------------------------------------------------
@@ -181,7 +413,7 @@ def load_profile(vault_dir: str | Path | None) -> dict:
         return _deep_merge(_DEFAULT_PROFILE, {})
 
     try:
-        import yaml  # type: ignore[import-untyped]
+        import yaml  # type: ignore[import-untyped]  # noqa: F401
     except ImportError:
         print(
             "[graphify] PyYAML not installed — cannot read profile.yaml. "
@@ -190,16 +422,22 @@ def load_profile(vault_dir: str | Path | None) -> dict:
         )
         return _deep_merge(_DEFAULT_PROFILE, {})
 
-    # Guard against empty YAML returning None (Pitfall 1)
-    user_data = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
+    # Phase 30 (CFG-02): walk the extends/includes chain BEFORE schema validation
+    # so partial fragments are tolerated (D-08) and only the composed profile
+    # must validate. Any resolver error → graceful fallback to _DEFAULT_PROFILE.
+    resolved = _resolve_profile_chain(profile_path, Path(vault_dir))
+    if resolved.errors:
+        for err in resolved.errors:
+            print(f"[graphify] profile error: {err}", file=sys.stderr)
+        return _deep_merge(_DEFAULT_PROFILE, {})
 
-    errors = validate_profile(user_data)
+    errors = validate_profile(resolved.composed)
     if errors:
         for err in errors:
             print(f"[graphify] profile error: {err}", file=sys.stderr)
         return _deep_merge(_DEFAULT_PROFILE, {})
 
-    return _deep_merge(_DEFAULT_PROFILE, user_data)
+    return _deep_merge(_DEFAULT_PROFILE, resolved.composed)
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +455,80 @@ def validate_profile(profile: dict) -> list[str]:
     for key in profile:
         if key not in _VALID_TOP_LEVEL_KEYS:
             errors.append(f"Unknown profile key '{key}' — valid keys are: {sorted(_VALID_TOP_LEVEL_KEYS)}")
+
+    # Phase 30 (CFG-02): extends/includes/community_templates schema checks.
+    # The resolver enforces semantic constraints (cycles, depth, paths); these
+    # are pure-typing guards that fire before resolution would even start.
+    ext = profile.get("extends")
+    if ext is not None and not isinstance(ext, str):
+        errors.append(
+            "'extends' must be a string (single-parent only — use 'includes' "
+            "for multi-base composition)"
+        )
+    incs = profile.get("includes")
+    if incs is not None:
+        if not isinstance(incs, list):
+            errors.append("'includes' must be a list")
+        else:
+            for i, item in enumerate(incs):
+                if not isinstance(item, str):
+                    errors.append(
+                        f"includes[{i}] must be a string (got {type(item).__name__})"
+                    )
+    ct = profile.get("community_templates")
+    if ct is not None:
+        if not isinstance(ct, list):
+            errors.append("'community_templates' must be a list")
+        else:
+            for idx, rule in enumerate(ct):
+                prefix = f"community_templates[{idx}]"
+                if not isinstance(rule, dict):
+                    errors.append(f"{prefix}: must be a mapping (dict)")
+                    continue
+                match = rule.get("match")
+                if match not in {"label", "id"}:
+                    errors.append(
+                        f"{prefix}.match must be 'label' or 'id' (got {match!r})"
+                    )
+                pattern = rule.get("pattern")
+                if "pattern" not in rule:
+                    errors.append(f"{prefix}.pattern is required")
+                elif match == "label" and not isinstance(pattern, str):
+                    errors.append(
+                        f"{prefix}.pattern must be a string when match='label' "
+                        f"(got {type(pattern).__name__})"
+                    )
+                elif match == "id" and (
+                    isinstance(pattern, bool) or not isinstance(pattern, int)
+                ):
+                    errors.append(
+                        f"{prefix}.pattern must be an integer when match='id' "
+                        f"(got {type(pattern).__name__})"
+                    )
+                template = rule.get("template")
+                if not isinstance(template, str) or not template:
+                    errors.append(f"{prefix}.template must be a non-empty string")
+                elif ".." in template:
+                    errors.append(
+                        f"{prefix}.template contains '..' — fragment paths must "
+                        f"stay inside .graphify/"
+                    )
+                elif Path(template).is_absolute():
+                    errors.append(
+                        f"{prefix}.template is an absolute path — must be "
+                        f"relative to .graphify/"
+                    )
+                elif template.startswith("~"):
+                    errors.append(
+                        f"{prefix}.template starts with '~' — must be relative "
+                        f"to .graphify/"
+                    )
+                extra = set(rule) - {"match", "pattern", "template"}
+                if extra:
+                    errors.append(
+                        f"{prefix}: unknown keys {sorted(extra)} — only "
+                        f"'match', 'pattern', 'template' are supported"
+                    )
 
     # naming section
     naming = profile.get("naming")
@@ -713,26 +1025,44 @@ def validate_profile_preflight(
         return PreflightResult(errors=[], warnings=[], rule_count=0, template_count=0)
 
     # Step A: load user YAML (if any). Mirrors load_profile's PyYAML guard.
+    # Phase 30 (CFG-02): resolve the extends/includes chain before validating.
+    # The composed dict — not the raw single-file YAML — is what we validate
+    # and what feeds the merged profile for layers 3 + 4.
     user_data: dict = {}
+    chain: list[Path] = []
+    provenance: dict[str, Path] = {}
+    community_template_rules: list[dict] = []
     if profile_path.exists():
         try:
-            import yaml  # type: ignore[import-untyped]
+            import yaml  # type: ignore[import-untyped]  # noqa: F401
         except ImportError:
             errors.append(
                 "PyYAML not installed — cannot read profile.yaml. "
                 "Install with: pip install graphifyy[obsidian]"
             )
-            return PreflightResult(errors, warnings, rule_count, template_count)
-        try:
-            user_data = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
-        except yaml.YAMLError as exc:
-            errors.append(f".graphify/profile.yaml parse error: {exc}")
-            return PreflightResult(errors, warnings, rule_count, template_count)
-        if not isinstance(user_data, dict):
-            errors.append(".graphify/profile.yaml top-level must be a mapping (dict)")
-            return PreflightResult(errors, warnings, rule_count, template_count)
+            return PreflightResult(
+                errors, warnings, rule_count, template_count,
+                chain, provenance, community_template_rules,
+            )
+        resolved = _resolve_profile_chain(profile_path, vault_path)
+        # Surface resolver errors with a stable prefix so doctor output is
+        # consistent with other layer-1 schema errors.
+        for err in resolved.errors:
+            errors.append(f"profile.yaml: {err}")
+        # Even on partial-failure we still populate downstream context so the
+        # rest of preflight (templates / dead-rules / path-safety) keeps
+        # producing useful output.
+        user_data = resolved.composed
+        chain = resolved.chain
+        provenance = resolved.provenance
+        community_template_rules = resolved.community_template_rules
+        if resolved.errors:
+            return PreflightResult(
+                errors, warnings, rule_count, template_count,
+                chain, provenance, community_template_rules,
+            )
 
-    # LAYER 1: Schema — validate_profile on the raw user data (errors only)
+    # LAYER 1: Schema — validate_profile on the COMPOSED user data (errors only)
     errors.extend(validate_profile(user_data))
 
     # Build the effective merged profile (for layers 3 + 4).
@@ -819,4 +1149,7 @@ def validate_profile_preflight(
         warnings=warnings,
         rule_count=rule_count,
         template_count=template_count,
+        chain=chain,
+        provenance=provenance,
+        community_template_rules=community_template_rules,
     )

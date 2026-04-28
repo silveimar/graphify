@@ -981,16 +981,22 @@ def test_preflight_result_is_named_tuple_with_four_fields(tmp_path):
 def test_preflight_result_tuple_unpack_backward_compat(tmp_path):
     vault = _mk_vault(tmp_path, profile_yaml="")
     result = validate_profile_preflight(vault)
-    # Legacy 2-tuple unpack via star-rest
+    # Legacy 2-tuple unpack via star-rest (still works for any prefix length)
     errors, warnings, *_ = result
     assert errors == result.errors
     assert warnings == result.warnings
-    # Full 4-tuple unpack
-    e2, w2, rc, tc = result
+    # Phase 30 (CFG-02): PreflightResult gained chain/provenance/community_template_rules
+    # trailing fields with defaults. Star-rest unpacking continues to work; the prefix
+    # of the original 4 fields remains positionally stable.
+    e2, w2, rc, tc, *_ = result
     assert e2 == result.errors
     assert w2 == result.warnings
     assert rc == result.rule_count
     assert tc == result.template_count
+    # New trailing fields are accessible by name and have sensible defaults
+    assert isinstance(result.chain, list)
+    assert isinstance(result.provenance, dict)
+    assert isinstance(result.community_template_rules, list)
 
 
 def test_preflight_result_rule_and_template_counts_populated(tmp_path):
