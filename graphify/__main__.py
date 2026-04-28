@@ -1401,6 +1401,12 @@ def main() -> None:
                 f"wrote obsidian vault at {Path(obsidian_dir).resolve()} "
                 f"\u2014 {total} actions ({created} CREATE, {updated} UPDATE)"
             )
+            # Phase 28 (D-29): write output manifest after successful export
+            # Guard: only on real run (not dry-run) and only when resolved is available
+            if resolved is not None:
+                from graphify.detect import _save_output_manifest
+                written = [str(p) for p in getattr(result, "succeeded", [])]
+                _save_output_manifest(resolved.artifacts_dir, resolved.notes_dir, written)
         sys.exit(0)
 
     # --diagram-seeds [options] (Phase 20, SEED-01/04/05/06/07/08)
@@ -2159,7 +2165,16 @@ def main() -> None:
 
         lock_fd = _foreground_acquire_enrichment_lock(out_dir, timeout_seconds=30.0)
         try:
-            run_corpus(target, use_router=use_router, out_dir=out_dir)
+            run_corpus(target, use_router=use_router, out_dir=out_dir, resolved=resolved)
+            # Phase 28 (D-29): write output manifest after successful run
+            # Guard: only when resolved is available; roots only (nesting guard covers via D-18)
+            if resolved is not None:
+                from graphify.detect import _save_output_manifest
+                _save_output_manifest(
+                    resolved.artifacts_dir,
+                    resolved.notes_dir,
+                    written_files=[],  # roots only; full file list recorded via --obsidian path
+                )
         finally:
             _foreground_release_enrichment_lock(lock_fd)
     elif cmd == "enrich":
