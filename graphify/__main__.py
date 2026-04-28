@@ -1294,6 +1294,9 @@ def main() -> None:
         dry_run = False
         force = False
         obsidian_dedup = False  # Phase 10: hydrate merged_from from dedup_report.json
+        # Phase 27: track explicit --obsidian-dir + new --output flag
+        user_passed_obsidian_dir = False
+        cli_output: str | None = None
         args = sys.argv[2:]
         i = 0
         while i < len(args):
@@ -1302,9 +1305,13 @@ def main() -> None:
             elif args[i].startswith("--graph="):
                 graph_path = args[i].split("=", 1)[1]; i += 1
             elif args[i] == "--obsidian-dir" and i + 1 < len(args):
-                obsidian_dir = args[i + 1]; i += 2
+                obsidian_dir = args[i + 1]; user_passed_obsidian_dir = True; i += 2
             elif args[i].startswith("--obsidian-dir="):
-                obsidian_dir = args[i].split("=", 1)[1]; i += 1
+                obsidian_dir = args[i].split("=", 1)[1]; user_passed_obsidian_dir = True; i += 1
+            elif args[i] == "--output" and i + 1 < len(args):
+                cli_output = args[i + 1]; i += 2
+            elif args[i].startswith("--output="):
+                cli_output = args[i].split("=", 1)[1]; i += 1
             elif args[i] == "--dry-run":
                 dry_run = True; i += 1
             elif args[i] == "--force":
@@ -1314,6 +1321,19 @@ def main() -> None:
             else:
                 print(f"error: unknown --obsidian option: {args[i]}", file=sys.stderr)
                 sys.exit(2)
+
+        # Phase 27 (VAULT-08, VAULT-09, VAULT-10): resolve vault-aware output destination.
+        from graphify.output import resolve_output
+        resolved = resolve_output(Path.cwd(), cli_output=cli_output)
+
+        # Precedence (D-08): --output > profile > --obsidian-dir > legacy default
+        if cli_output is not None:
+            obsidian_dir = str(resolved.notes_dir)
+        elif resolved.vault_detected and resolved.source == "profile":
+            obsidian_dir = str(resolved.notes_dir)
+        elif user_passed_obsidian_dir:
+            pass  # honor explicit --obsidian-dir; leave obsidian_dir as-is
+        # else: keep legacy default "graphify-out/obsidian" (D-12 backcompat)
 
         # Load graph.json — reuse the exact query-command pattern.
         gp = Path(graph_path).resolve()
