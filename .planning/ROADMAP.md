@@ -230,7 +230,10 @@ Plans:
   2. A template containing `{{#connections}}...{{/connections}}` iterates over each connection with per-iteration variable scope; nested loops are either supported or rejected with a clear error
   3. A profile field declaring per-note-type Dataview query strings produces notes whose Dataview block content matches the profile-declared query at render time
   4. All three template features are sanitized — node labels containing template syntax (`{{`, `}}`, `#`) cannot inject conditional logic or break out of loops
-**Plans:** TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 31-01-PLAN.md — [wave 1] Block engine: `{{#if_X}}` conditionals (TMPL-01) + `{{#connections}}` loops (TMPL-02) + sanitization hardening (T-31-01); _BlockTemplate subclass + _PREDICATE_CATALOG (4 entries) + _expand_blocks pre-processor + extended validate_template
+- [ ] 31-02-PLAN.md — [wave 1] Per-note-type Dataview queries (TMPL-03): new top-level `dataview_queries` profile key whitelisted against _KNOWN_NOTE_TYPES (6 entries); _build_dataview_block per-note-type lookup with legacy moc_query fallback; --validate-profile provenance per D-14
 
 ## Progress
 
