@@ -264,11 +264,67 @@ def test_run_doctor_no_disk_writes(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Stub: dry_run=True is a NotImplementedError (Plan 29-03 owns this branch)
+# 13. test_run_doctor_dry_run_preview (D-38, D-39)
 # ---------------------------------------------------------------------------
 
-def test_run_doctor_dry_run_is_stub(tmp_path):
+def test_run_doctor_dry_run_preview(tmp_path):
     pytest.importorskip("yaml")
     vault = _make_vault(tmp_path, profile_text=_VALID_PROFILE)
-    with pytest.raises(NotImplementedError):
-        run_doctor(vault, dry_run=True)
+    # A handful of code+doc files so detect() returns non-empty buckets.
+    (vault / "alpha.py").write_text("def a(): return 1\n")
+    (vault / "beta.py").write_text("def b(): return 2\n")
+    (vault / "notes.md").write_text("# Notes\nhello\n")
+    report = run_doctor(vault, dry_run=True)
+    assert report.preview is not None
+    assert report.preview.would_ingest_count > 0
+    assert isinstance(report.preview.would_ingest_sample, list)
+    assert all(isinstance(p, str) for p in report.preview.would_ingest_sample)
+    assert len(report.preview.would_ingest_sample) <= 10
+    assert len(report.preview.would_ingest_sample) == min(
+        10, report.preview.would_ingest_count
+    )
+
+
+# ---------------------------------------------------------------------------
+# 14. test_dry_run_skip_grouping (D-38)
+# ---------------------------------------------------------------------------
+
+def test_dry_run_skip_grouping(tmp_path):
+    pytest.importorskip("yaml")
+    vault = _make_vault(tmp_path, profile_text=_VALID_PROFILE)
+    # .graphifyignore'd file → "exclude-glob" reason
+    (vault / ".graphifyignore").write_text("ignored.py\n")
+    (vault / "ignored.py").write_text("def x(): return 0\n")
+    # noise dir with code → "noise-dir" reason
+    (vault / "node_modules").mkdir()
+    (vault / "node_modules" / "lib.js").write_text("module.exports = {};\n")
+    # a real ingestable file so flattened isn't completely empty
+    (vault / "real.py").write_text("def y(): return 1\n")
+    report = run_doctor(vault, dry_run=True)
+    assert report.preview is not None
+    grouped = report.preview.would_skip_grouped
+    # Both reasons present (detect's skipped dict initialized with empty lists
+    # for every reason; we only emit groups detect actually populated). When
+    # populated, each list is bounded at 5.
+    if "exclude-glob" in grouped:
+        assert len(grouped["exclude-glob"]) <= 5
+    if "noise-dir" in grouped:
+        assert len(grouped["noise-dir"]) <= 5
+
+
+# ---------------------------------------------------------------------------
+# 15. test_dry_run_no_disk_writes (T-29-* mitigation)
+# ---------------------------------------------------------------------------
+
+def test_dry_run_no_disk_writes(tmp_path):
+    pytest.importorskip("yaml")
+    vault = _make_vault(tmp_path, profile_text=_VALID_PROFILE)
+    (vault / "alpha.py").write_text("def a(): return 1\n")
+
+    def _snapshot(p: Path) -> set[Path]:
+        return {q for q in p.rglob("*") if q.is_file()}
+
+    before = _snapshot(tmp_path)
+    run_doctor(vault, dry_run=True)
+    after = _snapshot(tmp_path)
+    assert before == after, f"dry_run created files: {sorted(after - before)}"

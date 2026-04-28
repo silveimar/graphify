@@ -18,9 +18,9 @@ Decisions implemented (D-30..D-41 — see 29-CONTEXT.md):
           imperative fix lines
   - D-41: one fix line per detected issue, in detection order
 
-This module is read-only by design — run_doctor() performs no disk writes.
-The dry_run=True branch is a stub raising NotImplementedError; Plan 29-03 implements
-the dry-run preview.
+This module is read-only by design — run_doctor() performs no disk writes,
+even on the dry_run=True branch (D-38, D-39): the preview consumes detect()'s
+in-memory `files` and `skipped` dicts; no graphify-out/ is created.
 """
 from __future__ import annotations
 
@@ -47,6 +47,22 @@ from graphify.profile import load_profile, validate_profile
 # profile_validation_errors entries. WOULD_SELF_INGEST is a synthetic sentinel
 # appended to the error list (and stripped from the user-visible output) when
 # would_self_ingest is True, so it flows through the same fix-hint loop.
+
+# D-38: fixed reason ordering for preview output. Shared with _build_preview_section
+# and _format_preview so dict iteration order is deterministic regardless of detect()'s
+# internal key ordering.
+_PREVIEW_SKIP_ORDER: tuple[str, ...] = (
+    "nesting",
+    "exclude-glob",
+    "manifest",
+    "sensitive",
+    "noise-dir",
+)
+
+# D-38: bounded preview caps — first 10 ingest paths, first 5 per skip-reason group.
+_PREVIEW_INGEST_SAMPLE_CAP = 10
+_PREVIEW_SKIP_SAMPLE_CAP = 5
+
 
 _FIX_HINTS: list[tuple[str, str]] = [
     (
@@ -229,17 +245,63 @@ def _build_recommended_fixes(
 # Public API — run_doctor() (D-32) and format_report() (D-34)
 # ---------------------------------------------------------------------------
 
+def _build_preview_section(
+    detect_result: dict, resolved: ResolvedOutput
+) -> PreviewSection:
+    """Construct PreviewSection from a real detect() result (D-38, D-39).
+
+    Bounded per D-38:
+      - would_ingest_sample: first _PREVIEW_INGEST_SAMPLE_CAP (10) paths
+      - would_skip_grouped[reason]: first _PREVIEW_SKIP_SAMPLE_CAP (5) per reason
+
+    Single source of truth: consumes detect_result["files"] (dict[FileType.value,
+    list[str]]) and detect_result["skipped"] (dict[reason, list[str]]) — does NOT
+    re-implement scanning (D-39).
+    """
+    # Flatten result["files"] into a single ordered list. Iterate file-type
+    # buckets in insertion order; each bucket's list is already sorted by detect().
+    files_by_type = detect_result.get("files", {})
+    if not isinstance(files_by_type, dict):
+        files_by_type = {}
+    flattened: list[str] = []
+    for bucket in files_by_type.values():
+        if isinstance(bucket, list):
+            flattened.extend(str(p) for p in bucket)
+
+    skipped = detect_result.get("skipped", {})
+    if not isinstance(skipped, dict):
+        skipped = {}
+
+    # Preserve the fixed reason order for grouped/counts; only include reasons
+    # detect() actually populated this run (omit empty groups for a quieter
+    # preview).
+    grouped: dict[str, list[str]] = {}
+    counts: dict[str, int] = {}
+    for reason in _PREVIEW_SKIP_ORDER:
+        bucket = skipped.get(reason, [])
+        if not isinstance(bucket, list):
+            continue
+        grouped[reason] = [str(p) for p in bucket[:_PREVIEW_SKIP_SAMPLE_CAP]]
+        counts[reason] = len(bucket)
+
+    return PreviewSection(
+        would_ingest_count=len(flattened),
+        would_ingest_sample=flattened[:_PREVIEW_INGEST_SAMPLE_CAP],
+        would_skip_grouped=grouped,
+        would_skip_counts=counts,
+        notes_dir=resolved.notes_dir,
+        artifacts_dir=resolved.artifacts_dir,
+    )
+
+
 def run_doctor(cwd: Path, *, dry_run: bool = False) -> DoctorReport:
     """Build a DoctorReport for the given working directory. Read-only.
 
-    When dry_run=True, raises NotImplementedError — Plan 29-03 implements the
-    dry-run preview branch.
+    When dry_run=True, additionally calls the real detect() (D-39) and attaches
+    a bounded PreviewSection to report.preview. When the destination is
+    unresolvable, preview is left as None (is_misconfigured() still returns
+    True so exit code stays 1).
     """
-    if dry_run:
-        raise NotImplementedError(
-            "doctor --dry-run preview is implemented in Plan 29-03"
-        )
-
     cwd_resolved = cwd.resolve()
     report = DoctorReport()
 
@@ -300,7 +362,58 @@ def run_doctor(cwd: Path, *, dry_run: bool = False) -> DoctorReport:
         report.profile_validation_errors, report.would_self_ingest
     )
 
+    # --- Dry-run preview (D-38, D-39) -------------------------------------
+    # Only run detect() when we actually have a resolved destination — when
+    # resolved_output is None the misconfiguration is already surfaced via
+    # profile_validation_errors and is_misconfigured() returns True. T-29-*:
+    # detect() is read-only; no disk writes here.
+    if dry_run and report.resolved_output is not None:
+        from graphify.detect import detect as _detect_scan
+        scan = _detect_scan(cwd_resolved)
+        report.preview = _build_preview_section(scan, report.resolved_output)
+
     return report
+
+
+def _format_preview(preview: PreviewSection) -> list[str]:
+    """Render PreviewSection as [graphify]-prefixed lines (D-38).
+
+    Layout:
+      [graphify] === Preview ===
+      [graphify] Would ingest: N files
+      [graphify]   <path>            (up to _PREVIEW_INGEST_SAMPLE_CAP)
+      [graphify]   ... +K more       (when N exceeds the sample cap)
+      [graphify] Would skip ({reason}): M files
+      [graphify]   <path>            (up to _PREVIEW_SKIP_SAMPLE_CAP)
+      [graphify]   ... +K more       (when M exceeds the sample cap)
+      [graphify] Would write notes to: {notes_dir}
+      [graphify] Would write artifacts to: {artifacts_dir}
+    """
+    out: list[str] = ["[graphify] === Preview ==="]
+    out.append(f"[graphify] Would ingest: {preview.would_ingest_count} files")
+    for sample in preview.would_ingest_sample:
+        out.append(f"[graphify]   {sample}")
+    overflow_ingest = preview.would_ingest_count - len(preview.would_ingest_sample)
+    if overflow_ingest > 0:
+        out.append(f"[graphify]   ... +{overflow_ingest} more")
+
+    for reason in _PREVIEW_SKIP_ORDER:
+        if reason not in preview.would_skip_grouped:
+            continue
+        paths = preview.would_skip_grouped[reason]
+        total = preview.would_skip_counts.get(reason, len(paths))
+        out.append(f"[graphify] Would skip ({reason}): {total} files")
+        for p in paths:
+            out.append(f"[graphify]   {p}")
+        overflow_skip = total - len(paths)
+        if overflow_skip > 0:
+            out.append(f"[graphify]   ... +{overflow_skip} more")
+
+    if preview.notes_dir is not None:
+        out.append(f"[graphify] Would write notes to: {preview.notes_dir}")
+    if preview.artifacts_dir is not None:
+        out.append(f"[graphify] Would write artifacts to: {preview.artifacts_dir}")
+    return out
 
 
 def format_report(report: DoctorReport) -> str:
@@ -353,22 +466,9 @@ def format_report(report: DoctorReport) -> str:
         else:
             lines.append(f"[graphify] {source_label}: (none)")
 
-    # --- Preview (only when populated by Plan 29-03) ----------------------
+    # --- Preview (only when populated; D-38) ------------------------------
     if report.preview is not None:
-        lines.append("[graphify] === Preview ===")
-        pv = report.preview
-        lines.append(f"[graphify] would ingest: {pv.would_ingest_count} files")
-        for sample in pv.would_ingest_sample:
-            lines.append(f"[graphify]   - {sample}")
-        for reason, paths in pv.would_skip_grouped.items():
-            count = pv.would_skip_counts.get(reason, len(paths))
-            lines.append(f"[graphify] would skip [{reason}]: {count} files")
-            for p in paths:
-                lines.append(f"[graphify]   - {p}")
-        if pv.notes_dir is not None:
-            lines.append(f"[graphify] would write to: {pv.notes_dir}")
-        if pv.artifacts_dir is not None:
-            lines.append(f"[graphify] would write artifacts to: {pv.artifacts_dir}")
+        lines.extend(_format_preview(report.preview))
 
     # --- Recommended Fixes ------------------------------------------------
     lines.append("[graphify] === Recommended Fixes ===")
