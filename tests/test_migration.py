@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 
 def _make_vault(tmp_path: Path) -> Path:
     vault = tmp_path / "ls-vault"
@@ -275,6 +277,125 @@ def test_apply_never_deletes_legacy_orphan_files(tmp_path):
 
     assert create_target in result.succeeded
     assert legacy.exists(), "MIG-06 legacy _COMMUNITY_* files must never be deleted or moved"
+
+
+def test_archive_legacy_notes_moves_reviewed_orphans_and_mappings(tmp_path):
+    """D-02/D-03/D-04/D-12: reviewed legacy notes archive outside the vault tree."""
+    from graphify.migration import archive_legacy_notes
+
+    vault = _make_vault(tmp_path)
+    orphan = _write_legacy_community(vault, community_id=12)
+    mapped = _write_legacy_community(vault, community_id=13)
+    unrelated = vault / "Atlas" / "Sources" / "Graphify" / "MOCs" / "Keep.md"
+    unrelated.write_text("# Keep\n", encoding="utf-8")
+    orphan_text = orphan.read_text(encoding="utf-8")
+    mapped_text = mapped.read_text(encoding="utf-8")
+    orphan_rel = orphan.relative_to(vault).as_posix()
+    mapped_rel = mapped.relative_to(vault).as_posix()
+    artifacts_dir = tmp_path / "graphify-out"
+    plan_id = "a" * 16
+    loaded = {
+        "actions": [
+            {
+                "path": orphan_rel,
+                "action": "ORPHAN",
+                "legacy": True,
+                "review_only": True,
+            },
+            {
+                "path": unrelated.relative_to(vault).as_posix(),
+                "action": "ORPHAN",
+                "legacy": False,
+                "review_only": True,
+            },
+        ],
+        "legacy_mappings": [
+            {"old_path": mapped_rel, "new_path": "Atlas/Sources/Graphify/MOCs/Community_13.md"},
+            {"old_path": mapped_rel, "new_path": "Atlas/Sources/Graphify/MOCs/Community_13.md"},
+        ],
+    }
+
+    archived = archive_legacy_notes(loaded, vault, artifacts_dir, plan_id)
+
+    assert len(archived) == 2
+    archive_root = artifacts_dir.resolve() / "migrations" / "archive" / plan_id
+    orphan_archive = archive_root / orphan_rel
+    mapped_archive = archive_root / mapped_rel
+    assert not orphan.exists()
+    assert not mapped.exists()
+    assert orphan_archive.read_text(encoding="utf-8") == orphan_text
+    assert mapped_archive.read_text(encoding="utf-8") == mapped_text
+    assert unrelated.exists()
+    assert {
+        row["relative_path"] for row in archived
+    } == {orphan_rel, mapped_rel}
+    assert all(str(archive_root) in row["archive_path"] for row in archived)
+
+
+def test_archive_legacy_notes_rejects_escaping_sources_before_moving(tmp_path):
+    """D-15/D-16: loaded archive source paths are revalidated before any movement."""
+    from graphify.migration import archive_legacy_notes
+
+    vault = _make_vault(tmp_path)
+    legacy = _write_legacy_community(vault)
+    before_text = legacy.read_text(encoding="utf-8")
+    loaded = {
+        "actions": [
+            {
+                "path": "../escape.md",
+                "action": "ORPHAN",
+                "legacy": True,
+                "review_only": True,
+            },
+            {
+                "path": legacy.relative_to(vault).as_posix(),
+                "action": "ORPHAN",
+                "legacy": True,
+                "review_only": True,
+            },
+        ],
+        "legacy_mappings": [],
+    }
+
+    with pytest.raises(ValueError, match="would escape"):
+        archive_legacy_notes(loaded, vault, tmp_path / "graphify-out", "b" * 16)
+
+    assert legacy.exists()
+    assert legacy.read_text(encoding="utf-8") == before_text
+    assert not (tmp_path / "graphify-out" / "migrations" / "archive").exists()
+
+
+def test_archive_legacy_notes_rejects_duplicate_destinations_before_moving(tmp_path):
+    """D-16: duplicate archive destinations fail during preflight, before moves."""
+    from graphify.migration import archive_legacy_notes
+
+    vault = _make_vault(tmp_path)
+    legacy = _write_legacy_community(vault)
+    before_text = legacy.read_text(encoding="utf-8")
+    loaded = {
+        "actions": [
+            {
+                "path": "Atlas/Sources/Graphify/MOCs/../MOCs/_COMMUNITY_12.md",
+                "action": "ORPHAN",
+                "legacy": True,
+                "review_only": True,
+            },
+            {
+                "path": legacy.relative_to(vault).as_posix(),
+                "action": "ORPHAN",
+                "legacy": True,
+                "review_only": True,
+            },
+        ],
+        "legacy_mappings": [],
+    }
+
+    with pytest.raises(ValueError, match="duplicate archive destination"):
+        archive_legacy_notes(loaded, vault, tmp_path / "graphify-out", "c" * 16)
+
+    assert legacy.exists()
+    assert legacy.read_text(encoding="utf-8") == before_text
+    assert not (tmp_path / "graphify-out" / "migrations" / "archive").exists()
 
 
 def test_update_vault_rejects_stale_plan_id(tmp_path):
