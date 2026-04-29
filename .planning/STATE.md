@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: executing
-stopped_at: Completed 33-01-PLAN.md
-last_updated: "2026-04-29T02:06:11.128Z"
+stopped_at: Completed 33-02-PLAN.md
+last_updated: "2026-04-29T02:15:07.444Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 5
-  percent: 63
+  completed_plans: 6
+  percent: 75
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 ## Current Position
 
 Phase: 33 (Naming & Repo Identity Helpers) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-29
 
-Progress: [██████░░░░] 63%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Progress: [██████░░░░] 63%
 | Phase 32 P03 | 5min | 2 tasks | 4 files |
 | Phase 32 P04 | 6min | 2 tasks | 3 files |
 | Phase 33 P01 | 6min | 3 tasks | 5 files |
+| Phase 33 P02 | 6min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ Locked v1.8 choices:
 - [Phase 32]: Warning-only doctor profile findings guide migration without making is_misconfigured() true.
 - [Phase 32]: Doctor skips output resolution when fatal preflight errors exist to avoid duplicate invalid-profile diagnostics.
 - [Phase 33 Plan 01]: Wave 0 tests intentionally define red naming and repo identity contracts before production helpers are implemented.
+- [Phase 33 Plan 02]: Repo identity resolution is centralized in graphify.naming with explicit CLI > profile > git remote > directory precedence.
+- [Phase 33 Plan 02]: repo.identity is the only profile location for repo identity; naming.repo is rejected with guidance.
+- [Phase 33 Plan 02]: naming.concept_names exposes enabled, budget, and style controls only; prompt templates remain out of schema.
 
 ### Pending Todos
 
@@ -97,6 +101,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T02:06:11.125Z
-Stopped at: Completed 33-01-PLAN.md
-Next action: Execute Phase 33 Plan 02
+Last session: 2026-04-29T02:15:07.440Z
+Stopped at: Completed 33-02-PLAN.md
+Next action: Execute Phase 33 Plan 03

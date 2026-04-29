@@ -29,8 +29,8 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 
 ### Concept Naming
 
-- [ ] **NAME-01**: User receives human-readable concept MOC titles from cached LLM naming when concept naming is enabled.
-- [ ] **NAME-02**: User receives stable deterministic fallback concept names when LLM naming is unavailable, disabled by budget, or rejected by validation.
+- [x] **NAME-01**: User receives human-readable concept MOC titles from cached LLM naming when concept naming is enabled.
+- [x] **NAME-02**: User receives stable deterministic fallback concept names when LLM naming is unavailable, disabled by budget, or rejected by validation.
 - [ ] **NAME-03**: User can rerun graphify on an unchanged community and keep the same concept MOC filename across runs.
 - [ ] **NAME-04**: User can inspect concept naming provenance in generated MOC metadata or dry-run output.
 - [ ] **NAME-05**: User is protected from unsafe LLM-generated labels through filename, tag, wikilink, Dataview, and frontmatter sanitization.
@@ -44,9 +44,9 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 
 ### Repo Identity
 
-- [ ] **REPO-01**: User can provide repo identity through a CLI flag with highest precedence.
-- [ ] **REPO-02**: User can provide repo identity through `profile.yaml` when no CLI override is supplied.
-- [ ] **REPO-03**: User gets a deterministic auto-derived repo identity from git remote or current working directory when no explicit identity exists.
+- [x] **REPO-01**: User can provide repo identity through a CLI flag with highest precedence.
+- [x] **REPO-02**: User can provide repo identity through `profile.yaml` when no CLI override is supplied.
+- [x] **REPO-03**: User gets a deterministic auto-derived repo identity from git remote or current working directory when no explicit identity exists.
 - [ ] **REPO-04**: User sees the resolved repo identity recorded consistently in CODE note filenames, frontmatter, tags, and output manifests.
 
 ### Migration and Rollout
@@ -112,8 +112,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLUST-02 | Phase 34 | Pending |
 | CLUST-03 | Phase 34 | Pending |
 | CLUST-04 | Phase 32 | Complete |
-| NAME-01 | Phase 33 | Pending |
-| NAME-02 | Phase 33 | Pending |
+| NAME-01 | Phase 33 | Complete |
+| NAME-02 | Phase 33 | Complete |
 | NAME-03 | Phase 33 | Pending |
 | NAME-04 | Phase 33 | Pending |
 | NAME-05 | Phase 33 | Pending |
@@ -121,9 +121,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GOD-02 | Phase 34 | Pending |
 | GOD-03 | Phase 34 | Pending |
 | GOD-04 | Phase 34 | Pending |
-| REPO-01 | Phase 33 | Pending |
-| REPO-02 | Phase 33 | Pending |
-| REPO-03 | Phase 33 | Pending |
+| REPO-01 | Phase 33 | Complete |
+| REPO-02 | Phase 33 | Complete |
+| REPO-03 | Phase 33 | Complete |
 | REPO-04 | Phase 35 | Pending |
 | MIG-01 | Phase 35 | Pending |
 | MIG-02 | Phase 35 | Pending |

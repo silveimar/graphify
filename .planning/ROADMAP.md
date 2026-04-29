@@ -285,11 +285,11 @@ Plans:
   2. User receives cached LLM concept MOC titles when concept naming is enabled, with deterministic fallback names when LLM naming is unavailable, disabled by budget, or rejected
   3. User can rerun graphify on an unchanged community and keep the same concept MOC filename across runs
   4. User can inspect concept naming provenance, and unsafe generated labels are sanitized for filenames, tags, wikilinks, Dataview, and frontmatter
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 Plans:
 **Wave 1**
 - [x] 33-01-PLAN.md — Wave 0 validation scaffold for repo identity, concept naming, provenance, and sink safety
-- [ ] 33-02-PLAN.md — Repo identity resolver plus profile schema/default controls
+- [x] 33-02-PLAN.md — Repo identity resolver plus profile schema/default controls
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 33-03-PLAN.md — Stable concept naming helper with cache, fallback, provenance, and unsafe-title rejection
@@ -375,7 +375,7 @@ Plans:
 | 30. Profile Composition | v1.7 | 3/3 | Complete | 2026-04-28 |
 | 31. Template Engine Extensions | v1.7 | 2/2 | Complete | 2026-04-28 |
 | 32. Profile Contract & Defaults | v1.8 | 4/4 | Complete    | 2026-04-29 |
-| 33. Naming & Repo Identity Helpers | v1.8 | 1/4 | In Progress|  |
+| 33. Naming & Repo Identity Helpers | v1.8 | 2/4 | In Progress|  |
 | 34. Mapping, Cluster Quality & Note Classes | v1.8 | 0/TBD | Not started | - |
 | 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 0/TBD | Not started | - |
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 0/TBD | Not started | - |
