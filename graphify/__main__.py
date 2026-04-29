@@ -46,6 +46,31 @@ _SKILL_REGISTRATION = (
 )
 
 
+def _extract_repo_identity_arg(args: list[str]) -> tuple[str | None, list[str]]:
+    """Remove --repo-identity from argv and return its value."""
+    repo_identity: str | None = None
+    filtered: list[str] = []
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--repo-identity":
+            if i + 1 >= len(args) or args[i + 1].startswith("--"):
+                print("error: --repo-identity requires a value", file=sys.stderr)
+                sys.exit(2)
+            repo_identity = args[i + 1]
+            i += 2
+        elif arg.startswith("--repo-identity="):
+            repo_identity = arg.split("=", 1)[1]
+            if not repo_identity:
+                print("error: --repo-identity requires a value", file=sys.stderr)
+                sys.exit(2)
+            i += 1
+        else:
+            filtered.append(arg)
+            i += 1
+    return repo_identity, filtered
+
+
 _PLATFORM_CONFIG: dict[str, dict] = {
     "claude": {
         "skill_file": "skill.md",
@@ -1188,6 +1213,7 @@ def main() -> None:
         print("  --obsidian              export an already-built graphify-out/graph.json to an Obsidian vault (MRG-03)")
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
         print("    --obsidian-dir <path>   output vault directory (default graphify-out/obsidian)")
+        print("    --repo-identity <slug>  override profile/fallback repo identity for generated artifacts")
         print("    --dry-run               print the merge plan via format_merge_plan without writing files")
         print("    --force                 force update of user-modified notes (preserves sentinel blocks)")
         print("    --obsidian-dedup        hydrate merged_from from dedup_report.json (Phase 10 D-15)")
@@ -1225,6 +1251,7 @@ def main() -> None:
         print("  capability [--stdout|--validate]  MCP capability manifest JSON / drift gate (Phase 13)")
         print("  harness export [--target claude]  Emit SOUL/HEARTBEAT/USER harness files (Phase 13 / SEED-002)")
         print("  run [path] [--router]     AST extract with optional heterogeneous model routing (Phase 12)")
+        print("    --repo-identity <slug>  override profile/fallback repo identity for generated artifacts")
         print("  hook install            install post-commit/post-checkout git hooks (all platforms)")
         print("  hook uninstall          remove git hooks")
         print("  hook status             check if git hooks are installed")
@@ -1366,6 +1393,7 @@ def main() -> None:
         user_passed_obsidian_dir = False
         cli_output: str | None = None
         args = sys.argv[2:]
+        cli_repo_identity, args = _extract_repo_identity_arg(args)
         i = 0
         while i < len(args):
             if args[i] == "--graph" and i + 1 < len(args):
@@ -1448,6 +1476,7 @@ def main() -> None:
                 G,
                 communities,
                 obsidian_dir,
+                repo_identity=cli_repo_identity,
                 dry_run=dry_run,
                 force=force,
                 obsidian_dedup=obsidian_dedup,  # Phase 10 D-15
@@ -2195,6 +2224,7 @@ def main() -> None:
         from graphify.output import resolve_output
 
         rest = list(sys.argv[2:])
+        cli_repo_identity, rest = _extract_repo_identity_arg(rest)
         use_router = "--router" in rest
         rest = [a for a in rest if a != "--router"]
 
@@ -2214,6 +2244,10 @@ def main() -> None:
 
         # Resolve output BEFORE pipeline starts (emits VAULT-08 detection report + D-09 if applicable)
         resolved = resolve_output(Path.cwd(), cli_output=cli_output)
+        from graphify.naming import resolve_repo_identity
+        from graphify.profile import load_profile
+        profile = load_profile(Path.cwd())
+        resolve_repo_identity(Path.cwd(), cli_identity=cli_repo_identity, profile=profile)
 
         # D-07: when vault auto-adopts profile, input corpus is forced to CWD
         if resolved.vault_detected and resolved.source == "profile":

@@ -523,6 +523,7 @@ def to_obsidian(
     profile: dict | None = None,
     community_labels: dict[int, str] | None = None,
     cohesion: dict[int, float] | None = None,
+    repo_identity: str | None = None,
     dry_run: bool = False,
     force: bool = False,
     obsidian_dedup: bool = False,
@@ -581,6 +582,8 @@ def to_obsidian(
     # D-74: always run the new pipeline. No `if profile is None` branching.
     if profile is None:
         profile = load_profile(out)
+    from graphify.naming import resolve_repo_identity
+    resolve_repo_identity(Path.cwd(), cli_identity=repo_identity, profile=profile)
 
     mapping_result = classify(G, communities, profile, cohesion=cohesion)
     per_node = mapping_result.get("per_node", {}) or {}
