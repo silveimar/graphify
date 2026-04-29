@@ -414,5 +414,15 @@ Plans:
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 5/5 | Complete    | 2026-04-29 |
 | 37. Validation Metadata Ratification | v1.8 | 2/2 | Complete   | 2026-04-29 |
 
+### Phase 38: with dormant seeds and pending quick task
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 37
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 38 to break down)
+
 ---
 *Last updated: 2026-04-29 — v1.8 validation metadata gap-closure phase added after milestone audit; 33/33 requirements remain satisfied.*

@@ -68,6 +68,10 @@ Progress: [██████████] 100%
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 38 added: with dormant seeds and pending quick task
+
 ### Decisions
 
 Locked v1.8 choices:
