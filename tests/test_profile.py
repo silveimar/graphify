@@ -213,6 +213,88 @@ def test_validate_profile_collects_multiple_errors():
     assert len(errors) == 3
 
 
+def test_validate_profile_accepts_repo_identity():
+    profile = {"repo": {"identity": "work-vault"}}
+
+    assert validate_profile(profile) == []
+
+
+def test_validate_profile_rejects_invalid_repo_identity():
+    invalid_profile = {
+        "repo": "work-vault",
+        "naming": {
+            "repo": {"identity": "nested-is-not-valid"},
+        },
+    }
+    errors = validate_profile(invalid_profile)
+    assert any("'repo' must be a mapping" in e for e in errors)
+    assert any("repo identity" in e.lower() for e in errors)
+
+    errors = validate_profile({"repo": {"identity": 123}})
+    assert any("repo.identity" in e and "string" in e for e in errors)
+
+    errors = validate_profile({"repo": {"identity": ""}})
+    assert any("repo.identity" in e and "non-empty" in e for e in errors)
+
+    errors = validate_profile({"repo": {"identity": "../escape"}})
+    assert any("repo.identity" in e and ".." in e for e in errors)
+
+    errors = validate_profile({"repo": {"identity": "path/to/repo"}})
+    assert any("repo.identity" in e and "/" in e for e in errors)
+
+    errors = validate_profile({"repo": {"identity": "path\\to\\repo"}})
+    assert any("repo.identity" in e and "\\" in e for e in errors)
+
+    collected = validate_profile({
+        "repo": {"identity": "../escape"},
+        "naming": {
+            "repo": {"identity": "nested-is-not-valid"},
+            "concept_names": {"enabled": "yes", "budget": -1},
+        },
+    })
+    assert len(errors) == 1
+    assert len(collected) >= 3
+
+
+def test_validate_profile_accepts_concept_naming_controls():
+    profile = {
+        "naming": {
+            "concept_names": {
+                "enabled": True,
+                "budget": 2.5,
+                "style": "concise",
+            }
+        }
+    }
+
+    assert validate_profile(profile) == []
+
+
+def test_validate_profile_rejects_invalid_concept_naming_controls():
+    errors = validate_profile({"naming": {"concept_names": {"enabled": "true"}}})
+    assert any("naming.concept_names.enabled" in e and "bool" in e for e in errors)
+
+    errors = validate_profile({"naming": {"concept_names": {"budget": -0.1}}})
+    assert any("naming.concept_names.budget" in e and "non-negative" in e for e in errors)
+
+    errors = validate_profile({"naming": {"concept_names": {"budget": True}}})
+    assert any("naming.concept_names.budget" in e and "int or float" in e for e in errors)
+
+    errors = validate_profile({"naming": {"concept_names": {"style": ""}}})
+    assert any("naming.concept_names.style" in e and "short string" in e for e in errors)
+
+    errors = validate_profile({
+        "naming": {
+            "concept_names": {
+                "enabled": "yes",
+                "budget": -1,
+                "style": "",
+            }
+        }
+    })
+    assert len(errors) == 3
+
+
 def test_validate_profile_mapping_rules_not_list():
     errors = validate_profile({"mapping_rules": "not a list"})
     assert len(errors) == 1
