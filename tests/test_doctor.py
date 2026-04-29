@@ -37,10 +37,28 @@ def _make_vault(tmp_path: Path, *, profile_text: str | None = None) -> Path:
 
 
 _VALID_PROFILE = (
+    "taxonomy:\n"
+    "  version: v1.8\n"
+    "  root: Atlas/Sources/Graphify\n"
+    "  folders:\n"
+    "    moc: MOCs\n"
+    "    thing: Things\n"
+    "    statement: Statements\n"
+    "    person: People\n"
+    "    source: Sources\n"
+    "    default: Things\n"
+    "    unclassified: MOCs\n"
+    "mapping:\n"
+    "  min_community_size: 3\n"
     "output:\n"
     "  mode: vault-relative\n"
     "  path: Atlas/Generated\n"
 )
+
+
+def _valid_profile_with(extra: str) -> str:
+    """Append focused profile overrides to the v1.8-valid doctor fixture."""
+    return f"{_VALID_PROFILE}{extra}"
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +91,63 @@ def test_run_doctor_invalid_profile(tmp_path):
         f"expected non-empty errors, got: {report.profile_validation_errors}"
     )
     assert report.is_misconfigured() is True
+
+
+def test_run_doctor_surfaces_taxonomy_preflight_errors(tmp_path):
+    pytest.importorskip("yaml")
+    bad = _valid_profile_with(
+        "taxonomy:\n"
+        "  version: v1.8\n"
+        "  root: Atlas/Sources/Graphify\n"
+        "  bad_key: true\n"
+        "  folders:\n"
+        "    moc: MOCs\n"
+        "    thing: Things\n"
+        "    statement: Statements\n"
+        "    person: People\n"
+        "    source: Sources\n"
+        "    default: Things\n"
+        "    unclassified: MOCs\n"
+    )
+    vault = _make_vault(tmp_path, profile_text=bad)
+    report = run_doctor(vault)
+    text = format_report(report)
+    assert any("Unknown taxonomy key 'bad_key'" in err for err in report.profile_validation_errors)
+    assert "[graphify] error: Unknown taxonomy key 'bad_key'" in text
+    assert report.is_misconfigured() is True
+
+
+def test_run_doctor_mapping_moc_threshold_error_and_fix(tmp_path):
+    pytest.importorskip("yaml")
+    bad = _valid_profile_with(
+        "mapping:\n"
+        "  min_community_size: 3\n"
+        "  moc_threshold: 3\n"
+    )
+    vault = _make_vault(tmp_path, profile_text=bad)
+    report = run_doctor(vault)
+    assert any("mapping.moc_threshold" in err for err in report.profile_validation_errors)
+    assert report.is_misconfigured() is True
+    assert any("mapping.min_community_size" in fix for fix in report.recommended_fixes)
+
+
+def test_run_doctor_community_template_warning_is_nonfatal(tmp_path):
+    pytest.importorskip("yaml")
+    vault = _make_vault(tmp_path, profile_text=_VALID_PROFILE)
+    templates_dir = vault / ".graphify" / "templates"
+    templates_dir.mkdir()
+    (templates_dir / "community.md").write_text(
+        "${frontmatter}\n# ${label}\n${members_section}\n${dataview_block}\n",
+        encoding="utf-8",
+    )
+    report = run_doctor(vault)
+    text = format_report(report)
+    assert report.profile_validation_errors == []
+    assert report.profile_validation_warnings
+    assert any("MOC-only output" in warn for warn in report.profile_validation_warnings)
+    assert "[graphify] warning:" in text
+    assert "MOC-only output" in text
+    assert report.is_misconfigured() is False
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +220,7 @@ def test_run_doctor_self_ingest_detected(tmp_path):
     pytest.importorskip("yaml")
     # output.path lives nested under a name that trips _is_nested_output
     # (matches notes_dir basename → guard returns True).
-    nested = (
+    nested = _valid_profile_with(
         "output:\n"
         "  mode: vault-relative\n"
         "  path: graphify-out/notes\n"
