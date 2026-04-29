@@ -13,6 +13,7 @@ import datetime
 
 from graphify.profile import (
     _DEFAULT_PROFILE,
+    _VALID_TOP_LEVEL_KEYS,
     _deep_merge,
     _dump_frontmatter,
     load_profile,
@@ -57,19 +58,27 @@ def test_deep_merge_does_not_mutate_base():
 def test_load_profile_no_profile_returns_defaults(tmp_path):
     result = load_profile(tmp_path)
     assert result == _deep_merge(_DEFAULT_PROFILE, {})
-    assert result["folder_mapping"]["moc"] == "Atlas/Maps/"
+    assert result["taxonomy"]["version"] == "v1.8"
+    assert result["folder_mapping"]["moc"] == "Atlas/Sources/Graphify/MOCs/"
 
 
 def test_load_profile_with_yaml(tmp_path):
     profile_dir = tmp_path / ".graphify"
     profile_dir.mkdir()
     (profile_dir / "profile.yaml").write_text(
-        'folder_mapping:\n  moc: "Custom/Maps/"\n', encoding="utf-8"
+        'taxonomy:\n'
+        '  version: "v1.8"\n'
+        '  root: "Custom/Graphify"\n'
+        '  folders:\n'
+        '    moc: "Maps"\n'
+        'mapping:\n'
+        '  min_community_size: 3\n',
+        encoding="utf-8",
     )
     result = load_profile(tmp_path)
-    assert result["folder_mapping"]["moc"] == "Custom/Maps/"
+    assert result["folder_mapping"]["moc"] == "Custom/Graphify/Maps/"
     # Other defaults preserved (D-02)
-    assert result["folder_mapping"]["thing"] == "Atlas/Dots/Things/"
+    assert result["folder_mapping"]["thing"] == "Atlas/Sources/Graphify/Things/"
 
 
 def test_load_profile_empty_yaml_returns_defaults(tmp_path):
@@ -637,13 +646,14 @@ def test_deep_merge_preserves_new_defaults():
 def test_default_profile_includes_topology_and_mapping_keys():
     from graphify.profile import _DEFAULT_PROFILE
     assert _DEFAULT_PROFILE["topology"]["god_node"]["top_n"] == 10
-    assert _DEFAULT_PROFILE["mapping"]["moc_threshold"] == 3
+    assert _DEFAULT_PROFILE["mapping"]["min_community_size"] == 3
+    assert "moc_threshold" not in _DEFAULT_PROFILE["mapping"]
 
 
 def test_default_profile_top_n_and_threshold_are_not_bool():
     from graphify.profile import _DEFAULT_PROFILE
     top_n = _DEFAULT_PROFILE["topology"]["god_node"]["top_n"]
-    threshold = _DEFAULT_PROFILE["mapping"]["moc_threshold"]
+    threshold = _DEFAULT_PROFILE["mapping"]["min_community_size"]
     assert isinstance(top_n, int) and not isinstance(top_n, bool)
     assert isinstance(threshold, int) and not isinstance(threshold, bool)
 
@@ -655,15 +665,15 @@ def test_deep_merge_respects_topology_section():
     merged = _deep_merge(_DEFAULT_PROFILE, override)
     assert merged["topology"]["god_node"]["top_n"] == 25
     # Unrelated defaults preserved
-    assert merged["mapping"]["moc_threshold"] == 3
-    assert merged["folder_mapping"]["moc"] == "Atlas/Maps/"
+    assert merged["mapping"]["min_community_size"] == 3
+    assert merged["folder_mapping"]["moc"] == "Atlas/Sources/Graphify/MOCs/"
 
 
-def test_default_profile_rejects_bool_as_int_threshold():
+def test_default_profile_rejects_bool_as_int_min_community_size():
     # VALIDATION row 3-03-07
     from graphify.profile import validate_profile
-    errors = validate_profile({"mapping": {"moc_threshold": True}})
-    assert any("mapping.moc_threshold" in e for e in errors)
+    errors = validate_profile({"mapping": {"min_community_size": True}})
+    assert any("mapping.min_community_size" in e for e in errors)
 
 
 def test_validate_profile_rejects_bool_top_n():
@@ -749,7 +759,7 @@ def test_load_profile_user_field_policies_deep_merges_over_default(tmp_path):
     profile_dir = tmp_path / ".graphify"
     profile_dir.mkdir()
     (profile_dir / "profile.yaml").write_text(
-        "merge:\n  field_policies:\n    tags: replace\n",
+        _V18_REQUIRED_YAML + "merge:\n  field_policies:\n    tags: replace\n",
         encoding="utf-8",
     )
     from graphify.profile import load_profile
@@ -847,6 +857,100 @@ def _mk_vault(tmp_path, profile_yaml: str | None = None, templates: dict[str, st
     return vault
 
 
+_V18_REQUIRED_YAML = (
+    'taxonomy:\n'
+    '  version: "v1.8"\n'
+    '  root: "Atlas/Sources/Graphify"\n'
+    '  folders:\n'
+    '    moc: "MOCs"\n'
+    '    thing: "Things"\n'
+    '    statement: "Statements"\n'
+    '    person: "People"\n'
+    '    source: "Sources"\n'
+    '    default: "Things"\n'
+    '    unclassified: "MOCs"\n'
+    'mapping:\n'
+    '  min_community_size: 3\n'
+)
+
+
+def test_profile_v18_default_taxonomy(tmp_path):
+    result = load_profile(tmp_path)
+    assert result["taxonomy"]["version"] == "v1.8"
+    assert result["taxonomy"]["root"] == "Atlas/Sources/Graphify"
+    assert result["taxonomy"]["folders"]["moc"] == "MOCs"
+    assert result["folder_mapping"]["moc"] == "Atlas/Sources/Graphify/MOCs/"
+    assert result["folder_mapping"]["thing"] == "Atlas/Sources/Graphify/Things/"
+    assert result["folder_mapping"]["statement"] == "Atlas/Sources/Graphify/Statements/"
+    assert result["folder_mapping"]["person"] == "Atlas/Sources/Graphify/People/"
+    assert result["folder_mapping"]["source"] == "Atlas/Sources/Graphify/Sources/"
+    assert result["folder_mapping"]["default"] == "Atlas/Sources/Graphify/Things/"
+    assert result["mapping"]["min_community_size"] == 3
+    assert "moc_threshold" not in result["mapping"]
+
+
+def test_profile_v18_taxonomy_atomicity_guard(tmp_path):
+    assert "taxonomy" in _VALID_TOP_LEVEL_KEYS
+    assert "taxonomy" in _DEFAULT_PROFILE
+    assert validate_profile(_DEFAULT_PROFILE) == []
+
+    vault = _mk_vault(tmp_path)
+    result = validate_profile_preflight(vault)
+    assert result.errors == []
+
+
+def test_profile_v18_invalid_taxonomy_key_rejected():
+    errors = validate_profile({"taxonomy": {"bad": "x"}})
+    assert any("Unknown taxonomy key" in e for e in errors), errors
+
+
+def test_profile_v18_unsafe_taxonomy_folder_path_rejected():
+    errors = validate_profile({"taxonomy": {"folders": {"moc": "../escape"}}})
+    assert any(
+        "taxonomy.folders.moc" in e and "path traversal" in e
+        for e in errors
+    ), errors
+
+
+def test_profile_v18_user_profile_requires_taxonomy_and_min_community_size(tmp_path):
+    vault = _mk_vault(tmp_path, profile_yaml="naming: {convention: title_case}\n")
+    result = validate_profile_preflight(vault)
+    assert any("taxonomy" in e for e in result.errors), result.errors
+    assert any("mapping.min_community_size" in e for e in result.errors), result.errors
+
+    proc = _run_validate_profile(vault)
+    assert proc.returncode != 0
+    assert "taxonomy" in proc.stderr
+    assert "mapping.min_community_size" in proc.stderr
+
+
+def test_profile_v18_mapping_moc_threshold_invalid_even_with_min_community_size():
+    errors = validate_profile({
+        "mapping": {
+            "min_community_size": 3,
+            "moc_threshold": 2,
+        }
+    })
+    assert any(
+        "mapping.moc_threshold is no longer supported; use mapping.min_community_size" in e
+        for e in errors
+    ), errors
+
+
+def test_profile_v18_community_template_deprecation_warning(tmp_path):
+    community_template = "---\n${frontmatter}---\n# ${label}\n${members_section}\n"
+    vault = _mk_vault(
+        tmp_path,
+        profile_yaml=_V18_REQUIRED_YAML,
+        templates={"community.md": community_template},
+    )
+    result = validate_profile_preflight(vault)
+    assert any(
+        "community.md" in w and "MOC-only output" in w
+        for w in result.warnings
+    ), result.warnings
+
+
 def test_validate_profile_preflight_nonexistent_vault(tmp_path):
     result = validate_profile_preflight(tmp_path / "missing")
     assert len(result.errors) == 1
@@ -868,7 +972,8 @@ def test_validate_profile_preflight_no_graphify_dir(tmp_path):
 def test_validate_profile_preflight_empty_profile_yaml(tmp_path):
     vault = _mk_vault(tmp_path, profile_yaml="")
     result = validate_profile_preflight(vault)
-    assert result.errors == []
+    assert any("taxonomy" in e for e in result.errors)
+    assert any("mapping.min_community_size" in e for e in result.errors)
     assert result.template_count == 0
 
 
@@ -895,7 +1000,7 @@ def test_validate_profile_preflight_layer2_template_missing_required(tmp_path):
 
 
 def test_validate_profile_preflight_layer3_dead_rule_warning(tmp_path):
-    yaml_text = (
+    yaml_text = _V18_REQUIRED_YAML + (
         "mapping_rules:\n"
         "  - when: {topology: god_node}\n"
         "    then: {note_type: thing}\n"
@@ -911,7 +1016,7 @@ def test_validate_profile_preflight_layer3_dead_rule_warning(tmp_path):
 
 
 def test_validate_profile_preflight_layer4_deep_folder_warning(tmp_path):
-    yaml_text = (
+    yaml_text = _V18_REQUIRED_YAML + (
         "folder_mapping:\n"
         "  moc: 'A/B/C/D/E'\n"  # 5 segments > 4
     )
@@ -924,7 +1029,7 @@ def test_validate_profile_preflight_layer4_deep_folder_warning(tmp_path):
 
 def test_validate_profile_preflight_layer4_long_path_warning(tmp_path):
     deep_folder = "/".join(["longsegment" * 3] * 2)
-    yaml_text = f"folder_mapping:\n  moc: '{deep_folder}'\n"
+    yaml_text = _V18_REQUIRED_YAML + f"folder_mapping:\n  moc: '{deep_folder}'\n"
     vault = _mk_vault(tmp_path, profile_yaml=yaml_text)
     result = validate_profile_preflight(vault)
     assert any("path length" in w or "MAX_PATH" in w for w in result.warnings), (
@@ -933,7 +1038,7 @@ def test_validate_profile_preflight_layer4_long_path_warning(tmp_path):
 
 
 def test_validate_profile_preflight_layer4_mapping_rule_folder(tmp_path):
-    yaml_text = (
+    yaml_text = _V18_REQUIRED_YAML + (
         "mapping_rules:\n"
         "  - when: {topology: god_node}\n"
         "    then: {note_type: thing, folder: 'A/B/C/D/E'}\n"
@@ -946,7 +1051,10 @@ def test_validate_profile_preflight_layer4_mapping_rule_folder(tmp_path):
 
 
 def test_validate_profile_preflight_no_side_effects(tmp_path):
-    vault = _mk_vault(tmp_path, profile_yaml="naming: {convention: kebab-case}\n")
+    vault = _mk_vault(
+        tmp_path,
+        profile_yaml=_V18_REQUIRED_YAML + "naming: {convention: kebab-case}\n",
+    )
     r_a = validate_profile_preflight(vault)
     r_b = validate_profile_preflight(vault)
     assert r_a == r_b
@@ -957,7 +1065,7 @@ def test_validate_profile_preflight_no_side_effects(tmp_path):
 def test_validate_profile_preflight_clean_vault_passes(tmp_path):
     vault = _mk_vault(
         tmp_path,
-        profile_yaml="naming: {convention: title_case}\n",
+        profile_yaml=_V18_REQUIRED_YAML + "naming: {convention: title_case}\n",
     )
     result = validate_profile_preflight(vault)
     assert result.errors == []
@@ -979,7 +1087,7 @@ def test_preflight_result_is_named_tuple_with_four_fields(tmp_path):
 
 
 def test_preflight_result_tuple_unpack_backward_compat(tmp_path):
-    vault = _mk_vault(tmp_path, profile_yaml="")
+    vault = _mk_vault(tmp_path, profile_yaml=_V18_REQUIRED_YAML)
     result = validate_profile_preflight(vault)
     # Legacy 2-tuple unpack via star-rest (still works for any prefix length)
     errors, warnings, *_ = result
@@ -1001,7 +1109,7 @@ def test_preflight_result_tuple_unpack_backward_compat(tmp_path):
 
 def test_preflight_result_rule_and_template_counts_populated(tmp_path):
     # Valid profile with 3 rules and 1 valid template override
-    yaml_text = (
+    yaml_text = _V18_REQUIRED_YAML + (
         "mapping_rules:\n"
         "  - when: {topology: god_node}\n"
         "    then: {note_type: thing}\n"
@@ -1102,7 +1210,8 @@ def test_load_profile_user_tag_taxonomy_deep_merge(tmp_path):
     gdir = vault / ".graphify"
     gdir.mkdir()
     (gdir / "profile.yaml").write_text(
-        "tag_taxonomy:\n  garden: [custom]\n", encoding="utf-8"
+        _V18_REQUIRED_YAML + "tag_taxonomy:\n  garden: [custom]\n",
+        encoding="utf-8",
     )
     p = load_profile(vault)
     assert p["tag_taxonomy"]["garden"] == ["custom"]
@@ -1510,6 +1619,7 @@ def test_dataview_queries_provenance_in_validate_profile_output(tmp_path):
     )
     (graphify_dir / "profile.yaml").write_text(
         "extends: bases/core.yaml\n"
+        + _V18_REQUIRED_YAML +
         "dataview_queries:\n"
         "  moc: \"OVERRIDE moc query\"\n"
         "  thing: \"OVERRIDE thing query\"\n",
@@ -1541,6 +1651,11 @@ def test_dataview_queries_absent_key_is_legacy_compatible(tmp_path):
     shutil.copy(
         _DVQ_FIXTURES / "dataview_queries_legacy_fallback.yaml",
         graphify_dir / "profile.yaml",
+    )
+    existing = (graphify_dir / "profile.yaml").read_text(encoding="utf-8")
+    (graphify_dir / "profile.yaml").write_text(
+        _V18_REQUIRED_YAML + existing,
+        encoding="utf-8",
     )
     proc = _run_validate_profile(vault)
     assert proc.returncode == 0, proc.stderr
