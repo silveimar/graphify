@@ -1,105 +1,105 @@
 # v1.8 Obsidian Migration Guide
 
-This guide explains how to update an existing Obsidian vault with graphify v1.8 output. It is generic first: `--input` points at the raw corpus you want graphify to read, and `--vault` points at the target Obsidian vault that should receive reviewed updates.
+This guide explains how to update an existing Obsidian vault with graphify v1.8 output. It is generic first: `--input` points at the raw corpus you want graphify to analyze, and `--vault` points at the target Obsidian vault that should receive reviewed generated notes.
 
-Canonical example:
+The canonical example uses `work-vault/raw` as the raw corpus and `ls-vault` as the target vault:
 
 ```bash
 graphify update-vault --input work-vault/raw --vault ls-vault
 ```
 
-In that example, `work-vault/raw` is only the raw source corpus and `ls-vault` is the target vault. You can replace both paths for any vault framework that graphify can update through a vault-side `.graphify/profile.yaml` or the built-in default profile.
+Use different paths for your own setup. The command is not a vault-to-vault move; graphify analyzes the raw input, previews the target vault changes, and writes migration review artifacts before any apply step.
 
-## 1. Back Up The Target Vault
+## 1. Confirm The Target Vault
 
-Back up the target vault before apply.
+The target vault must already be an Obsidian vault with a `.obsidian/` directory. If it has a `.graphify/profile.yaml`, graphify uses that profile. Otherwise, graphify falls back to the built-in v1.8 profile.
 
-Make a restorable copy of the target vault before running any apply/archive command. The preview step is read-only for vault notes, but apply writes reviewed changes and archives legacy graphify-managed notes under `graphify-out/migrations/archive/`.
+Before you start, confirm which directory is your raw corpus and which directory is the Obsidian vault:
 
-Recommended backups:
+```bash
+graphify update-vault --input work-vault/raw --vault ls-vault
+```
 
-- Commit or snapshot the target vault if it is version-controlled.
-- Copy the vault directory to a separate location.
-- Confirm the backup includes `.graphify/`, generated Graphify notes, and any legacy `_COMMUNITY_*` notes you expect to migrate.
+## 2. Validate The Vault Profile
 
-Do not continue to `--apply --plan-id` until you know how to restore this backup.
-
-## 2. Validate The Target Vault
-
-Validate the vault profile before previewing migration effects:
+If the target vault has a graphify profile, validate it before migration:
 
 ```bash
 graphify --validate-profile ls-vault
 ```
 
-Fix reported profile errors first. Warnings may indicate deprecated v1.8 settings such as legacy community overview output; review them before migration so the generated notes match the v1.8 MOC-only contract.
+Fix profile errors before continuing. Warnings can usually be reviewed alongside the preview output.
 
 ## 3. Preview The Migration
 
-Run the update command without `--apply`:
+Preview is the default behavior:
 
 ```bash
 graphify update-vault --input work-vault/raw --vault ls-vault
 ```
 
-Preview is the default. It rebuilds the graph from the raw corpus, renders the target vault output as a dry run, and writes review artifacts under `graphify-out/migrations/`. It does not write vault notes during preview.
+The preview writes migration artifacts under `graphify-out/migrations/` and does not apply vault note writes. Review the generated JSON and Markdown plan before continuing.
 
-Review the command output and the generated migration plan. The plan lists `CREATE`, `UPDATE`, `REPLACE`, `SKIP_PRESERVE`, `SKIP_CONFLICT`, and `ORPHAN` rows so you can see what graphify would write, preserve, refuse, or archive.
+## 4. Back Up Before Apply
 
-## 4. Review The Migration Plan
+Back up the target vault before apply. Treat this as a hard prerequisite, not an optional safety tip.
 
-Review the migration plan before apply.
+At minimum, make sure you have one of these:
 
-Open the generated `migration-plan-<id>.md` and `migration-plan-<id>.json` files under `graphify-out/migrations/`.
+- A clean git commit or branch containing the current vault state.
+- A filesystem copy of the target vault.
+- A backup from your normal Obsidian sync or backup provider that you have verified can restore files.
 
-Check at least:
+Do not run an apply command until the backup exists.
 
-- The raw input path and target vault path match the command you intended.
-- New v1.8 notes land under the Graphify-owned output tree declared by the profile.
-- Legacy `_COMMUNITY_*` notes appear only as migration candidates or review-only orphan rows, not as new generated output.
-- `SKIP_PRESERVE` rows correspond to user-modified notes you want graphify to leave alone.
-- `SKIP_CONFLICT` rows, especially repo identity drift, are expected and understood.
+## 5. Review The Migration Plan
 
-Copy the plan ID from the preview output or from the artifact filename.
+Review the migration plan before apply. The plan lists CREATE, UPDATE, REPLACE, SKIP_PRESERVE, SKIP_CONFLICT, and ORPHAN rows so you can see what graphify would do and which legacy notes are review-only.
 
-## 5. Apply and archive
+Look for:
 
-Apply only after the backup and review are complete:
+- New v1.8 Graphify-owned paths under the target vault.
+- Preserved user edits and conflict rows.
+- Legacy `_COMMUNITY_*` notes that will be archived during reviewed apply.
+- The plan ID you will pass to the apply command.
+
+## 6. Apply and archive
+
+Apply only a reviewed plan ID:
 
 ```bash
 graphify update-vault --input work-vault/raw --vault ls-vault --apply --plan-id <id>
 ```
 
-Apply requires a reviewed plan ID. Graphify reloads the plan artifact, verifies that the current preview still matches the reviewed request, writes only approved `CREATE`, `UPDATE`, and `REPLACE` rows, and archives reviewed legacy notes by default after successful writes.
+Apply revalidates the reviewed plan against the current input, vault, repo identity, and preview digest before writing. Legacy notes are archived by default under `graphify-out/migrations/archive/`. Graphify does not destructively delete legacy notes; it moves reviewed legacy files into the archive so you can inspect or restore them.
 
-Archived legacy notes are moved under:
-
-```text
-graphify-out/migrations/archive/
-```
-
-Graphify does not destructively delete legacy notes. Archive movement preserves relative paths so you can inspect or restore individual files.
-
-## 6. Roll Back If Needed
+## 7. Roll Back If Needed
 
 Rollback immediately after apply/archive if needed.
 
-If the apply result is wrong, roll back before making more graphify runs or manual edits:
+If the applied output is not what you expected:
 
-1. Restore the target vault from the backup you made before apply.
-2. If you only need specific legacy notes, copy them back from `graphify-out/migrations/archive/<plan-id>/` to their original vault-relative paths.
-3. Re-run the preview command and confirm the new migration plan reflects the restored state.
+1. Stop making further vault edits.
+2. Restore the target vault from the backup you made before apply.
+3. If you only need a legacy note back, copy it from `graphify-out/migrations/archive/` to its original relative path in the vault.
+4. Re-run preview and inspect the migration plan again before another apply.
 
-The archive is evidence for review and rollback, not a substitute for a full vault backup.
-
-## 7. Rerun And Review Cleanup
+## 8. Rerun After Archive Review
 
 Rerun graphify after reviewing the archive.
 
-After apply and any rollback decision, run the preview command again:
+Use another preview first:
 
 ```bash
 graphify update-vault --input work-vault/raw --vault ls-vault
 ```
 
-The rerun should show a smaller or empty set of migration rows. Review any remaining legacy or conflict rows before applying another plan. Keep the archive until you are confident the v1.8 output is correct and your vault backup policy has captured the updated state.
+The rerun should reflect the current vault state, including generated v1.8 notes and archived legacy notes. Review any remaining SKIP_CONFLICT or ORPHAN rows before applying another plan.
+
+## 9. Cleanup Review
+
+After the migration is stable:
+
+- Keep the latest migration artifacts until you no longer need rollback evidence.
+- Review archived files before deleting any local backup copies.
+- Leave localized README updates for a later translation pass; this guide is the English v1.8 contract.
