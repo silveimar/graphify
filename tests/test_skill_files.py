@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 import graphify
+from graphify import __main__ as graphify_main
 
 
 PRIMARY_SKILL = "skill.md"
@@ -37,13 +38,23 @@ REQUIRED_V18_OBSIDIAN_PHRASES = (
 FORBIDDEN_V18_OBSIDIAN_PHRASES = (
     "generates _COMMUNITY_",
     "generates `_COMMUNITY_",
-    "_COMMUNITY_* overview notes are generated",
-    "_COMMUNITY_* overview notes are created",
+    "_COMMUNITY_" + "* overview notes are generated",
+    "_COMMUNITY_" + "* overview notes are created",
 )
 FORBIDDEN_V18_OBSIDIAN_PATTERNS = (
     re.compile(r"_COMMUNITY_\*.*overview notes", re.IGNORECASE),
     re.compile(r"_COMMUNITY_\*.*dataview queries", re.IGNORECASE),
     re.compile(r"print\(.*_COMMUNITY_", re.IGNORECASE),
+)
+REQUIRED_INSTALL_GUIDANCE_PHRASES = (
+    "GRAPH_REPORT.md",
+    "MOC",
+    "[[wikilinks]]",
+    "wiki/index.md",
+)
+INSTALL_GUIDANCE_SECTIONS = (
+    ("CLAUDE.md install section", graphify_main._CLAUDE_MD_SECTION),
+    ("AGENTS.md install section", graphify_main._AGENTS_MD_SECTION),
 )
 
 
@@ -99,3 +110,26 @@ def test_skill_files_forbid_stale_generated_community_claims():
         ]
         found = stale_phrases + stale_patterns
         assert not found, f"{skill_file} contains stale v1.8 Obsidian claims: {found}"
+
+
+def test_install_guidance_sections_share_v18_obsidian_navigation_contract():
+    for section_name, text in INSTALL_GUIDANCE_SECTIONS:
+        missing = [
+            phrase for phrase in REQUIRED_INSTALL_GUIDANCE_PHRASES
+            if phrase not in text
+        ]
+        assert not missing, f"{section_name} missing v1.8 navigation phrases: {missing}"
+
+
+def test_install_guidance_sections_forbid_stale_generated_community_claims():
+    for section_name, text in INSTALL_GUIDANCE_SECTIONS:
+        stale_phrases = [
+            phrase for phrase in FORBIDDEN_V18_OBSIDIAN_PHRASES
+            if phrase in text
+        ]
+        stale_patterns = [
+            pattern.pattern for pattern in FORBIDDEN_V18_OBSIDIAN_PATTERNS
+            if pattern.search(text)
+        ]
+        found = stale_phrases + stale_patterns
+        assert not found, f"{section_name} contains stale v1.8 Obsidian claims: {found}"
