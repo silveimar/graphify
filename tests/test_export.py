@@ -274,7 +274,7 @@ def test_to_obsidian_resolves_concept_names_for_moc_paths(tmp_path):
         G,
         communities,
         output_dir=str(obsidian_dir),
-        community_labels={0: "Authentication Session Flow"},
+        concept_namer=lambda _payload: "Authentication Session Flow",
         dry_run=True,
     )
 
@@ -298,8 +298,57 @@ def test_to_obsidian_dry_run_does_not_write_naming_sidecar(tmp_path):
         G,
         communities,
         output_dir=str(obsidian_dir),
-        community_labels={0: "Authentication Session Flow"},
+        concept_namer=lambda _payload: "Authentication Session Flow",
         dry_run=True,
     )
 
     assert not (out_root / "concept-names.json").exists()
+
+
+def test_to_obsidian_profile_repo_identity_records_sidecar(tmp_path):
+    from graphify.export import to_obsidian
+
+    G, communities = _phase33_graph()
+    out_root = tmp_path / "graphify-out"
+    obsidian_dir = out_root / "obsidian"
+    profile = {
+        "repo": {"identity": "profile-repo"},
+        "naming": {"concept_names": {"enabled": False}},
+    }
+
+    to_obsidian(
+        G,
+        communities,
+        output_dir=str(obsidian_dir),
+        profile=profile,
+    )
+
+    payload = json.loads((out_root / "repo-identity.json").read_text(encoding="utf-8"))
+    assert payload["identity"] == "profile-repo"
+    assert payload["source"] == "profile"
+    assert payload["raw_value"] == "profile-repo"
+    assert payload["warnings"] == []
+
+
+def test_to_obsidian_fallback_repo_identity_records_sidecar(tmp_path, monkeypatch):
+    from graphify.export import to_obsidian
+
+    G, communities = _phase33_graph()
+    project = tmp_path / "my-project"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    out_root = tmp_path / "graphify-out"
+    obsidian_dir = out_root / "obsidian"
+
+    to_obsidian(
+        G,
+        communities,
+        output_dir=str(obsidian_dir),
+        profile={"naming": {"concept_names": {"enabled": False}}},
+    )
+
+    payload = json.loads((out_root / "repo-identity.json").read_text(encoding="utf-8"))
+    assert payload["identity"] == "my-project"
+    assert payload["source"] == "fallback-directory"
+    assert payload["raw_value"] == "my-project"
+    assert payload["warnings"] == []
