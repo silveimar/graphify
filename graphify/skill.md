@@ -43,6 +43,16 @@ Turn any folder of files into a navigable knowledge graph with community detecti
 /graphify analyze for <lens>                           # single-lens tournament (~6 LLM calls vs ~24 for all 4)
 ```
 
+## v1.8 Obsidian vault behavior
+
+v1.8 uses MOC-only community output in a Graphify-owned v1.8 subtree. The lower-level `--obsidian` export writes graphify-rendered notes to an output or vault path; existing-vault migration/update uses preview-first update-vault:
+
+```bash
+graphify update-vault --input work-vault/raw --vault ls-vault
+```
+
+Back up the target vault before apply. Review preview artifacts first, then apply only with a reviewed plan id. Reviewed apply archives legacy `_COMMUNITY_*` files under `graphify-out/migrations/archive/` for rollback evidence and performs no destructive deletion.
+
 <!-- graphify:persistence-contract:v1 -->
 
 ## Mandatory response persistence
