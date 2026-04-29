@@ -3,10 +3,12 @@ from __future__ import annotations
 import html as _html
 import json
 import math
+import os
 import re
 import sys
 from collections import Counter
 from pathlib import Path
+from typing import Callable
 import networkx as nx
 from networkx.readwrite import json_graph
 from graphify.security import sanitize_label
@@ -19,6 +21,33 @@ COMMUNITY_COLORS = [
 ]
 
 MAX_NODES_FOR_VIZ = 5_000
+
+
+def _write_repo_identity_sidecar(artifacts_dir: Path, resolved_repo_identity) -> None:
+    """Write resolved repo identity as a generated artifact sidecar."""
+    sidecar_path = artifacts_dir / "repo-identity.json"
+    sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = sidecar_path.with_suffix(".json.tmp")
+    payload = {
+        "identity": resolved_repo_identity.identity,
+        "raw_value": resolved_repo_identity.raw_value,
+        "source": resolved_repo_identity.source,
+        "warnings": list(resolved_repo_identity.warnings),
+    }
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, indent=2, sort_keys=True))
+            fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, sidecar_path)
+    except OSError:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        raise
 
 
 def _html_styles() -> str:
@@ -524,6 +553,7 @@ def to_obsidian(
     community_labels: dict[int, str] | None = None,
     cohesion: dict[int, float] | None = None,
     repo_identity: str | None = None,
+    concept_namer: Callable | None = None,
     dry_run: bool = False,
     force: bool = False,
     obsidian_dedup: bool = False,
@@ -582,23 +612,44 @@ def to_obsidian(
     # D-74: always run the new pipeline. No `if profile is None` branching.
     if profile is None:
         profile = load_profile(out)
-    from graphify.naming import resolve_repo_identity
-    resolve_repo_identity(Path.cwd(), cli_identity=repo_identity, profile=profile)
+    artifacts_dir = out.resolve().parent
+    from graphify.naming import resolve_concept_names, resolve_repo_identity
+    resolved_repo_identity = resolve_repo_identity(
+        Path.cwd(),
+        cli_identity=repo_identity,
+        profile=profile,
+    )
+    if not dry_run:
+        _write_repo_identity_sidecar(artifacts_dir, resolved_repo_identity)
+    concept_names = resolve_concept_names(
+        G,
+        communities,
+        profile,
+        artifacts_dir,
+        llm_namer=concept_namer,
+        dry_run=dry_run,
+    )
+    resolved_labels = {
+        cid: concept.title
+        for cid, concept in concept_names.items()
+    }
 
     mapping_result = classify(G, communities, profile, cohesion=cohesion)
     per_node = mapping_result.get("per_node", {}) or {}
     per_community = mapping_result.get("per_community", {}) or {}
     skipped = mapping_result.get("skipped_node_ids", set()) or set()
 
-    # community_labels flows through per_community context — when caller
-    # passes display labels, inject them as community_name override into
-    # the matching ClassificationContext so render_moc picks them up.
+    # Explicit caller labels win, then Phase 33 concept names, then mapping's
+    # topology-derived labels. render_moc applies final sink sanitization.
+    merged_labels = dict(resolved_labels)
     if community_labels:
-        for cid, label in community_labels.items():
-            if cid in per_community:
-                ctx = dict(per_community[cid])
-                ctx.setdefault("community_name", label)
-                per_community[cid] = ctx
+        merged_labels.update(community_labels)
+    for cid, label in merged_labels.items():
+        if cid in per_community:
+            ctx = dict(per_community[cid])
+            ctx["community_name"] = label
+            ctx["community_tag"] = safe_tag(label)
+            per_community[cid] = ctx
 
     rendered_notes: dict[str, RenderedNote] = {}
 

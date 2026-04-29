@@ -265,15 +265,19 @@ def _phase33_graph():
 
 def test_to_obsidian_resolves_concept_names_for_moc_paths(tmp_path):
     from graphify.export import to_obsidian
+    from graphify.profile import _DEFAULT_PROFILE
 
     G, communities = _phase33_graph()
     out_root = tmp_path / "graphify-out"
     obsidian_dir = out_root / "obsidian"
+    profile = json.loads(json.dumps(_DEFAULT_PROFILE))
+    profile["naming"]["concept_names"]["budget"] = 1.0
 
     plan = to_obsidian(
         G,
         communities,
         output_dir=str(obsidian_dir),
+        profile=profile,
         concept_namer=lambda _payload: "Authentication Session Flow",
         dry_run=True,
     )
@@ -289,15 +293,19 @@ def test_to_obsidian_resolves_concept_names_for_moc_paths(tmp_path):
 
 def test_to_obsidian_dry_run_does_not_write_naming_sidecar(tmp_path):
     from graphify.export import to_obsidian
+    from graphify.profile import _DEFAULT_PROFILE
 
     G, communities = _phase33_graph()
     out_root = tmp_path / "graphify-out"
     obsidian_dir = out_root / "obsidian"
+    profile = json.loads(json.dumps(_DEFAULT_PROFILE))
+    profile["naming"]["concept_names"]["budget"] = 1.0
 
     to_obsidian(
         G,
         communities,
         output_dir=str(obsidian_dir),
+        profile=profile,
         concept_namer=lambda _payload: "Authentication Session Flow",
         dry_run=True,
     )
