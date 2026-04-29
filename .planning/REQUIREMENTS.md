@@ -31,9 +31,9 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 
 - [x] **NAME-01**: User receives human-readable concept MOC titles from cached LLM naming when concept naming is enabled.
 - [x] **NAME-02**: User receives stable deterministic fallback concept names when LLM naming is unavailable, disabled by budget, or rejected by validation.
-- [ ] **NAME-03**: User can rerun graphify on an unchanged community and keep the same concept MOC filename across runs.
-- [ ] **NAME-04**: User can inspect concept naming provenance in generated MOC metadata or dry-run output.
-- [ ] **NAME-05**: User is protected from unsafe LLM-generated labels through filename, tag, wikilink, Dataview, and frontmatter sanitization.
+- [x] **NAME-03**: User can rerun graphify on an unchanged community and keep the same concept MOC filename across runs.
+- [x] **NAME-04**: User can inspect concept naming provenance in generated MOC metadata or dry-run output.
+- [x] **NAME-05**: User is protected from unsafe LLM-generated labels through filename, tag, wikilink, Dataview, and frontmatter sanitization.
 
 ### God-Node Taxonomy
 
@@ -114,9 +114,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLUST-04 | Phase 32 | Complete |
 | NAME-01 | Phase 33 | Complete |
 | NAME-02 | Phase 33 | Complete |
-| NAME-03 | Phase 33 | Pending |
-| NAME-04 | Phase 33 | Pending |
-| NAME-05 | Phase 33 | Pending |
+| NAME-03 | Phase 33 | Complete |
+| NAME-04 | Phase 33 | Complete |
+| NAME-05 | Phase 33 | Complete |
 | GOD-01 | Phase 34 | Pending |
 | GOD-02 | Phase 34 | Pending |
 | GOD-03 | Phase 34 | Pending |
