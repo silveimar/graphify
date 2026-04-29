@@ -78,7 +78,7 @@ def test_load_profile_with_yaml(tmp_path):
     result = load_profile(tmp_path)
     assert result["folder_mapping"]["moc"] == "Custom/Graphify/Maps/"
     # Other defaults preserved (D-02)
-    assert result["folder_mapping"]["thing"] == "Atlas/Sources/Graphify/Things/"
+    assert result["folder_mapping"]["thing"] == "Custom/Graphify/Things/"
 
 
 def test_load_profile_empty_yaml_returns_defaults(tmp_path):
@@ -1016,9 +1016,14 @@ def test_validate_profile_preflight_layer3_dead_rule_warning(tmp_path):
 
 
 def test_validate_profile_preflight_layer4_deep_folder_warning(tmp_path):
-    yaml_text = _V18_REQUIRED_YAML + (
-        "folder_mapping:\n"
-        "  moc: 'A/B/C/D/E'\n"  # 5 segments > 4
+    yaml_text = (
+        'taxonomy:\n'
+        '  version: "v1.8"\n'
+        '  root: "Atlas/Sources/Graphify"\n'
+        '  folders:\n'
+        '    moc: "A/B/C/D/E"\n'
+        'mapping:\n'
+        '  min_community_size: 3\n'
     )
     vault = _mk_vault(tmp_path, profile_yaml=yaml_text)
     result = validate_profile_preflight(vault)

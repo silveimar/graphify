@@ -60,13 +60,26 @@ class ResolvedProfile(NamedTuple):
 # ---------------------------------------------------------------------------
 
 _DEFAULT_PROFILE: dict = {
+    "taxonomy": {
+        "version": "v1.8",
+        "root": "Atlas/Sources/Graphify",
+        "folders": {
+            "moc": "MOCs",
+            "thing": "Things",
+            "statement": "Statements",
+            "person": "People",
+            "source": "Sources",
+            "default": "Things",
+            "unclassified": "MOCs",
+        },
+    },
     "folder_mapping": {
-        "moc": "Atlas/Maps/",
-        "thing": "Atlas/Dots/Things/",
-        "statement": "Atlas/Dots/Statements/",
-        "person": "Atlas/Dots/People/",
-        "source": "Atlas/Sources/",
-        "default": "Atlas/Dots/",
+        "moc": "Atlas/Sources/Graphify/MOCs/",
+        "thing": "Atlas/Sources/Graphify/Things/",
+        "statement": "Atlas/Sources/Graphify/Statements/",
+        "person": "Atlas/Sources/Graphify/People/",
+        "source": "Atlas/Sources/Graphify/Sources/",
+        "default": "Atlas/Sources/Graphify/Things/",
     },
     "naming": {"convention": "title_case"},
     "merge": {
@@ -93,7 +106,7 @@ _DEFAULT_PROFILE: dict = {
     "dataview_queries": {},
     # Phase 3 extensions (D-48, D-52)
     "topology": {"god_node": {"top_n": 10}},
-    "mapping": {"moc_threshold": 3},
+    "mapping": {"min_community_size": 3},
     # Phase 19 extensions (D-17, D-18)
     "tag_taxonomy": {
         "garden": ["plant", "cultivate", "probe", "repot", "revitalize", "revisit", "question"],
@@ -136,7 +149,7 @@ _DEFAULT_PROFILE: dict = {
 _VALID_TOP_LEVEL_KEYS = {
     "folder_mapping", "naming", "merge", "mapping_rules", "obsidian",
     "topology", "mapping", "tag_taxonomy", "profile_sync", "diagram_types",
-    "output",
+    "output", "taxonomy",
     "extends", "includes", "community_templates",  # Phase 30 (CFG-02 / CFG-03)
     "dataview_queries",  # Phase 31 (TMPL-03, D-11)
 }
@@ -150,6 +163,11 @@ _KNOWN_NOTE_TYPES: frozenset[str] = frozenset(
 )
 
 _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
+
+_VALID_TAXONOMY_KEYS: frozenset[str] = frozenset({"version", "root", "folders"})
+_VALID_TAXONOMY_FOLDER_KEYS: frozenset[str] = frozenset({
+    "moc", "thing", "statement", "person", "source", "default", "unclassified"
+})
 
 # Phase 27 (D-01, VAULT-10): valid modes for the output: block. Schema-only
 # check; sibling-of-vault paths are further validated at use-time via
@@ -235,6 +253,68 @@ def _deep_merge_with_provenance(
             result[key] = value
             provenance[dotted] = source_path
     return result
+
+
+def _taxonomy_path_errors(field: str, value: object) -> list[str]:
+    """Validate a taxonomy path component before it is used for note routing."""
+    if not isinstance(value, str):
+        return [f"{field} must be a string, got {type(value).__name__}"]
+    if not value.strip():
+        return [f"{field} must be a non-empty string"]
+    path = Path(value)
+    if path.is_absolute():
+        return [
+            f"{field} is an absolute path — only relative paths are allowed in taxonomy"
+        ]
+    if value.startswith("~"):
+        return [
+            f"{field} starts with '~' — home-relative paths are not allowed in taxonomy"
+        ]
+    if ".." in path.parts:
+        return [
+            f"{field} contains '..' — path traversal sequences are not allowed in taxonomy folders"
+        ]
+    return []
+
+
+def _join_taxonomy_folder(root: str, folder: str) -> str:
+    """Join taxonomy root/folder into a normalized vault-relative folder."""
+    joined = Path(root) / folder
+    text = joined.as_posix().strip("/")
+    return f"{text}/"
+
+
+def _apply_taxonomy_folder_mapping(profile: dict) -> dict:
+    """Resolve taxonomy folder semantics into the legacy folder_mapping surface."""
+    taxonomy = profile.get("taxonomy")
+    if not isinstance(taxonomy, dict):
+        return profile
+    root = taxonomy.get("root")
+    folders = taxonomy.get("folders")
+    if not isinstance(root, str) or not isinstance(folders, dict):
+        return profile
+
+    folder_mapping = dict(profile.get("folder_mapping") or {})
+    for key, folder in folders.items():
+        if key == "unclassified" or not isinstance(folder, str):
+            continue
+        folder_mapping[key] = _join_taxonomy_folder(root, folder)
+    profile["folder_mapping"] = folder_mapping
+    return profile
+
+
+def _validate_required_v18_user_profile(profile: dict) -> list[str]:
+    """Return errors for v1.8 keys required in user-authored profile files."""
+    errors: list[str] = []
+    if "taxonomy" not in profile:
+        errors.append("profile.yaml must define top-level taxonomy for v1.8 profiles")
+
+    mapping = profile.get("mapping")
+    if not isinstance(mapping, dict) or "min_community_size" not in mapping:
+        errors.append(
+            "profile.yaml must define mapping.min_community_size for v1.8 profiles"
+        )
+    return errors
 
 
 # ---------------------------------------------------------------------------
@@ -422,10 +502,10 @@ def load_profile(vault_dir: str | Path | None) -> dict:
     None, no profile.yaml exists, or when PyYAML is not installed.
     """
     if vault_dir is None:
-        return _deep_merge(_DEFAULT_PROFILE, {})
+        return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, {}))
     profile_path = Path(vault_dir) / ".graphify" / "profile.yaml"
     if not profile_path.exists():
-        return _deep_merge(_DEFAULT_PROFILE, {})
+        return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, {}))
 
     try:
         import yaml  # type: ignore[import-untyped]  # noqa: F401
@@ -435,7 +515,7 @@ def load_profile(vault_dir: str | Path | None) -> dict:
             "Install with: pip install graphifyy[obsidian]",
             file=sys.stderr,
         )
-        return _deep_merge(_DEFAULT_PROFILE, {})
+        return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, {}))
 
     # Phase 30 (CFG-02): walk the extends/includes chain BEFORE schema validation
     # so partial fragments are tolerated (D-08) and only the composed profile
@@ -444,15 +524,16 @@ def load_profile(vault_dir: str | Path | None) -> dict:
     if resolved.errors:
         for err in resolved.errors:
             print(f"[graphify] profile error: {err}", file=sys.stderr)
-        return _deep_merge(_DEFAULT_PROFILE, {})
+        return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, {}))
 
-    errors = validate_profile(resolved.composed)
+    errors = _validate_required_v18_user_profile(resolved.composed)
+    errors.extend(validate_profile(resolved.composed))
     if errors:
         for err in errors:
             print(f"[graphify] profile error: {err}", file=sys.stderr)
-        return _deep_merge(_DEFAULT_PROFILE, {})
+        return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, {}))
 
-    return _deep_merge(_DEFAULT_PROFILE, resolved.composed)
+    return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, resolved.composed))
 
 
 # ---------------------------------------------------------------------------
@@ -574,6 +655,45 @@ def validate_profile(profile: dict) -> list[str]:
                         f"dataview_queries.{key}: query must be a non-empty string"
                     )
 
+    taxonomy = profile.get("taxonomy")
+    if taxonomy is not None:
+        if not isinstance(taxonomy, dict):
+            errors.append("'taxonomy' must be a mapping (dict)")
+        else:
+            for key in taxonomy:
+                if key not in _VALID_TAXONOMY_KEYS:
+                    errors.append(
+                        f"Unknown taxonomy key '{key}' — valid keys are: "
+                        f"{sorted(_VALID_TAXONOMY_KEYS)}"
+                    )
+
+            version = taxonomy.get("version")
+            if version is not None and version != "v1.8":
+                errors.append("taxonomy.version must be 'v1.8'")
+
+            root = taxonomy.get("root")
+            if root is not None:
+                errors.extend(_taxonomy_path_errors("taxonomy.root", root))
+
+            folders = taxonomy.get("folders")
+            if folders is not None:
+                if not isinstance(folders, dict):
+                    errors.append("'taxonomy.folders' must be a mapping (dict)")
+                else:
+                    for name, path_val in folders.items():
+                        if name not in _VALID_TAXONOMY_FOLDER_KEYS:
+                            errors.append(
+                                f"Unknown taxonomy folder '{name}' — valid folders are: "
+                                f"{sorted(_VALID_TAXONOMY_FOLDER_KEYS)}"
+                            )
+                            continue
+                        errors.extend(
+                            _taxonomy_path_errors(
+                                f"taxonomy.folders.{name}",
+                                path_val,
+                            )
+                        )
+
     # naming section
     naming = profile.get("naming")
     if naming is not None:
@@ -688,16 +808,21 @@ def validate_profile(profile: dict) -> list[str]:
         if not isinstance(mapping, dict):
             errors.append("'mapping' must be a mapping (dict)")
         else:
-            threshold = mapping.get("moc_threshold")
+            if "moc_threshold" in mapping:
+                errors.append(
+                    "mapping.moc_threshold is no longer supported; "
+                    "use mapping.min_community_size"
+                )
+            threshold = mapping.get("min_community_size")
             if threshold is not None:
                 if isinstance(threshold, bool) or not isinstance(threshold, int):
                     errors.append(
-                        f"mapping.moc_threshold must be an integer "
+                        f"mapping.min_community_size must be an integer "
                         f"(got {type(threshold).__name__})"
                     )
                 elif threshold < 1:
                     errors.append(
-                        f"mapping.moc_threshold must be ≥ 1 (got {threshold})"
+                        f"mapping.min_community_size must be ≥ 1 (got {threshold})"
                     )
 
     # mapping_rules section — delegate to validate_rules (Phase 3, D-44/D-45)
@@ -1107,10 +1232,12 @@ def validate_profile_preflight(
             )
 
     # LAYER 1: Schema — validate_profile on the COMPOSED user data (errors only)
+    if profile_path.exists():
+        errors.extend(_validate_required_v18_user_profile(user_data))
     errors.extend(validate_profile(user_data))
 
     # Build the effective merged profile (for layers 3 + 4).
-    merged = _deep_merge(_DEFAULT_PROFILE, user_data)
+    merged = _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, user_data))
 
     # LAYER 2: Templates — check every override present in .graphify/templates/
     templates_dir = graphify_dir / "templates"
@@ -1124,6 +1251,11 @@ def validate_profile_preflight(
             tpl_file = templates_dir / f"{note_type}.md"
             if not tpl_file.exists():
                 continue
+            if note_type == "community":
+                warnings.append(
+                    "templates/community.md is hard-deprecated; use MOC-only output "
+                    "and follow the v1.8 migration guidance"
+                )
             # Path-confinement: templates/<type>.md must stay inside vault
             try:
                 validate_vault_path(Path(".graphify") / "templates" / f"{note_type}.md", vault_path)
@@ -1142,6 +1274,12 @@ def validate_profile_preflight(
             else:
                 # Only templates that PASSED validation count toward template_count.
                 template_count += 1
+
+    if community_template_rules:
+        warnings.append(
+            "community_templates profile rules are hard-deprecated; use "
+            "MOC-only output and follow the v1.8 migration guidance"
+        )
 
     # LAYER 3: Dead mapping rules (warnings only)
     rules = merged.get("mapping_rules") or []
