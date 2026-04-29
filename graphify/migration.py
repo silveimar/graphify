@@ -199,11 +199,41 @@ def format_migration_preview(
 
 
 def write_migration_artifacts(preview: dict, artifacts_dir: Path) -> tuple[Path, Path]:
-    raise NotImplementedError("Task 3 implements artifact persistence")
+    """Persist JSON and Markdown migration artifacts atomically."""
+    plan_id = str(preview.get("plan_id", ""))
+    _validate_plan_id(plan_id)
+    directory = Path(artifacts_dir).resolve() / MIGRATION_ARTIFACT_DIR
+    json_path = directory / f"migration-plan-{plan_id}.json"
+    markdown_path = directory / f"migration-plan-{plan_id}.md"
+    _write_atomic_text(
+        json_path,
+        json.dumps(preview, indent=2, sort_keys=True) + "\n",
+    )
+    _write_atomic_text(markdown_path, format_migration_preview(preview))
+    return json_path, markdown_path
 
 
 def load_migration_plan(artifacts_dir: Path, plan_id: str) -> dict:
-    raise NotImplementedError("Task 3 implements artifact loading")
+    """Load and verify a migration plan artifact by digest id."""
+    _validate_plan_id(plan_id)
+    path = (
+        Path(artifacts_dir).resolve()
+        / MIGRATION_ARTIFACT_DIR
+        / f"migration-plan-{plan_id}.json"
+    )
+    if not path.exists():
+        raise ValueError("migration plan not found")
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("invalid migration plan") from exc
+    if not isinstance(loaded, dict):
+        raise ValueError("invalid migration plan")
+    stored_plan_id = str(loaded.get("plan_id", ""))
+    recomputed = compute_migration_plan_id(loaded)
+    if stored_plan_id != plan_id or recomputed != plan_id:
+        raise ValueError("invalid migration plan")
+    return loaded
 
 
 def validate_plan_matches_request(
@@ -214,11 +244,26 @@ def validate_plan_matches_request(
     *,
     current_preview: dict | None = None,
 ) -> None:
-    raise NotImplementedError("Task 3 implements apply gate validation")
+    """Ensure a loaded migration plan matches the current apply request."""
+    if preview.get("input") != str(Path(input_dir).resolve()):
+        raise ValueError("stale or mismatched migration plan")
+    if preview.get("vault") != str(Path(vault_dir).resolve()):
+        raise ValueError("stale or mismatched migration plan")
+    if preview.get("repo_identity") != repo_identity:
+        raise ValueError("stale or mismatched migration plan")
+    plan_id = str(preview.get("plan_id", ""))
+    if compute_migration_plan_id(preview) != plan_id:
+        raise ValueError("stale or mismatched migration plan")
+    if current_preview is not None and plan_id != current_preview.get("plan_id"):
+        raise ValueError("stale or mismatched migration plan")
 
 
 def filter_applicable_actions(preview: dict) -> list[dict]:
-    raise NotImplementedError("Task 3 implements apply action filtering")
+    """Return only action rows that an apply step may write."""
+    return [
+        dict(row) for row in preview.get("actions", [])
+        if row.get("action") in {"CREATE", "UPDATE", "REPLACE"}
+    ]
 
 
 def _has_graphify_fingerprint(text: str) -> bool:
@@ -380,3 +425,24 @@ def _normalize_legacy_mappings(mappings: list[dict]) -> list[dict]:
         [dict(row) for row in mappings],
         key=lambda row: (row.get("old_path", ""), row.get("new_path", "")),
     )
+
+
+def _validate_plan_id(plan_id: str) -> None:
+    if (
+        not plan_id
+        or "/" in plan_id
+        or "\\" in plan_id
+        or ".." in plan_id
+        or _PLAN_ID_RE.match(plan_id) is None
+    ):
+        raise ValueError("invalid migration plan")
+
+
+def _write_atomic_text(target: Path, content: str) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(content)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, target)
