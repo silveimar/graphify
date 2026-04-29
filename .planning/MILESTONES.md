@@ -1,5 +1,39 @@
 # Milestones
 
+## v1.8 Output Taxonomy & Cluster Quality (Shipped: 2026-04-29)
+
+**Phases completed:** 7 phases, 25 plans, 55 tasks
+
+**Known deferred items at close:** 5 (see `STATE.md` — Deferred Items, milestone close acknowledgment)
+
+**Key accomplishments:**
+
+- v1.8 planning docs now use the canonical taxonomy and community-size contract that downstream Phase 32-36 executors must follow.
+- v1.8 profile defaults now resolve Obsidian note folders under `Atlas/Sources/Graphify/`, validate taxonomy and `mapping.min_community_size`, and warn on deprecated community overview output.
+- Taxonomy-resolved mapping contexts now route Obsidian notes under the Graphify subtree with canonical `mapping.min_community_size` community behavior.
+- Doctor diagnostics now surface the same v1.8 profile preflight errors and warnings as direct profile validation, with warning-only community overview guidance kept nonfatal.
+- Red pytest contract suite for cached concept names, deterministic fallbacks, repo identity precedence, MOC naming sinks, and CLI `--repo-identity` parsing
+- Stdlib repo identity resolver plus vault profile schema for repo.identity and bounded concept naming controls
+- Cache-backed concept MOC names with deterministic fallbacks, provenance sidecar records, and unsafe LLM title rejection
+- Repo identity and concept naming now flow through CLI and Obsidian export, with durable sidecar provenance and sanitized generated MOC titles
+- CODE note contracts with default cluster floor 6 and built-in safe template rendering
+- Deterministic cluster routing metadata with CODE-only god-node classification and capped CODE member rollups
+- Repo-aware CODE note filenames with deterministic collision provenance and MOC-only community export dispatch
+- CODE notes and concept MOCs now link bidirectionally using final rendered concept labels and safe template sinks
+- Concept MOCs now link to generated CODE notes using exact collision-safe filename stems while preserving sanitized display aliases
+- Review-first Obsidian migration previews with deterministic plan IDs, durable artifacts, legacy ORPHAN visibility, and non-destructive apply filtering
+- Resolved repo identity now appears consistently in CODE note filenames, frontmatter, tags, and vault manifests
+- Preview-first raw corpus to Obsidian vault updates with reviewed plan-id apply gates and repo-drift conflict visibility
+- Reviewed `update-vault --apply --plan-id` now archives legacy Obsidian notes under plan-scoped `graphify-out/migrations/archive/` paths with rollback metadata and helper/CLI regression coverage.
+- Generic-first v1.8 migration guide with README and CLI help aligned around preview-first `update-vault`, reviewed apply, archive evidence, and rollback.
+- Packaged graphify skill variants now share one tested v1.8 Obsidian contract for MOC-only output, preview-first `update-vault`, backup-before-apply, archive evidence, and no destructive deletion.
+- Executable sanitizer coverage and final security validation for v1.8 Obsidian migration readiness.
+- Install-time Claude/AGENTS guidance now matches the v1.8 Obsidian navigation contract and is covered by regression tests.
+- Phase 34 validation metadata was ratified into a Nyquist-discoverable, evidence-aligned state without changing shipped runtime behavior.
+- v1.8 milestone audit metadata debt was closed and Phase 37 planning/validation tracking was ratified for deterministic closeout automation.
+
+---
+
 ## v1.7 Vault Adapter UX & Template Polish (Shipped: 2026-04-28)
 
 **Phases completed:** 5 phases (27–31), 14 plans

@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
-status: executing
+status: completed
 stopped_at: Completed 38-02-PLAN.md
-last_updated: "2026-04-29T13:49:32.985Z"
-last_activity: 2026-04-29 -- Phase 38 execution complete
+last_updated: "2026-04-29T16:30:29.831Z"
+last_activity: 2026-04-29
 progress:
   total_phases: 7
   completed_phases: 7
@@ -18,19 +18,19 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
+See: .planning/PROJECT.md (updated 2026-04-29 after v1.8 ship)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
-**Current focus:** Phase 38 — Dormant seed and quick-task reconciliation
+**Current focus:** Planning the next milestone (`/gsd-new-milestone`)
 
 ## Current Position
 
-Phase: 38
-Plan: 38.1 complete, 38.2 complete
-Status: Complete
-Last activity: 2026-04-29 -- Phase 38 execution complete
+Milestone: v1.8 shipped (2026-04-29)
+Phase: —
+Status: Milestone complete — awaiting next roadmap
+Last activity: 2026-04-29 — v1.8 archived; REQUIREMENTS reset pending
 
-Progress: [██████████] 100%
+Progress: [██████████] 100% (v1.8)
 
 ## Performance Metrics
 
@@ -160,8 +160,20 @@ Items carried forward outside v1.8 scope:
 | vault-selection | Explicit `--vault` flag and multi-vault selector | Future milestone |
 | baseline-test | `test_detect_skips_dotfiles`, `test_collect_files_from_dir` | Separate `/gsd-debug` session |
 
+### Milestone close acknowledgment (v1.8, 2026-04-29)
+
+Open artifact audit items acknowledged at ship; no runtime blockers:
+
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 260427-rc7-fix-detect-self-ingestion | missing — track via backlog or `/gsd-debug` |
+| seed | SEED-001 tacit-knowledge-elicitation-engine | dormant |
+| seed | SEED-002 harness-memory-export | dormant |
+| seed | SEED-bidirectional-concept-code-links | dormant |
+| seed | SEED-vault-root-aware-cli | dormant |
+
 ## Session Continuity
 
-Last session: 2026-04-29T13:49:32.981Z
-Stopped at: Completed 38-02-PLAN.md
-Next action: `/gsd-complete-milestone`
+Last session: 2026-04-29 (milestone complete)
+Stopped at: v1.8 archived
+Next action: `/gsd-new-milestone`

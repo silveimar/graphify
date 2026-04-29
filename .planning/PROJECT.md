@@ -8,18 +8,13 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: v1.8 Output Taxonomy & Cluster Quality
+## Shipped: v1.8 Output Taxonomy & Cluster Quality (2026-04-29)
 
-**Goal:** Make graphify's vault output legible at a glance and give the real `work-vault` → `ls-vault` workflow a safe, step-by-step migration path.
+Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community output, `mapping.min_community_size` cluster floor, concept naming with cache and fallbacks, repo identity resolution, CODE vs concept note classes, preview-first `update-vault` migration, platform skill alignment, Nyquist validation metadata ratification, and Phase 38 docs-only dormant-seed/quick-task reconciliation. Full detail: `.planning/milestones/v1.8-ROADMAP.md`.
 
-**Target features:**
-- Restructure the built-in/default vault output layout under Graphify-owned folders.
-- Deprecate legacy `_COMMUNITY_*` overview notes in favor of MOC-only community output.
-- Add a configurable cluster-quality floor for isolates and tiny connected clusters.
-- Add hybrid concept naming with deterministic cached fallbacks.
-- Split god-node output into code-derived `CODE_...` notes and concept MOCs with bidirectional links.
-- Add layered repo identity via CLI flag, profile key, then auto-derived fallback.
-- Add a Markdown migration/update guide for safely updating the real `work-vault` → `ls-vault` usage.
+## Next milestone
+
+Not defined yet. Run `/gsd-new-milestone` to gather goals, requirements, and roadmap for v1.9 (or the next version label you choose).
 
 ---
 
@@ -117,6 +112,16 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 - ✓ Excalidraw Skill & Vault Bridge — deployable `excalidraw-diagram` skill orchestrates seeds → Excalidraw → vault pipeline with pure-Python `graphify/excalidraw.py` fallback (`write_diagram`, `layout_for`, `SCENE_JSON_SKELETON`), `graphify install excalidraw` unified dispatcher, `_PLATFORM_CONFIG` 12-key entry — SKILL-01..06
 - ✓ End-to-end flow verified: `vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → skill invocation. All 7 cross-phase wires confirmed by `gsd-integration-checker`. Nyquist compliance: all 4 phases formally signed off.
 
+**v1.8 — Output Taxonomy & Cluster Quality:** *(Shipped 2026-04-29, phases 32–38; 33/33 requirements; milestone audit passed)*
+
+- ✓ Graphify-owned default taxonomy and validation (`taxonomy:`, `mapping.min_community_size`; `mapping.moc_threshold` invalid) — TAX/COMM/CLUST
+- ✓ MOC-only community output; legacy `_COMMUNITY_*` migration visibility — COMM/MIG
+- ✓ Repo identity resolution and cached concept naming with sanitization — NAME/REPO
+- ✓ CODE note class vs concept MOCs; collision-safe filenames; bidirectional links — GOD
+- ✓ Preview-first migration/update vault, manifests, non-destructive apply — MIG/VER
+- ✓ Docs, skill variants, sanitizer matrix, install guidance regression tests — VER
+- ✓ Phase 38 planning reconciliation for dormant seeds and quick-task lifecycle (docs-only) — P38-SCOPE
+
 **v1.6 — Hardening & Onboarding:** *(Shipped 2026-04-27, phases 23 + 24 + 25 + 26; 15/15 requirements)*
 - ✓ Dedup `source_file` list-handling fix — `dedup.py` edge-merge delegates list-shape handling to `analyze._iter_sources`; cross-type regression test green (Issue #4) — DEDUP-01..03
 - ✓ Manifest writer hardening — `RoutingAudit.flush` + `write_manifest_atomic` perform read-merge-write keyed by row identity (path/tool name) before atomic `.tmp` + `os.replace`; subpath isolation regression tests assert sibling rows preserved; AUDIT.md enumerates all 5 on-disk writers with PATCHED/LOCKED/DEFERRED dispositions — MANIFEST-09..12
@@ -125,15 +130,7 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 ### Active
 
-**v1.8 — Output Taxonomy & Cluster Quality:** *(scope being defined via `/gsd-new-milestone`)*
-
-- [ ] Built-in/default vault output layout moves generated notes under Graphify-owned folders.
-- [ ] Legacy `_COMMUNITY_*` overview notes are deprecated in favor of a single MOC community shape.
-- [ ] Community note generation applies a configurable cluster-quality floor for isolates and tiny clusters.
-- [ ] Concept MOCs use stable human-readable names via LLM naming with deterministic fallbacks.
-- [ ] Code-derived god nodes and concept MOCs use distinct note classes with bidirectional links.
-- [ ] Repo identity is configurable and propagated into code-note naming, tags, and manifests.
-- [ ] A migration/update guide documents the real `work-vault` → `ls-vault` workflow step by step.
+No active milestone requirements until `/gsd-new-milestone` locks the next version.
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -249,15 +246,17 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Codebase at v1.6 close:** Python 3.10/3.12. v1.6 added +3,159 / −65 LOC across 27 files (16 commits, single-day milestone 2026-04-27). Full test suite still green at 1,524+ passing (excluding 2 pre-existing baseline failures inherited from base 24810ec).
 
+**Shipped v1.8** (2026-04-29) — Output taxonomy, cluster-quality floor, naming/repo identity, CODE notes, migration/update vault path, skill and regression alignment. 7 phases (32–38), 25 plans, 33/33 requirements. Archives under `.planning/milestones/v1.8-*`.
+
 ## Next Milestone Goals
 
-v1.8 scoped 2026-04-28 as **Output Taxonomy & Cluster Quality** (see Current Milestone above).
+Define v1.9+ via `/gsd-new-milestone` (requirements, roadmap, phase numbering).
 
-Backlog beyond v1.8:
+Backlog candidates:
 - Onboarding & Tacit-to-Explicit (SEED-001 trigger conditions met when discovery becomes a primary theme)
 - Multi-harness memory expansion + prompt-injection defenses (SEED-002 follow-on)
 - Remaining vault-root-aware CLI surface: explicit `--vault` flag and multi-vault selector
 - 2 pre-existing baseline test failures (`test_detect_skips_dotfiles`, `test_collect_files_from_dir`) — separate `/gsd-debug` session
 
 ---
-*Last updated: 2026-04-28 — v1.8 Output Taxonomy & Cluster Quality scoped*
+*Last updated: 2026-04-29 — v1.8 Output Taxonomy & Cluster Quality shipped*
