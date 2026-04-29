@@ -1246,6 +1246,7 @@ def main() -> None:
         print("    --router                use heterogeneous extraction router")
         print("    --verbose               print all migration rows")
         print("    --apply --plan-id <id>  apply a reviewed migration plan artifact")
+        print("                            apply output includes Archived legacy notes under graphify-out/migrations/archive/")
         print("  enrich                 run background derivation passes over an existing graph (overlay only)")
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
         print("    --budget N              token budget cap (description → patterns → community; staleness compute-only)")

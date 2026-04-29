@@ -246,12 +246,23 @@ def run_update_vault(
             manifest_path=manifest_path,
             old_manifest=manifest,
         )
+        archived_legacy_notes: list[dict] = []
+        if not result.failed:
+            archived_legacy_notes = archive_legacy_notes(
+                loaded,
+                vault,
+                resolved.artifacts_dir,
+                str(plan_id),
+            )
+            loaded = dict(loaded)
+            loaded["archived_legacy_notes"] = archived_legacy_notes
         return {
             "preview": loaded,
             "json_path": resolved.artifacts_dir / MIGRATION_ARTIFACT_DIR / f"migration-plan-{plan_id}.json",
             "markdown_path": resolved.artifacts_dir / MIGRATION_ARTIFACT_DIR / f"migration-plan-{plan_id}.md",
             "applied": True,
             "result": result,
+            "archived_legacy_notes": archived_legacy_notes,
             "repo_identity": resolved_repo.identity,
         }
 
@@ -309,6 +320,16 @@ def format_migration_preview(
                 f"  {mapping['old_path']} -> {mapping['new_path']} "
                 f"({mapping['identity_source']}, {mapping['legacy_action']} beside "
                 f"{mapping['canonical_action']})"
+            )
+        lines.append("")
+
+    archived = preview.get("archived_legacy_notes") or []
+    if archived:
+        lines.append(f"Archived legacy notes ({len(archived)})")
+        for row in archived:
+            lines.append(
+                f"  {row['relative_path']} -> "
+                f"{_archive_display_path(preview.get('plan_id', ''), row['relative_path'])}"
             )
         lines.append("")
 
@@ -490,6 +511,10 @@ def _archive_destination(archive_root: Path, relative_path: str) -> Path:
     except ValueError as exc:
         raise ValueError(f"archive path would escape archive root: {relative_path}") from exc
     return destination
+
+
+def _archive_display_path(plan_id: str, relative_path: str) -> str:
+    return f"graphify-out/{MIGRATION_ARCHIVE_ARTIFACT_DIR}/{plan_id}/{relative_path}"
 
 
 def _legacy_identity(
