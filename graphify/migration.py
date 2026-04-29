@@ -9,7 +9,7 @@ import os
 import re
 from pathlib import Path
 
-from graphify.merge import MergeAction, MergePlan, split_rendered_note
+from graphify.merge import MergeAction, MergePlan, apply_merge_plan, split_rendered_note
 from graphify.profile import validate_vault_path
 
 
@@ -200,16 +200,16 @@ def run_update_vault(
     )
     G = build([extraction])
     communities = cluster(G)
-    plan = to_obsidian(
+    render_context = to_obsidian(
         G,
         communities,
         str(resolved.notes_dir),
         profile=profile,
         repo_identity=resolved_repo.identity,
         dry_run=True,
+        return_render_context=True,
     )
-    manifest_path = resolved.artifacts_dir / "vault-manifest.json"
-    manifest = _load_manifest(manifest_path)
+    plan, rendered_notes, render_profile, manifest_path, manifest = render_context
     preview = build_migration_preview(
         plan,
         input_dir=raw,
@@ -222,18 +222,31 @@ def run_update_vault(
 
     if apply:
         loaded = load_migration_plan(resolved.artifacts_dir, str(plan_id))
-        validate_plan_matches_request(
-            loaded,
-            raw,
-            vault,
-            resolved_repo.identity,
-            current_preview=preview,
+        try:
+            validate_plan_matches_request(
+                loaded,
+                raw,
+                vault,
+                resolved_repo.identity,
+                current_preview=preview,
+            )
+        except ValueError as exc:
+            raise ValueError(f"stale or mismatched migration plan: {exc}") from exc
+        applicable_plan = _merge_plan_from_preview(loaded, vault)
+        result = apply_merge_plan(
+            applicable_plan,
+            resolved.notes_dir,
+            rendered_notes,
+            render_profile,
+            manifest_path=manifest_path,
+            old_manifest=manifest,
         )
         return {
             "preview": loaded,
             "json_path": resolved.artifacts_dir / MIGRATION_ARTIFACT_DIR / f"migration-plan-{plan_id}.json",
             "markdown_path": resolved.artifacts_dir / MIGRATION_ARTIFACT_DIR / f"migration-plan-{plan_id}.md",
-            "applied": False,
+            "applied": True,
+            "result": result,
             "repo_identity": resolved_repo.identity,
         }
 
@@ -365,6 +378,26 @@ def filter_applicable_actions(preview: dict) -> list[dict]:
         dict(row) for row in preview.get("actions", [])
         if row.get("action") in {"CREATE", "UPDATE", "REPLACE"}
     ]
+
+
+def _merge_plan_from_preview(preview: dict, vault: Path) -> MergePlan:
+    actions = [_row_to_action(row, vault) for row in filter_applicable_actions(preview)]
+    summary = _summary_for([_action_to_row(action, Path(vault).resolve(), review_only=False) for action in actions])
+    return MergePlan(actions=actions, orphans=[], summary=summary)
+
+
+def _row_to_action(row: dict, vault: Path) -> MergeAction:
+    return MergeAction(
+        path=validate_vault_path(str(row.get("path", "")), Path(vault).resolve()),
+        action=row["action"],
+        reason=str(row.get("reason") or "validated migration plan action"),
+        changed_fields=list(row.get("changed_fields") or []),
+        changed_blocks=list(row.get("changed_blocks") or []),
+        conflict_kind=row.get("conflict_kind"),
+        user_modified=bool(row.get("user_modified")),
+        has_user_blocks=bool(row.get("has_user_blocks")),
+        source=str(row.get("source") or "graphify"),
+    )
 
 
 def _has_graphify_fingerprint(text: str) -> bool:

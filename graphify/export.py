@@ -557,7 +557,8 @@ def to_obsidian(
     dry_run: bool = False,
     force: bool = False,
     obsidian_dedup: bool = False,
-) -> "MergeResult | MergePlan":
+    return_render_context: bool = False,
+) -> "MergeResult | MergePlan | tuple":
     """Export graph as an Obsidian vault using the profile-driven pipeline.
 
     Runs: load_profile → classify → render_all → compute_merge_plan → apply_merge_plan.
@@ -831,6 +832,8 @@ def to_obsidian(
         force=force,
     )
     if dry_run:
+        if return_render_context:
+            return plan, rendered_notes, profile, manifest_path, manifest
         return plan
     return apply_merge_plan(
         plan, out, rendered_notes, profile,

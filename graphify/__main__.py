@@ -1240,6 +1240,12 @@ def main() -> None:
         print("    --delta                also generate GRAPH_DELTA.md comparing against previous snapshot")
         print("  doctor                  diagnose vault/profile/output configuration (VAULT-14/15)")
         print("    --dry-run               preview which files would be ingested/skipped, no writes")
+        print("  update-vault --input work-vault/raw --vault ls-vault")
+        print("                            preview/apply raw corpus updates into an Obsidian vault")
+        print("    --repo-identity <slug>  override profile/fallback repo identity")
+        print("    --router                use heterogeneous extraction router")
+        print("    --verbose               print all migration rows")
+        print("    --apply --plan-id <id>  apply a reviewed migration plan artifact")
         print("  enrich                 run background derivation passes over an existing graph (overlay only)")
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
         print("    --budget N              token budget cap (description → patterns → community; staleness compute-only)")
@@ -2414,6 +2420,46 @@ def main() -> None:
         report = run_doctor(Path.cwd(), dry_run=opts.dry_run)
         print(format_report(report))
         sys.exit(1 if report.is_misconfigured() else 0)
+    elif cmd == "update-vault":
+        # graphify update-vault --input work-vault/raw --vault ls-vault
+        import argparse as _ap
+
+        _p_uv = _ap.ArgumentParser(
+            prog="graphify update-vault",
+            description=(
+                "Preview or apply graphify updates with: "
+                "graphify update-vault --input work-vault/raw --vault ls-vault"
+            ),
+            epilog="Example: graphify update-vault --input work-vault/raw --vault ls-vault",
+            formatter_class=_ap.RawDescriptionHelpFormatter,
+        )
+        _p_uv.add_argument("--input", required=True, help="Raw corpus input path")
+        _p_uv.add_argument("--" "vault", required=True, help="Target Obsidian vault path")
+        _p_uv.add_argument("--repo-identity", default=None, help="Override repo identity")
+        _p_uv.add_argument("--router", action="store_true", help="Use heterogeneous extraction routing")
+        _p_uv.add_argument("--verbose", action="store_true", help="Print all migration rows")
+        _p_uv.add_argument("--apply", action="store_true", help="Apply a reviewed migration plan")
+        _p_uv.add_argument("--plan-id", default=None, help="Plan id from a preview artifact")
+        opts = _p_uv.parse_args(sys.argv[2:])
+        if opts.apply and not opts.plan_id:
+            print("error: --apply requires --plan-id from a preview artifact", file=sys.stderr)
+            sys.exit(2)
+        from graphify.migration import format_migration_preview, run_update_vault
+        try:
+            result = run_update_vault(
+                input_dir=Path(opts.input),
+                vault_dir=Path(opts.vault),
+                repo_identity=opts.repo_identity,
+                apply=opts.apply,
+                plan_id=opts.plan_id,
+                use_router=opts.router,
+                verbose=opts.verbose,
+            )
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        print(format_migration_preview(result["preview"], verbose=opts.verbose))
+        sys.exit(0)
     elif cmd == "vault-promote":
         # graphify vault-promote --vault PATH [--threshold N] [--graph PATH]
         import argparse as _ap
