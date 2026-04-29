@@ -337,6 +337,32 @@ def _make_doctor_vault(tmp_path: Path, *, profile_text: str | None) -> Path:
     return vault
 
 
+def _make_update_vault_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    raw = tmp_path / "work-vault" / "raw"
+    raw.mkdir(parents=True)
+    (raw / "alpha.py").write_text(
+        "class Alpha:\n"
+        "    def compute(self):\n"
+        "        return 1\n",
+        encoding="utf-8",
+    )
+
+    vault = tmp_path / "ls-vault"
+    vault.mkdir()
+    (vault / ".obsidian").mkdir()
+    (vault / ".graphify").mkdir()
+    (vault / ".graphify" / "profile.yaml").write_text(
+        _V18_PROFILE_BASE +
+        "repo:\n"
+        "  identity: graphify\n"
+        "output:\n"
+        "  mode: vault-relative\n"
+        "  path: Atlas/Sources/Graphify\n",
+        encoding="utf-8",
+    )
+    return raw, vault
+
+
 def test_doctor_clean_exit_zero(tmp_path):
     pytest.importorskip("yaml")
     vault = _make_doctor_vault(tmp_path, profile_text=_DOCTOR_VALID_PROFILE)
@@ -396,3 +422,46 @@ def test_doctor_in_help(tmp_path):
     result = _graphify(["--help"], cwd=tmp_path)
     assert "doctor" in result.stdout
     assert "--dry-run" in result.stdout
+
+
+def test_update_vault_preview_default_runs_pipeline(tmp_path):
+    pytest.importorskip("yaml")
+    raw, vault = _make_update_vault_fixture(tmp_path)
+
+    result = _graphify(
+        ["update-vault", "--input", str(raw), "--vault", str(vault)],
+        cwd=tmp_path,
+    )
+
+    assert result.returncode == 0, (
+        f"expected preview exit 0; got {result.returncode}\n"
+        f"stdout={result.stdout}\nstderr={result.stderr}"
+    )
+    assert "Migration Preview - repo: graphify" in result.stdout
+    artifacts = tmp_path / "graphify-out" / "migrations"
+    assert len(list(artifacts.glob("migration-plan-*.json"))) == 1
+    assert len(list(artifacts.glob("migration-plan-*.md"))) == 1
+    vault_markdown = [
+        p for p in vault.rglob("*.md")
+        if ".graphify" not in p.relative_to(vault).parts
+    ]
+    assert vault_markdown == []
+
+
+def test_update_vault_apply_without_plan_id_exits_two(tmp_path):
+    raw, vault = _make_update_vault_fixture(tmp_path)
+
+    result = _graphify(
+        ["update-vault", "--input", str(raw), "--vault", str(vault), "--apply"],
+        cwd=tmp_path,
+    )
+
+    assert result.returncode == 2
+    assert "error: --apply requires --plan-id from a preview artifact" in result.stderr
+
+
+def test_update_vault_help_lists_command_shape(tmp_path):
+    result = _graphify(["update-vault", "--help"], cwd=tmp_path)
+
+    assert result.returncode == 0
+    assert "graphify update-vault --input work-vault/raw --vault ls-vault" in result.stdout

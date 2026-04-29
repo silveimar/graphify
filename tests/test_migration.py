@@ -67,6 +67,42 @@ def _manifest_for_community(legacy: Path, vault: Path) -> dict[str, dict]:
     }
 
 
+def _make_update_vault_fixture(tmp_path: Path, *, raw_name: str = "raw") -> tuple[Path, Path]:
+    raw = tmp_path / "work-vault" / raw_name
+    raw.mkdir(parents=True)
+    (raw / "alpha.py").write_text(
+        "class Alpha:\n"
+        "    def compute(self):\n"
+        "        return 1\n",
+        encoding="utf-8",
+    )
+
+    vault = _make_vault(tmp_path)
+    (vault / ".graphify").mkdir()
+    (vault / ".graphify" / "profile.yaml").write_text(
+        "taxonomy:\n"
+        "  version: v1.8\n"
+        "  root: Atlas/Sources/Graphify\n"
+        "  folders:\n"
+        "    moc: MOCs\n"
+        "    thing: Things\n"
+        "    statement: Statements\n"
+        "    person: People\n"
+        "    source: Sources\n"
+        "    default: Things\n"
+        "    unclassified: MOCs\n"
+        "mapping:\n"
+        "  min_community_size: 1\n"
+        "repo:\n"
+        "  identity: graphify\n"
+        "output:\n"
+        "  mode: vault-relative\n"
+        "  path: Atlas/Sources/Graphify\n",
+        encoding="utf-8",
+    )
+    return raw, vault
+
+
 def test_legacy_community_files_surface_as_orphans(tmp_path):
     """D-06/D-08/COMM-02: unmatched _COMMUNITY_* files surface as review-only ORPHAN rows."""
     from graphify.merge import MergePlan
@@ -233,3 +269,82 @@ def test_apply_never_deletes_legacy_orphan_files(tmp_path):
 
     assert create_target in result.succeeded
     assert legacy.exists(), "MIG-06 legacy _COMMUNITY_* files must never be deleted or moved"
+
+
+def test_update_vault_rejects_stale_plan_id(tmp_path):
+    """D-14/MIG-01/MIG-04: apply validates the reviewed plan against the current preview before writes."""
+    from graphify.migration import run_update_vault
+
+    raw, vault = _make_update_vault_fixture(tmp_path)
+    preview_result = run_update_vault(input_dir=raw, vault_dir=vault)
+    plan_id = preview_result["preview"]["plan_id"]
+    stale_raw = tmp_path / "work-vault" / "stale-raw"
+    stale_raw.mkdir(parents=True)
+    (stale_raw / "beta.py").write_text("def beta():\n    return 2\n", encoding="utf-8")
+
+    before_vault_files = {p.relative_to(vault).as_posix() for p in vault.rglob("*") if p.is_file()}
+    try:
+        run_update_vault(
+            input_dir=stale_raw,
+            vault_dir=vault,
+            apply=True,
+            plan_id=plan_id,
+        )
+    except ValueError as exc:
+        assert "stale or mismatched migration plan" in str(exc)
+    else:
+        raise AssertionError("stale migration plan should be rejected")
+    after_vault_files = {p.relative_to(vault).as_posix() for p in vault.rglob("*") if p.is_file()}
+    assert after_vault_files == before_vault_files
+
+
+def test_repo_identity_drift_becomes_skip_conflict(tmp_path):
+    """D-18/REPO-04: concrete existing repo drift is visible as SKIP_CONFLICT evidence."""
+    from graphify.merge import MergeAction, MergePlan
+    from graphify.migration import build_migration_preview
+
+    vault = _make_vault(tmp_path)
+    target = vault / "Atlas" / "Sources" / "Graphify" / "CODE_graphify_alpha.md"
+    target.write_text(
+        "---\n"
+        "graphify_managed: true\n"
+        "type: code\n"
+        "repo: other-repo\n"
+        "---\n"
+        "# Alpha\n",
+        encoding="utf-8",
+    )
+    rel = target.relative_to(vault).as_posix()
+    manifest = {
+        rel: {
+            "content_hash": "stale",
+            "target_path": rel,
+            "node_id": "alpha",
+            "note_type": "code",
+            "repo_identity": "other-repo",
+        }
+    }
+    plan = MergePlan(
+        actions=[MergeAction(path=target, action="UPDATE", reason="update")],
+        orphans=[],
+        summary={"UPDATE": 1},
+    )
+
+    preview = build_migration_preview(
+        plan,
+        input_dir=tmp_path / "work-vault" / "raw",
+        vault_dir=vault,
+        artifacts_dir=tmp_path / "graphify-out",
+        repo_identity="graphify",
+        manifest=manifest,
+    )
+
+    drift_rows = [
+        row for row in preview["actions"]
+        if row["path"] == rel and row["action"] == "SKIP_CONFLICT"
+    ]
+    assert len(drift_rows) == 1
+    assert drift_rows[0]["conflict_kind"] == "repo_identity_drift"
+    assert drift_rows[0]["existing_repo_identity"] == "other-repo"
+    assert drift_rows[0]["repo_identity"] == "graphify"
+    assert "repo_identity_drift" in json.dumps(preview, sort_keys=True)
