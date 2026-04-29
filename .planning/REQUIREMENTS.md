@@ -47,7 +47,7 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 - [x] **REPO-01**: User can provide repo identity through a CLI flag with highest precedence.
 - [x] **REPO-02**: User can provide repo identity through `profile.yaml` when no CLI override is supplied.
 - [x] **REPO-03**: User gets a deterministic auto-derived repo identity from git remote or current working directory when no explicit identity exists.
-- [ ] **REPO-04**: User sees the resolved repo identity recorded consistently in CODE note filenames, frontmatter, tags, and output manifests.
+- [x] **REPO-04**: User sees the resolved repo identity recorded consistently in CODE note filenames, frontmatter, tags, and output manifests.
 
 ### Migration and Rollout
 
@@ -124,7 +124,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REPO-01 | Phase 33 | Complete |
 | REPO-02 | Phase 33 | Complete |
 | REPO-03 | Phase 33 | Complete |
-| REPO-04 | Phase 35 | Pending |
+| REPO-04 | Phase 35 | Complete |
 | MIG-01 | Phase 35 | Pending |
 | MIG-02 | Phase 35 | Complete |
 | MIG-03 | Phase 35 | Complete |
