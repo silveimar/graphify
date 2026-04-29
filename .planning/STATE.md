@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: completed
-stopped_at: Completed 38-02-PLAN.md
-last_updated: "2026-04-29T16:30:29.831Z"
-last_activity: 2026-04-29
+stopped_at: v1.8 archived
+last_updated: "2026-04-29T16:51:40.037Z"
+last_activity: 2026-04-29 — v1.8 archived; REQUIREMENTS reset pending
 progress:
   total_phases: 7
   completed_phases: 7
@@ -174,6 +174,6 @@ Open artifact audit items acknowledged at ship; no runtime blockers:
 
 ## Session Continuity
 
-Last session: 2026-04-29 (milestone complete)
+Last session: 2026-04-29T16:51:40.023Z
 Stopped at: v1.8 archived
 Next action: `/gsd-new-milestone`
