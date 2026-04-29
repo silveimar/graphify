@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
-status: executing
-stopped_at: Completed 36-03-PLAN.md
-last_updated: "2026-04-29T07:55:16.833Z"
+status: verifying
+stopped_at: Completed 36-04-PLAN.md
+last_updated: "2026-04-29T08:09:22.381Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 20
-  completed_plans: 19
-  percent: 95
+  completed_plans: 20
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 
 ## Current Position
 
-Phase: 36 (Migration Guide, Skill Alignment & Regression Sweep) — EXECUTING
+Phase: 36 (Migration Guide, Skill Alignment & Regression Sweep) — VERIFYING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-29
 
-Progress: [██████████] 95%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [██████████] 95%
 | Phase 36 P01 | 13min | 3 tasks | 4 files |
 | Phase 36 P02 | 7min | 2 tasks | 5 files |
 | Phase 36 P03 | 6min | 2 tasks | 10 files |
+| Phase 36 P04 | 9min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -121,6 +122,8 @@ Locked v1.8 choices:
 - [Phase 36]: Skill contract drift is guarded with exact required phrases and targeted forbidden stale-claim phrases rather than full-file snapshots.
 - [Phase 36]: The shared skill wording distinguishes lower-level --obsidian export from reviewed preview-first update-vault existing-vault migration/update.
 - [Phase 36]: Legacy _COMMUNITY_* wording remains allowed only when describing reviewed legacy archive behavior, not generated v1.8 output.
+- [Phase 36]: [Phase 36 Plan 04]: The sanitizer matrix imports private sink helpers intentionally where the private helper is the security boundary under test. — Private sink helpers are the exact security boundaries carrying VER-03 invariants.
+- [Phase 36]: [Phase 36 Plan 04]: Phase 36 final validation records actual focused and full pytest outputs; known baseline failures did not reproduce. — Milestone audit needs executed evidence rather than planned command claims.
 
 ### Pending Todos
 
@@ -147,6 +150,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T07:55:16.830Z
-Stopped at: Completed 36-03-PLAN.md
+Last session: 2026-04-29T08:09:22.378Z
+Stopped at: Completed 36-04-PLAN.md
 Next action: `/gsd-execute-phase 36`

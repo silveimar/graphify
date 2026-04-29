@@ -256,7 +256,7 @@ Plans:
 - [x] **Phase 33: Naming & Repo Identity Helpers** - Resolve stable concept names and repo identities before rendering or manifest writes depend on them. (completed 2026-04-29)
 - [x] **Phase 34: Mapping, Cluster Quality & Note Classes** - Apply MOC-only community semantics, the cluster-quality floor, and CODE-vs-concept note classes. (completed 2026-04-29)
 - [x] **Phase 35: Templates, Export Plumbing & Dry-Run/Migration Visibility** - Render the new taxonomy, expose repo identity in outputs, and make migration effects previewable. (completed 2026-04-29)
-- [ ] **Phase 36: Migration Guide, Skill Alignment & Regression Sweep** - Document the real vault migration path and verify CLI, skill, security, and tests stay aligned.
+- [x] **Phase 36: Migration Guide, Skill Alignment & Regression Sweep** - Document the real vault migration path and verify CLI, skill, security, and tests stay aligned. (completed 2026-04-29)
 
 ## Phase Details
 
@@ -333,7 +333,7 @@ Plans:
   2. Maintainer can confirm skill files and CLI docs use the same v1.8 Obsidian export behavior
   3. Maintainer can verify v1.8 behavior with pure unit tests that use `tmp_path` and perform no network calls
   4. Maintainer can confirm all new path, template, profile, LLM-label, and repo-identity inputs pass through existing security and sanitization helpers
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 Plans:
 **Wave 1**
 - [x] 36-01-PLAN.md — Archive-by-default migration apply helpers, CLI evidence, and tmp_path tests
@@ -343,7 +343,7 @@ Plans:
 - [x] 36-03-PLAN.md — Platform skill variant v1.8 wording and drift tests
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 36-04-PLAN.md — Sanitizer coverage matrix and final regression/security evidence
+- [x] 36-04-PLAN.md — Sanitizer coverage matrix and final regression/security evidence
 
 ---
 
@@ -393,7 +393,7 @@ Plans:
 | 33. Naming & Repo Identity Helpers | v1.8 | 4/4 | Complete    | 2026-04-29 |
 | 34. Mapping, Cluster Quality & Note Classes | v1.8 | 5/5 | Complete   | 2026-04-29 |
 | 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 3/3 | Complete    | 2026-04-29 |
-| 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 3/4 | In Progress|  |
+| 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 4/4 | Complete   | 2026-04-29 |
 
 ---
 *Last updated: 2026-04-28 — v1.8 Output Taxonomy & Cluster Quality planned: 5 phases (32–36), 33/33 requirements mapped, standard granularity.*
