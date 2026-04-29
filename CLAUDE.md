@@ -14,6 +14,15 @@ pytest tests/test_extract.py::test_name -q  # run a single test
 graphify --help                   # verify CLI works
 ```
 
+**Package version** (`pyproject.toml`, PyPI name `graphifyy`): the CLI resolves it via `importlib.metadata`. After a shipped milestone (or any PyPI-facing release), bump, reinstall, sync MCP `server.json` (manifest hash includes `graphify_version`), then test:
+
+```bash
+python scripts/bump_version.py 1.1.0   # example next minor
+pip install -e ".[mcp,pdf,watch]"
+python scripts/sync_mcp_server_json.py
+pytest tests/ -q
+```
+
 No linter or formatter is configured. CI runs pytest on Python 3.10 and 3.12.
 
 ## Architecture

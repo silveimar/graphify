@@ -2,6 +2,11 @@
 
 Full release notes with details on each version: [GitHub Releases](https://github.com/safishamsi/graphify/releases)
 
+## 1.0.0 (2026-04-29)
+
+- **Stable 1.0** — PyPI `graphifyy` version aligned with the shipped v1.8 “Output Taxonomy & Cluster Quality” milestone (default vault taxonomy, MOC-only communities, cluster floor, concept naming, repo identity, CODE notes, migration/update vault, skill alignment). No breaking API change relative to 0.4.7 beyond prior v1.8 planning scope; version signals production-ready packaging.
+- Process: `scripts/bump_version.py` and `scripts/sync_mcp_server_json.py` document the release checklist (see `CLAUDE.md`).
+
 ## 0.4.7 (2026-04-12)
 
 - Fix: `watch` semantic edge preservation was always empty — `graph.json` uses `links` key but code read `edges` (#269)
