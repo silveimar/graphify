@@ -1088,6 +1088,7 @@ def render_note(
         ctx.get("community_name") or ctx.get("parent_moc_label")
     ) if isinstance(ctx, dict) else None
     sibling_labels = ctx.get("sibling_labels", []) if isinstance(ctx, dict) else []
+    repo_identity = ctx.get("repo_identity") if isinstance(ctx, dict) else None
 
     # Build each section as a pre-rendered scalar (D-18)
     up_list: list[str] = []
@@ -1104,6 +1105,8 @@ def render_note(
         # component (WR-04). community_tag from ctx may not be pre-slugified.
         tag_list.append(f"community/{safe_tag(community_tag)}")
     tag_list.append(f"graphify/{safe_tag(file_type or 'note')}")
+    if note_type == "code" and isinstance(repo_identity, str) and repo_identity:
+        tag_list.append(f"repo/{safe_tag(repo_identity)}")
 
     frontmatter_fields = _build_frontmatter_fields(
         up=up_list,
@@ -1118,6 +1121,8 @@ def render_note(
         # IN-05: caller-supplied date wins; default to today for back-compat.
         created=created if created is not None else datetime.date.today(),
     )
+    if note_type == "code" and isinstance(repo_identity, str) and repo_identity:
+        frontmatter_fields["repo"] = safe_frontmatter_value(repo_identity)
     if isinstance(ctx, dict) and ctx.get("filename_collision"):
         frontmatter_fields["filename_collision"] = True
         collision_hash = ctx.get("filename_collision_hash")

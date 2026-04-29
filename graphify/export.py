@@ -716,6 +716,7 @@ def to_obsidian(
             continue
         ctx = dict(per_node[node_id])
         ctx.update(stem_info)
+        ctx["repo_identity"] = resolved_repo_identity.identity
         per_node[node_id] = ctx
     for cid, ctx in list(per_community.items()):
         enriched_members: list[dict] = []
