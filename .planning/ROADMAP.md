@@ -333,7 +333,17 @@ Plans:
   2. Maintainer can confirm skill files and CLI docs use the same v1.8 Obsidian export behavior
   3. Maintainer can verify v1.8 behavior with pure unit tests that use `tmp_path` and perform no network calls
   4. Maintainer can confirm all new path, template, profile, LLM-label, and repo-identity inputs pass through existing security and sanitization helpers
-**Plans:** TBD
+**Plans:** 4 plans
+Plans:
+**Wave 1**
+- [ ] 36-01-PLAN.md — Archive-by-default migration apply helpers, CLI evidence, and tmp_path tests
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 36-02-PLAN.md — Generic-first migration guide plus README and CLI help alignment
+- [ ] 36-03-PLAN.md — Platform skill variant v1.8 wording and drift tests
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 36-04-PLAN.md — Sanitizer coverage matrix and final regression/security evidence
 
 ---
 
