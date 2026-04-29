@@ -1,6 +1,7 @@
 """Unit tests for migration preview helpers (Phase 35 Plan 01)."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -30,6 +31,10 @@ def _write_legacy_community(vault: Path, community_id: int = 12) -> Path:
         encoding="utf-8",
     )
     return legacy
+
+
+def _content_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
 
 
 def _plan_with_actions(vault: Path):
@@ -134,6 +139,7 @@ def test_legacy_community_files_surface_as_orphans(tmp_path):
     ]
     assert len(orphan_rows) == 1, "D-06/D-08/COMM-02 legacy community file must not be ignored"
     assert orphan_rows[0]["review_only"] is True, "D-08 ORPHAN rows must be review-only"
+    assert orphan_rows[0]["content_hash"] == _content_hash(legacy)
 
 
 def test_preview_writes_artifacts_but_no_vault_notes(tmp_path):
@@ -186,6 +192,7 @@ def test_legacy_manifest_identity_maps_old_path_to_new_path(tmp_path):
 
     assert mapping["old_path"] == "Atlas/Sources/Graphify/MOCs/_COMMUNITY_12.md"
     assert mapping["new_path"] == "Atlas/Sources/Graphify/MOCs/Community_12.md"
+    assert mapping["old_content_hash"] == _content_hash(legacy)
     assert mapping["identity_source"] == "manifest"
     assert mapping["legacy_action"] == "ORPHAN"
     assert mapping["canonical_action"] == "UPDATE"
@@ -194,6 +201,38 @@ def test_legacy_manifest_identity_maps_old_path_to_new_path(tmp_path):
     assert mapping["new_path"] in json.dumps(preview, sort_keys=True)
     assert mapping["old_path"] in rendered
     assert mapping["new_path"] in rendered
+
+
+def test_legacy_content_hash_changes_plan_id(tmp_path):
+    """Reviewed migration plans bind legacy source content, not only source paths."""
+    from graphify.merge import MergePlan
+    from graphify.migration import build_migration_preview
+
+    vault = _make_vault(tmp_path)
+    legacy = _write_legacy_community(vault)
+    plan = MergePlan(actions=[], orphans=[], summary={})
+
+    first = build_migration_preview(
+        plan,
+        input_dir=tmp_path / "work-vault" / "raw",
+        vault_dir=vault,
+        artifacts_dir=tmp_path / "graphify-out",
+        repo_identity="graphify",
+    )
+    legacy.write_text(
+        legacy.read_text(encoding="utf-8") + "\nEdited after preview.\n",
+        encoding="utf-8",
+    )
+    second = build_migration_preview(
+        plan,
+        input_dir=tmp_path / "work-vault" / "raw",
+        vault_dir=vault,
+        artifacts_dir=tmp_path / "graphify-out",
+        repo_identity="graphify",
+    )
+
+    assert first["actions"][0]["content_hash"] != second["actions"][0]["content_hash"]
+    assert first["plan_id"] != second["plan_id"]
 
 
 def test_preview_expands_risky_action_rows(tmp_path):
@@ -301,6 +340,7 @@ def test_archive_legacy_notes_moves_reviewed_orphans_and_mappings(tmp_path):
                 "action": "ORPHAN",
                 "legacy": True,
                 "review_only": True,
+                "content_hash": _content_hash(orphan),
             },
             {
                 "path": unrelated.relative_to(vault).as_posix(),
@@ -310,8 +350,16 @@ def test_archive_legacy_notes_moves_reviewed_orphans_and_mappings(tmp_path):
             },
         ],
         "legacy_mappings": [
-            {"old_path": mapped_rel, "new_path": "Atlas/Sources/Graphify/MOCs/Community_13.md"},
-            {"old_path": mapped_rel, "new_path": "Atlas/Sources/Graphify/MOCs/Community_13.md"},
+            {
+                "old_path": mapped_rel,
+                "new_path": "Atlas/Sources/Graphify/MOCs/Community_13.md",
+                "old_content_hash": _content_hash(mapped),
+            },
+            {
+                "old_path": mapped_rel,
+                "new_path": "Atlas/Sources/Graphify/MOCs/Community_13.md",
+                "old_content_hash": _content_hash(mapped),
+            },
         ],
     }
 
@@ -346,12 +394,14 @@ def test_archive_legacy_notes_rejects_escaping_sources_before_moving(tmp_path):
                 "action": "ORPHAN",
                 "legacy": True,
                 "review_only": True,
+                "content_hash": "escape-hash",
             },
             {
                 "path": legacy.relative_to(vault).as_posix(),
                 "action": "ORPHAN",
                 "legacy": True,
                 "review_only": True,
+                "content_hash": _content_hash(legacy),
             },
         ],
         "legacy_mappings": [],
@@ -379,12 +429,14 @@ def test_archive_legacy_notes_rejects_duplicate_destinations_before_moving(tmp_p
                 "action": "ORPHAN",
                 "legacy": True,
                 "review_only": True,
+                "content_hash": _content_hash(legacy),
             },
             {
                 "path": legacy.relative_to(vault).as_posix(),
                 "action": "ORPHAN",
                 "legacy": True,
                 "review_only": True,
+                "content_hash": _content_hash(legacy),
             },
         ],
         "legacy_mappings": [],
@@ -396,6 +448,82 @@ def test_archive_legacy_notes_rejects_duplicate_destinations_before_moving(tmp_p
     assert legacy.exists()
     assert legacy.read_text(encoding="utf-8") == before_text
     assert not (tmp_path / "graphify-out" / "migrations" / "archive").exists()
+
+
+def test_archive_legacy_notes_rejects_changed_content_before_moving(tmp_path):
+    """Apply fails if a reviewed legacy note changed after preview."""
+    from graphify.migration import archive_legacy_notes
+
+    vault = _make_vault(tmp_path)
+    legacy = _write_legacy_community(vault)
+    before_text = legacy.read_text(encoding="utf-8")
+    rel = legacy.relative_to(vault).as_posix()
+    loaded = {
+        "actions": [
+            {
+                "path": rel,
+                "action": "ORPHAN",
+                "legacy": True,
+                "review_only": True,
+                "content_hash": _content_hash(legacy),
+            },
+        ],
+        "legacy_mappings": [],
+    }
+    legacy.write_text(before_text + "\nEdited after preview.\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="legacy content changed since preview"):
+        archive_legacy_notes(loaded, vault, tmp_path / "graphify-out", "d" * 16)
+
+    assert legacy.exists()
+    assert legacy.read_text(encoding="utf-8") == before_text + "\nEdited after preview.\n"
+    assert not (tmp_path / "graphify-out" / "migrations" / "archive").exists()
+
+
+def test_archive_legacy_notes_rejects_existing_destination_before_moving(tmp_path):
+    """Archive preflight preserves rollback evidence by rejecting collisions."""
+    from graphify.migration import archive_legacy_notes
+
+    vault = _make_vault(tmp_path)
+    first = _write_legacy_community(vault, community_id=12)
+    second = _write_legacy_community(vault, community_id=13)
+    first_text = first.read_text(encoding="utf-8")
+    second_text = second.read_text(encoding="utf-8")
+    first_rel = first.relative_to(vault).as_posix()
+    second_rel = second.relative_to(vault).as_posix()
+    artifacts_dir = tmp_path / "graphify-out"
+    plan_id = "e" * 16
+    existing_archive = artifacts_dir / "migrations" / "archive" / plan_id / second_rel
+    existing_archive.parent.mkdir(parents=True)
+    existing_archive.write_text("previous rollback evidence\n", encoding="utf-8")
+    loaded = {
+        "actions": [
+            {
+                "path": first_rel,
+                "action": "ORPHAN",
+                "legacy": True,
+                "review_only": True,
+                "content_hash": _content_hash(first),
+            },
+            {
+                "path": second_rel,
+                "action": "ORPHAN",
+                "legacy": True,
+                "review_only": True,
+                "content_hash": _content_hash(second),
+            },
+        ],
+        "legacy_mappings": [],
+    }
+
+    with pytest.raises(ValueError, match="archive destination already exists"):
+        archive_legacy_notes(loaded, vault, artifacts_dir, plan_id)
+
+    assert first.exists()
+    assert second.exists()
+    assert first.read_text(encoding="utf-8") == first_text
+    assert second.read_text(encoding="utf-8") == second_text
+    assert existing_archive.read_text(encoding="utf-8") == "previous rollback evidence\n"
 
 
 def test_update_vault_rejects_stale_plan_id(tmp_path):

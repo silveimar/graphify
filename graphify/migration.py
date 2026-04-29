@@ -67,9 +67,11 @@ def scan_legacy_notes(vault_dir: Path, manifest: dict[str, dict] | None = None) 
                 continue
             rel = rel_path.as_posix()
             identity, identity_source = _legacy_identity(rel, text, manifest.get(rel))
+            content_hash = _content_hash(text)
             entries.append({
                 "path": rel,
                 "absolute_path": str(safe_path),
+                "content_hash": content_hash,
                 "review_only": True,
                 "identity": identity,
                 "identity_source": identity_source,
@@ -121,6 +123,7 @@ def build_migration_preview(
             legacy_mappings.append({
                 "old_path": legacy["path"],
                 "new_path": canonical["path"],
+                "old_content_hash": legacy["content_hash"],
                 "identity_source": legacy["identity_source"],
                 "legacy_action": "ORPHAN",
                 "canonical_action": canonical["action"],
@@ -130,6 +133,7 @@ def build_migration_preview(
                 "path": legacy["path"],
                 "action": "ORPHAN",
                 "reason": "legacy graphify-managed note — review only, never deleted",
+                "content_hash": legacy["content_hash"],
                 "changed_fields": [],
                 "changed_blocks": [],
                 "conflict_kind": None,
@@ -430,7 +434,7 @@ def archive_legacy_notes(
     planned_moves: list[tuple[Path, Path, str, str]] = []
     destinations: dict[Path, str] = {}
 
-    for raw_path, reason in archive_sources:
+    for raw_path, reason, expected_hash in archive_sources:
         source = validate_vault_path(raw_path, vault)
         relative_path = source.relative_to(vault).as_posix()
         archive_path = _archive_destination(archive_root, relative_path)
@@ -440,6 +444,13 @@ def archive_legacy_notes(
         destinations[archive_path] = raw_path
         if not source.exists():
             raise ValueError(f"legacy source not found: {relative_path}")
+        if archive_path.exists():
+            raise ValueError(f"archive destination already exists: {relative_path}")
+        current_hash = _read_content_hash(source, relative_path)
+        if not expected_hash:
+            raise ValueError(f"legacy content hash missing: {relative_path}")
+        if current_hash != expected_hash:
+            raise ValueError(f"legacy content changed since preview: {relative_path}")
         planned_moves.append((source, archive_path, relative_path, reason))
 
     archived: list[dict] = []
@@ -474,8 +485,19 @@ def _has_graphify_fingerprint(text: str) -> bool:
     return bool(frontmatter.get("graphify_managed")) or "<!-- graphify:" in body
 
 
-def _archive_sources_from_plan(loaded: dict) -> list[tuple[str, str]]:
-    sources: list[tuple[str, str]] = []
+def _content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _read_content_hash(path: Path, relative_path: str) -> str:
+    try:
+        return _content_hash(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError(f"legacy source unreadable: {relative_path}") from exc
+
+
+def _archive_sources_from_plan(loaded: dict) -> list[tuple[str, str, str]]:
+    sources: list[tuple[str, str, str]] = []
     seen: set[str] = set()
 
     for mapping in loaded.get("legacy_mappings") or []:
@@ -485,7 +507,8 @@ def _archive_sources_from_plan(loaded: dict) -> list[tuple[str, str]]:
         seen.add(raw_path)
         new_path = str(mapping.get("new_path") or "")
         reason = f"legacy mapping archived before replacement by {new_path}".strip()
-        sources.append((raw_path, reason))
+        expected_hash = str(mapping.get("old_content_hash") or "")
+        sources.append((raw_path, reason, expected_hash))
 
     for row in loaded.get("actions") or []:
         if (
@@ -499,7 +522,8 @@ def _archive_sources_from_plan(loaded: dict) -> list[tuple[str, str]]:
             continue
         seen.add(raw_path)
         reason = str(row.get("reason") or "reviewed legacy orphan archived")
-        sources.append((raw_path, reason))
+        expected_hash = str(row.get("content_hash") or "")
+        sources.append((raw_path, reason, expected_hash))
     return sources
 
 
@@ -718,13 +742,24 @@ def _normalize_actions(actions: list[dict]) -> list[dict]:
             "source": row.get("source"),
             "review_only": bool(row.get("review_only")),
             "legacy": bool(row.get("legacy")),
+            "content_hash": row.get("content_hash"),
         })
     return sorted(normalized, key=lambda row: (row["action"], row["path"]))
 
 
 def _normalize_legacy_mappings(mappings: list[dict]) -> list[dict]:
     return sorted(
-        [dict(row) for row in mappings],
+        [
+            {
+                "old_path": row.get("old_path"),
+                "new_path": row.get("new_path"),
+                "old_content_hash": row.get("old_content_hash"),
+                "identity_source": row.get("identity_source"),
+                "legacy_action": row.get("legacy_action"),
+                "canonical_action": row.get("canonical_action"),
+            }
+            for row in mappings
+        ],
         key=lambda row: (row.get("old_path", ""), row.get("new_path", "")),
     )
 
