@@ -3,10 +3,14 @@ from __future__ import annotations
 
 import configparser
 import hashlib
+import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import Callable, Literal, NamedTuple
+
+import networkx as nx
 
 
 class ResolvedRepoIdentity(NamedTuple):
@@ -20,12 +24,23 @@ class ConceptName(NamedTuple):
     community_id: int
     title: str
     filename_stem: str
-    source: str
+    source: Literal["llm-cache", "llm-fresh", "fallback", "cache-tolerant"]
     signature: str
     reason: str
 
 
 _REPO_IDENTITY_MAX_LEN = 80
+_CONCEPT_STOP_WORDS = {
+    "community",
+    "node",
+    "file",
+    "source",
+    "module",
+    "class",
+    "function",
+    "method",
+    "test",
+}
 
 
 def normalize_repo_identity(value: str) -> str:
@@ -152,6 +167,103 @@ def resolve_repo_identity(
     return ResolvedRepoIdentity(identity, "fallback-directory", raw_value, tuple(warnings))
 
 
-def resolve_concept_names(*args: object, **kwargs: object) -> dict[int, ConceptName]:
-    """Placeholder contract for later concept naming implementation."""
-    raise NotImplementedError("concept naming is implemented in a later Phase 33 plan")
+def _stringify_source_file(value: object) -> str:
+    if isinstance(value, (list, tuple, set)):
+        return "|".join(str(item) for item in value)
+    return str(value or "")
+
+
+def _community_signature(G: nx.Graph, members: list[str]) -> str:
+    """Hash sorted member IDs, labels, and source files into a stable signature."""
+    payload = []
+    for node_id in sorted(str(member) for member in members):
+        data = G.nodes.get(node_id, {})
+        payload.append(
+            {
+                "id": node_id,
+                "label": str(data.get("label", node_id)),
+                "source_file": _stringify_source_file(data.get("source_file", "")),
+            }
+        )
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _top_terms(G: nx.Graph, members: list[str], limit: int = 3) -> list[str]:
+    """Return title-cased, meaningful label terms weighted by node degree."""
+    scores: dict[str, tuple[int, str]] = {}
+    for member in sorted(str(m) for m in members):
+        data = G.nodes.get(member, {})
+        if data.get("file_type") == "file":
+            continue
+        label = str(data.get("label", member))
+        weight = int(G.degree(member)) if member in G else 0
+        for raw_term in re.split(r"[^A-Za-z0-9]+", label):
+            term = raw_term.strip()
+            if not term:
+                continue
+            key = term.lower()
+            if key in _CONCEPT_STOP_WORDS:
+                continue
+            current_score = scores.get(key, (0, term))[0]
+            scores[key] = (current_score + max(weight, 1), term)
+
+    ranked = sorted(scores.items(), key=lambda item: (-item[1][0], item[0]))
+    return [term.title() for _, (_, term) in ranked[:limit]]
+
+
+def _fallback_title(
+    G: nx.Graph,
+    members: list[str],
+    cid: int,
+    signature: str,
+) -> str:
+    """Build a deterministic concept title from top terms and a stable suffix."""
+    suffix = f"c{cid}{signature[:2]}"
+    terms = _top_terms(G, members)
+    if not terms:
+        return f"Concept {suffix}"
+    return f"{' '.join(terms)} {suffix}"
+
+
+def _filename_stem(title: str) -> str:
+    name = unicodedata.normalize("NFC", title.replace(" ", "_"))
+    name = re.sub(
+        r'[\\/*?:"<>|#^[\]\x00-\x1f\x7f\u0085\u2028\u2029]', "", name
+    ).strip() or "unnamed"
+    if len(name) > 200:
+        suffix = hashlib.sha256(name.encode("utf-8")).hexdigest()[:8]
+        name = name[:191] + "_" + suffix
+    return name
+
+
+def resolve_concept_names(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    profile: dict,
+    artifacts_dir: Path,
+    *,
+    llm_namer: Callable[[dict], str | None] | None = None,
+    dry_run: bool = False,
+) -> dict[int, ConceptName]:
+    """Resolve concept MOC names with deterministic fallback behavior."""
+    del artifacts_dir, llm_namer, dry_run
+
+    concept_config = profile.get("naming", {}).get("concept_names", {})
+    enabled = bool(concept_config.get("enabled", True))
+    reason = "llm-unavailable" if enabled else "disabled"
+
+    resolved: dict[int, ConceptName] = {}
+    for cid in sorted(communities):
+        members = communities[cid]
+        signature = _community_signature(G, members)
+        title = _fallback_title(G, members, cid, signature)
+        resolved[cid] = ConceptName(
+            community_id=cid,
+            title=title,
+            filename_stem=_filename_stem(title),
+            source="fallback",
+            signature=signature,
+            reason=reason,
+        )
+    return resolved
