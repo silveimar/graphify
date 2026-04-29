@@ -12,7 +12,7 @@ Decisions implemented (D-30..D-41 — see 29-CONTEXT.md):
   - D-34: format_report() emits sections in fixed order, every line [graphify]-prefixed
   - D-35: is_misconfigured() returns True for ANY of: validation errors / unresolvable
           dest / would_self_ingest
-  - D-36: validate_profile() called as-is — no signature change
+  - D-36: validate_profile_preflight() called as-is — no signature change
   - D-37: ignore_list grouped by 4 source labels; no cross-source dedup
   - D-40: hardcoded _FIX_HINTS table maps validator error substrings to verb-first
           imperative fix lines
@@ -37,7 +37,7 @@ from graphify.detect import (
     _load_output_manifest,
 )
 from graphify.output import ResolvedOutput, is_obsidian_vault, resolve_output
-from graphify.profile import load_profile, validate_profile
+from graphify.profile import validate_profile_preflight
 
 
 # ---------------------------------------------------------------------------
@@ -76,6 +76,30 @@ _FIX_HINTS: list[tuple[str, str]] = [
     (
         "PyYAML",
         "[graphify] FIX: Install PyYAML — pip install 'graphifyy[routing]'",
+    ),
+    (
+        "Unknown taxonomy key",
+        "[graphify] FIX: Remove unsupported taxonomy keys or move folder routing under taxonomy.folders in .graphify/profile.yaml",
+    ),
+    (
+        "Unknown taxonomy folder",
+        "[graphify] FIX: Use supported taxonomy folder keys: moc, thing, statement, person, source, default, unclassified",
+    ),
+    (
+        "taxonomy.folders",
+        "[graphify] FIX: Set taxonomy folders to safe vault-relative paths under the Graphify taxonomy root",
+    ),
+    (
+        "mapping.moc_threshold",
+        "[graphify] FIX: Replace mapping.moc_threshold with mapping.min_community_size in .graphify/profile.yaml",
+    ),
+    (
+        "mapping.min_community_size",
+        "[graphify] FIX: Add mapping.min_community_size: 3 under mapping: in .graphify/profile.yaml",
+    ),
+    (
+        "MOC-only output",
+        "[graphify] FIX: Remove community overview templates/settings and use MOC-only output for v1.8",
     ),
     (
         "sibling-of-vault",
@@ -124,6 +148,7 @@ class DoctorReport:
     vault_detection: bool = False
     vault_path: Optional[Path] = None
     profile_validation_errors: list[str] = field(default_factory=list)
+    profile_validation_warnings: list[str] = field(default_factory=list)
     resolved_output: Optional[ResolvedOutput] = None
     ignore_list: dict[str, list[str]] = field(default_factory=dict)
     manifest_history: Optional[list[dict]] = None
@@ -215,6 +240,7 @@ def _build_ignore_list(cwd: Path, resolved: Optional[ResolvedOutput]) -> dict[st
 def _build_recommended_fixes(
     profile_validation_errors: list[str],
     would_self_ingest: bool,
+    profile_validation_warnings: list[str] | None = None,
 ) -> list[str]:
     """Map issues to fix lines via _FIX_HINTS substring match (first-match-wins)."""
     fixes: list[str] = []
@@ -228,6 +254,12 @@ def _build_recommended_fixes(
 
     for err in profile_validation_errors:
         fix = _match(err)
+        if fix is not None and fix not in seen_fixes:
+            fixes.append(fix)
+            seen_fixes.add(fix)
+
+    for warning in profile_validation_warnings or []:
+        fix = _match(warning)
         if fix is not None and fix not in seen_fixes:
             fixes.append(fix)
             seen_fixes.add(fix)
@@ -311,16 +343,15 @@ def run_doctor(cwd: Path, *, dry_run: bool = False) -> DoctorReport:
 
     # --- Profile validation (D-36) ----------------------------------------
     profile_yaml = cwd_resolved / ".graphify" / "profile.yaml"
-    if profile_yaml.exists():
+    templates_dir = cwd_resolved / ".graphify" / "templates"
+    if profile_yaml.exists() or templates_dir.exists():
         try:
-            profile = load_profile(cwd_resolved)
-            if isinstance(profile, dict):
-                report.profile_validation_errors.extend(validate_profile(profile))
+            result = validate_profile_preflight(cwd_resolved)
+            report.profile_validation_errors.extend(result.errors)
+            report.profile_validation_warnings.extend(result.warnings)
         except Exception as exc:
-            # load_profile prints to stderr on its own paths; surface a stable
-            # error string for _FIX_HINTS matching.
             report.profile_validation_errors.append(
-                f"profile load error: {exc}"
+                f"profile preflight error: {exc}"
             )
 
     # --- Output destination resolution (D-13) -----------------------------
@@ -359,7 +390,9 @@ def run_doctor(cwd: Path, *, dry_run: bool = False) -> DoctorReport:
 
     # --- Recommended fixes (D-40, D-41) -----------------------------------
     report.recommended_fixes = _build_recommended_fixes(
-        report.profile_validation_errors, report.would_self_ingest
+        report.profile_validation_errors,
+        report.would_self_ingest,
+        report.profile_validation_warnings,
     )
 
     # --- Dry-run preview (D-38, D-39) -------------------------------------
@@ -436,7 +469,9 @@ def format_report(report: DoctorReport) -> str:
     if report.profile_validation_errors:
         for err in report.profile_validation_errors:
             lines.append(f"[graphify] error: {err}")
-    else:
+    for warning in report.profile_validation_warnings:
+        lines.append(f"[graphify] warning: {warning}")
+    if not report.profile_validation_errors:
         lines.append("[graphify] profile valid (or not present)")
 
     # --- Output Destination -----------------------------------------------
