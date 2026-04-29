@@ -416,13 +416,17 @@ Plans:
 
 ### Phase 38: with dormant seeds and pending quick task
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Reconcile dormant-seed posture and pending quick-task lifecycle state into one auditable planning baseline before post-v1.8 milestone rollover.
+**Requirements**: P38-SCOPE-01, P38-SCOPE-02, P38-SCOPE-03
 **Depends on:** Phase 37
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 38 to break down)
+**Wave 1**
+- [ ] 38-01-PLAN.md — Normalize dormant seed registry and replace Phase 38 planning placeholders with explicit reconciliation scope.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 38-02-PLAN.md — Produce verification and summary closure artifacts with command-backed evidence and handoff guidance.
 
 ---
 *Last updated: 2026-04-29 — v1.8 validation metadata gap-closure phase added after milestone audit; 33/33 requirements remain satisfied.*

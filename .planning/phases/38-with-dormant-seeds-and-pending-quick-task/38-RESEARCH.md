@@ -189,17 +189,15 @@ command -v gsd-sdk
 **Deprecated/outdated:**
 - Treating `_COMMUNITY_*` output semantics as active v1.8 behavior is outdated; v1.8 is MOC-only by default. [VERIFIED: `REQUIREMENTS.md` COMM-01/COMM-02 and v1.8 audit]
 
-## Open Questions
+## Open Questions (Resolved)
 
 1. **Should Phase 38 formally archive or merely annotate the completed quick task?**
-   - What we know: quick task artifacts show completion and passing verification. [VERIFIED: `260427-rc7-SUMMARY.md`]
-   - What's unclear: desired end-state convention for quick artifacts after closure.
-   - Recommendation: choose one explicit lifecycle rule in `38-PLAN.md` and apply consistently.
+   - **Resolution:** Annotate the quick task as completed and reconciled in canonical planning state; do not archive quick artifacts in this phase.
+   - **Rationale:** Preserve provenance in `.planning/quick/` while removing "pending" ambiguity from roadmap/state continuity.
 
 2. **Which dormant seeds remain intentionally deferred vs candidate for next milestone intake?**
-   - What we know: `STATE.md` explicitly lists `SEED-001`/`SEED-002` as deferred; other seed docs exist with status metadata. [VERIFIED]
-   - What's unclear: whether non-listed seed files should be represented in canonical deferred table.
-   - Recommendation: Phase 38 should produce a single normalized dormant-seed register.
+   - **Resolution:** Keep currently deferred seeds as deferred unless explicitly promoted by a future milestone command.
+   - **Rationale:** Phase 38 is a governance/reconciliation phase; seed activation requires explicit next-milestone intake decisions.
 
 ## Environment Availability
 
