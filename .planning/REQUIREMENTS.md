@@ -16,7 +16,7 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 
 ### Community Output Semantics
 
-- [ ] **COMM-01**: User receives MOC-only community output by default, with no generated `_COMMUNITY_*` overview notes.
+- [x] **COMM-01**: User receives MOC-only community output by default, with no generated `_COMMUNITY_*` overview notes.
 - [ ] **COMM-02**: User sees legacy `_COMMUNITY_*` files surfaced as migration candidates or orphans instead of silently ignored.
 - [x] **COMM-03**: User receives targeted guidance when an existing custom profile or template requests hard-deprecated community overview output.
 
@@ -37,7 +37,7 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 
 ### God-Node Taxonomy
 
-- [ ] **GOD-01**: User sees code-derived god nodes exported as `CODE_<repo>_<node>` notes rather than generic Things.
+- [x] **GOD-01**: User sees code-derived god nodes exported as `CODE_<repo>_<node>` notes rather than generic Things.
 - [ ] **GOD-02**: User sees CODE notes linked to their related concept MOC through frontmatter or body wikilinks.
 - [ ] **GOD-03**: User sees concept MOCs list their important CODE member notes, preserving bidirectional navigation.
 - [ ] **GOD-04**: User is protected from filename collisions between CODE notes and concept MOCs.
@@ -105,7 +105,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TAX-02 | Phase 32 | Complete |
 | TAX-03 | Phase 32 | Complete |
 | TAX-04 | Phase 32 | Complete |
-| COMM-01 | Phase 34 | Pending |
+| COMM-01 | Phase 34 | Complete |
 | COMM-02 | Phase 35 | Pending |
 | COMM-03 | Phase 32 | Complete |
 | CLUST-01 | Phase 32 | Complete |
@@ -117,7 +117,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAME-03 | Phase 33 | Complete |
 | NAME-04 | Phase 33 | Complete |
 | NAME-05 | Phase 33 | Complete |
-| GOD-01 | Phase 34 | Pending |
+| GOD-01 | Phase 34 | Complete |
 | GOD-02 | Phase 34 | Pending |
 | GOD-03 | Phase 34 | Pending |
 | GOD-04 | Phase 34 | Pending |
