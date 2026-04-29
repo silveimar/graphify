@@ -45,6 +45,52 @@ def test_generated_moc_title_is_sanitized_across_sinks():
     assert "../escape" not in filename
 
 
+def test_render_moc_code_member_preserves_exact_filename_stem_target():
+    import networkx as nx
+
+    from graphify.profile import _DEFAULT_PROFILE
+    from graphify.templates import render_moc
+
+    G = nx.Graph()
+    G.add_node(
+        "n_auth_session",
+        label="Auth Session",
+        file_type="code",
+        source_file="graphify/auth/session.py",
+        community=0,
+    )
+
+    _, text = render_moc(
+        0,
+        G,
+        {0: ["n_auth_session"]},
+        _DEFAULT_PROFILE,
+        {
+            "note_type": "moc",
+            "folder": "Atlas/Sources/Graphify/MOCs/",
+            "community_name": "Auth Concepts",
+            "community_tag": "auth-concepts",
+            "members_by_type": {},
+            "code_members": [
+                {
+                    "id": "n_auth_session",
+                    "label": "Auth Session",
+                    "filename_stem": "CODE_graphify_Auth_Session",
+                }
+            ],
+            "code_member_labels": [],
+            "sub_communities": [],
+            "sibling_labels": [],
+            "cohesion": 0.75,
+        },
+        vault_dir=None,
+    )
+
+    assert "[[CODE_graphify_Auth_Session|" in text
+    assert "[[CODE_graphify_Auth_Session|Auth Session]]" in text
+    assert "[[Code_Graphify_Auth_Session|" not in text
+
+
 # ---------------------------------------------------------------------------
 # Task 1: KNOWN_VARS and ClassificationContext tests
 # ---------------------------------------------------------------------------
