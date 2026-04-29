@@ -5,6 +5,8 @@ This test file is intentionally self-contained. It does NOT import tests/test_co
 execution — plan-checker WARNING 1 fix.
 """
 from __future__ import annotations
+
+import re
 from pathlib import Path
 
 import graphify
@@ -37,6 +39,11 @@ FORBIDDEN_V18_OBSIDIAN_PHRASES = (
     "generates `_COMMUNITY_",
     "_COMMUNITY_* overview notes are generated",
     "_COMMUNITY_* overview notes are created",
+)
+FORBIDDEN_V18_OBSIDIAN_PATTERNS = (
+    re.compile(r"_COMMUNITY_\*.*overview notes", re.IGNORECASE),
+    re.compile(r"_COMMUNITY_\*.*dataview queries", re.IGNORECASE),
+    re.compile(r"print\(.*_COMMUNITY_", re.IGNORECASE),
 )
 
 
@@ -82,8 +89,13 @@ def test_skill_files_forbid_stale_generated_community_claims():
     all_files = (PRIMARY_SKILL,) + PLATFORM_VARIANTS
     for skill_file in all_files:
         text = _read(skill_file)
-        found = [
+        stale_phrases = [
             phrase for phrase in FORBIDDEN_V18_OBSIDIAN_PHRASES
             if phrase in text
         ]
+        stale_patterns = [
+            pattern.pattern for pattern in FORBIDDEN_V18_OBSIDIAN_PATTERNS
+            if pattern.search(text)
+        ]
+        found = stale_phrases + stale_patterns
         assert not found, f"{skill_file} contains stale v1.8 Obsidian claims: {found}"
