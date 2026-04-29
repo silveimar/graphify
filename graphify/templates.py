@@ -276,7 +276,6 @@ def _build_edge_records(graph, node_id) -> list[dict]:
         target = v if u == node_id else u
         target_node = graph.nodes[target]
         label = _sanitize_wikilink_alias(str(target_node.get("label", target)))
-        target_alias = _sanitize_wikilink_alias(str(target_node.get("label", target)))  # D-06
         relation = _sanitize_wikilink_alias(str(data.get("relation", "")))
         confidence = _sanitize_wikilink_alias(str(data.get("confidence", "")))
         community = _sanitize_wikilink_alias(str(target_node.get("community", "")))
@@ -284,7 +283,7 @@ def _build_edge_records(graph, node_id) -> list[dict]:
         records.append({
             "label": label,
             "relation": relation,
-            "target": target_alias,
+            "target": label,
             "confidence": confidence,
             "community": community,
             "source_file": source_file,
