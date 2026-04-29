@@ -85,6 +85,20 @@ class TestDataclassesAndPolicies:
         assert r.skipped_identical == []
 
 
+def test_repo_frontmatter_policy_replaces_graphify_repo():
+    from graphify.merge import _DEFAULT_FIELD_POLICIES, _merge_frontmatter
+
+    assert _DEFAULT_FIELD_POLICIES["repo"] == "replace"
+    merged, changed = _merge_frontmatter(
+        {"repo": "old-repo", "user_note": "keep me"},
+        {"repo": "graphify"},
+        profile={},
+    )
+    assert merged["repo"] == "graphify"
+    assert merged["user_note"] == "keep me"
+    assert changed == ["repo"]
+
+
 # ---------------------------------------------------------------------------
 # Task 2 — Frontmatter reader round-trip tests (RED tests)
 # ---------------------------------------------------------------------------
@@ -1521,6 +1535,41 @@ class TestVaultManifest:
         _save_manifest(manifest_path, data)
         loaded = _load_manifest(manifest_path)
         assert loaded == data
+
+
+def test_merge_manifest_tolerates_missing_repo_identity(tmp_path):
+    from graphify.merge import _content_hash, _load_manifest, compute_merge_plan
+
+    vault = _copy_vault_fixture("pristine_graphify", tmp_path)
+    target_rel = "Atlas/Dots/Things/Transformer.md"
+    target_path = vault / target_rel
+    manifest_path = tmp_path / "vault-manifest.json"
+    manifest_path.write_text(
+        "{\n"
+        f'  "{target_rel}": {{\n'
+        f'    "content_hash": "{_content_hash(target_path)}",\n'
+        '    "last_merged": "2026-01-01T00:00:00+00:00",\n'
+        f'    "target_path": "{target_rel}",\n'
+        '    "node_id": "transformer",\n'
+        '    "note_type": "thing",\n'
+        '    "community_id": 0,\n'
+        '    "has_user_blocks": false\n'
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    manifest = _load_manifest(manifest_path)
+    assert "repo_identity" not in manifest[target_rel]
+
+    rn = _rendered_note_matching_pristine(vault)
+    plan = compute_merge_plan(vault, {"transformer": rn}, {}, manifest=manifest)
+
+    assert all(action.conflict_kind != "repo_identity" for action in plan.actions)
+    assert not any(action.action == "SKIP_CONFLICT" for action in plan.actions)
+
+
+class TestVaultManifestMore:
 
     def test_load_missing_returns_empty(self, tmp_path):
         from graphify.merge import _load_manifest

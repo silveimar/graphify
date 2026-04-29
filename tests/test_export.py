@@ -402,6 +402,38 @@ def test_to_obsidian_dry_run_uses_repo_prefixed_code_paths(tmp_path):
     assert not any("_COMMUNITY_" in path for path in relative_paths)
 
 
+def test_code_notes_record_repo_identity_in_frontmatter_tags_and_manifest(tmp_path):
+    from graphify.export import to_obsidian
+    from graphify.profile import _DEFAULT_PROFILE
+
+    G, communities = _phase33_graph()
+    out_root = tmp_path / "graphify-out"
+    obsidian_dir = out_root / "obsidian"
+    profile = json.loads(json.dumps(_DEFAULT_PROFILE))
+    profile["repo"] = {"identity": "Graphify"}
+    profile["naming"]["concept_names"]["enabled"] = False
+    profile["mapping"]["min_community_size"] = 1
+
+    to_obsidian(
+        G,
+        communities,
+        output_dir=str(obsidian_dir),
+        profile=profile,
+    )
+
+    code_note = next(obsidian_dir.rglob("CODE_graphify_Auth_Session.md"))
+    assert "CODE_graphify_" in code_note.stem
+    text = code_note.read_text(encoding="utf-8")
+    assert "repo: graphify" in text
+    assert "repo/graphify" in text
+
+    manifest = json.loads((out_root / "vault-manifest.json").read_text(encoding="utf-8"))
+    rel_key = code_note.relative_to(obsidian_dir).as_posix()
+    assert manifest[rel_key]["repo_identity"] == "graphify"
+    assert manifest["__graphify_run__"]["manifest_version"] == 2
+    assert manifest["__graphify_run__"]["repo_identity"] == "graphify"
+
+
 def test_to_obsidian_code_note_links_to_final_concept_label(tmp_path):
     from graphify.export import to_obsidian
     from graphify.profile import _DEFAULT_PROFILE
