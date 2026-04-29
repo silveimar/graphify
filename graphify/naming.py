@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import configparser
+import datetime
 import hashlib
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -41,6 +43,10 @@ _CONCEPT_STOP_WORDS = {
     "method",
     "test",
 }
+_CONCEPT_CACHE_VERSION = 1
+_CONCEPT_CACHE_NAME = "concept-names.json"
+_GENERIC_TITLES = {"community", "concept", "node", "file", "source", "module"}
+_MAX_TITLE_LEN = 80
 
 
 def normalize_repo_identity(value: str) -> str:
@@ -237,6 +243,180 @@ def _filename_stem(title: str) -> str:
     return name
 
 
+def _load_concept_name_cache(artifacts_dir: Path) -> dict:
+    """Load concept name sidecar cache, returning an empty cache on corruption."""
+    cache_path = Path(artifacts_dir) / _CONCEPT_CACHE_NAME
+    if not cache_path.exists():
+        return {"version": _CONCEPT_CACHE_VERSION, "entries": {}}
+
+    try:
+        raw = json.loads(cache_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        print(
+            "[graphify] concept naming cache corrupted or unreadable — "
+            "falling back to deterministic names",
+            file=sys.stderr,
+        )
+        return {"version": _CONCEPT_CACHE_VERSION, "entries": {}}
+
+    if isinstance(raw, dict) and isinstance(raw.get("entries"), dict):
+        return {
+            "version": raw.get("version", _CONCEPT_CACHE_VERSION),
+            "entries": raw["entries"],
+            "updated_at": raw.get("updated_at", ""),
+        }
+
+    if isinstance(raw, dict):
+        entries: dict[str, dict] = {}
+        for key, value in raw.items():
+            if isinstance(value, dict):
+                entry = dict(value)
+                entry.setdefault("community_id", key)
+                entry.setdefault("signature", entry.get("signature", key))
+                entries[str(key)] = entry
+        return {"version": _CONCEPT_CACHE_VERSION, "entries": entries}
+
+    print(
+        "[graphify] concept naming cache corrupted or unreadable — "
+        "falling back to deterministic names",
+        file=sys.stderr,
+    )
+    return {"version": _CONCEPT_CACHE_VERSION, "entries": {}}
+
+
+def _save_concept_name_cache(artifacts_dir: Path, cache: dict) -> None:
+    """Write concept name sidecar cache atomically."""
+    cache_path = Path(artifacts_dir) / _CONCEPT_CACHE_NAME
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = cache_path.with_suffix(".json.tmp")
+    payload = {
+        "version": _CONCEPT_CACHE_VERSION,
+        "entries": cache.get("entries", {}),
+        "updated_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    }
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, sort_keys=True)
+            fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, cache_path)
+    except OSError:
+        if tmp.exists():
+            tmp.unlink()
+        raise
+
+
+def _validate_title_candidate(
+    title: str | None,
+    used_titles: set[str],
+) -> tuple[bool, str]:
+    if title is None:
+        return False, "empty"
+    candidate = str(title).strip()
+    if not candidate:
+        return False, "empty"
+    if len(candidate) > _MAX_TITLE_LEN:
+        return False, "too-long"
+    lowered = candidate.lower()
+    if lowered in _GENERIC_TITLES:
+        return False, "generic"
+    if lowered in used_titles:
+        return False, "duplicate"
+    if "/" in candidate or "\\" in candidate or ".." in candidate:
+        return False, "path-like"
+    if "[[" in candidate or "]]" in candidate or "|" in candidate:
+        return False, "wikilink-breaking"
+    if "{{" in candidate or "}}" in candidate or "{%" in candidate or "%}" in candidate:
+        return False, "template-breaking"
+    if re.search(r"[\x00-\x1f\x7f\u0085\u2028\u2029]", candidate):
+        return False, "control-character"
+    return True, "accepted"
+
+
+def _cache_entries(cache: dict) -> dict[str, dict]:
+    entries = cache.get("entries", {})
+    return entries if isinstance(entries, dict) else {}
+
+
+def _cache_entry_to_name(
+    cid: int,
+    signature: str,
+    entry: dict,
+    source: Literal["llm-cache", "cache-tolerant"],
+    reason: str,
+) -> ConceptName:
+    title = str(entry.get("title", "")).strip()
+    filename_stem = str(entry.get("filename_stem") or _filename_stem(title))
+    return ConceptName(
+        community_id=cid,
+        title=title,
+        filename_stem=filename_stem,
+        source=source,
+        signature=signature,
+        reason=reason,
+    )
+
+
+def _find_exact_cache_match(cache: dict, cid: int, signature: str) -> dict | None:
+    entries = _cache_entries(cache)
+    entry = entries.get(signature)
+    if isinstance(entry, dict):
+        return entry
+    legacy_entry = entries.get(str(cid))
+    if isinstance(legacy_entry, dict):
+        return legacy_entry
+    return None
+
+
+def _find_tolerant_cache_match(cache: dict, top_terms: list[str]) -> dict | None:
+    if not top_terms:
+        return None
+    target_terms = {term.lower() for term in top_terms}
+    minimum_overlap = min(2, len(target_terms))
+    for entry in _cache_entries(cache).values():
+        if not isinstance(entry, dict):
+            continue
+        cached_terms = {
+            str(term).lower()
+            for term in entry.get("top_terms", [])
+            if str(term).strip()
+        }
+        if len(target_terms & cached_terms) >= minimum_overlap:
+            return entry
+    return None
+
+
+def _cache_record(name: ConceptName, top_terms: list[str]) -> dict:
+    return {
+        "community_id": name.community_id,
+        "filename_stem": name.filename_stem,
+        "reason": name.reason,
+        "signature": name.signature,
+        "source": name.source,
+        "title": name.title,
+        "top_terms": top_terms,
+    }
+
+
+def _fallback_name(
+    G: nx.Graph,
+    members: list[str],
+    cid: int,
+    signature: str,
+    reason: str,
+) -> ConceptName:
+    title = _fallback_title(G, members, cid, signature)
+    return ConceptName(
+        community_id=cid,
+        title=title,
+        filename_stem=_filename_stem(title),
+        source="fallback",
+        signature=signature,
+        reason=reason,
+    )
+
+
 def resolve_concept_names(
     G: nx.Graph,
     communities: dict[int, list[str]],
@@ -246,24 +426,121 @@ def resolve_concept_names(
     llm_namer: Callable[[dict], str | None] | None = None,
     dry_run: bool = False,
 ) -> dict[int, ConceptName]:
-    """Resolve concept MOC names with deterministic fallback behavior."""
-    del artifacts_dir, llm_namer, dry_run
-
+    """Resolve concept MOC names with cache-backed LLM names and fallback."""
     concept_config = profile.get("naming", {}).get("concept_names", {})
     enabled = bool(concept_config.get("enabled", True))
-    reason = "llm-unavailable" if enabled else "disabled"
+    try:
+        budget = float(concept_config.get("budget", 1.0))
+    except (TypeError, ValueError):
+        budget = 0.0
+
+    cache = _load_concept_name_cache(artifacts_dir)
+    updated_entries = dict(_cache_entries(cache))
+    used_titles: set[str] = set()
 
     resolved: dict[int, ConceptName] = {}
     for cid in sorted(communities):
         members = communities[cid]
         signature = _community_signature(G, members)
-        title = _fallback_title(G, members, cid, signature)
-        resolved[cid] = ConceptName(
-            community_id=cid,
-            title=title,
-            filename_stem=_filename_stem(title),
-            source="fallback",
-            signature=signature,
-            reason=reason,
-        )
+        top_terms = _top_terms(G, members)
+
+        if not enabled:
+            name = _fallback_name(G, members, cid, signature, "disabled")
+            resolved[cid] = name
+            used_titles.add(name.title.lower())
+            updated_entries[signature] = _cache_record(name, top_terms)
+            continue
+
+        cached = _find_exact_cache_match(cache, cid, signature)
+        if cached is not None:
+            valid, reason = _validate_title_candidate(
+                str(cached.get("title", "")),
+                used_titles,
+            )
+            if valid:
+                name = _cache_entry_to_name(
+                    cid,
+                    signature,
+                    cached,
+                    "llm-cache",
+                    "cache hit",
+                )
+                resolved[cid] = name
+                used_titles.add(name.title.lower())
+                updated_entries[signature] = _cache_record(name, top_terms)
+                continue
+
+        tolerant = _find_tolerant_cache_match(cache, top_terms)
+        if tolerant is not None:
+            valid, reason = _validate_title_candidate(
+                str(tolerant.get("title", "")),
+                used_titles,
+            )
+            if valid:
+                previous_signature = str(tolerant.get("signature", "unknown"))
+                name = _cache_entry_to_name(
+                    cid,
+                    signature,
+                    tolerant,
+                    "cache-tolerant",
+                    (
+                        "tolerant cache hit "
+                        f"previous_signature={previous_signature} "
+                        f"current_signature={signature}"
+                    ),
+                )
+                resolved[cid] = name
+                used_titles.add(name.title.lower())
+                updated_entries[signature] = _cache_record(name, top_terms)
+                continue
+
+        if budget <= 0:
+            name = _fallback_name(G, members, cid, signature, "budget-disabled")
+            resolved[cid] = name
+            used_titles.add(name.title.lower())
+            updated_entries[signature] = _cache_record(name, top_terms)
+            continue
+
+        if llm_namer is not None:
+            try:
+                candidate = llm_namer(
+                    {
+                        "community_id": cid,
+                        "signature": signature,
+                        "top_terms": top_terms,
+                        "members": members,
+                    }
+                )
+            except Exception as exc:
+                name = _fallback_name(G, members, cid, signature, f"llm-error: {exc}")
+            else:
+                valid, reason = _validate_title_candidate(candidate, used_titles)
+                if valid and candidate is not None:
+                    title = str(candidate).strip()
+                    name = ConceptName(
+                        community_id=cid,
+                        title=title,
+                        filename_stem=_filename_stem(title),
+                        source="llm-fresh",
+                        signature=signature,
+                        reason="accepted",
+                    )
+                else:
+                    name = _fallback_name(
+                        G,
+                        members,
+                        cid,
+                        signature,
+                        f"llm rejected: {reason}",
+                    )
+        else:
+            name = _fallback_name(G, members, cid, signature, "llm-unavailable")
+
+        resolved[cid] = name
+        used_titles.add(name.title.lower())
+        updated_entries[signature] = _cache_record(name, top_terms)
+
+    if not dry_run:
+        cache["entries"] = updated_entries
+        _save_concept_name_cache(artifacts_dir, cache)
     return resolved
