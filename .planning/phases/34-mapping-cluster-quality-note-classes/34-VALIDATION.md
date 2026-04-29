@@ -78,6 +78,7 @@ pytest tests/test_mapping.py tests/test_templates.py tests/test_export.py tests/
 
 ## Validation Sign-Off
 
+- [x] Status rows are evidence-aligned with `34-VERIFICATION.md`.
 - [x] Deterministic requirement coverage rows match passed verification evidence.
 - [x] Wave 0 checklist items are complete.
 - [x] Focused and full-suite gates are recorded as green in verification evidence.
