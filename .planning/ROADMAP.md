@@ -287,6 +287,24 @@ Activate **SEED-001** (tacit-to-explicit elicitation), **SEED-002** (multi-harne
 
 </details>
 
+<details>
+<summary>Phase 39: Tacit-to-Explicit Onboarding &amp; Elicitation — PLANNING</summary>
+
+**Goal:** Guided interview/state machine → validated extraction → SOUL/HEARTBEAT/USER artifacts; docs for discovery-first workflows. **Requirements:** ELIC-01–ELIC-07. **Context:** `.planning/phases/39-tacit-to-explicit-onboarding-elicitation/39-CONTEXT.md` (D-01..D-08).
+
+**Plans:** 5 plans in 4 waves
+
+Plans:
+- [ ] `39-01-PLAN.md` — [wave 1] Library core: hybrid scripted elicitation, sidecar persistence, validation tests (ELIC-01/02/04/05/06; D-03, D-06)
+- [ ] `39-02-PLAN.md` — [wave 2] `build()` merge for elicitation sidecar with explicit ordering + tests (ELIC-02/04/05; D-06)
+- [ ] `39-03-PLAN.md` — [wave 3] Harness-aligned direct + `export_claude_harness` integration (ELIC-03/05; D-04)
+- [ ] `39-04-PLAN.md` — [wave 3] Canonical `graphify elicit` CLI + skill thin wrappers + `resolve_output` (ELIC-01/02/05/06; D-01/D-02/D-05)
+- [ ] `39-05-PLAN.md` — [wave 4] `docs/ELICITATION.md` + README pointer (ELIC-07; D-08)
+
+**Artifacts:** `39-RESEARCH.md`, `39-PATTERNS.md` in phase directory.
+
+</details>
+
 ---
 
 ## Progress
@@ -338,7 +356,7 @@ Activate **SEED-001** (tacit-to-explicit elicitation), **SEED-002** (multi-harne
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 5/5 | Complete    | 2026-04-29 |
 | 37. Validation Metadata Ratification | v1.8 | 2/2 | Complete   | 2026-04-29 |
 | 38. Dormant seeds & quick-task reconciliation | v1.8 | 2/2 | Complete | 2026-04-29 |
-| 39. Tacit-to-Explicit Onboarding & Elicitation | v1.9 | 0/? | Not started | — |
+| 39. Tacit-to-Explicit Onboarding & Elicitation | v1.9 | 0/5 | Not started | — |
 | 40. Multi-Harness Memory, Inverse Import & Injection Defenses | v1.9 | 0/? | Not started | — |
 | 41. Vault CLI — `--vault` & Multi-Vault Selector | v1.9 | 0/? | Not started | — |
 

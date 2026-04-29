@@ -6,13 +6,85 @@ Scoped from `/gsd-new-milestone` input and seeds `SEED-001`, `SEED-002`, `SEED-v
 
 ## Tacit-to-explicit onboarding & elicitation
 
-- [ ] **ELIC-01**: User can complete a guided elicitation flow (CLI entrypoint and/or documented skill orchestration) structured around rhythms, decisions, dependencies, tacit knowledge, and friction, with confirm-before-save checkpoints.
-- [ ] **ELIC-02**: Elicitation persists answers into extraction-compatible graph data (`nodes`/`edges`) that passes `validate.validate_extraction` before `build_graph()`.
-- [ ] **ELIC-03**: Elicitation emits portable harness-facing artifacts (at minimum SOUL.md, HEARTBEAT.md, USER.md — paths configurable or profile-relative) using existing label/path sanitization.
-- [ ] **ELIC-04**: Re-running elicitation against the same target does not spam duplicates without an explicit merge or preview strategy (documented behavior + tests).
-- [ ] **ELIC-05**: All elicitation-written paths stay within approved output roots per `security.py` patterns.
-- [ ] **ELIC-06**: Pure unit tests cover the elicitation flow core with fixtures (no network).
-- [ ] **ELIC-07**: Project docs explain when to use elicitation versus corpus-based extraction.
+### ELIC-01 — Guided hybrid interview entry surface
+
+**Goal:** Users can run a deterministic, testable elicitation interview (scripted backbone + optional deepening) from the canonical CLI path; platform skills delegate to that path without duplicating logic.
+
+**Acceptance criteria:**
+
+1. A documented primary CLI invocation (e.g. `graphify elicit …`) exercises the same library functions that any skill wrapper calls (per D-01).
+2. The scripted backbone covers the SEED-001 dimensions: rhythms, decisions, dependencies, tacit knowledge, and friction, with explicit confirm-before-persist checkpoints.
+3. Optional LLM deepening is gated (flag and/or env) and is not required for baseline tests (per D-03).
+
+---
+
+### ELIC-02 — Validated extraction-shaped graph input
+
+**Goal:** Elicited answers become `nodes` / `edges` dicts that satisfy `graphify.validate.validate_extraction` before graph assembly.
+
+**Acceptance criteria:**
+
+1. For a representative fixture session, `validate_extraction(elicitation_dict)` returns no schema errors.
+2. Elicitation-fed data reaches `build.build()` / `build.build_from_json()` only after validation (or with the same warning policy as other extraction merges for dangling edges).
+3. Elicitation is integrated via a persisted sidecar (or bundle) merged in `build` with explicit ordering/dedup rules (per D-06).
+
+---
+
+### ELIC-03 — Harness-aligned artifacts (SOUL / HEARTBEAT / USER)
+
+**Goal:** Outputs remain compatible with Phase 13 harness shapes: either direct markdown from elicitation state (fast path) or `export_claude_harness`-compatible snapshots under `graphify/harness_schemas/claude.yaml` when a graph bundle exists (per D-04).
+
+**Acceptance criteria:**
+
+1. When a graph JSON + sidecars exist, `graphify harness export` (or shared `export_claude_harness`) can consume elicitation-enriched data without ad-hoc template forks.
+2. When no graph exists yet, elicitation can still emit SOUL/HEARTBEAT/USER-class files whose structure matches schema placeholders (filenames and section intent per `claude.yaml`).
+3. Labels and paths pass through existing sanitization (`security.py` and harness annotation allow-lists as applicable).
+
+---
+
+### ELIC-04 — Idempotent re-run behavior
+
+**Goal:** Re-running elicitation does not duplicate nodes/edges without an explicit merge, replace, or preview strategy.
+
+**Acceptance criteria:**
+
+1. Behavior is documented (README fragment, `docs/…`, or CLI `--help`) describing default merge vs overwrite vs preview.
+2. At least one `tmp_path` test proves duplicate suppression or preview gating for a second run against the same target bundle.
+
+---
+
+### ELIC-05 — Path confinement
+
+**Goal:** All writes from elicitation stay inside approved roots resolved the same way as the rest of the pipeline (`validate_graph_path` / `ResolvedOutput.artifacts_dir` patterns).
+
+**Acceptance criteria:**
+
+1. Attempted escape paths (e.g. `..` components, symlinks outside root where tests simulate) fail closed with clear errors.
+2. Default artifact locations use vault-resolved `artifacts_dir` when `resolve_output()` applies (per D-05).
+
+---
+
+### ELIC-06 — Offline unit test coverage
+
+**Goal:** Core state machine, validation, and merge behaviors are covered without network calls.
+
+**Acceptance criteria:**
+
+1. `tests/test_elicit.py` (or split per module) runs under `pytest` with no external API usage.
+2. CI-matching commands (`pytest tests/… -q`) document the minimum elicitation test entrypoints in PLAN verification blocks.
+
+---
+
+### ELIC-07 — Discovery-first documentation
+
+**Goal:** A dedicated doc explains when elicitation fits (empty/tiny corpus, onboarding) versus full corpus extraction (per D-02, D-08).
+
+**Acceptance criteria:**
+
+1. A non-README primary file (e.g. `docs/ELICITATION.md`) links from CLI help or top-level docs index where appropriate.
+2. The doc states prerequisites (vault/profile if required), output locations, and how elicitation data joins the graph via sidecar merge.
+
+---
 
 ## Multi-harness memory & inverse import
 
