@@ -11,6 +11,7 @@
 - ✅ **v1.6 Hardening & Onboarding** — Phases 23–26 (shipped 2026-04-27)
 - ✅ **v1.7 Vault Adapter UX & Template Polish** — Phases 27–31 (shipped 2026-04-28)
 - ✅ **v1.8 Output Taxonomy & Cluster Quality** — Phases 32–38 (shipped 2026-04-29)
+- 🔲 **v1.9 Onboarding, Harness Portability & Vault CLI** — Phases 39–41 (planning)
 
 ## Phases
 
@@ -265,6 +266,29 @@ Make vault output legible at a glance and deliver a safe `work-vault` → `ls-va
 
 ---
 
+<details>
+<summary>🔲 v1.9 Onboarding, Harness Portability & Vault CLI (Phases 39–41) — PLANNING</summary>
+
+Activate **SEED-001** (tacit-to-explicit elicitation), **SEED-002** (multi-harness memory + inverse import, with injection defenses), and complete **SEED-vault-root-aware-cli** (explicit `--vault`, multi-vault selector) on top of v1.7 vault detection.
+
+**Phases:**
+
+- [ ] **Phase 39: Tacit-to-Explicit Onboarding & Elicitation** — Guided interview/state machine → validated extraction → SOUL/HEARTBEAT/USER artifacts; docs for discovery-first workflows. **Requirements:** ELIC-01–ELIC-07. **Depends on:** None within milestone (uses existing `validate`/`build`/`security`).
+- [ ] **Phase 40: Multi-Harness Memory, Inverse Import & Injection Defenses** — Extend harness export/import, canonical schemas, MCP parity, SECURITY.md threats; sanitize imported harness content. **Requirements:** PORT-01–PORT-05, SEC-01–SEC-04. **Depends on:** Phase 39 recommended for coherent artifact story (SOUL/HEARTBEAT provenance); can proceed in parallel if interfaces are frozen early.
+- [ ] **Phase 41: Vault CLI — `--vault` & Multi-Vault Selector** — Deterministic vault root flag, discovery/selection UX, `doctor` + dry-run alignment. **Requirements:** VCLI-01–VCLI-06. **Depends on:** v1.7 `ResolvedOutput` / vault detection (shipped).
+
+**Success criteria (milestone):**
+
+1. A user with no corpus can run elicitation and obtain graph + harness artifacts without manual YAML authoring.
+2. Harness import/export paths share validation with CLI and resist injection gadgets covered by tests.
+3. Scripts can pin vault context with `--vault` and multi-root environments can select a vault without fragile `cd`.
+
+**Totals:** 3 phases; 22 requirements mapped (see `.planning/REQUIREMENTS.md`).
+
+</details>
+
+---
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -314,6 +338,9 @@ Make vault output legible at a glance and deliver a safe `work-vault` → `ls-va
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 5/5 | Complete    | 2026-04-29 |
 | 37. Validation Metadata Ratification | v1.8 | 2/2 | Complete   | 2026-04-29 |
 | 38. Dormant seeds & quick-task reconciliation | v1.8 | 2/2 | Complete | 2026-04-29 |
+| 39. Tacit-to-Explicit Onboarding & Elicitation | v1.9 | 0/? | Not started | — |
+| 40. Multi-Harness Memory, Inverse Import & Injection Defenses | v1.9 | 0/? | Not started | — |
+| 41. Vault CLI — `--vault` & Multi-Vault Selector | v1.9 | 0/? | Not started | — |
 
 ---
-*Last updated: 2026-04-29 — v1.8 milestone shipped; see `.planning/milestones/v1.8-ROADMAP.md` for full phase detail.*
+*Last updated: 2026-04-29 — Milestone v1.9 planned (Phases 39–41); v1.8 shipped — see `.planning/milestones/v1.8-ROADMAP.md` for prior phase detail.*

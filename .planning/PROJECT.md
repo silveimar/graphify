@@ -12,9 +12,17 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community output, `mapping.min_community_size` cluster floor, concept naming with cache and fallbacks, repo identity resolution, CODE vs concept note classes, preview-first `update-vault` migration, platform skill alignment, Nyquist validation metadata ratification, and Phase 38 docs-only dormant-seed/quick-task reconciliation. Full detail: `.planning/milestones/v1.8-ROADMAP.md`.
 
-## Next milestone
+## Current Milestone: v1.9 Onboarding, Harness Portability & Vault CLI
 
-Not defined yet. Run `/gsd-new-milestone` to gather goals, requirements, and roadmap for v1.9 (or the next version label you choose).
+**Goal:** Turn discovery and onboarding into first-class graphify capabilities: structured tacit-to-explicit elicitation (SEED-001), expanded multi-harness memory export/import with prompt-injection defenses (SEED-002 follow-on), and the remaining vault-root CLI surface—explicit `--vault` plus a multi-vault selector—building on v1.7 vault detection.
+
+**Target features:**
+
+- Tacit-to-explicit onboarding: guided interview → validated graph projection + SOUL/HEARTBEAT/USER artifacts
+- Harness portability: additional export targets, canonical schema mappings, `import-harness`, shared sanitization with MCP
+- Vault CLI: deterministic `--vault`, multi-vault discovery/selection, doctor/dry-run consistency
+
+**Phases:** 39–41 (continued after v1.8 Phase 38). Requirements: `.planning/REQUIREMENTS.md`. Roadmap: `.planning/ROADMAP.md`.
 
 ---
 
@@ -128,9 +136,9 @@ Not defined yet. Run `/gsd-new-milestone` to gather goals, requirements, and roa
 - ✓ Mandatory dual-artifact persistence — sentinel "Mandatory response persistence" block emitted byte-equal across all 9 platform skill variants (`skill.md`, `skill-codex.md`, `skill-opencode.md`, `skill-openclaw.md`, `skill-droid.md`, `skill-trae.md`, `skill-trae-cn.md`, copilot/antigravity); 12 parametrized tests over `_PLATFORM_CONFIG` enforce drift-lock — SKILLMEM-01..04
 - ✓ v1.5 configuration walkthrough — single-file `CONFIGURING_V1_5.md` (414 lines) covers `vault-promote → --diagram-seeds → --init-diagram-templates → install excalidraw → /excalidraw-diagram` end-to-end with annotated `.graphify/profile.yaml` (6 built-ins + custom `decision-tree`) and verbatim MCP `list_diagram_seeds` / `get_diagram_seed` / `_resolve_alias` quotes; README cross-link added — DOCS-01..04
 
-### Active
+### Active (v1.9)
 
-No active milestone requirements until `/gsd-new-milestone` locks the next version.
+See `.planning/REQUIREMENTS.md` — ELIC-* (elicitation), PORT-* / SEC-* (harness portability + injection defenses), VCLI-* (vault CLI). Traceability maps requirements to Phases 39–41.
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -250,13 +258,12 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-Define v1.9+ via `/gsd-new-milestone` (requirements, roadmap, phase numbering).
+After v1.9 ships, run `/gsd-complete-milestone` then `/gsd-new-milestone` for the next version label.
 
-Backlog candidates:
-- Onboarding & Tacit-to-Explicit (SEED-001 trigger conditions met when discovery becomes a primary theme)
-- Multi-harness memory expansion + prompt-injection defenses (SEED-002 follow-on)
-- Remaining vault-root-aware CLI surface: explicit `--vault` flag and multi-vault selector
-- 2 pre-existing baseline test failures (`test_detect_skips_dotfiles`, `test_collect_files_from_dir`) — separate `/gsd-debug` session
+**Still deferred / separate tracks:**
+
+- 2 pre-existing baseline test failures (`test_detect_skips_dotfiles`, `test_collect_files_from_dir`) — track via `/gsd-debug` unless pulled into a future milestone explicitly.
+- **SEED-bidirectional-concept-code-links** — dormant until scoped in a future milestone.
 
 ---
-*Last updated: 2026-04-29 — v1.8 Output Taxonomy & Cluster Quality shipped*
+*Last updated: 2026-04-29 — Milestone v1.9 initialized (Onboarding, Harness Portability & Vault CLI)*

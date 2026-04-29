@@ -1,36 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.8
-milestone_name: Output Taxonomy & Cluster Quality
-status: completed
-stopped_at: v1.8 archived
-last_updated: "2026-04-29T16:51:40.037Z"
-last_activity: 2026-04-29 — v1.8 archived; REQUIREMENTS reset pending
+milestone: v1.9
+milestone_name: Onboarding, Harness Portability & Vault CLI
+status: planning
+last_updated: "2026-04-29T17:20:16.180Z"
+last_activity: 2026-04-29
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 25
-  completed_plans: 25
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-29 after v1.8 ship)
+See: .planning/PROJECT.md (milestone v1.9)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
-**Current focus:** Planning the next milestone (`/gsd-new-milestone`)
+**Current focus:** Milestone v1.9 — requirements locked; execute Phase 39 (`/gsd-discuss-phase 39` or `/gsd-plan-phase 39`)
 
 ## Current Position
 
-Milestone: v1.8 shipped (2026-04-29)
-Phase: —
-Status: Milestone complete — awaiting next roadmap
-Last activity: 2026-04-29 — v1.8 archived; REQUIREMENTS reset pending
-
-Progress: [██████████] 100% (v1.8)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-29 — Milestone v1.9 started
 
 ## Performance Metrics
 
