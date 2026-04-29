@@ -402,6 +402,64 @@ def test_to_obsidian_dry_run_uses_repo_prefixed_code_paths(tmp_path):
     assert not any("_COMMUNITY_" in path for path in relative_paths)
 
 
+def test_to_obsidian_code_note_links_to_final_concept_label(tmp_path):
+    from graphify.export import to_obsidian
+    from graphify.profile import _DEFAULT_PROFILE
+
+    G, communities = _phase33_graph()
+    out_root = tmp_path / "graphify-out"
+    obsidian_dir = out_root / "obsidian"
+    profile = json.loads(json.dumps(_DEFAULT_PROFILE))
+    profile["repo"] = {"identity": "graphify"}
+    profile["naming"]["concept_names"]["enabled"] = False
+    profile["mapping"]["min_community_size"] = 1
+
+    to_obsidian(
+        G,
+        communities,
+        output_dir=str(obsidian_dir),
+        profile=profile,
+        community_labels={0: "Auth Concepts"},
+    )
+
+    code_note = next(obsidian_dir.rglob("CODE_graphify_Auth_Session.md"))
+    text = code_note.read_text(encoding="utf-8")
+    assert "up:" in text
+    assert "[[Auth_Concepts|Auth Concepts]]" in text
+    assert "Auth Session c" not in text
+
+
+def test_to_obsidian_bucketed_code_note_links_to_unclassified(tmp_path):
+    from graphify.export import to_obsidian
+    from graphify.profile import _DEFAULT_PROFILE
+
+    G = nx.Graph()
+    G.add_node(
+        "n_orphan",
+        label="Orphan Service",
+        file_type="code",
+        source_file="src/orphan.py",
+        source_location="L1",
+        community=0,
+    )
+    out_root = tmp_path / "graphify-out"
+    obsidian_dir = out_root / "obsidian"
+    profile = json.loads(json.dumps(_DEFAULT_PROFILE))
+    profile["repo"] = {"identity": "graphify"}
+    profile["naming"]["concept_names"]["enabled"] = False
+
+    to_obsidian(
+        G,
+        {0: ["n_orphan"]},
+        output_dir=str(obsidian_dir),
+        profile=profile,
+    )
+
+    code_note = next(obsidian_dir.rglob("CODE_graphify_Orphan_Service.md"))
+    text = code_note.read_text(encoding="utf-8")
+    assert "[[Unclassified|_Unclassified]]" in text
+
+
 def _code_collision_graph(order: str) -> tuple[nx.Graph, dict[int, list[str]]]:
     G = nx.Graph()
     nodes = [

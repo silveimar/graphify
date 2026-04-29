@@ -969,6 +969,48 @@ def test_render_note_uses_filename_stem_from_context_for_code_notes():
     assert "type: code" in text
 
 
+def test_render_code_note_links_up_to_parent_moc():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context(
+        note_type="code",
+        parent_moc_label="Auth Concepts",
+        community_name="Auth Concepts",
+        community_tag="auth-concepts",
+        filename_stem="CODE_graphify_Auth_Service",
+    )
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+
+    fname, text = render_note("n_transformer", G, profile, "code", ctx)
+
+    assert fname == "CODE_graphify_Auth_Service.md"
+    assert "type: code" in text
+    assert "up:" in text
+    assert "[[Auth_Concepts|Auth Concepts]]" in text
+    assert "> Up: [[Auth_Concepts|Auth Concepts]]" in text
+
+
+def test_render_code_note_collision_metadata_uses_frontmatter():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context(
+        note_type="code",
+        filename_stem="CODE_graphify_Auth_Service_ab12cd34",
+        filename_collision=True,
+        filename_collision_hash="ab12cd34",
+    )
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+
+    _, text = render_note("n_transformer", G, profile, "code", ctx)
+
+    assert "filename_collision: true" in text
+    assert "filename_collision_hash: ab12cd34" in text
+
+
 def test_render_note_wikilink_alias_human_label():
     from tests.fixtures.template_context import make_min_graph, make_classification_context
     from graphify.templates import render_note
@@ -1493,6 +1535,28 @@ def test_render_moc_contains_members_section():
     _, text = render_moc(0, G, communities, profile, ctx)
     assert "> [!info] Things" in text
     assert "[[Transformer|Transformer]]" in text
+
+
+def test_render_moc_lists_code_members_safely():
+    from tests.fixtures.template_context import make_min_graph, make_moc_context
+    from graphify.templates import render_moc
+
+    G = make_min_graph()
+    ctx = make_moc_context(
+        code_members=[
+            {"id": "n_auth", "label": "CODE graphify Auth]]Service|Unsafe"},
+        ],
+        code_member_labels=["CODE graphify Auth]]Service|Unsafe"],
+    )
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+    communities = {0: ["n_transformer", "n_paper"]}
+
+    _, text = render_moc(0, G, communities, profile, ctx)
+
+    assert "related:" in text
+    assert "Important CODE Notes" in text
+    assert "[[CODE_Graphify_AuthServiceUnsafe|CODE graphify Auth  Service Unsafe]]" in text
+    assert "Auth]]Service|Unsafe" not in text
 
 
 def test_render_moc_contains_dataview_fence():
