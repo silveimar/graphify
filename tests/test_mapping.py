@@ -90,13 +90,27 @@ def test_match_when_non_string_attr_contains_returns_false():
 
 def _profile(**overrides) -> dict:
     base = {
+        "taxonomy": {
+            "version": "v1.8",
+            "root": "Atlas/Sources/Graphify",
+            "folders": {
+                "moc": "MOCs",
+                "thing": "Things",
+                "statement": "Statements",
+                "person": "People",
+                "source": "Sources",
+                "default": "Things",
+                "unclassified": "MOCs",
+            },
+        },
         "folder_mapping": {
-            "moc": "Atlas/Maps/",
-            "thing": "Atlas/Dots/Things/",
-            "statement": "Atlas/Dots/Statements/",
-            "person": "Atlas/Dots/People/",
-            "source": "Atlas/Sources/",
-            "default": "Atlas/Dots/",
+            "moc": "Atlas/Sources/Graphify/MOCs/",
+            "thing": "Atlas/Sources/Graphify/Things/",
+            "statement": "Atlas/Sources/Graphify/Statements/",
+            "person": "Atlas/Sources/Graphify/People/",
+            "source": "Atlas/Sources/Graphify/Sources/",
+            "default": "Atlas/Sources/Graphify/Things/",
+            "unclassified": "Atlas/Sources/Graphify/MOCs/",
         },
         "mapping_rules": [],
         # top_n=1 restricts god nodes to the single top-degree real node
@@ -106,7 +120,7 @@ def _profile(**overrides) -> dict:
         # default-statement assertions untestable. Plan 02/03 tests with
         # larger fixtures can override this via the `topology` key.
         "topology": {"god_node": {"top_n": 1}},
-        "mapping": {"moc_threshold": 3},
+        "mapping": {"min_community_size": 3},
     }
     base.update(overrides)
     return base
@@ -119,7 +133,7 @@ def test_classify_default_statement_uses_folder_mapping_default():
     G, communities = make_classification_fixture()
     result = classify(G, communities, _profile())
     assert result["per_node"]["n_softmax"]["note_type"] == "statement"
-    assert result["per_node"]["n_softmax"]["folder"] == "Atlas/Dots/Statements/"
+    assert result["per_node"]["n_softmax"]["folder"] == "Atlas/Sources/Graphify/Statements/"
 
 
 def test_classify_rule_folder_override():
@@ -144,7 +158,7 @@ def test_classify_topology_fallback_god_node_becomes_thing():
     result = classify(G, communities, _profile())
     # n_transformer has degree 5 → top god node
     assert result["per_node"]["n_transformer"]["note_type"] == "thing"
-    assert result["per_node"]["n_transformer"]["folder"] == "Atlas/Dots/Things/"
+    assert result["per_node"]["n_transformer"]["folder"] == "Atlas/Sources/Graphify/Things/"
 
 
 def test_classify_default_statement_when_no_match():
@@ -156,7 +170,7 @@ def test_classify_default_statement_when_no_match():
     # n_token: degree 1, below god-node threshold in a small graph
     # (n_transformer=5 takes the top slot)
     assert result["per_node"]["n_token"]["note_type"] == "statement"
-    assert result["per_node"]["n_token"]["folder"] == "Atlas/Dots/Statements/"
+    assert result["per_node"]["n_token"]["folder"] == "Atlas/Sources/Graphify/Statements/"
 
 
 def test_classify_attribute_rule_beats_topology():
@@ -172,7 +186,7 @@ def test_classify_attribute_rule_beats_topology():
     # n_auth has file_type=person AND is a god node (degree 2 in cid 1).
     # The explicit attribute rule must win.
     assert result["per_node"]["n_auth"]["note_type"] == "person"
-    assert result["per_node"]["n_auth"]["folder"] == "Atlas/Dots/People/"
+    assert result["per_node"]["n_auth"]["folder"] == "Atlas/Sources/Graphify/People/"
 
 
 def test_classify_first_match_wins_rule_order():
@@ -429,15 +443,15 @@ def test_community_above_threshold_becomes_moc():
     result = classify(G, communities, _profile())
     assert 0 in result["per_community"]
     assert result["per_community"][0]["note_type"] == "moc"
-    assert result["per_community"][0]["folder"] == "Atlas/Maps/"
+    assert result["per_community"][0]["folder"] == "Atlas/Sources/Graphify/MOCs/"
     assert result["per_community"][0]["community_name"] == "Transformer"
 
 
-def test_default_profile_moc_threshold_is_3():
+def test_default_profile_min_community_size_is_3():
     """VALIDATION row 3-01-09.
 
-    Plan 02 tests exercise the behavior with an explicit ``moc_threshold: 3``
-    in ``_profile()``; Plan 03 lands the literal ``_DEFAULT_PROFILE`` default.
+    Plan 02 tests exercised the behavior with ``moc_threshold``; v1.8 uses
+    ``mapping.min_community_size`` as the canonical standalone MOC floor.
     """
     from graphify.mapping import classify
 
@@ -449,6 +463,54 @@ def test_default_profile_moc_threshold_is_3():
     assert 0 in result["per_community"]
     assert 1 not in result["per_community"]
     assert 2 not in result["per_community"]
+
+
+def test_mapping_min_community_size_controls_standalone_moc_floor():
+    from graphify.mapping import classify
+
+    G, communities = make_classification_fixture()
+
+    low_floor = classify(G, communities, _profile(mapping={"min_community_size": 2}))
+    high_floor = classify(G, communities, _profile(mapping={"min_community_size": 3}))
+
+    assert 1 in low_floor["per_community"]
+    assert low_floor["per_community"][1]["note_type"] == "moc"
+    assert low_floor["per_community"][1]["folder"] == "Atlas/Sources/Graphify/MOCs/"
+    assert 1 not in high_floor["per_community"]
+
+
+def test_taxonomy_moc_folder_wins_over_conflicting_folder_mapping():
+    from graphify.mapping import classify
+
+    G, communities = make_classification_fixture()
+    profile = _profile(
+        taxonomy={
+            "version": "v1.8",
+            "root": "Custom/Graphify",
+            "folders": {
+                "moc": "Concept MOCs",
+                "thing": "Things",
+                "statement": "Statements",
+                "person": "People",
+                "source": "Sources",
+                "default": "Things",
+                "unclassified": "Concept MOCs",
+            },
+        },
+        folder_mapping={
+            "moc": "Old/Maps/",
+            "thing": "Old/Things/",
+            "statement": "Old/Statements/",
+            "person": "Old/People/",
+            "source": "Old/Sources/",
+            "default": "Old/Default/",
+            "unclassified": "Old/Unclassified/",
+        },
+    )
+
+    result = classify(G, communities, profile)
+
+    assert result["per_community"][0]["folder"] == "Custom/Graphify/Concept MOCs/"
 
 
 def test_community_below_threshold_collapses_to_host():
@@ -491,8 +553,9 @@ def test_bucket_moc_absorbs_hostless_below_threshold():
     result = classify(G, communities, _profile())
     # No above-threshold communities → bucket MOC emitted
     assert -1 in result["per_community"]
-    assert result["per_community"][-1]["community_name"] == "Uncategorized"
-    assert result["per_community"][-1]["community_tag"] == "uncategorized"
+    assert result["per_community"][-1]["folder"] == "Atlas/Sources/Graphify/MOCs/"
+    assert result["per_community"][-1]["community_name"] == "_Unclassified"
+    assert result["per_community"][-1]["community_tag"] == "unclassified"
     # Both below communities merged into bucket
     assert len(result["per_community"][-1]["sub_communities"]) == 2
 

@@ -186,3 +186,45 @@ def test_to_obsidian_default_no_dedup_hydration(tmp_path):
         dry_run=True,
     )
     assert "merged_from" not in G.nodes["foo"]
+
+
+def test_to_obsidian_no_profile_dry_run_uses_graphify_default_paths(tmp_path):
+    from graphify.export import to_obsidian
+    import networkx as nx
+
+    G = nx.Graph()
+    G.add_node(
+        "transformer",
+        label="Transformer",
+        file_type="code",
+        source_file="model.py",
+        source_location="L1",
+        community=0,
+    )
+    G.add_node(
+        "softmax",
+        label="Softmax",
+        file_type="code",
+        source_file="model.py",
+        source_location="L2",
+        community=0,
+    )
+    G.add_edge("transformer", "softmax", relation="calls", confidence="EXTRACTED")
+    obsidian_dir = tmp_path / "obsidian"
+    obsidian_dir.mkdir()
+
+    plan = to_obsidian(
+        G,
+        communities={0: ["transformer", "softmax"]},
+        output_dir=str(obsidian_dir),
+        dry_run=True,
+    )
+
+    relative_paths = [
+        action.path.relative_to(obsidian_dir).as_posix()
+        for action in plan.actions
+        if action.action == "CREATE"
+    ]
+    assert relative_paths
+    assert all(path.startswith("Atlas/Sources/Graphify/") for path in relative_paths)
+    assert any(path.startswith("Atlas/Sources/Graphify/MOCs/") for path in relative_paths)
