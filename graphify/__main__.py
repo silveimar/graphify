@@ -1466,9 +1466,14 @@ def main() -> None:
                 continue
             communities.setdefault(cid_int, []).append(node_id)
 
-        # Call the library — profile discovery happens inside to_obsidian
-        # itself (load_profile(out) falls back to _DEFAULT_PROFILE when the
-        # vault has no .graphify/profile.yaml). The CLI passes profile=None.
+        profile = None
+        if resolved.vault_detected and resolved.vault_path is not None:
+            from graphify.profile import load_profile
+            profile = load_profile(resolved.vault_path)
+
+        # Call the library. When a vault was detected, pass the vault profile
+        # explicitly because obsidian_dir may point at a profile-selected notes
+        # subdirectory rather than the vault root.
         from graphify.export import to_obsidian
         from graphify.merge import MergePlan, format_merge_plan
         try:
@@ -1476,6 +1481,7 @@ def main() -> None:
                 G,
                 communities,
                 obsidian_dir,
+                profile=profile,
                 repo_identity=cli_repo_identity,
                 dry_run=dry_run,
                 force=force,
