@@ -116,7 +116,7 @@ _DEFAULT_PROFILE: dict = {
     "dataview_queries": {},
     # Phase 3 extensions (D-48, D-52)
     "topology": {"god_node": {"top_n": 10}},
-    "mapping": {"min_community_size": 3},
+    "mapping": {"min_community_size": 6},
     # Phase 19 extensions (D-17, D-18)
     "tag_taxonomy": {
         "garden": ["plant", "cultivate", "probe", "repot", "revitalize", "revisit", "question"],
@@ -165,11 +165,11 @@ _VALID_TOP_LEVEL_KEYS = {
 }
 
 # Phase 31 (TMPL-03, D-12): per-note-type keys allowed under `dataview_queries:`.
-# Frozen to exactly six members. Defined in profile.py (not templates.py) to
+# Defined in profile.py (not templates.py) to
 # avoid the templates.py ↔ profile.py import cycle — same precedent as
 # `_REQUIRED_PER_TYPE` (see validate_profile_preflight Layer 2 below).
 _KNOWN_NOTE_TYPES: frozenset[str] = frozenset(
-    {"moc", "community", "thing", "statement", "person", "source"}
+    {"moc", "community", "thing", "statement", "person", "source", "code"}
 )
 
 _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
