@@ -187,6 +187,63 @@ def test_obsidian_output_flag_takes_precedence_over_obsidian_dir(tmp_path):
     assert "loser" not in result.stderr.split("overrides")[0]
 
 
+def test_run_repo_identity_flag_overrides_profile(tmp_path):
+    pytest.importorskip("yaml")
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / ".obsidian").mkdir()
+    (vault / ".graphify").mkdir()
+    (vault / ".graphify" / "profile.yaml").write_text(
+        _V18_PROFILE_BASE
+        + "repo:\n  identity: profile-repo\n"
+        + "output:\n  mode: vault-relative\n  path: Atlas/Generated\n",
+        encoding="utf-8",
+    )
+    custom = tmp_path / "graphify-out"
+
+    result = _graphify(
+        ["run", "--repo-identity", "cli-repo", "--output", str(custom), "--router"],
+        cwd=vault,
+    )
+
+    assert "[graphify] repo identity: cli-repo (source=cli-flag)" in result.stderr
+    assert result.stderr.count("[graphify] repo identity:") == 1
+    assert "profile-repo (source=profile)" not in result.stderr
+
+
+def test_obsidian_repo_identity_flag_overrides_profile(tmp_path):
+    pytest.importorskip("yaml")
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / ".obsidian").mkdir()
+    (vault / ".graphify").mkdir()
+    (vault / ".graphify" / "profile.yaml").write_text(
+        _V18_PROFILE_BASE
+        + "repo:\n  identity: profile-repo\n"
+        + "output:\n  mode: vault-relative\n  path: Atlas/Generated\n",
+        encoding="utf-8",
+    )
+    (vault / "graph.json").write_text(
+        '{"directed":false,"multigraph":false,"graph":{},"nodes":[],"links":[]}',
+        encoding="utf-8",
+    )
+
+    result = _graphify(
+        [
+            "--obsidian",
+            "--graph",
+            str(vault / "graph.json"),
+            "--repo-identity=cli-repo",
+            "--dry-run",
+        ],
+        cwd=vault,
+    )
+
+    assert "[graphify] repo identity: cli-repo (source=cli-flag)" in result.stderr
+    assert result.stderr.count("[graphify] repo identity:") == 1
+    assert "profile-repo (source=profile)" not in result.stderr
+
+
 # ---------------------------------------------------------------------------
 # Phase 29 / VAULT-14 / VAULT-15: doctor subcommand wiring
 # ---------------------------------------------------------------------------

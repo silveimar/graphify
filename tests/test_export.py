@@ -228,3 +228,78 @@ def test_to_obsidian_no_profile_dry_run_uses_graphify_default_paths(tmp_path):
     assert relative_paths
     assert all(path.startswith("Atlas/Sources/Graphify/") for path in relative_paths)
     assert any(path.startswith("Atlas/Sources/Graphify/MOCs/") for path in relative_paths)
+
+
+def _phase33_graph():
+    G = nx.Graph()
+    G.add_node(
+        "n_auth_session",
+        label="Auth Session",
+        file_type="code",
+        source_file="auth/session.py",
+        source_location="L10",
+        community=0,
+    )
+    G.add_node(
+        "n_refresh_token",
+        label="Refresh Token",
+        file_type="code",
+        source_file="auth/tokens.py",
+        source_location="L20",
+        community=0,
+    )
+    G.add_node(
+        "n_login_flow",
+        label="Login Flow",
+        file_type="document",
+        source_file="docs/login.md",
+        source_location="L1",
+        community=0,
+    )
+    G.add_edges_from([
+        ("n_auth_session", "n_refresh_token"),
+        ("n_auth_session", "n_login_flow"),
+    ])
+    return G, {0: ["n_auth_session", "n_refresh_token", "n_login_flow"]}
+
+
+def test_to_obsidian_resolves_concept_names_for_moc_paths(tmp_path):
+    from graphify.export import to_obsidian
+
+    G, communities = _phase33_graph()
+    out_root = tmp_path / "graphify-out"
+    obsidian_dir = out_root / "obsidian"
+
+    plan = to_obsidian(
+        G,
+        communities,
+        output_dir=str(obsidian_dir),
+        community_labels={0: "Authentication Session Flow"},
+        dry_run=True,
+    )
+
+    created = [action for action in plan.actions if action.action == "CREATE"]
+    assert created
+    moc_paths = [action.path.relative_to(obsidian_dir).as_posix() for action in created]
+    assert any(
+        "Atlas/Sources/Graphify/MOCs/Authentication_Session_Flow.md" in path
+        for path in moc_paths
+    )
+
+
+def test_to_obsidian_dry_run_does_not_write_naming_sidecar(tmp_path):
+    from graphify.export import to_obsidian
+
+    G, communities = _phase33_graph()
+    out_root = tmp_path / "graphify-out"
+    obsidian_dir = out_root / "obsidian"
+
+    to_obsidian(
+        G,
+        communities,
+        output_dir=str(obsidian_dir),
+        community_labels={0: "Authentication Session Flow"},
+        dry_run=True,
+    )
+
+    assert not (out_root / "concept-names.json").exists()

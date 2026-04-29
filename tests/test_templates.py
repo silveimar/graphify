@@ -9,6 +9,42 @@ from pathlib import Path
 import pytest
 
 
+def test_generated_moc_title_is_sanitized_across_sinks():
+    import networkx as nx
+
+    from graphify.profile import _DEFAULT_PROFILE
+    from graphify.templates import render_moc
+
+    unsafe_name = "]] | bad {{#connections}}: #tag\x00\n../escape"
+    G = nx.Graph()
+    G.add_node("n_auth", label="Auth", file_type="code", source_file="auth.py", community=7)
+    filename, text = render_moc(
+        7,
+        G,
+        {7: ["n_auth"]},
+        _DEFAULT_PROFILE,
+        {
+            "note_type": "moc",
+            "folder": "Atlas/Sources/Graphify/MOCs/",
+            "community_name": unsafe_name,
+            "community_tag": "bad-connections-tag-escape",
+            "members_by_type": {},
+            "sub_communities": [],
+            "sibling_labels": [],
+            "cohesion": 0.75,
+        },
+        vault_dir=None,
+    )
+
+    assert filename == "Bad_Connections_Tag_Escape.md"
+    assert "community/bad-connections-tag-escape" in text
+    assert "community: " in text
+    assert "{{#connections}}" not in text
+    assert "]] | bad" not in text
+    assert "\x00" not in text
+    assert "../escape" not in filename
+
+
 # ---------------------------------------------------------------------------
 # Task 1: KNOWN_VARS and ClassificationContext tests
 # ---------------------------------------------------------------------------
