@@ -11,7 +11,7 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 
 - [ ] **TAX-01**: User can run graphify with no vault profile and receive generated notes under a Graphify-owned default subtree.
 - [ ] **TAX-02**: User can find default concept MOCs under `Atlas/Sources/Graphify/MOCs/`.
-- [ ] **TAX-03**: User-authored vault profiles continue to override default folder placement without requiring profile rewrites.
+- [ ] **TAX-03**: User-authored v1.8 vault profiles can override default folder placement through `taxonomy:`, while profiles missing `taxonomy:` or `mapping.min_community_size` fail validation.
 - [ ] **TAX-04**: User can validate a v1.8 profile and see actionable errors for unsupported taxonomy keys or invalid folder mappings.
 
 ### Community Output Semantics
@@ -22,10 +22,10 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 
 ### Cluster Quality Floor
 
-- [ ] **CLUST-01**: User can set `clustering.min_community_size` in the vault profile to control the minimum size for standalone MOC generation.
+- [ ] **CLUST-01**: User can set `mapping.min_community_size` in the vault profile to control the minimum size for standalone MOC generation.
 - [ ] **CLUST-02**: User sees isolate communities omitted from standalone MOC generation while their nodes remain available in graph data and non-community exports.
 - [ ] **CLUST-03**: User sees tiny connected communities below the configured floor routed deterministically into an `_Unclassified` MOC.
-- [ ] **CLUST-04**: User receives deterministic behavior when both legacy `mapping.moc_threshold` and new `clustering.min_community_size` are present, with the new key taking precedence.
+- [ ] **CLUST-04**: User receives a deterministic validation failure when legacy `mapping.moc_threshold` is present, including when `mapping.min_community_size` is also present.
 
 ### Concept Naming
 
