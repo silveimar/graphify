@@ -9,23 +9,23 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 
 ### Default Output Taxonomy
 
-- [ ] **TAX-01**: User can run graphify with no vault profile and receive generated notes under a Graphify-owned default subtree.
-- [ ] **TAX-02**: User can find default concept MOCs under `Atlas/Sources/Graphify/MOCs/`.
-- [ ] **TAX-03**: User-authored v1.8 vault profiles can override default folder placement through `taxonomy:`, while profiles missing `taxonomy:` or `mapping.min_community_size` fail validation.
-- [ ] **TAX-04**: User can validate a v1.8 profile and see actionable errors for unsupported taxonomy keys or invalid folder mappings.
+- [x] **TAX-01**: User can run graphify with no vault profile and receive generated notes under a Graphify-owned default subtree.
+- [x] **TAX-02**: User can find default concept MOCs under `Atlas/Sources/Graphify/MOCs/`.
+- [x] **TAX-03**: User-authored v1.8 vault profiles can override default folder placement through `taxonomy:`, while profiles missing `taxonomy:` or `mapping.min_community_size` fail validation.
+- [x] **TAX-04**: User can validate a v1.8 profile and see actionable errors for unsupported taxonomy keys or invalid folder mappings.
 
 ### Community Output Semantics
 
 - [ ] **COMM-01**: User receives MOC-only community output by default, with no generated `_COMMUNITY_*` overview notes.
 - [ ] **COMM-02**: User sees legacy `_COMMUNITY_*` files surfaced as migration candidates or orphans instead of silently ignored.
-- [ ] **COMM-03**: User receives targeted guidance when an existing custom profile or template requests hard-deprecated community overview output.
+- [x] **COMM-03**: User receives targeted guidance when an existing custom profile or template requests hard-deprecated community overview output.
 
 ### Cluster Quality Floor
 
-- [ ] **CLUST-01**: User can set `mapping.min_community_size` in the vault profile to control the minimum size for standalone MOC generation.
+- [x] **CLUST-01**: User can set `mapping.min_community_size` in the vault profile to control the minimum size for standalone MOC generation.
 - [ ] **CLUST-02**: User sees isolate communities omitted from standalone MOC generation while their nodes remain available in graph data and non-community exports.
 - [ ] **CLUST-03**: User sees tiny connected communities below the configured floor routed deterministically into an `_Unclassified` MOC.
-- [ ] **CLUST-04**: User receives a deterministic validation failure when legacy `mapping.moc_threshold` is present, including when `mapping.min_community_size` is also present.
+- [x] **CLUST-04**: User receives a deterministic validation failure when legacy `mapping.moc_threshold` is present, including when `mapping.min_community_size` is also present.
 
 ### Concept Naming
 
@@ -101,17 +101,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TAX-01 | Phase 32 | Pending |
-| TAX-02 | Phase 32 | Pending |
-| TAX-03 | Phase 32 | Pending |
-| TAX-04 | Phase 32 | Pending |
+| TAX-01 | Phase 32 | Complete |
+| TAX-02 | Phase 32 | Complete |
+| TAX-03 | Phase 32 | Complete |
+| TAX-04 | Phase 32 | Complete |
 | COMM-01 | Phase 34 | Pending |
 | COMM-02 | Phase 35 | Pending |
-| COMM-03 | Phase 32 | Pending |
-| CLUST-01 | Phase 32 | Pending |
+| COMM-03 | Phase 32 | Complete |
+| CLUST-01 | Phase 32 | Complete |
 | CLUST-02 | Phase 34 | Pending |
 | CLUST-03 | Phase 34 | Pending |
-| CLUST-04 | Phase 32 | Pending |
+| CLUST-04 | Phase 32 | Complete |
 | NAME-01 | Phase 33 | Pending |
 | NAME-02 | Phase 33 | Pending |
 | NAME-03 | Phase 33 | Pending |

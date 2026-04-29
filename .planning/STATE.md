@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: executing
-stopped_at: Completed 32-01-PLAN.md
-last_updated: "2026-04-29T00:10:00.649Z"
+stopped_at: Completed 32-02-PLAN.md
+last_updated: "2026-04-29T00:18:08.222Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
-  percent: 25
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 ## Current Position
 
 Phase: 32 (Profile Contract & Defaults) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-29
 
@@ -43,6 +43,7 @@ Progress: [###-------] 25%
 | v1.7 | 27-31 | 14 | 13/13 requirements, shipped 2026-04-28 |
 | v1.8 | 32-36 | TBD | 33/33 requirements mapped, not started |
 | Phase 32 P01 | 4min | 2 tasks | 3 files |
+| Phase 32 P02 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -57,6 +58,9 @@ Locked v1.8 choices:
 - v1.8 derives phases from current milestone requirements only and continues numbering at Phase 32.
 - [Phase 32]: Phase 32 planning contract uses mapping.min_community_size as the canonical cluster floor key.
 - [Phase 32]: mapping.moc_threshold is documented as invalid immediately for v1.8 profiles.
+- [Phase 32]: v1.8 taxonomy is resolved into folder_mapping at profile load/preflight time. — Keeps downstream mapping/export consumers on the existing folder_mapping contract while centralizing taxonomy truth in profile.py.
+- [Phase 32]: mapping.min_community_size is canonical; mapping.moc_threshold is a hard validation error. — Matches the locked v1.8 contract and prevents silent legacy precedence behavior.
+- [Phase 32]: Deprecated community overview templates remain renderable but produce MOC-only output migration warnings. — Phase 32 is the contract layer, so warnings guide migration without removing renderer support.
 
 ### Pending Todos
 
@@ -83,6 +87,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T00:09:18.092Z
-Stopped at: Completed 32-01-PLAN.md
+Last session: 2026-04-29T00:18:08.220Z
+Stopped at: Completed 32-02-PLAN.md
 Next action: `/gsd-execute-phase 32`
