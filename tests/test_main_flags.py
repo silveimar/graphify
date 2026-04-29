@@ -1,6 +1,7 @@
 """Integration tests for --output flag wiring in graphify CLI (Phase 27)."""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -363,6 +364,24 @@ def _make_update_vault_fixture(tmp_path: Path) -> tuple[Path, Path]:
     return raw, vault
 
 
+def _write_legacy_community(vault: Path, community_id: int = 12) -> Path:
+    legacy = vault / "Atlas" / "Sources" / "Graphify" / "MOCs" / f"_COMMUNITY_{community_id}.md"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(
+        "---\n"
+        "graphify_managed: true\n"
+        "type: community\n"
+        f"community: {community_id}\n"
+        "---\n"
+        f"# Legacy Community {community_id}\n"
+        "<!-- graphify:metadata:start -->\n"
+        "legacy graphify fingerprint\n"
+        "<!-- graphify:metadata:end -->\n",
+        encoding="utf-8",
+    )
+    return legacy
+
+
 def test_doctor_clean_exit_zero(tmp_path):
     pytest.importorskip("yaml")
     vault = _make_doctor_vault(tmp_path, profile_text=_DOCTOR_VALID_PROFILE)
@@ -446,6 +465,59 @@ def test_update_vault_preview_default_runs_pipeline(tmp_path):
         if ".graphify" not in p.relative_to(vault).parts
     ]
     assert vault_markdown == []
+
+
+def test_update_vault_apply_archives_legacy_notes_by_default(tmp_path):
+    pytest.importorskip("yaml")
+    raw, vault = _make_update_vault_fixture(tmp_path)
+    legacy = _write_legacy_community(vault)
+    legacy_text = legacy.read_text(encoding="utf-8")
+
+    preview = _graphify(
+        ["update-vault", "--input", str(raw), "--vault", str(vault)],
+        cwd=tmp_path,
+    )
+
+    assert preview.returncode == 0, (
+        f"expected preview exit 0; got {preview.returncode}\n"
+        f"stdout={preview.stdout}\nstderr={preview.stderr}"
+    )
+    assert legacy.exists()
+    assert "Archived legacy notes" not in preview.stdout
+    artifacts = tmp_path / "graphify-out" / "migrations"
+    plan_path = next(artifacts.glob("migration-plan-*.json"))
+    plan_id = json.loads(plan_path.read_text(encoding="utf-8"))["plan_id"]
+
+    apply = _graphify(
+        [
+            "update-vault",
+            "--input",
+            str(raw),
+            "--vault",
+            str(vault),
+            "--apply",
+            "--plan-id",
+            plan_id,
+        ],
+        cwd=tmp_path,
+    )
+
+    archive_path = (
+        tmp_path
+        / "graphify-out"
+        / "migrations"
+        / "archive"
+        / plan_id
+        / legacy.relative_to(vault)
+    )
+    assert apply.returncode == 0, (
+        f"expected apply exit 0; got {apply.returncode}\n"
+        f"stdout={apply.stdout}\nstderr={apply.stderr}"
+    )
+    assert not legacy.exists()
+    assert archive_path.read_text(encoding="utf-8") == legacy_text
+    assert "Archived legacy notes" in apply.stdout
+    assert "graphify-out/migrations/archive/" in apply.stdout
 
 
 def test_update_vault_apply_without_plan_id_exits_two(tmp_path):
