@@ -10,7 +10,7 @@
 - ✅ **v1.5 Diagram Intelligence & Excalidraw Bridge** — Phases 19–22 (shipped 2026-04-27)
 - ✅ **v1.6 Hardening & Onboarding** — Phases 23–26 (shipped 2026-04-27)
 - ✅ **v1.7 Vault Adapter UX & Template Polish** — Phases 27–31 (shipped 2026-04-28)
-- 🚧 **v1.8 Output Taxonomy & Cluster Quality** — Phases 32–36 (planned)
+- 🚧 **v1.8 Output Taxonomy & Cluster Quality** — Phases 32–37 (gap closure)
 
 ## Phases
 
@@ -257,6 +257,7 @@ Plans:
 - [x] **Phase 34: Mapping, Cluster Quality & Note Classes** - Apply MOC-only community semantics, the cluster-quality floor, and CODE-vs-concept note classes. (completed 2026-04-29)
 - [x] **Phase 35: Templates, Export Plumbing & Dry-Run/Migration Visibility** - Render the new taxonomy, expose repo identity in outputs, and make migration effects previewable. (completed 2026-04-29)
 - [x] **Phase 36: Migration Guide, Skill Alignment & Regression Sweep** - Document the real vault migration path and verify CLI, skill, security, and tests stay aligned. (completed 2026-04-29)
+- [ ] **Phase 37: Validation Metadata Ratification** - Normalize stale Nyquist validation metadata from the v1.8 milestone audit before archive closeout.
 
 ## Phase Details
 
@@ -348,6 +349,17 @@ Plans:
 **Wave 4** *(gap closure after verification)*
 - [x] 36-05-PLAN.md — Install-time Claude/AGENTS guidance alignment and drift tests
 
+### Phase 37: Validation Metadata Ratification
+**Goal:** Maintainers can close v1.8 with validation metadata that matches the already-passed phase verification evidence.
+**Depends on:** Phase 36
+**Requirements:** None — audit tech debt only
+**Gap Closure:** Closes validation metadata debt from `.planning/v1.8-MILESTONE-AUDIT.md`
+**Success Criteria** (what must be TRUE):
+  1. Phase 32, 33, 34, and 35 `*-VALIDATION.md` files expose consistent Nyquist metadata for automated discovery
+  2. Validation task rows and sign-off sections reflect the already-passed verification/test evidence without changing shipped behavior
+  3. Re-running `/gsd-audit-milestone` reports no validation-metadata tech debt for v1.8
+**Plans:** TBD
+
 ---
 
 ## Progress
@@ -397,6 +409,7 @@ Plans:
 | 34. Mapping, Cluster Quality & Note Classes | v1.8 | 5/5 | Complete   | 2026-04-29 |
 | 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 3/3 | Complete    | 2026-04-29 |
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 5/5 | Complete    | 2026-04-29 |
+| 37. Validation Metadata Ratification | v1.8 | 0/0 | Not started | - |
 
 ---
-*Last updated: 2026-04-28 — v1.8 Output Taxonomy & Cluster Quality planned: 5 phases (32–36), 33/33 requirements mapped, standard granularity.*
+*Last updated: 2026-04-29 — v1.8 validation metadata gap-closure phase added after milestone audit; 33/33 requirements remain satisfied.*
