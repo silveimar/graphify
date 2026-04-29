@@ -23,6 +23,15 @@ GUIDE_REQUIRED_PHRASES = (
     "Rerun graphify after reviewing the archive",
 )
 
+README_REQUIRED_PHRASES = (
+    "MIGRATION_V1_8.md",
+    "graphify update-vault --input <raw-corpus> --vault <target-vault>",
+    "preview is the default",
+    "--apply --plan-id <id>",
+    "graphify-out/migrations/archive/",
+    "does not destructively delete legacy notes",
+)
+
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
@@ -52,3 +61,10 @@ def test_v18_docs_contract_is_english_only():
     contract_names = {path.name for path in DOC_CONTRACT_FILES}
 
     assert not contract_names & LOCALIZED_READMES
+
+
+def test_readme_links_v18_migration_guide_and_update_vault_contract():
+    text = _read(README)
+
+    for phrase in README_REQUIRED_PHRASES:
+        assert phrase in text

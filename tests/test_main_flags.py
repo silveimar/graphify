@@ -537,3 +537,6 @@ def test_update_vault_help_lists_command_shape(tmp_path):
 
     assert result.returncode == 0
     assert "graphify update-vault --input work-vault/raw --vault ls-vault" in result.stdout
+    assert "Back up the target vault before apply" in result.stdout
+    assert "--apply --plan-id <id>" in result.stdout
+    assert "graphify-out/migrations/archive/" in result.stdout
