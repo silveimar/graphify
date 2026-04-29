@@ -17,7 +17,7 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 ### Community Output Semantics
 
 - [x] **COMM-01**: User receives MOC-only community output by default, with no generated `_COMMUNITY_*` overview notes.
-- [ ] **COMM-02**: User sees legacy `_COMMUNITY_*` files surfaced as migration candidates or orphans instead of silently ignored.
+- [x] **COMM-02**: User sees legacy `_COMMUNITY_*` files surfaced as migration candidates or orphans instead of silently ignored.
 - [x] **COMM-03**: User receives targeted guidance when an existing custom profile or template requests hard-deprecated community overview output.
 
 ### Cluster Quality Floor
@@ -52,11 +52,11 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 ### Migration and Rollout
 
 - [ ] **MIG-01**: User can run an automated migration command for the real `work-vault` to `ls-vault` update path.
-- [ ] **MIG-02**: User can preview migration effects in dry-run mode before any vault writes occur.
-- [ ] **MIG-03**: User sees old managed paths mapped to new Graphify-owned paths when note identity can be matched.
-- [ ] **MIG-04**: User can review CREATE, UPDATE, SKIP_PRESERVE, SKIP_CONFLICT, REPLACE, and ORPHAN outcomes before committing to the migration.
+- [x] **MIG-02**: User can preview migration effects in dry-run mode before any vault writes occur.
+- [x] **MIG-03**: User sees old managed paths mapped to new Graphify-owned paths when note identity can be matched.
+- [x] **MIG-04**: User can review CREATE, UPDATE, SKIP_PRESERVE, SKIP_CONFLICT, REPLACE, and ORPHAN outcomes before committing to the migration.
 - [ ] **MIG-05**: User receives a Markdown migration guide with backup, validation, dry-run, migration command, review, cleanup, rollback, and rerun steps.
-- [ ] **MIG-06**: User never has legacy vault notes automatically deleted during migration.
+- [x] **MIG-06**: User never has legacy vault notes automatically deleted during migration.
 
 ### Verification and Compatibility
 
@@ -106,7 +106,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TAX-03 | Phase 32 | Complete |
 | TAX-04 | Phase 32 | Complete |
 | COMM-01 | Phase 34 | Complete |
-| COMM-02 | Phase 35 | Pending |
+| COMM-02 | Phase 35 | Complete |
 | COMM-03 | Phase 32 | Complete |
 | CLUST-01 | Phase 32 | Complete |
 | CLUST-02 | Phase 34 | Complete |
@@ -126,11 +126,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REPO-03 | Phase 33 | Complete |
 | REPO-04 | Phase 35 | Pending |
 | MIG-01 | Phase 35 | Pending |
-| MIG-02 | Phase 35 | Pending |
-| MIG-03 | Phase 35 | Pending |
-| MIG-04 | Phase 35 | Pending |
+| MIG-02 | Phase 35 | Complete |
+| MIG-03 | Phase 35 | Complete |
+| MIG-04 | Phase 35 | Complete |
 | MIG-05 | Phase 36 | Pending |
-| MIG-06 | Phase 35 | Pending |
+| MIG-06 | Phase 35 | Complete |
 | VER-01 | Phase 36 | Pending |
 | VER-02 | Phase 36 | Pending |
 | VER-03 | Phase 36 | Pending |

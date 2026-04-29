@@ -322,7 +322,7 @@ Plans:
   2. User can run an automated migration command for the real `work-vault` to `ls-vault` update path and preview its effects in dry-run mode before vault writes
   3. User sees old managed paths mapped to new Graphify-owned paths when note identity can be matched, with legacy `_COMMUNITY_*` files surfaced as migration candidates or orphans
   4. User can review CREATE, UPDATE, SKIP_PRESERVE, SKIP_CONFLICT, REPLACE, and ORPHAN outcomes before committing, and migration never automatically deletes legacy vault notes
-**Plans:** TBD
+**Plans:** 1/3 plans executed
 
 ### Phase 36: Migration Guide, Skill Alignment & Regression Sweep
 **Goal:** Users and maintainers can trust the v1.8 behavior because docs, skill files, tests, and security checks all describe and verify the same export contract.
@@ -382,7 +382,7 @@ Plans:
 | 32. Profile Contract & Defaults | v1.8 | 4/4 | Complete    | 2026-04-29 |
 | 33. Naming & Repo Identity Helpers | v1.8 | 4/4 | Complete    | 2026-04-29 |
 | 34. Mapping, Cluster Quality & Note Classes | v1.8 | 5/5 | Complete   | 2026-04-29 |
-| 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 0/TBD | Not started | - |
+| 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 1/3 | In Progress | 2026-04-29 |
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 0/TBD | Not started | - |
 
 ---

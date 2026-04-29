@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
-status: verifying
-stopped_at: Completed 34-05-PLAN.md
-last_updated: "2026-04-29T04:27:46.830Z"
+status: executing
+stopped_at: Completed 35-01-PLAN.md
+last_updated: "2026-04-29T05:35:37.051Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
+  total_plans: 16
+  completed_plans: 14
+  percent: 88
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
-**Current focus:** Phase 34 — mapping-cluster-quality-note-classes
+**Current focus:** Phase 35 — templates-export-plumbing-dry-run-migration-visibility
 
 ## Current Position
 
-Phase: 34 (mapping-cluster-quality-note-classes) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
+Phase: 35 (templates-export-plumbing-dry-run-migration-visibility) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-29
 
-Progress: [██████████] 100%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Progress: [██████████] 100%
 | Phase 34 P03 | 6min | 2 tasks | 6 files |
 | Phase 34 P4 | 7min | 3 tasks | 4 files |
 | Phase 34 P5 | 4min | 2 tasks | 2 files |
+| Phase 35 P01 | 6min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,9 @@ Locked v1.8 choices:
 - [Phase 34]: [Phase 34 Plan 04]: Concept MOC CODE links render from ClassificationContext code_members/code_member_labels via _emit_wikilink(). — Preserves context-owned rendering and established wikilink sanitization.
 - [Phase 34]: [Phase 34 Plan 04]: CODE collision provenance is emitted only for colliding filename stems through the frontmatter dumper. — Avoids extra metadata for normal CODE notes while keeping collision evidence sanitized.
 - [Phase 34 Plan 05]: Structured CODE member links preserve export-provided filename_stem as the wikilink target after safe_filename only. — Closes the verifier gap by preventing title-case target drift while keeping aliases sanitized.
+- [Phase 35 Plan 01]: Migration preview plan IDs are SHA-256 digests over normalized non-volatile preview payloads.
+- [Phase 35 Plan 01]: Legacy _COMMUNITY_* files are surfaced as review-only ORPHAN rows and never promoted into apply writes.
+- [Phase 35 Plan 01]: Migration artifact writes are confined to graphify-out/migrations with tmp+fsync+os.replace.
 
 ### Pending Todos
 
@@ -126,6 +130,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T04:27:46.827Z
-Stopped at: Completed 34-05-PLAN.md
-Next action: `/gsd-verify-work 34`
+Last session: 2026-04-29T05:35:37.048Z
+Stopped at: Completed 35-01-PLAN.md
+Next action: `/gsd-execute-phase 35`
