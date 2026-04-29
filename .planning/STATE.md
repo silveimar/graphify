@@ -4,14 +4,14 @@ milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: executing
 stopped_at: Completed 36-01-PLAN.md
-last_updated: "2026-04-29T07:32:58.956Z"
+last_updated: "2026-04-29T07:45:03.456Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 20
-  completed_plans: 17
-  percent: 85
+  completed_plans: 18
+  percent: 90
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 ## Current Position
 
 Phase: 36 (Migration Guide, Skill Alignment & Regression Sweep) — EXECUTING
-Plan: 2 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-04-29
 
@@ -59,6 +59,8 @@ Progress: [█████████░] 88%
 | Phase 35 P02 | 6min | 3 tasks | 5 files |
 | Phase 35 P03 | 9min | 3 tasks | 5 files |
 | Phase 36 P01 | 13min | 3 tasks | 4 files |
+| Phase 36 P02 | 7min | 2 tasks | 5 files |
+| Phase 36 P02 | 6min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -113,6 +115,310 @@ Locked v1.8 choices:
 - [Phase 36 Plan 01]: Archive movement stays migration-specific in graphify/migration.py; the generic merge engine continues to skip ORPHAN rows.
 - [Phase 36 Plan 01]: Reviewed apply archives legacy notes only after apply_merge_plan reports zero failures.
 - [Phase 36 Plan 01]: Rollback evidence is exposed through archived_legacy_notes metadata and CLI wording under graphify-out/migrations/archive/.
+- [Phase 36]: ---
+
+phase: 36-migration-guide-skill-alignment-regression-sweep
+plan: 02
+subsystem: documentation
+tags: [obsidian, migration, cli, docs, pytest]
+
+requires:
+
+  - phase: 35-templates-export-plumbing-dry-run-migration-visibility
+    provides: preview-first update-vault flow, reviewed apply, and archive evidence
+
+  - phase: 36-migration-guide-skill-alignment-regression-sweep
+    provides: archive-by-default apply wording from Plan 36-01
+provides:
+
+  - generic-first v1.8 Obsidian migration guide
+  - README guidance distinguishing direct export from reviewed update-vault migration
+  - CLI help contract for backup-before-apply and archive location
+
+affects: [migration-guide, skill-alignment, release-docs]
+
+tech-stack:
+  added: []
+  patterns:
+
+    - docs contract tests reading repo-root Markdown directly
+    - argparse RawDescriptionHelpFormatter epilog for multi-line safety guidance
+
+key-files:
+  created:
+
+    - MIGRATION_V1_8.md
+    - tests/test_docs.py
+    - .planning/phases/36-migration-guide-skill-alignment-regression-sweep/36-02-SUMMARY.md
+  modified:
+
+    - README.md
+    - graphify/__main__.py
+    - tests/test_main_flags.py
+
+key-decisions:
+
+  - "The v1.8 guide is generic-first: --input is any raw corpus and --vault is the target Obsidian vault, with work-vault/raw -> ls-vault as the canonical example."
+  - "README presents --obsidian as lower-level direct export and update-vault as the reviewed existing-vault migration/update workflow."
+  - "CLI help repeats backup-before-apply, reviewed --apply --plan-id, archive path, and non-destructive legacy-note wording."
+
+patterns-established:
+
+  - "Docs drift tests assert exact safety phrases and section ordering rather than snapshotting full Markdown files."
+  - "User-facing migration docs put backup before any apply command and rollback immediately after apply/archive."
+
+requirements-completed: [MIG-05, VER-02]
+
+duration: 7min
+completed: 2026-04-29
+---
+
+# Phase 36 Plan 02: Migration Guide and Command Docs Summary
+
+**Generic-first v1.8 migration guide with README and CLI help aligned around preview-first `update-vault`, reviewed apply, archive evidence, and rollback.**
+
+- [Phase 36]: The migration guide is generic-first: --input is any raw corpus and --vault is the target Obsidian vault, with work-vault/raw -> ls-vault kept as the canonical example. — Keeps docs reusable while preserving the canonical example from the plan.
+- [Phase 36]: Backup-before-apply, reviewed --apply --plan-id, archive path, rollback, and rerun wording are enforced by docs and CLI help tests. — Prevents documentation drift around write safety.
+- [Phase 36]: Localized READMEs remain outside this English docs contract per D-08. — Matches the phase scope and avoids unreviewed translation edits.
+
+## Performance
+
+- **Duration:** 7 min
+- **Started:** 2026-04-29T07:36:05Z
+- **Completed:** 2026-04-29T07:43:41Z
+- **Tasks:** 2
+- **Files modified:** 5
+
+## Accomplishments
+
+- Added `MIGRATION_V1_8.md`, covering raw-corpus-to-target-vault semantics, validation, dry-run preview, plan review, backup as a hard prerequisite, reviewed apply/archive, immediate rollback, rerun, and cleanup review.
+- Added `tests/test_docs.py` to enforce required migration guide phrases, backup/apply/rollback ordering, README guide linkage, and the English-only docs contract for this plan.
+- Updated `README.md` and `graphify update-vault --help` so both distinguish lower-level `--obsidian` export from reviewed `update-vault` migration and mention `graphify-out/migrations/archive/`.
+
+## Task Commits
+
+1. **Task 1 RED: Add migration guide docs contract** - `90ecce3` (test)
+2. **Task 1 GREEN: Add v1.8 migration guide** - `afc8ac1` (feat)
+3. **Task 1 refinement: Tighten migration guide wording/order** - `2992437` (feat)
+4. **Task 2 RED: Add README and CLI help docs contracts** - `dfd0ef5` (test)
+5. **Task 2 GREEN: Align README and CLI help** - `ca24880` (feat)
+
+## Files Created/Modified
+
+- `MIGRATION_V1_8.md` - Generic-first v1.8 migration guide with canonical `work-vault/raw` to `ls-vault` example.
+- `README.md` - English Obsidian adapter docs now describe direct export and reviewed existing-vault update/migration as separate surfaces.
+- `graphify/__main__.py` - Top-level and `update-vault --help` text now include reviewed apply, backup, and archive wording.
+- `tests/test_docs.py` - Docs contract tests for guide phrases, ordering, README linkage, and localized README scope.
+- `tests/test_main_flags.py` - CLI help contract now checks backup, `--apply --plan-id`, and archive path wording.
+
+## Decisions Made
+
+- Keep the migration guide in the repository root as `MIGRATION_V1_8.md` so README can link to it directly and users can find it beside other top-level guides.
+- Keep localized READMEs unchanged per D-08; the tests explicitly scope this contract to English docs.
+- Use exact phrase tests for safety-critical wording, including `Back up the target vault before apply`, `Review the migration plan before apply`, and `Rollback immediately after apply/archive if needed`.
+
+## Deviations from Plan
+
+### Auto-fixed Issues
+
+None - plan executed exactly as written.
+
+**Total deviations:** 0 auto-fixed.
+**Impact on plan:** Plan scope was preserved.
+
+## TDD Gate Compliance
+
+- Task 1 RED failed as expected because `MIGRATION_V1_8.md` did not exist yet; GREEN passed after adding the guide.
+- Task 2 RED failed as expected because README and CLI help lacked the required v1.8 wording; GREEN passed after updating both surfaces.
+- An additional guide refinement commit (`2992437`) was created after the initial guide commit to tighten section wording and ordering while preserving the Task 1 behavior.
+
+## Issues Encountered
+
+- The git hook prints ImageMagick `import` help before graph rebuilds; commits still completed successfully with normal hooks.
+- `git add graphify/...` reports the ignored `graphify` path, so tracked changes under `graphify/` were staged explicitly with `git add -f graphify/__main__.py`.
+- A transient `.git/index.lock` appeared after the first commit retry. No active Git process was found, and the lock cleared before the retry; no manual lock deletion was needed.
+
+## Known Stubs
+
+None. Stub-pattern scan found no TODO/FIXME/placeholder or UI-empty-data patterns in the files created or modified by this plan.
+
+## Threat Flags
+
+None. This plan changed documentation and CLI help only; no new endpoint, auth path, schema, network, or filesystem trust boundary was introduced beyond the documented migration behavior covered by the plan threat model.
+
+## Verification
+
+- `pytest tests/test_docs.py -q` - 3 passed after Task 1 GREEN
+- `pytest tests/test_docs.py tests/test_main_flags.py::test_update_vault_help_lists_command_shape -q` - 5 passed
+- `pytest tests/ -q` - 1881 passed, 1 xfailed, 8 warnings
+
+## User Setup Required
+
+None - no external service configuration required.
+
+## Next Phase Readiness
+
+Ready for Plan 36-03 to align packaged platform skill variants with the same v1.8 wording and drift tests.
+
+## Self-Check: PASSED
+
+- Summary file exists at `.planning/phases/36-migration-guide-skill-alignment-regression-sweep/36-02-SUMMARY.md`.
+- Created/modified files exist: `MIGRATION_V1_8.md`, `tests/test_docs.py`, `README.md`, `graphify/__main__.py`, and `tests/test_main_flags.py`.
+- Task commits exist in `git log --oneline --all`: `90ecce3`, `afc8ac1`, `2992437`, `dfd0ef5`, `ca24880`.
+- Focused and full verification commands passed.
+
+---
+*Phase: 36-migration-guide-skill-alignment-regression-sweep*
+*Completed: 2026-04-29*
+---
+phase: 36-migration-guide-skill-alignment-regression-sweep
+plan: 02
+subsystem: docs
+tags: [obsidian, migration, update-vault, cli, pytest]
+
+requires:
+
+  - phase: 35-templates-export-plumbing-dry-run-migration-visibility
+    provides: preview-first update-vault flow with reviewed apply and migration artifacts
+
+  - phase: 36-migration-guide-skill-alignment-regression-sweep
+    provides: archive-by-default apply metadata from Plan 36-01
+provides:
+
+  - generic-first v1.8 Obsidian migration guide
+  - README guidance for lower-level export versus reviewed update-vault migration
+  - CLI help wording for backup-before-apply and archive location
+
+affects: [migration-guide, skill-alignment, docs-contracts]
+
+tech-stack:
+  added: []
+  patterns:
+
+    - exact-phrase docs contract tests for migration safety wording
+    - preview-first CLI docs mirrored across README and help text
+
+key-files:
+  created:
+
+    - MIGRATION_V1_8.md
+    - .planning/phases/36-migration-guide-skill-alignment-regression-sweep/36-02-SUMMARY.md
+  modified:
+
+    - README.md
+    - graphify/__main__.py
+    - tests/test_docs.py
+    - tests/test_main_flags.py
+
+key-decisions:
+
+  - "The migration guide is generic-first: --input is any raw corpus and --vault is the target Obsidian vault, with work-vault/raw -> ls-vault kept as the canonical example."
+  - "Backup-before-apply, reviewed --apply --plan-id, archive path, rollback, and rerun wording are enforced by docs and CLI help tests."
+  - "Localized READMEs remain outside this English docs contract per D-08."
+
+patterns-established:
+
+  - "Docs safety contract: required user-facing phrases are asserted directly from Markdown and CLI help output."
+  - "Migration docs distinguish low-level --obsidian export from reviewed existing-vault update-vault migration."
+
+requirements-completed: [MIG-05, VER-02]
+
+duration: 6min
+completed: 2026-04-29
+---
+
+# Phase 36 Plan 02: Migration Guide and Docs Alignment Summary
+
+**Generic-first v1.8 Obsidian migration guidance now documents preview, backup, reviewed apply/archive, rollback, and rerun across the guide, README, CLI help, and docs contract tests.**
+
+## Performance
+
+- **Duration:** 6 min
+- **Started:** 2026-04-29T07:37:37Z
+- **Completed:** 2026-04-29T07:43:03Z
+- **Tasks:** 2
+- **Files modified:** 5
+
+## Accomplishments
+
+- Added `MIGRATION_V1_8.md` with the canonical `graphify update-vault --input work-vault/raw --vault ls-vault` example while explaining that the command works for any raw corpus and target Obsidian vault.
+- Documented backup as a hard prerequisite before `--apply --plan-id <id>`, with rollback instructions immediately after the apply/archive step and rerun guidance after archive review.
+- Updated README and `graphify update-vault --help` to describe the same preview-first reviewed apply flow, archive location, and non-destructive legacy-note handling.
+- Added docs and CLI help contract tests that protect required v1.8 wording without requiring localized README updates.
+
+## Task Commits
+
+1. **Task 1 RED: Add migration guide docs contract** - `90ecce3` (test)
+2. **Task 1 GREEN: Add v1.8 migration guide** - `afc8ac1` (feat)
+3. **Task 1 GREEN refinement: Normalize guide content** - `2992437` (feat)
+4. **Task 2 RED: Add README and CLI docs contracts** - `dfd0ef5` (test)
+5. **Task 2 GREEN: Align README and update-vault help** - `ca24880` (feat)
+
+## Files Created/Modified
+
+- `MIGRATION_V1_8.md` - Generic-first v1.8 migration guide with backup, preview, review, apply/archive, rollback, rerun, and cleanup guidance.
+- `README.md` - Obsidian section now distinguishes `--obsidian` direct export from reviewed `update-vault` migration and links to the guide.
+- `graphify/__main__.py` - Top-level and `update-vault --help` text now include backup-before-apply, reviewed apply, lower-level export, and archive wording.
+- `tests/test_docs.py` - Direct Markdown contract tests for guide and README required phrases.
+- `tests/test_main_flags.py` - CLI help phrase assertions for the `update-vault` command.
+- `.planning/phases/36-migration-guide-skill-alignment-regression-sweep/36-02-SUMMARY.md` - Execution summary and verification record.
+
+## Decisions Made
+
+- The guide keeps `work-vault/raw` -> `ls-vault` as the example but frames it as a replaceable raw-corpus-to-target-vault pattern.
+- README uses the generic command shape `graphify update-vault --input <raw-corpus> --vault <target-vault>` while CLI help keeps the concrete canonical example for discoverability.
+- Localized READMEs are intentionally untouched and excluded from this docs contract.
+
+## Deviations from Plan
+
+None - plan executed exactly as written.
+
+**Total deviations:** 0 auto-fixed.
+**Impact on plan:** Plan scope was preserved.
+
+## Issues Encountered
+
+- The Task 1 and Task 2 RED commits already existed in the working history when execution began; focused tests confirmed both RED states before GREEN changes were applied.
+- The git hook prints ImageMagick `import` help before graph rebuilds; commits still completed successfully with normal hooks.
+- `git add graphify/...` is blocked by the ignored `graphify` path unless staged with `git add -f`; the intended tracked file was staged explicitly.
+
+## Known Stubs
+
+None. Stub-pattern scan found no TODO, FIXME, placeholder, empty UI-data defaults, or hardcoded empty values in the files created or modified by this plan.
+
+## Threat Flags
+
+None. The changes are documentation, CLI help, and tests only; no new endpoint, auth path, file-access implementation, or schema trust boundary was introduced.
+
+## TDD Gate Compliance
+
+- Task 1 RED failed as expected on the missing migration guide, then GREEN passed after guide content was present.
+- Task 2 RED failed as expected on missing README and CLI help phrases, then GREEN passed after README and help wording were aligned.
+
+## Verification
+
+- `pytest tests/test_docs.py -q` - 3 passed
+- `pytest tests/test_docs.py tests/test_main_flags.py::test_update_vault_help_lists_command_shape -q` - 5 passed
+- Acceptance greps passed for canonical command, backup prerequisite, rollback wording, README guide link, README update-vault guidance, and `graphify-out/migrations/archive/` wording in README and CLI help.
+
+## User Setup Required
+
+None - no external service configuration required.
+
+## Next Phase Readiness
+
+Ready for Plan 36-03 to align shipped platform skill variants against the same v1.8 preview/apply/archive wording.
+
+## Self-Check: PASSED
+
+- Summary and all key files exist on disk.
+- Task commits exist: `90ecce3`, `afc8ac1`, `2992437`, `dfd0ef5`, `ca24880`.
+- Focused verification and acceptance checks passed.
+
+---
+*Phase: 36-migration-guide-skill-alignment-regression-sweep*
+*Completed: 2026-04-29*
+
 ### Pending Todos
 
 None.
@@ -138,6 +444,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T07:32:58.953Z
+Last session: 2026-04-29T07:44:36.284Z
 Stopped at: Completed 36-01-PLAN.md
 Next action: `/gsd-discuss-phase 36`

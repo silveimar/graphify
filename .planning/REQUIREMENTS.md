@@ -61,7 +61,7 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 ### Verification and Compatibility
 
 - [x] **VER-01**: Maintainer can verify v1.8 behavior with pure unit tests that use `tmp_path` and perform no network calls.
-- [ ] **VER-02**: Maintainer can confirm skill files and CLI docs use the same v1.8 Obsidian export behavior.
+- [x] **VER-02**: Maintainer can confirm skill files and CLI docs use the same v1.8 Obsidian export behavior.
 - [x] **VER-03**: Maintainer can confirm all new path, template, profile, LLM-label, and repo-identity inputs pass through existing security/sanitization helpers.
 
 ## Future Requirements
@@ -132,7 +132,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MIG-05 | Phase 36 | Complete |
 | MIG-06 | Phase 35 | Complete |
 | VER-01 | Phase 36 | Complete |
-| VER-02 | Phase 36 | Pending |
+| VER-02 | Phase 36 | Complete |
 | VER-03 | Phase 36 | Complete |
 
 **Coverage:**

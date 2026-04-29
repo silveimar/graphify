@@ -333,13 +333,13 @@ Plans:
   2. Maintainer can confirm skill files and CLI docs use the same v1.8 Obsidian export behavior
   3. Maintainer can verify v1.8 behavior with pure unit tests that use `tmp_path` and perform no network calls
   4. Maintainer can confirm all new path, template, profile, LLM-label, and repo-identity inputs pass through existing security and sanitization helpers
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 Plans:
 **Wave 1**
 - [x] 36-01-PLAN.md — Archive-by-default migration apply helpers, CLI evidence, and tmp_path tests
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 36-02-PLAN.md — Generic-first migration guide plus README and CLI help alignment
+- [x] 36-02-PLAN.md — Generic-first migration guide plus README and CLI help alignment
 - [ ] 36-03-PLAN.md — Platform skill variant v1.8 wording and drift tests
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -393,7 +393,7 @@ Plans:
 | 33. Naming & Repo Identity Helpers | v1.8 | 4/4 | Complete    | 2026-04-29 |
 | 34. Mapping, Cluster Quality & Note Classes | v1.8 | 5/5 | Complete   | 2026-04-29 |
 | 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 3/3 | Complete    | 2026-04-29 |
-| 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 1/4 | In Progress|  |
+| 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 2/4 | In Progress|  |
 
 ---
 *Last updated: 2026-04-28 — v1.8 Output Taxonomy & Cluster Quality planned: 5 phases (32–36), 33/33 requirements mapped, standard granularity.*
