@@ -55,14 +55,14 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 - [x] **MIG-02**: User can preview migration effects in dry-run mode before any vault writes occur.
 - [x] **MIG-03**: User sees old managed paths mapped to new Graphify-owned paths when note identity can be matched.
 - [x] **MIG-04**: User can review CREATE, UPDATE, SKIP_PRESERVE, SKIP_CONFLICT, REPLACE, and ORPHAN outcomes before committing to the migration.
-- [ ] **MIG-05**: User receives a Markdown migration guide with backup, validation, dry-run, migration command, review, cleanup, rollback, and rerun steps.
+- [x] **MIG-05**: User receives a Markdown migration guide with backup, validation, dry-run, migration command, review, cleanup, rollback, and rerun steps.
 - [x] **MIG-06**: User never has legacy vault notes automatically deleted during migration.
 
 ### Verification and Compatibility
 
-- [ ] **VER-01**: Maintainer can verify v1.8 behavior with pure unit tests that use `tmp_path` and perform no network calls.
+- [x] **VER-01**: Maintainer can verify v1.8 behavior with pure unit tests that use `tmp_path` and perform no network calls.
 - [ ] **VER-02**: Maintainer can confirm skill files and CLI docs use the same v1.8 Obsidian export behavior.
-- [ ] **VER-03**: Maintainer can confirm all new path, template, profile, LLM-label, and repo-identity inputs pass through existing security/sanitization helpers.
+- [x] **VER-03**: Maintainer can confirm all new path, template, profile, LLM-label, and repo-identity inputs pass through existing security/sanitization helpers.
 
 ## Future Requirements
 
@@ -129,11 +129,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MIG-02 | Phase 35 | Complete |
 | MIG-03 | Phase 35 | Complete |
 | MIG-04 | Phase 35 | Complete |
-| MIG-05 | Phase 36 | Pending |
+| MIG-05 | Phase 36 | Complete |
 | MIG-06 | Phase 35 | Complete |
-| VER-01 | Phase 36 | Pending |
+| VER-01 | Phase 36 | Complete |
 | VER-02 | Phase 36 | Pending |
-| VER-03 | Phase 36 | Pending |
+| VER-03 | Phase 36 | Complete |
 
 **Coverage:**
 - v1.8 requirements: 33 total

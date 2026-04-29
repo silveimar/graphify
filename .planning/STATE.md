@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: executing
-stopped_at: Phase 36 context gathered
-last_updated: "2026-04-29T07:17:18.671Z"
-last_activity: 2026-04-29 -- Phase 36 planning complete
+stopped_at: Completed 36-01-PLAN.md
+last_updated: "2026-04-29T07:32:58.956Z"
+last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 20
-  completed_plans: 16
-  percent: 80
+  completed_plans: 17
+  percent: 85
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
-**Current focus:** Phase 35 — templates-export-plumbing-dry-run-migration-visibility
+**Current focus:** Phase 36 — Migration Guide, Skill Alignment & Regression Sweep
 
 ## Current Position
 
-Phase: 36
-Plan: Not started
+Phase: 36 (Migration Guide, Skill Alignment & Regression Sweep) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-04-29 -- Phase 36 planning complete
+Last activity: 2026-04-29
 
 Progress: [█████████░] 88%
 
@@ -58,6 +58,7 @@ Progress: [█████████░] 88%
 | Phase 35 P01 | 6min | 3 tasks | 2 files |
 | Phase 35 P02 | 6min | 3 tasks | 5 files |
 | Phase 35 P03 | 9min | 3 tasks | 5 files |
+| Phase 36 P01 | 13min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -109,7 +110,9 @@ Locked v1.8 choices:
 - [Phase 35]: [Phase 35 Plan 02]: Repo identity for CODE notes is sourced from resolved_repo_identity.identity and propagated through CODE render contexts. — Keeps repo normalization centralized while allowing templates and manifests to expose the same resolved identity.
 - [Phase 35]: [Phase 35 Plan 02]: Repo frontmatter is graphify-owned replace metadata while unknown user-added keys remain preserved. — Ensures generated repo metadata updates safely without clobbering arbitrary user-authored frontmatter.
 - [Phase 35]: [Phase 35 Plan 02]: Vault manifest run metadata uses reserved __graphify_run__ so path-entry readers can skip it safely. — Separates run-level audit metadata from per-note path entries and preserves old manifest compatibility.
-
+- [Phase 36 Plan 01]: Archive movement stays migration-specific in graphify/migration.py; the generic merge engine continues to skip ORPHAN rows.
+- [Phase 36 Plan 01]: Reviewed apply archives legacy notes only after apply_merge_plan reports zero failures.
+- [Phase 36 Plan 01]: Rollback evidence is exposed through archived_legacy_notes metadata and CLI wording under graphify-out/migrations/archive/.
 ### Pending Todos
 
 None.
@@ -135,6 +138,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T07:00:57.050Z
-Stopped at: Phase 36 context gathered
+Last session: 2026-04-29T07:32:58.953Z
+Stopped at: Completed 36-01-PLAN.md
 Next action: `/gsd-discuss-phase 36`
