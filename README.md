@@ -328,15 +328,32 @@ Audio never leaves your machine. All transcription runs locally.
 
 ## Obsidian vault adapter (Ideaverse integration)
 
-`--obsidian` exports the knowledge graph as a structured Obsidian vault with proper frontmatter, wikilinks, tags, Dataview queries, and folder placement. The adapter is fully profile-driven — it reads a `.graphify/profile.yaml` from the target vault and generates notes that fit your vault's framework.
+Graphify has two Obsidian surfaces:
+
+- `--obsidian` is the lower-level export for direct generation from an already-built `graph.json` into an Obsidian vault.
+- `graphify update-vault --input <raw-corpus> --vault <target-vault>` is the reviewed update/migration workflow for an existing vault.
+
+Use the reviewed workflow when updating a real vault. In this flow, preview is the default; apply requires `--apply --plan-id <id>` from a reviewed migration artifact, and legacy graphify-managed notes are archived by default under `graphify-out/migrations/archive/`. Graphify does not destructively delete legacy notes.
+
+For the full v1.8 flow, including backup, validation, rollback, and rerun steps, see the [v1.8 migration guide](MIGRATION_V1_8.md).
+
+Canonical reviewed update example:
+
+```bash
+graphify update-vault --input work-vault/raw --vault ls-vault
+```
+
+In this command, `--input` is the raw corpus graphify analyzes and `--vault` is the target Obsidian vault that receives reviewed generated notes.
+
+`--obsidian` remains available for direct profile-driven export. It reads a `.graphify/profile.yaml` from the target vault and generates notes that fit your vault's framework.
 
 **How it works:**
 
 1. **Profile loading** — discovers `.graphify/profile.yaml` in the vault. No profile? Falls back to a built-in default that produces an [Ideaverse](https://ideaverse.com)-compatible ACE structure (`Atlas/Maps/`, `Atlas/Dots/Things/`, etc.).
 2. **Classification** — routes each graph node to a note type (MOC, thing, statement, person, source) based on topology (god nodes, degree) and attributes (`file_type`). Custom mapping rules supported.
 3. **Template rendering** — generates markdown with YAML frontmatter, `[[wikilinks]]` to related nodes, Dataview queries for MOCs, and community tags. Override any template by placing a `<type>.md` file in `.graphify/templates/`.
-4. **Merge planning** — compares new notes against existing vault notes. Preserves user-edited fields (configurable via `merge.preserve_fields`), handles orphans (nodes deleted from graph don't auto-delete notes), and supports three strategies: `update` (default), `skip`, `replace`.
-5. **Atomic write** — executes the merge plan, writing only changed files. `--dry-run` previews the plan without writing.
+4. **Merge planning** — compares new notes against existing vault notes. Preserves user-edited fields (configurable via `merge.preserve_fields`), handles orphans (nodes deleted from graph do not auto-delete notes), and supports three strategies: `update` (default), `skip`, `replace`.
+5. **Atomic write** — executes the merge plan, writing only changed files. `--dry-run` previews the plan without writing; `update-vault` always previews before reviewed apply.
 
 ```yaml
 # .graphify/profile.yaml (optional — defaults to Ideaverse ACE)
@@ -371,6 +388,10 @@ graphify --obsidian --obsidian-dir ~/vaults/myproject --dry-run
 
 # full export
 graphify --obsidian --obsidian-dir ~/vaults/myproject
+
+# reviewed existing-vault update/migration
+graphify update-vault --input work-vault/raw --vault ls-vault
+graphify update-vault --input work-vault/raw --vault ls-vault --apply --plan-id <id>
 ```
 
 The adapter works with any Obsidian vault framework — Ideaverse, PARA, custom setups — driven entirely by the declarative profile. No code changes needed.

@@ -1241,11 +1241,13 @@ def main() -> None:
         print("  doctor                  diagnose vault/profile/output configuration (VAULT-14/15)")
         print("    --dry-run               preview which files would be ingested/skipped, no writes")
         print("  update-vault --input work-vault/raw --vault ls-vault")
-        print("                            preview/apply raw corpus updates into an Obsidian vault")
+        print("                            reviewed existing-vault migration/update; preview is default")
+        print("                            lower-level direct generation remains --obsidian")
         print("    --repo-identity <slug>  override profile/fallback repo identity")
         print("    --router                use heterogeneous extraction router")
         print("    --verbose               print all migration rows")
         print("    --apply --plan-id <id>  apply a reviewed migration plan artifact")
+        print("                            Back up the target vault before apply")
         print("                            apply output includes Archived legacy notes under graphify-out/migrations/archive/")
         print("  enrich                 run background derivation passes over an existing graph (overlay only)")
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
@@ -2428,10 +2430,16 @@ def main() -> None:
         _p_uv = _ap.ArgumentParser(
             prog="graphify update-vault",
             description=(
-                "Preview or apply graphify updates with: "
+                "Preview or apply reviewed existing-vault updates with: "
                 "graphify update-vault --input work-vault/raw --vault ls-vault"
             ),
-            epilog="Example: graphify update-vault --input work-vault/raw --vault ls-vault",
+            epilog=(
+                "Example: graphify update-vault --input work-vault/raw --vault ls-vault\n"
+                "Preview is the default. Back up the target vault before apply.\n"
+                "Apply reviewed changes with --apply --plan-id <id>.\n"
+                "Archived legacy notes are written under graphify-out/migrations/archive/.\n"
+                "Use --obsidian for lower-level direct Obsidian export."
+            ),
             formatter_class=_ap.RawDescriptionHelpFormatter,
         )
         _p_uv.add_argument("--input", required=True, help="Raw corpus input path")
