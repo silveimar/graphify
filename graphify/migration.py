@@ -89,6 +89,7 @@ def build_migration_preview(
     *,
     input_dir: Path,
     vault_dir: Path,
+    notes_dir: Path | None = None,
     artifacts_dir: Path,
     repo_identity: str,
     manifest: dict[str, dict] | None = None,
@@ -96,11 +97,12 @@ def build_migration_preview(
 ) -> dict:
     """Build a JSON-serializable migration preview from a MergePlan."""
     vault = Path(vault_dir).resolve()
+    notes_root = Path(notes_dir).resolve() if notes_dir is not None else vault
     manifest = manifest or {}
     actions = [
         _classify_repo_drift(
-            _action_to_row(action, vault, review_only=False),
-            vault,
+            _action_to_row(action, notes_root, review_only=False),
+            notes_root,
             repo_identity,
             manifest,
         )
@@ -214,6 +216,7 @@ def run_update_vault(
         plan,
         input_dir=raw,
         vault_dir=vault,
+        notes_dir=resolved.notes_dir,
         artifacts_dir=resolved.artifacts_dir,
         repo_identity=resolved_repo.identity,
         manifest=manifest,
@@ -232,7 +235,7 @@ def run_update_vault(
             )
         except ValueError as exc:
             raise ValueError(f"stale or mismatched migration plan: {exc}") from exc
-        applicable_plan = _merge_plan_from_preview(loaded, vault)
+        applicable_plan = _merge_plan_from_preview(loaded, resolved.notes_dir)
         result = apply_merge_plan(
             applicable_plan,
             resolved.notes_dir,

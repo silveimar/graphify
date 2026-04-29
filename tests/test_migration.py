@@ -67,7 +67,13 @@ def _manifest_for_community(legacy: Path, vault: Path) -> dict[str, dict]:
     }
 
 
-def _make_update_vault_fixture(tmp_path: Path, *, raw_name: str = "raw") -> tuple[Path, Path]:
+def _make_update_vault_fixture(
+    tmp_path: Path,
+    *,
+    raw_name: str = "raw",
+    output_mode: str = "vault-relative",
+    output_path: str = "Atlas/Sources/Graphify",
+) -> tuple[Path, Path]:
     raw = tmp_path / "work-vault" / raw_name
     raw.mkdir(parents=True)
     (raw / "alpha.py").write_text(
@@ -96,8 +102,8 @@ def _make_update_vault_fixture(tmp_path: Path, *, raw_name: str = "raw") -> tupl
         "repo:\n"
         "  identity: graphify\n"
         "output:\n"
-        "  mode: vault-relative\n"
-        "  path: Atlas/Sources/Graphify\n",
+        f"  mode: {output_mode}\n"
+        f"  path: {output_path}\n",
         encoding="utf-8",
     )
     return raw, vault
@@ -296,6 +302,42 @@ def test_update_vault_rejects_stale_plan_id(tmp_path):
         raise AssertionError("stale migration plan should be rejected")
     after_vault_files = {p.relative_to(vault).as_posix() for p in vault.rglob("*") if p.is_file()}
     assert after_vault_files == before_vault_files
+
+
+def test_update_vault_profile_output_outside_vault_previews_and_applies(tmp_path):
+    """MIG-01/MIG-04: update-vault honors profile-routed notes outside the vault root."""
+    from graphify.migration import run_update_vault
+
+    for mode in ("absolute", "sibling-of-vault"):
+        case_root = tmp_path / mode
+        case_root.mkdir()
+        notes_dir = case_root / f"{mode}-notes"
+        raw, vault = _make_update_vault_fixture(
+            case_root,
+            raw_name=f"raw-{mode}",
+            output_mode=mode,
+            output_path=str(notes_dir) if mode == "absolute" else notes_dir.name,
+        )
+
+        preview_result = run_update_vault(input_dir=raw, vault_dir=vault)
+        preview = preview_result["preview"]
+        plan_id = preview["plan_id"]
+
+        assert preview_result["applied"] is False
+        assert preview["vault"] == str(vault.resolve())
+        assert all(not Path(row["path"]).is_absolute() for row in preview["actions"])
+        assert not list(notes_dir.rglob("*.md"))
+
+        apply_result = run_update_vault(
+            input_dir=raw,
+            vault_dir=vault,
+            apply=True,
+            plan_id=plan_id,
+        )
+
+        assert apply_result["applied"] is True
+        assert apply_result["result"].failed == []
+        assert list(notes_dir.rglob("*.md"))
 
 
 def test_repo_identity_drift_becomes_skip_conflict(tmp_path):
