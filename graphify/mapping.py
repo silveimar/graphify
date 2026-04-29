@@ -591,6 +591,7 @@ def _assemble_communities(
         per_community[cid] = ClassificationContext(
             note_type="moc",
             folder=moc_folder,
+            routing="standalone",
             community_name=name,
             parent_moc_label=name,  # MOC is its own anchor for Phase 2 fallback
             community_tag=tag,
@@ -625,6 +626,7 @@ def _assemble_communities(
         per_community[-1] = ClassificationContext(
             note_type="moc",
             folder=unclassified_folder,
+            routing="bucketed",
             community_name=bucket_name,
             parent_moc_label=bucket_name,
             community_tag=safe_tag(bucket_name),
@@ -662,10 +664,25 @@ def _assemble_communities(
                 }
             )
         if member_dicts:
+            if host_cid == -1:
+                routing_fields = {
+                    "routing": "bucketed",
+                    "source_community_id": below_cid,
+                    "bucket_moc_label": "_Unclassified",
+                    "parent_moc_label": "_Unclassified",
+                }
+            else:
+                routing_fields = {
+                    "routing": "hosted",
+                    "source_community_id": below_cid,
+                    "host_community_id": host_cid,
+                    "parent_moc_label": per_community[host_cid]["community_name"],
+                }
             per_community[host_cid]["sub_communities"].append(
                 {
                     "label": sub_label,
                     "members": member_dicts,
+                    **routing_fields,
                     # Internal key used only for deterministic ordering.
                     # ClassificationContext TypedDict is total=False so Phase 2
                     # consumers reading via .get() ignore unknown keys.
