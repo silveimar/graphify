@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
-status: verifying
-stopped_at: Phase 36 verified and marked complete
-last_updated: "2026-04-29T08:50:42.817Z"
-last_activity: 2026-04-29
+status: completed
+stopped_at: Phase 37 plans executed and ratified
+last_updated: "2026-04-29T12:50:31.302Z"
+last_activity: 2026-04-29 -- Phase 37 execution complete
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 21
-  completed_plans: 21
+  total_phases: 6
+  completed_phases: 6
+  total_plans: 23
+  completed_plans: 23
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
-**Current focus:** Phase 36 — Migration Guide, Skill Alignment & Regression Sweep
+**Current focus:** Phase 37 — Validation Metadata Ratification
 
 ## Current Position
 
-Phase: 36
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-29
+Phase: 37
+Plan: 37.2 complete
+Status: Complete
+Last activity: 2026-04-29 -- Phase 37 execution complete
 
 Progress: [██████████] 100%
 
@@ -63,6 +63,8 @@ Progress: [██████████] 100%
 | Phase 36 P03 | 6min | 2 tasks | 10 files |
 | Phase 36 P04 | 9min | 2 tasks | 3 files |
 | Phase 36 P05 | 6min | 2 tasks | 3 files |
+| Phase 37 P01 | 6min | 2 tasks | 1 file |
+| Phase 37 P02 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -127,6 +129,8 @@ Locked v1.8 choices:
 - [Phase 36]: [Phase 36 Plan 04]: Phase 36 final validation records actual focused and full pytest outputs; known baseline failures did not reproduce. — Milestone audit needs executed evidence rather than planned command claims.
 - [Phase 36]: [Phase 36 Plan 05]: Install-time Claude and AGENTS guidance now uses GRAPH_REPORT.md, Obsidian MOC notes with [[wikilinks]], and wiki/index.md fallback instead of legacy _COMMUNITY_* overview notes. — Closes VER-02 install-time drift identified by phase verification.
 - [Phase 36]: [Phase 36 Plan 05]: Embedded install guidance constants are covered by tests/test_skill_files.py so future drift is caught with packaged skill files. — Keeps install-time guidance and packaged skill wording under the same regression test surface.
+- [Phase 37]: [Phase 37 Plan 37.1]: Nyquist ratification keeps `status: draft` vocabulary while using `nyquist_compliant` and `wave_0_complete` as deterministic gate truth.
+- [Phase 37]: [Phase 37 Plan 37.2]: v1.8 audit debt closure is metadata-only and preserves historical requirement and phase verification facts.
 
 ### Pending Todos
 
@@ -153,6 +157,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T08:48:11.994Z
-Stopped at: Phase 36 verified and marked complete
-Next action: `/gsd-verify-work 36`
+Last session: 2026-04-29T12:50:31.299Z
+Stopped at: Completed 37-37.2-PLAN.md
+Next action: `/gsd-complete-milestone`
