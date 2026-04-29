@@ -1,6 +1,7 @@
 """Wave 0 tests for Phase 33 naming and repo identity helpers."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -232,3 +233,85 @@ def test_repo_identity_fallback_git_remote_then_cwd(tmp_path, capsys, monkeypatc
     assert "[graphify] repo identity: graphify-fork (source=fallback-git-remote)" in captured.err
     assert "[graphify] repo identity: work-vault (source=fallback-directory)" in captured.err
     assert "origin" in (git_dir / "config").read_text(encoding="utf-8")
+
+
+def test_code_filename_stems_use_repo_prefix_and_safe_node_stems():
+    from graphify.naming import build_code_filename_stems
+
+    result = build_code_filename_stems(
+        [
+            {
+                "node_id": "n_auth_service",
+                "label": "Auth Service?",
+                "source_file": "src/auth/service.py",
+            }
+        ],
+        "Graphify",
+    )
+
+    assert result["n_auth_service"] == {
+        "filename_stem": "CODE_graphify_Auth_Service",
+        "filename_collision": False,
+        "filename_collision_hash": "",
+    }
+
+
+def test_code_filename_stem_collisions_suffix_every_member():
+    from graphify.naming import build_code_filename_stems
+
+    first_hash = hashlib.sha256(
+        "n_auth_service\x00src/auth/service.py".encode("utf-8")
+    ).hexdigest()[:8]
+    second_hash = hashlib.sha256(
+        "n_auth_service_duplicate\x00lib/auth/service.py".encode("utf-8")
+    ).hexdigest()[:8]
+
+    result = build_code_filename_stems(
+        [
+            {
+                "node_id": "n_auth_service",
+                "label": "Auth Service",
+                "source_file": "src/auth/service.py",
+            },
+            {
+                "node_id": "n_auth_service_duplicate",
+                "label": "Auth_Service",
+                "source_file": "lib/auth/service.py",
+            },
+        ],
+        "graphify",
+    )
+
+    assert result["n_auth_service"] == {
+        "filename_stem": f"CODE_graphify_Auth_Service_{first_hash}",
+        "filename_collision": True,
+        "filename_collision_hash": first_hash,
+    }
+    assert result["n_auth_service_duplicate"] == {
+        "filename_stem": f"CODE_graphify_Auth_Service_{second_hash}",
+        "filename_collision": True,
+        "filename_collision_hash": second_hash,
+    }
+    assert first_hash != second_hash
+
+
+def test_code_filename_stem_collisions_are_order_independent():
+    from graphify.naming import build_code_filename_stems
+
+    candidates = [
+        {
+            "node_id": "n_auth_service",
+            "label": "Auth Service",
+            "source_file": "src/auth/service.py",
+        },
+        {
+            "node_id": "n_auth_service_duplicate",
+            "label": "Auth_Service",
+            "source_file": "lib/auth/service.py",
+        },
+    ]
+
+    forward = build_code_filename_stems(candidates, "graphify")
+    reversed_order = build_code_filename_stems(list(reversed(candidates)), "graphify")
+
+    assert forward == reversed_order
