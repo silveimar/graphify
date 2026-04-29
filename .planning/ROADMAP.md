@@ -375,7 +375,7 @@ Plans:
 | 30. Profile Composition | v1.7 | 3/3 | Complete | 2026-04-28 |
 | 31. Template Engine Extensions | v1.7 | 2/2 | Complete | 2026-04-28 |
 | 32. Profile Contract & Defaults | v1.8 | 4/4 | Complete    | 2026-04-29 |
-| 33. Naming & Repo Identity Helpers | v1.8 | 4/4 | Complete   | 2026-04-29 |
+| 33. Naming & Repo Identity Helpers | v1.8 | 4/4 | Complete    | 2026-04-29 |
 | 34. Mapping, Cluster Quality & Note Classes | v1.8 | 0/TBD | Not started | - |
 | 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 0/TBD | Not started | - |
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 0/TBD | Not started | - |
