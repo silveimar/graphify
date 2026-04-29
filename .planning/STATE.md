@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: verifying
-stopped_at: Completed 34-04-PLAN.md
-last_updated: "2026-04-29T04:14:57.879Z"
+stopped_at: Completed 34-05-PLAN.md
+last_updated: "2026-04-29T04:27:46.830Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 13
+  completed_plans: 13
   percent: 100
 ---
 
@@ -54,6 +54,7 @@ Progress: [██████████] 100%
 | Phase 34 P2 | 8min | 2 tasks | 2 files |
 | Phase 34 P03 | 6min | 2 tasks | 6 files |
 | Phase 34 P4 | 7min | 3 tasks | 4 files |
+| Phase 34 P5 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,7 @@ Locked v1.8 choices:
 - [Phase 34]: [Phase 34 Plan 04]: Export propagates final concept labels into CODE parent links before rendering. — Keeps CODE up links aligned with explicit community labels and concept naming overrides.
 - [Phase 34]: [Phase 34 Plan 04]: Concept MOC CODE links render from ClassificationContext code_members/code_member_labels via _emit_wikilink(). — Preserves context-owned rendering and established wikilink sanitization.
 - [Phase 34]: [Phase 34 Plan 04]: CODE collision provenance is emitted only for colliding filename stems through the frontmatter dumper. — Avoids extra metadata for normal CODE notes while keeping collision evidence sanitized.
+- [Phase 34 Plan 05]: Structured CODE member links preserve export-provided filename_stem as the wikilink target after safe_filename only. — Closes the verifier gap by preventing title-case target drift while keeping aliases sanitized.
 
 ### Pending Todos
 
@@ -124,6 +126,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T04:14:57.825Z
-Stopped at: Completed 34-04-PLAN.md
+Last session: 2026-04-29T04:27:46.827Z
+Stopped at: Completed 34-05-PLAN.md
 Next action: `/gsd-verify-work 34`

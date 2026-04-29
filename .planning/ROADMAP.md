@@ -306,7 +306,7 @@ Plans:
   2. User sees isolate communities omitted from standalone MOC generation while their nodes remain available in graph data and non-community exports
   3. User sees tiny connected communities below the configured floor routed deterministically into an `_Unclassified` MOC
   4. User sees code-derived god nodes exported as collision-safe `CODE_<repo>_<node>` notes with bidirectional navigation to their related concept MOCs
-**Plans:** 4/4 plans complete
+**Plans:** 5/5 plans complete
 Plans:
 - [x] 34-01-PLAN.md — Establish profile/template note-class contract and default cluster floor
 - [x] 34-02-PLAN.md — Emit mapping routing metadata, CODE eligibility, and CODE member context
@@ -381,7 +381,7 @@ Plans:
 | 31. Template Engine Extensions | v1.7 | 2/2 | Complete | 2026-04-28 |
 | 32. Profile Contract & Defaults | v1.8 | 4/4 | Complete    | 2026-04-29 |
 | 33. Naming & Repo Identity Helpers | v1.8 | 4/4 | Complete    | 2026-04-29 |
-| 34. Mapping, Cluster Quality & Note Classes | v1.8 | 4/4 | Complete   | 2026-04-29 |
+| 34. Mapping, Cluster Quality & Note Classes | v1.8 | 5/5 | Complete   | 2026-04-29 |
 | 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 0/TBD | Not started | - |
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 0/TBD | Not started | - |
 
