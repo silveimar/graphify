@@ -62,6 +62,7 @@ _DEFAULT_FIELD_POLICIES: dict[str, str] = {
     "source_location": "replace",
     "community": "replace",
     "cohesion": "replace",
+    "repo": "replace",
     "graphify_managed": "replace",  # Fingerprint scalar (D-62) — always refreshed on UPDATE
     # Graphify-owned lists (D-64 union list)
     "up": "union",
@@ -571,6 +572,7 @@ _CANONICAL_KEY_ORDER: list[str] = [
     "source_location",
     "community",
     "cohesion",
+    "repo",
     "graphify_managed",
 ]
 
@@ -1082,6 +1084,11 @@ def _load_manifest(manifest_path: Path) -> dict[str, dict]:
         return {}
 
 
+def _is_manifest_reserved_key(key: str) -> bool:
+    """Return True for non-path manifest metadata entries."""
+    return key.startswith("__graphify_")
+
+
 def _save_manifest(manifest_path: Path, manifest: dict[str, dict]) -> None:
     """Write manifest atomically via tmp + os.replace (D-05).
 
@@ -1120,6 +1127,12 @@ def _build_manifest_from_result(
         notes_by_path[resolved] = rn
 
     new_manifest: dict[str, dict] = dict(old_manifest)
+    run_repo_identity: str | None = None
+    for rn in rendered_notes.values():
+        repo_identity = rn["frontmatter_fields"].get("repo")
+        if repo_identity:
+            run_repo_identity = str(repo_identity)
+            break
 
     # Update entries for paths that were actually written (succeeded) or
     # confirmed identical (skipped_identical — content unchanged but we
@@ -1139,10 +1152,24 @@ def _build_manifest_from_result(
             "community_id": rn["frontmatter_fields"].get("community", None) if rn else None,
             "has_user_blocks": _has_user_sentinel_blocks(path.read_text(encoding="utf-8")),
         }
+        repo_identity = rn["frontmatter_fields"].get("repo") if rn else None
+        if repo_identity:
+            entry["repo_identity"] = str(repo_identity)
         new_manifest[rel_key] = entry
 
+    if run_repo_identity:
+        new_manifest["__graphify_run__"] = {
+            "manifest_version": 2,
+            "repo_identity": run_repo_identity,
+            "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }
+
     # Remove entries for paths that no longer exist on disk (orphaned from a prior run)
-    stale_keys = [k for k, v in new_manifest.items() if not (vault_dir / k).exists()]
+    stale_keys = [
+        k
+        for k, v in new_manifest.items()
+        if not _is_manifest_reserved_key(k) and not (vault_dir / k).exists()
+    ]
     for k in stale_keys:
         del new_manifest[k]
 
