@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: verifying
-stopped_at: Completed 36-04-PLAN.md
-last_updated: "2026-04-29T08:09:22.381Z"
+stopped_at: Completed 36-05-PLAN.md
+last_updated: "2026-04-29T08:40:29.132Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 5
-  total_plans: 20
-  completed_plans: 20
+  total_plans: 21
+  completed_plans: 21
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 ## Current Position
 
 Phase: 36 (Migration Guide, Skill Alignment & Regression Sweep) — VERIFYING
-Plan: 4 of 4
+Plan: 5 of 5
 Status: Phase complete — ready for verification
 Last activity: 2026-04-29
 
@@ -62,6 +62,7 @@ Progress: [██████████] 100%
 | Phase 36 P02 | 7min | 2 tasks | 5 files |
 | Phase 36 P03 | 6min | 2 tasks | 10 files |
 | Phase 36 P04 | 9min | 2 tasks | 3 files |
+| Phase 36 P05 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,8 @@ Locked v1.8 choices:
 - [Phase 36]: Legacy _COMMUNITY_* wording remains allowed only when describing reviewed legacy archive behavior, not generated v1.8 output.
 - [Phase 36]: [Phase 36 Plan 04]: The sanitizer matrix imports private sink helpers intentionally where the private helper is the security boundary under test. — Private sink helpers are the exact security boundaries carrying VER-03 invariants.
 - [Phase 36]: [Phase 36 Plan 04]: Phase 36 final validation records actual focused and full pytest outputs; known baseline failures did not reproduce. — Milestone audit needs executed evidence rather than planned command claims.
+- [Phase 36]: [Phase 36 Plan 05]: Install-time Claude and AGENTS guidance now uses GRAPH_REPORT.md, Obsidian MOC notes with [[wikilinks]], and wiki/index.md fallback instead of legacy _COMMUNITY_* overview notes. — Closes VER-02 install-time drift identified by phase verification.
+- [Phase 36]: [Phase 36 Plan 05]: Embedded install guidance constants are covered by tests/test_skill_files.py so future drift is caught with packaged skill files. — Keeps install-time guidance and packaged skill wording under the same regression test surface.
 
 ### Pending Todos
 
@@ -150,6 +153,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T08:09:22.378Z
-Stopped at: Completed 36-04-PLAN.md
-Next action: `/gsd-execute-phase 36`
+Last session: 2026-04-29T08:40:13.144Z
+Stopped at: Completed 36-05-PLAN.md
+Next action: `/gsd-verify-work 36`
