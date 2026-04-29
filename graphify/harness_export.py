@@ -559,8 +559,9 @@ def export_claude_harness(
     include_annotations: bool = False,
     secrets_mode: str = "redact",
     _clock: Callable[[], datetime] | None = None,
+    memory_format: str = "markdown",
 ) -> list[Path]:
-    """Emit SOUL/HEARTBEAT/USER markdown files under ``out_dir/harness/``.
+    """Emit SOUL/HEARTBEAT/USER markdown and/or JSON interchange under ``out_dir/harness/``.
 
     Parameters
     ----------
@@ -587,12 +588,16 @@ def export_claude_harness(
         to the module-level clock override via :func:`set_clock` or to
         ``datetime.now(timezone.utc)``. HARNESS-08 (round-trip fidelity)
         relies on a pinned clock to produce byte-equal output.
+    memory_format:
+        ``markdown`` (default): SOUL/HEARTBEAT/USER only. ``interchange``:
+        write :file:`harness_memory.v1.json` only. ``both``: markdown plus
+        interchange (Phase 40 / PORT-01).
 
     Returns
     -------
     list[Path]
-        The three written paths in deterministic block order
-        (SOUL, HEARTBEAT, USER).
+        Written artifact paths (markdown blocks in order, then interchange
+        file when requested, then ``fidelity.json``).
 
     Raises
     ------
@@ -625,94 +630,109 @@ def export_claude_harness(
             f"harness_dir {validated_dir} escaped base {base}"
         ) from exc
 
-    # Load schema first so an unknown target fails before any I/O on sidecars.
-    schema_doc = yaml.safe_load(schema_path(target).read_text(encoding="utf-8"))
-    if not isinstance(schema_doc, dict) or "blocks" not in schema_doc:
+    if memory_format not in {"markdown", "interchange", "both"}:
         raise ValueError(
-            f"harness schema for target {target!r} is malformed: "
-            "expected a top-level 'blocks' key."
-        )
-    blocks = schema_doc["blocks"]
-    if not isinstance(blocks, dict):
-        raise ValueError(
-            f"harness schema for target {target!r} has non-dict 'blocks'."
+            "memory_format must be one of 'markdown', 'interchange', 'both' "
+            f"(got {memory_format!r})"
         )
 
     sidecars = _load_sidecars(base)
-    annotations = sidecars["annotations"]
-    findings: list[dict[str, Any]] = []
-    if include_annotations:
-        # HARNESS-07 / T-13-07: scan BEFORE skipping allow-list so redaction is
-        # visible in output. ``mode='error'`` raises ValueError; the CLI maps
-        # that to exit-code 3.
-        annotations, findings = scan_annotations_for_secrets(
-            annotations, mode=secrets_mode
-        )
-    else:
-        annotations = _filter_annotations_allowlist(annotations)
 
-    if findings:
-        unique_ids = len({f["id"] for f in findings})
-        print(
-            f"[graphify] harness export: redacted {len(findings)} secret "
-            f"match(es) across {unique_ids} annotation(s)",
-            file=sys.stderr,
-        )
-
-    god_nodes = _collect_god_nodes(sidecars["graph_data"])
-    recent_deltas = _collect_recent_deltas(sidecars["agent_edges"])
-    hot_paths = _collect_hot_paths(sidecars["telemetry"])
-    agent_identity = _collect_agent_identity(sidecars["telemetry"])
-
-    # HARNESS-08: kwarg > module override > system wall clock.
     clock = _clock or _default_clock
-    generated_at = clock().isoformat(timespec="seconds")
-    graphify_version = str(sidecars["telemetry"].get("graphify_version", "unknown"))
-
-    context: dict[str, str] = {
-        "god_nodes": god_nodes,
-        "recent_deltas": recent_deltas,
-        "hot_paths": hot_paths,
-        "agent_identity": agent_identity,
-        "generated_at": generated_at,
-        "graphify_version": graphify_version,
-    }
-
     written: list[Path] = []
-    for block_name in _BLOCK_ORDER:
-        block = blocks.get(block_name)
-        if not isinstance(block, dict):
+
+    if memory_format in ("markdown", "both"):
+        schema_doc = yaml.safe_load(schema_path(target).read_text(encoding="utf-8"))
+        if not isinstance(schema_doc, dict) or "blocks" not in schema_doc:
             raise ValueError(
-                f"schema block {block_name!r} missing or malformed in "
-                f"{target!r} schema"
+                f"harness schema for target {target!r} is malformed: "
+                "expected a top-level 'blocks' key."
             )
-        filename = block.get("filename")
-        body = block.get("body")
-        if not isinstance(filename, str) or not isinstance(body, str):
+        blocks = schema_doc["blocks"]
+        if not isinstance(blocks, dict):
             raise ValueError(
-                f"schema block {block_name!r} requires string 'filename' "
-                "and 'body' fields"
+                f"harness schema for target {target!r} has non-dict 'blocks'."
             )
 
-        normalized = _normalize_placeholders(body)
-        rendered = string.Template(normalized).safe_substitute(context)
+        annotations = sidecars["annotations"]
+        findings: list[dict[str, Any]] = []
+        if include_annotations:
+            annotations, findings = scan_annotations_for_secrets(
+                annotations, mode=secrets_mode
+            )
+        else:
+            annotations = _filter_annotations_allowlist(annotations)
 
-        out_path = validated_dir / filename
-        # Final guard — filename could conceivably contain ``..``; ensure the
-        # resolved child path still lives under the validated directory.
-        # WR-03 (Phase 13 review): use ``relative_to`` instead of string
-        # prefix matching to avoid sibling-directory prefix collisions.
-        try:
-            out_path.resolve().relative_to(base)
-        except ValueError as exc:
-            raise ValueError(
-                f"harness filename {filename!r} escapes base {base}"
-            ) from exc
+        if findings:
+            unique_ids = len({f["id"] for f in findings})
+            print(
+                f"[graphify] harness export: redacted {len(findings)} secret "
+                f"match(es) across {unique_ids} annotation(s)",
+                file=sys.stderr,
+            )
 
-        tmp = out_path.with_suffix(out_path.suffix + ".tmp")
-        tmp.write_text(rendered, encoding="utf-8")
-        os.replace(tmp, out_path)
-        written.append(out_path)
+        god_nodes = _collect_god_nodes(sidecars["graph_data"])
+        recent_deltas = _collect_recent_deltas(sidecars["agent_edges"])
+        hot_paths = _collect_hot_paths(sidecars["telemetry"])
+        agent_identity = _collect_agent_identity(sidecars["telemetry"])
+
+        generated_at = clock().isoformat(timespec="seconds")
+        graphify_version = str(sidecars["telemetry"].get("graphify_version", "unknown"))
+
+        context: dict[str, str] = {
+            "god_nodes": god_nodes,
+            "recent_deltas": recent_deltas,
+            "hot_paths": hot_paths,
+            "agent_identity": agent_identity,
+            "generated_at": generated_at,
+            "graphify_version": graphify_version,
+        }
+
+        for block_name in _BLOCK_ORDER:
+            block = blocks.get(block_name)
+            if not isinstance(block, dict):
+                raise ValueError(
+                    f"schema block {block_name!r} missing or malformed in "
+                    f"{target!r} schema"
+                )
+            filename = block.get("filename")
+            body = block.get("body")
+            if not isinstance(filename, str) or not isinstance(body, str):
+                raise ValueError(
+                    f"schema block {block_name!r} requires string 'filename' "
+                    "and 'body' fields"
+                )
+
+            normalized = _normalize_placeholders(body)
+            rendered = string.Template(normalized).safe_substitute(context)
+
+            out_path = validated_dir / filename
+            try:
+                out_path.resolve().relative_to(base)
+            except ValueError as exc:
+                raise ValueError(
+                    f"harness filename {filename!r} escapes base {base}"
+                ) from exc
+
+            tmp = out_path.with_suffix(out_path.suffix + ".tmp")
+            tmp.write_text(rendered, encoding="utf-8")
+            os.replace(tmp, out_path)
+            written.append(out_path)
+
+    if memory_format in ("interchange", "both"):
+        from graphify.harness_interchange import INTERCHANGE_FILENAME, export_interchange_v1
+
+        gv_raw = str(sidecars["telemetry"].get("graphify_version", "unknown"))
+        gv_kw = None if gv_raw == "unknown" else gv_raw
+        interchange_path = validated_dir / INTERCHANGE_FILENAME
+        export_interchange_v1(
+            sidecars["graph_data"],
+            out_path=interchange_path,
+            clock=clock,
+            graphify_version=gv_kw,
+            artifacts_base=base,
+        )
+        written.append(interchange_path)
 
     # HARNESS-08: write the round-trip fidelity manifest AFTER the three
     # block files exist so the per-file SHA-256 reflects final on-disk bytes.

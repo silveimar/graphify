@@ -1,6 +1,7 @@
 """graphify CLI - `graphify install` sets up the Claude Code skill."""
 from __future__ import annotations
 import json
+import os
 import platform
 import re
 import shutil
@@ -1259,6 +1260,7 @@ def main() -> None:
         print("  benchmark [graph.json]  measure token reduction vs naive full-corpus approach")
         print("  capability [--stdout|--validate]  MCP capability manifest JSON / drift gate (Phase 13)")
         print("  harness export [--target claude]  Emit SOUL/HEARTBEAT/USER harness files (Phase 13 / SEED-002)")
+        print("  import-harness PATH            Import harness JSON/markdown to validated extraction (Phase 40)")
         print("  elicit [--output PATH] [--dry-run] [--demo] [--force]")
         print("                            tacit-to-explicit interview; prefer when corpus is empty/tiny (Phase 39)")
         print("  run [path] [--router]     AST extract with optional heterogeneous model routing (Phase 12)")
@@ -2268,6 +2270,7 @@ def main() -> None:
         if not rest or rest[0] != "export":
             print(
                 "Usage: graphify harness export [--target claude] [--out PATH] "
+                "[--format {markdown,interchange,both}] "
                 "[--include-annotations] [--secrets-mode {redact,error}]",
                 file=sys.stderr,
             )
@@ -2280,6 +2283,16 @@ def main() -> None:
         parser = _ap.ArgumentParser(prog="graphify harness export")
         parser.add_argument("--target", default="claude", choices=["claude"])
         parser.add_argument("--out", default="graphify-out")
+        parser.add_argument(
+            "--format",
+            default="markdown",
+            choices=["markdown", "interchange", "both"],
+            dest="memory_format",
+            help=(
+                "markdown: SOUL/HEARTBEAT/USER only; interchange: harness_memory.v1.json "
+                "only; both: markdown plus JSON interchange (Phase 40)."
+            ),
+        )
         parser.add_argument(
             "--include-annotations",
             action="store_true",
@@ -2300,6 +2313,7 @@ def main() -> None:
                 target=opts.target,
                 include_annotations=opts.include_annotations,
                 secrets_mode=opts.secrets_mode,
+                memory_format=opts.memory_format,
             )
         except ValueError as exc:
             # HARNESS-07: secret scanner in ``mode='error'`` raises
@@ -2310,6 +2324,71 @@ def main() -> None:
             sys.exit(3)
         for p in written:
             print(str(p))
+        sys.exit(0)
+    elif cmd == "import-harness":
+        # graphify import-harness PATH [--format auto|json|claude] [--strict] [--output PATH]
+        import argparse as _ap
+        import json as _json
+
+        from graphify.harness_import import import_harness_path
+        from graphify.output import resolve_output
+
+        parser = _ap.ArgumentParser(prog="graphify import-harness")
+        parser.add_argument(
+            "path",
+            help="Harness file under graphify-out/ (interchange JSON or Claude markdown)",
+        )
+        parser.add_argument(
+            "--format",
+            default="auto",
+            choices=["auto", "json", "claude"],
+            help="Parser selector (default: sniff by extension/content)",
+        )
+        parser.add_argument(
+            "--strict",
+            action="store_true",
+            help="Reject on high-confidence injection-pattern matches",
+        )
+        parser.add_argument(
+            "--output",
+            default=None,
+            help="Override artifacts root (same precedence as graphify run / elicit)",
+        )
+        opts = parser.parse_args(sys.argv[2:])
+
+        if opts.path in {"-", "/dev/stdin"}:
+            print(
+                "[graphify] import-harness: stdin and URLs are not supported in this release.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
+        resolved = resolve_output(Path.cwd(), cli_output=opts.output)
+        artifacts = resolved.artifacts_dir
+        artifacts.mkdir(parents=True, exist_ok=True)
+
+        src = Path(opts.path)
+        if not src.is_absolute():
+            src = (Path.cwd() / src).resolve()
+        try:
+            extraction = import_harness_path(
+                src,
+                format=opts.format,
+                strict=opts.strict,
+                artifacts_root=artifacts,
+            )
+        except (ValueError, FileNotFoundError) as exc:
+            print(f"[graphify] {exc}", file=sys.stderr)
+            sys.exit(2)
+
+        out_json = artifacts / "harness_import.json"
+        tmp = out_json.with_suffix(".tmp")
+        tmp.write_text(
+            _json.dumps(extraction, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(tmp, out_json)
+        print(str(out_json))
         sys.exit(0)
     elif cmd == "run":
         # graphify run [path] [--router] [--output <path>]

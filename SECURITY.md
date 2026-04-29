@@ -44,6 +44,18 @@ graphify is a **local development tool**. It runs as a Claude Code skill and opt
 | Symlink traversal | `os.walk(..., followlinks=False)` is explicit throughout `detect.py`. |
 | Corrupted graph.json | `_load_graph()` in `serve.py` wraps `json.JSONDecodeError` and prints a clear recovery message instead of crashing. |
 
+### Harness memory import/export (Phase 40)
+
+| Risk | Mitigation |
+|------|------------|
+| Untrusted harness files (markdown / JSON interchange) | `harness_import.import_harness_path` reads only inside `graphify-out/` via `validate_graph_path`; byte cap `MAX_HARNESS_IMPORT_BYTES` (same order as text fetch cap); decoding errors fail closed. |
+| Prompt injection via imported labels or bodies | Layered `sanitize_label`, `sanitize_harness_text`, and `guard_harness_injection_patterns` in `security.py`; optional `strict` rejects on pattern hit (SEC-01). |
+| Path traversal on harness paths | `validate_graph_path` resolves and confines reads/writes to the artifacts root — CLI, MCP, and library share the same checks (PORT-05, SEC-03). |
+| MCP vs CLI trust mismatch | MCP tools `import_harness` and `export_harness_interchange` call `import_harness_path` / `export_interchange_v1` — no duplicate parsers in `serve.py` (SEC-03, D-05). |
+| Oversized harness payloads | Read capped before decode; long free-text fields capped in `sanitize_harness_text`. |
+
+Traceability: **PORT-01–PORT-05** (interchange export/import surface, schema artifact, validation, round-trip scope, path policy); **SEC-01–SEC-04** (sanitization, interchange provenance metadata on export, shared MCP/CLI behavior, documentation).
+
 ### What graphify does NOT do
 
 - Does not run a network listener (MCP server communicates over stdio only)

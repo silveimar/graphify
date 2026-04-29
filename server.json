@@ -22,8 +22,8 @@
     }
   ],
   "_meta": {
-    "manifest_content_hash": "f6b10b9df7bc453ea27059184320163de5935889549068bc6c9d81d6ba711405",
-    "tool_count": 24,
+    "manifest_content_hash": "3ea1b9acc86aab648ef6e3cc59f7368a8e8181feaeac09b8db64155dbb31a08f",
+    "tool_count": 26,
     "regenerate_command": "graphify capability --stdout > server.json"
   }
 }

@@ -380,6 +380,42 @@ def build_mcp_tools():
                 "required": ["seed_id"],
             },
         ),
+        types.Tool(
+            name="import_harness",
+            description=(
+                "Import a harness memory file from disk (interchange JSON v1 or Claude markdown). "
+                "Same validation and sanitization as `graphify import-harness` (Phase 40, SEC-03). "
+                "Path must be inside the active graphify-out directory."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Relative or absolute path under graphify-out",
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": ["auto", "json", "claude"],
+                        "default": "auto",
+                    },
+                    "strict": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Reject on high-confidence injection-pattern matches",
+                    },
+                },
+                "required": ["path"],
+            },
+        ),
+        types.Tool(
+            name="export_harness_interchange",
+            description=(
+                "Build the canonical JSON interchange v1 envelope from the loaded graph.json "
+                "snapshot (no markdown). Same core as `graphify harness export --format interchange`."
+            ),
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 

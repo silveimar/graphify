@@ -119,3 +119,13 @@ get_diagram_seed:
   deterministic: true
   cacheable_until: graph_mtime
   composable_from: [list_diagram_seeds]
+import_harness:
+  cost_class: cheap
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: []
+export_harness_interchange:
+  cost_class: cheap
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: []

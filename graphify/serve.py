@@ -3327,6 +3327,49 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             G, _out_dir.parent, arguments or {}, alias_map=_alias_map
         )
 
+    def _tool_import_harness(arguments: dict) -> str:
+        """Phase 40: delegate harness import to graphify.harness_import (CLI parity, SEC-03)."""
+        raw_path = (arguments or {}).get("path") or ""
+        fmt = str((arguments or {}).get("format") or "auto")
+        strict = bool((arguments or {}).get("strict", False))
+        try:
+            resolved = validate_graph_path(Path(raw_path), base=_out_dir)
+        except (ValueError, FileNotFoundError, OSError) as exc:
+            return json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False)
+        from graphify.harness_import import import_harness_path
+
+        try:
+            ext = import_harness_path(
+                resolved,
+                format=fmt,
+                strict=strict,
+                artifacts_root=_out_dir,
+            )
+        except ValueError as exc:
+            return json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False)
+        return json.dumps({"status": "ok", "extraction": ext}, ensure_ascii=False)
+
+    def _tool_export_harness_interchange(arguments: dict) -> str:
+        """Phase 40: build interchange v1 JSON envelope from graph.json (library parity)."""
+        _reload_if_stale()
+        gp = Path(graph_path)
+        if not gp.exists():
+            return json.dumps(
+                {"status": "no_graph", "error": "graph.json not found"},
+                ensure_ascii=False,
+            )
+        try:
+            raw_g = json.loads(gp.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            return json.dumps(
+                {"status": "error", "error": f"invalid graph.json: {exc}"},
+                ensure_ascii=False,
+            )
+        from graphify.harness_interchange import export_interchange_v1
+
+        env = export_interchange_v1(raw_g, out_path=None)
+        return json.dumps({"status": "ok", "interchange": env}, ensure_ascii=False)
+
     _handlers = {
         "query_graph": _tool_query_graph,
         "get_node": _tool_get_node,
@@ -3352,6 +3395,8 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "capability_describe": _tool_capability_describe,
         "list_diagram_seeds": _tool_list_diagram_seeds,  # Phase 20 SEED-09
         "get_diagram_seed": _tool_get_diagram_seed,      # Phase 20 SEED-10
+        "import_harness": _tool_import_harness,
+        "export_harness_interchange": _tool_export_harness_interchange,
     }
 
     _reg_tools = build_mcp_tools()

@@ -14,6 +14,8 @@ import socket
 _ALLOWED_SCHEMES = {"http", "https"}
 _MAX_FETCH_BYTES = 52_428_800   # 50 MB hard cap for binary downloads
 _MAX_TEXT_BYTES  = 10_485_760   # 10 MB hard cap for HTML / text
+# Phase 40 (PORT-05): harness import reads local files only; cap matches text budget.
+MAX_HARNESS_IMPORT_BYTES = _MAX_TEXT_BYTES
 
 # AWS metadata, link-local, and common cloud metadata endpoints
 _BLOCKED_HOSTS = {"metadata.google.internal", "metadata.google.com"}
@@ -205,3 +207,55 @@ def sanitize_label_md(text: str) -> str:
     `sanitize_label` for label values rendered into Markdown reports.
     """
     return text.replace("`", "'").replace("<", "&lt;").replace(">", "&gt;")
+
+
+# ---------------------------------------------------------------------------
+# Harness import — Phase 40 (SEC-01, D-04)
+# ---------------------------------------------------------------------------
+
+_HARNESS_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+_MAX_HARNESS_FREE_TEXT = 1_048_576
+
+# Prompt-injection gadgets in imported harness bodies / labels (best-effort).
+_HARNESS_INJECTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("yaml_fence_line", re.compile(r"(?m)^-{3,}\s*$")),
+    ("fake_xml_system", re.compile(r"(?i)<\s*/?\s*system\s*>")),
+    (
+        "override_instruction",
+        re.compile(r"(?i)\bignore\s+(all\s+)?(prior\s+)?instructions\b"),
+    ),
+    ("role_override", re.compile(r"(?im)^\s*(system|assistant|user)\s*:\s*$")),
+)
+
+
+def sanitize_harness_text(text: str, *, max_chars: int | None = None) -> str:
+    """Strip control characters and cap length for free-text harness fields."""
+    mc = max_chars if max_chars is not None else _MAX_HARNESS_FREE_TEXT
+    t = _HARNESS_CONTROL.sub("", text)
+    if len(t) > mc:
+        t = t[:mc]
+    return t
+
+
+def guard_harness_injection_patterns(
+    text: str,
+    *,
+    strict: bool = False,
+    replacement: str = "[stripped]",
+) -> tuple[str, bool]:
+    """Neutralize common injection gadget patterns in harness text.
+
+    Returns ``(cleaned_text, matched_any)``. In ``strict=True``, raises
+    :class:`ValueError` on the first pattern match instead of substituting.
+    """
+    cleaned = text
+    matched = False
+    for name, pattern in _HARNESS_INJECTION_PATTERNS:
+        if pattern.search(cleaned):
+            matched = True
+            if strict:
+                raise ValueError(
+                    f"harness import: strict mode rejected injection pattern ({name})"
+                )
+            cleaned = pattern.sub(replacement, cleaned)
+    return cleaned, matched
