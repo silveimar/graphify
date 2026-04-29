@@ -134,6 +134,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VER-01 | Phase 36 | Complete |
 | VER-02 | Phase 36 | Complete |
 | VER-03 | Phase 36 | Complete |
+| ONB-01 | Future | Deferred |
+| HAR-01 | Future | Deferred |
+| HAR-02 | Future | Deferred |
+| VAULT-01 | Future | Deferred |
+| VAULT-02 | Future | Deferred |
 
 **Coverage:**
 - v1.8 requirements: 33 total

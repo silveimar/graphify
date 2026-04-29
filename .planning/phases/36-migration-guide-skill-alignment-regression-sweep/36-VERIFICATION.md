@@ -5,11 +5,11 @@ status: passed
 score: 9/9 must-haves verified
 overrides_applied: 0
 re_verification:
-  previous_status: gaps_found
+  previous_status: not_passed
   previous_score: 8/9
-  gaps_closed:
+  issues_closed:
     - "Maintainer can confirm skill files and CLI/install docs use the same v1.8 Obsidian export behavior, with stale generated `_COMMUNITY_*` claims gone."
-  gaps_remaining: []
+  issues_remaining: []
   regressions: []
 ---
 
