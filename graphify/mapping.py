@@ -237,6 +237,38 @@ def _resolve_folder(
     return folder_mapping.get(note_type) or folder_mapping.get("default", "Atlas/Dots/")
 
 
+def _join_taxonomy_folder(root: str, folder: str) -> str:
+    """Join taxonomy root/folder into a normalized vault-relative folder."""
+    text = "/".join(
+        segment.strip("/")
+        for segment in (root, folder)
+        if segment.strip("/")
+    )
+    return f"{text}/" if text else ""
+
+
+def _effective_folder_mapping(profile: dict) -> dict:
+    """Return folder mappings with taxonomy taking precedence when present."""
+    folder_mapping = dict(profile.get("folder_mapping") or {})
+    taxonomy = profile.get("taxonomy")
+    if not isinstance(taxonomy, dict):
+        return folder_mapping
+
+    root = taxonomy.get("root")
+    folders = taxonomy.get("folders")
+    if not isinstance(root, str) or not isinstance(folders, dict):
+        return folder_mapping
+
+    for key in (
+        "moc", "thing", "statement", "person", "source", "default",
+        "unclassified",
+    ):
+        folder = folders.get(key)
+        if isinstance(folder, str) and folder:
+            folder_mapping[key] = _join_taxonomy_folder(root, folder)
+    return folder_mapping
+
+
 # ---------------------------------------------------------------------------
 # classify() — D-47 precedence pipeline (per-node half; Plan 02 adds
 # community assembly)
@@ -267,7 +299,7 @@ def classify(
     """
     from graphify.cluster import score_all
 
-    folder_mapping = profile.get("folder_mapping") or {}
+    folder_mapping = _effective_folder_mapping(profile)
     top_n = (
         profile.get("topology", {})
         .get("god_node", {})
@@ -506,12 +538,12 @@ def _assemble_communities(
     community_name / sibling_labels.
 
     Logic:
-      1. Communities with ``len(members) >= moc_threshold`` become MOC
+      1. Communities with ``len(members) >= min_community_size`` become MOC
          entries (note_type="moc").
       2. Below-threshold communities are routed to the nearest host via
          ``_nearest_host`` (D-53 arg-max by inter-community edge count).
       3. Below-threshold communities with no host edges collapse into a
-         synthetic ``per_community[-1]`` Uncategorized bucket MOC (D-56).
+         synthetic ``per_community[-1]`` _Unclassified bucket MOC (D-56).
       4. Non-MOC per_node entries receive their host MOC's
          community_name / tag / parent_moc_label. ``sibling_labels`` is
          populated only for god nodes (D-60 BLOCKER fidelity fix) and is
@@ -519,14 +551,15 @@ def _assemble_communities(
     """
     from graphify.profile import safe_tag
 
-    folder_mapping = profile.get("folder_mapping") or {}
+    folder_mapping = _effective_folder_mapping(profile)
     moc_folder = folder_mapping.get("moc") or folder_mapping.get(
         "default", "Atlas/Maps/"
     )
+    unclassified_folder = folder_mapping.get("unclassified") or moc_folder
 
-    # Defensive threshold parse — belt-and-suspenders with Plan 03's
-    # validate_rules. Explicitly reject bool (bool is a subclass of int).
-    raw_threshold = profile.get("mapping", {}).get("moc_threshold", 3)
+    # Defensive threshold parse — belt-and-suspenders with profile validation.
+    # Explicitly reject bool (bool is a subclass of int).
+    raw_threshold = profile.get("mapping", {}).get("min_community_size", 3)
     if isinstance(raw_threshold, bool) or not isinstance(raw_threshold, int):
         threshold = 3
     else:
@@ -588,12 +621,13 @@ def _assemble_communities(
     # --- Synthesize bucket MOC only when needed (D-56) ----------------------
     bucket_needed = bool(hostless_below) or (not above_cids and bool(below_cids))
     if bucket_needed:
+        bucket_name = "_Unclassified"
         per_community[-1] = ClassificationContext(
             note_type="moc",
-            folder=moc_folder,
-            community_name="Uncategorized",
-            parent_moc_label="Uncategorized",
-            community_tag="uncategorized",
+            folder=unclassified_folder,
+            community_name=bucket_name,
+            parent_moc_label=bucket_name,
+            community_tag=safe_tag(bucket_name),
             members_by_type={"thing": [], "statement": [], "person": [], "source": []},
             sub_communities=[],
             sibling_labels=[],
