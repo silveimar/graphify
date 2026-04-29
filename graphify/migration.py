@@ -96,7 +96,16 @@ def build_migration_preview(
 ) -> dict:
     """Build a JSON-serializable migration preview from a MergePlan."""
     vault = Path(vault_dir).resolve()
-    actions = [_action_to_row(action, vault, review_only=False) for action in plan.actions]
+    manifest = manifest or {}
+    actions = [
+        _classify_repo_drift(
+            _action_to_row(action, vault, review_only=False),
+            vault,
+            repo_identity,
+            manifest,
+        )
+        for action in plan.actions
+    ]
     legacy_notes = scan_legacy_notes(vault, manifest=manifest)
     canonical_by_identity = _canonical_actions_by_identity(actions)
     existing_paths = {row["path"] for row in actions}
@@ -144,6 +153,98 @@ def build_migration_preview(
     }
     preview["plan_id"] = compute_migration_plan_id(preview)
     return preview
+
+
+def run_update_vault(
+    *,
+    input_dir: Path,
+    vault_dir: Path,
+    repo_identity: str | None = None,
+    apply: bool = False,
+    plan_id: str | None = None,
+    use_router: bool = False,
+    verbose: bool = False,
+) -> dict:
+    """Run the preview-first raw-corpus to Obsidian vault update workflow."""
+    raw = Path(input_dir).resolve()
+    vault = Path(vault_dir).resolve()
+    if not raw.exists():
+        raise ValueError(f"input path not found: {raw}")
+    if not (vault / ".obsidian").is_dir():
+        raise ValueError(f"target vault must contain .obsidian: {vault}")
+    if apply and not plan_id:
+        raise ValueError("--apply requires --plan-id from a preview artifact")
+
+    from graphify.build import build
+    from graphify.cluster import cluster
+    from graphify.export import to_obsidian
+    from graphify.merge import _load_manifest
+    from graphify.naming import resolve_repo_identity
+    from graphify.output import resolve_output
+    from graphify.pipeline import run_corpus
+    from graphify.profile import load_profile
+
+    resolved = resolve_output(vault)
+    profile = load_profile(vault)
+    resolved_repo = resolve_repo_identity(
+        raw,
+        cli_identity=repo_identity,
+        profile=profile,
+    )
+
+    extraction = run_corpus(
+        raw,
+        use_router=use_router,
+        out_dir=resolved.artifacts_dir,
+        resolved=None,
+    )
+    G = build([extraction])
+    communities = cluster(G)
+    plan = to_obsidian(
+        G,
+        communities,
+        str(resolved.notes_dir),
+        profile=profile,
+        repo_identity=resolved_repo.identity,
+        dry_run=True,
+    )
+    manifest_path = resolved.artifacts_dir / "vault-manifest.json"
+    manifest = _load_manifest(manifest_path)
+    preview = build_migration_preview(
+        plan,
+        input_dir=raw,
+        vault_dir=vault,
+        artifacts_dir=resolved.artifacts_dir,
+        repo_identity=resolved_repo.identity,
+        manifest=manifest,
+        verbose=verbose,
+    )
+
+    if apply:
+        loaded = load_migration_plan(resolved.artifacts_dir, str(plan_id))
+        validate_plan_matches_request(
+            loaded,
+            raw,
+            vault,
+            resolved_repo.identity,
+            current_preview=preview,
+        )
+        return {
+            "preview": loaded,
+            "json_path": resolved.artifacts_dir / MIGRATION_ARTIFACT_DIR / f"migration-plan-{plan_id}.json",
+            "markdown_path": resolved.artifacts_dir / MIGRATION_ARTIFACT_DIR / f"migration-plan-{plan_id}.md",
+            "applied": False,
+            "repo_identity": resolved_repo.identity,
+        }
+
+    json_path, markdown_path = write_migration_artifacts(preview, resolved.artifacts_dir)
+    return {
+        "preview": preview,
+        "json_path": json_path,
+        "markdown_path": markdown_path,
+        "applied": False,
+        "repo_identity": resolved_repo.identity,
+    }
 
 
 def format_migration_preview(
@@ -314,7 +415,7 @@ def _identity_from_frontmatter(frontmatter: dict) -> dict:
 
 def _action_to_row(action: MergeAction, vault: Path, *, review_only: bool) -> dict:
     path = _display_path(action.path, vault)
-    return {
+    row = {
         "path": path,
         "action": action.action,
         "reason": action.reason,
@@ -327,6 +428,62 @@ def _action_to_row(action: MergeAction, vault: Path, *, review_only: bool) -> di
         "review_only": review_only,
         "legacy": False,
     }
+    if Path(path).name.startswith("CODE_"):
+        row["repo_identity"] = None
+    return row
+
+
+def _classify_repo_drift(
+    row: dict,
+    vault: Path,
+    repo_identity: str,
+    manifest: dict[str, dict],
+) -> dict:
+    existing_repo = _existing_repo_identity(row["path"], vault, manifest)
+    if existing_repo is None:
+        if Path(row["path"]).name.startswith("CODE_"):
+            updated = dict(row)
+            updated["repo_identity"] = repo_identity
+            return updated
+        return row
+    if existing_repo == repo_identity:
+        updated = dict(row)
+        updated["repo_identity"] = repo_identity
+        return updated
+    updated = dict(row)
+    updated["action"] = "SKIP_CONFLICT"
+    updated["reason"] = (
+        "existing managed note belongs to a different repo identity "
+        f"({existing_repo} != {repo_identity})"
+    )
+    updated["changed_fields"] = []
+    updated["changed_blocks"] = []
+    updated["conflict_kind"] = "repo_identity_drift"
+    updated["source"] = "both"
+    updated["review_only"] = True
+    updated["existing_repo_identity"] = existing_repo
+    updated["repo_identity"] = repo_identity
+    return updated
+
+
+def _existing_repo_identity(path: str, vault: Path, manifest: dict[str, dict]) -> str | None:
+    entry = manifest.get(path)
+    if isinstance(entry, dict):
+        value = entry.get("repo_identity")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    candidate = validate_vault_path(path, vault)
+    if not candidate.exists() or candidate.suffix.lower() != ".md":
+        return None
+    try:
+        frontmatter, _ = split_rendered_note(candidate.read_text(encoding="utf-8"))
+    except OSError:
+        return None
+    value = frontmatter.get("repo")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
 
 
 def _display_path(path: Path, vault: Path) -> str:
