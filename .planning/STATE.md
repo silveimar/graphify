@@ -156,7 +156,7 @@ Items carried forward outside v1.8 scope:
 | Category | Item | Status |
 |----------|------|--------|
 | seed | SEED-001 tacit-to-explicit elicitation | Dormant; activate only for onboarding/discovery milestones or explicit tacit-knowledge-only user demand |
-| seed | SEED-002 multi-harness/inverse import | Dormant; activate only on real multi-harness portability demand after SEED-001/Phase 14 prerequisites |
+| seed | SEED-002 multi-harness/inverse import | Dormant; activate only on real multi-harness portability demand after prerequisite discovery/context work |
 | vault-selection | Explicit `--vault` flag and multi-vault selector | Future milestone |
 | baseline-test | `test_detect_skips_dotfiles`, `test_collect_files_from_dir` | Separate `/gsd-debug` session |
 
