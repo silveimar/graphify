@@ -358,7 +358,10 @@ Plans:
   1. Phase 32, 33, 34, and 35 `*-VALIDATION.md` files expose consistent Nyquist metadata for automated discovery
   2. Validation task rows and sign-off sections reflect the already-passed verification/test evidence without changing shipped behavior
   3. Re-running `/gsd-audit-milestone` reports no validation-metadata tech debt for v1.8
-**Plans:** TBD
+**Plans:** 2 plans
+Plans:
+- [x] 37.1-PLAN.md — Normalize Phase 32-35 Nyquist frontmatter and reconcile validation sign-off/task status rows to passed verification evidence.
+- [x] 37.2-PLAN.md — Reconcile v1.8 milestone audit debt status and finalize explicit Phase 37 roadmap/validation artifact wiring.
 
 ---
 
@@ -409,7 +412,7 @@ Plans:
 | 34. Mapping, Cluster Quality & Note Classes | v1.8 | 5/5 | Complete   | 2026-04-29 |
 | 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 3/3 | Complete    | 2026-04-29 |
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 5/5 | Complete    | 2026-04-29 |
-| 37. Validation Metadata Ratification | v1.8 | 0/0 | Not started | - |
+| 37. Validation Metadata Ratification | v1.8 | 2/2 | Complete | 2026-04-29 |
 
 ---
 *Last updated: 2026-04-29 — v1.8 validation metadata gap-closure phase added after milestone audit; 33/33 requirements remain satisfied.*
