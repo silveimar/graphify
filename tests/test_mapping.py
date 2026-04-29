@@ -479,6 +479,33 @@ def test_mapping_min_community_size_controls_standalone_moc_floor():
     assert 1 not in high_floor["per_community"]
 
 
+def test_min_community_size_one_allows_single_node_standalone_moc():
+    import networkx as nx
+
+    from graphify.mapping import classify
+
+    G = nx.Graph()
+    G.add_node(
+        "solo",
+        label="SoloConcept",
+        file_type="document",
+        source_file="notes/solo.md",
+        source_location="L1",
+    )
+    communities = {0: ["solo"]}
+
+    result = classify(
+        G,
+        communities,
+        _profile(mapping={"min_community_size": 1}),
+    )
+
+    assert -1 not in result["per_community"]
+    assert result["per_community"][0]["routing"] == "standalone"
+    assert result["per_community"][0]["community_name"] == "SoloConcept"
+    assert result["per_node"]["solo"]["parent_moc_label"] == "SoloConcept"
+
+
 def test_taxonomy_moc_folder_wins_over_conflicting_folder_mapping():
     from graphify.mapping import classify
 
@@ -518,13 +545,35 @@ def test_community_below_threshold_collapses_to_host():
     from graphify.mapping import classify
 
     G, communities = make_classification_fixture()
-    result = classify(G, communities, _profile())
+    result = classify(G, communities, _profile(mapping={"min_community_size": 6}))
     # cid 1 should collapse into cid 0 via the n_transformer—n_auth edge.
+    assert result["per_community"][0]["routing"] == "standalone"
     subs = result["per_community"][0]["sub_communities"]
-    labels_in_subs = {s["label"] for s in subs}
-    assert "AuthService" in labels_in_subs
+    auth_sub = next(s for s in subs if s["label"] == "AuthService")
+    assert auth_sub["routing"] == "hosted"
+    assert auth_sub["source_community_id"] == 1
+    assert auth_sub["host_community_id"] == 0
     # n_auth's per_node ctx points parent_moc_label at "Transformer"
     assert result["per_node"]["n_auth"]["parent_moc_label"] == "Transformer"
+
+
+def test_isolate_below_floor_routes_to_unclassified_with_bucket_metadata():
+    from graphify.mapping import classify
+
+    G, communities = make_classification_fixture()
+
+    result = classify(G, communities, _profile(mapping={"min_community_size": 6}))
+
+    assert 2 not in result["per_community"]
+    assert result["per_node"]["n_isolate"]["parent_moc_label"] == "_Unclassified"
+    bucket = result["per_community"][-1]
+    assert bucket["routing"] == "bucketed"
+    assert bucket["community_name"] == "_Unclassified"
+    isolate_sub = next(s for s in bucket["sub_communities"] if s["label"] == "Orphan")
+    assert isolate_sub["routing"] == "bucketed"
+    assert isolate_sub["source_community_id"] == 2
+    assert isolate_sub["bucket_moc_label"] == "_Unclassified"
+    assert isolate_sub["parent_moc_label"] == "_Unclassified"
 
 
 def test_bucket_moc_absorbs_hostless_below_threshold():
@@ -555,9 +604,16 @@ def test_bucket_moc_absorbs_hostless_below_threshold():
     assert -1 in result["per_community"]
     assert result["per_community"][-1]["folder"] == "Atlas/Sources/Graphify/MOCs/"
     assert result["per_community"][-1]["community_name"] == "_Unclassified"
+    assert result["per_community"][-1]["routing"] == "bucketed"
     assert result["per_community"][-1]["community_tag"] == "unclassified"
     # Both below communities merged into bucket
     assert len(result["per_community"][-1]["sub_communities"]) == 2
+    assert {
+        sub["source_community_id"] for sub in result["per_community"][-1]["sub_communities"]
+    } == {0, 1}
+    assert {
+        sub["bucket_moc_label"] for sub in result["per_community"][-1]["sub_communities"]
+    } == {"_Unclassified"}
 
 
 def test_community_tag_is_safe_tag_of_name():
