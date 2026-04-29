@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: executing
-stopped_at: Completed 32-02-PLAN.md
-last_updated: "2026-04-29T00:18:08.222Z"
+stopped_at: Completed 32-03-PLAN.md
+last_updated: "2026-04-29T00:27:28.602Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 ## Current Position
 
 Phase: 32 (Profile Contract & Defaults) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-04-29
 
@@ -44,6 +44,7 @@ Progress: [###-------] 25%
 | v1.8 | 32-36 | TBD | 33/33 requirements mapped, not started |
 | Phase 32 P01 | 4min | 2 tasks | 3 files |
 | Phase 32 P02 | 5min | 2 tasks | 3 files |
+| Phase 32 P03 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -61,6 +62,9 @@ Locked v1.8 choices:
 - [Phase 32]: v1.8 taxonomy is resolved into folder_mapping at profile load/preflight time. — Keeps downstream mapping/export consumers on the existing folder_mapping contract while centralizing taxonomy truth in profile.py.
 - [Phase 32]: mapping.min_community_size is canonical; mapping.moc_threshold is a hard validation error. — Matches the locked v1.8 contract and prevents silent legacy precedence behavior.
 - [Phase 32]: Deprecated community overview templates remain renderable but produce MOC-only output migration warnings. — Phase 32 is the contract layer, so warnings guide migration without removing renderer support.
+- [Phase 32]: Mapping resolves taxonomy folders into ClassificationContext.folder before Obsidian export rendering.
+- [Phase 32]: mapping.min_community_size is the only runtime standalone MOC floor key in mapping.py.
+- [Phase 32]: Hostless tiny communities route to the _Unclassified MOC bucket.
 
 ### Pending Todos
 
@@ -87,6 +91,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T00:18:08.220Z
-Stopped at: Completed 32-02-PLAN.md
+Last session: 2026-04-29T00:27:28.599Z
+Stopped at: Completed 32-03-PLAN.md
 Next action: `/gsd-execute-phase 32`
