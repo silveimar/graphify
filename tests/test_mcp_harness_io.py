@@ -19,3 +19,12 @@ def test_serve_handlers_reference_library_functions() -> None:
     assert "export_interchange_v1" in text
     assert '"import_harness": _tool_import_harness' in text
     assert '"export_harness_interchange": _tool_export_harness_interchange' in text
+
+
+def test_security_md_phase40_harness_traceability() -> None:
+    """SEC-04 / 40-04: SECURITY.md retains harness I/O subsection + requirement IDs."""
+    sec = Path(__file__).resolve().parents[1] / "SECURITY.md"
+    text = sec.read_text(encoding="utf-8")
+    assert "Harness memory import/export" in text
+    assert "PORT-01" in text
+    assert "SEC-01" in text or "SEC-04" in text
