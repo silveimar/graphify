@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 
 from graphify.merge import MergeAction, MergePlan, apply_merge_plan, split_rendered_note
@@ -14,6 +15,7 @@ from graphify.profile import validate_vault_path
 
 
 MIGRATION_ARTIFACT_DIR = "migrations"
+MIGRATION_ARCHIVE_ARTIFACT_DIR = "migrations/archive"
 RISKY_ACTIONS = frozenset({"SKIP_CONFLICT", "SKIP_PRESERVE", "ORPHAN", "REPLACE"})
 ACTION_ORDER = ("CREATE", "UPDATE", "SKIP_PRESERVE", "SKIP_CONFLICT", "REPLACE", "ORPHAN")
 
@@ -389,6 +391,49 @@ def _merge_plan_from_preview(preview: dict, vault: Path) -> MergePlan:
     return MergePlan(actions=actions, orphans=[], summary=summary)
 
 
+def archive_legacy_notes(
+    loaded: dict,
+    vault_dir: Path,
+    artifacts_dir: Path,
+    plan_id: str,
+) -> list[dict]:
+    """Move reviewed legacy notes to a plan-scoped archive outside the vault."""
+    _validate_plan_id(plan_id)
+    vault = Path(vault_dir).resolve()
+    archive_root = (
+        Path(artifacts_dir).resolve()
+        / MIGRATION_ARCHIVE_ARTIFACT_DIR
+        / plan_id
+    )
+    archive_sources = _archive_sources_from_plan(loaded)
+    planned_moves: list[tuple[Path, Path, str, str]] = []
+    destinations: dict[Path, str] = {}
+
+    for raw_path, reason in archive_sources:
+        source = validate_vault_path(raw_path, vault)
+        relative_path = source.relative_to(vault).as_posix()
+        archive_path = _archive_destination(archive_root, relative_path)
+        existing_raw = destinations.get(archive_path)
+        if existing_raw is not None and existing_raw != raw_path:
+            raise ValueError(f"duplicate archive destination: {relative_path}")
+        destinations[archive_path] = raw_path
+        if not source.exists():
+            raise ValueError(f"legacy source not found: {relative_path}")
+        planned_moves.append((source, archive_path, relative_path, reason))
+
+    archived: list[dict] = []
+    for source, archive_path, relative_path, reason in planned_moves:
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source), str(archive_path))
+        archived.append({
+            "source_path": str(source),
+            "archive_path": str(archive_path),
+            "relative_path": relative_path,
+            "reason": reason,
+        })
+    return archived
+
+
 def _row_to_action(row: dict, vault: Path) -> MergeAction:
     return MergeAction(
         path=validate_vault_path(str(row.get("path", "")), Path(vault).resolve()),
@@ -406,6 +451,45 @@ def _row_to_action(row: dict, vault: Path) -> MergeAction:
 def _has_graphify_fingerprint(text: str) -> bool:
     frontmatter, body = split_rendered_note(text)
     return bool(frontmatter.get("graphify_managed")) or "<!-- graphify:" in body
+
+
+def _archive_sources_from_plan(loaded: dict) -> list[tuple[str, str]]:
+    sources: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    for mapping in loaded.get("legacy_mappings") or []:
+        raw_path = str(mapping.get("old_path") or "")
+        if not raw_path or raw_path in seen:
+            continue
+        seen.add(raw_path)
+        new_path = str(mapping.get("new_path") or "")
+        reason = f"legacy mapping archived before replacement by {new_path}".strip()
+        sources.append((raw_path, reason))
+
+    for row in loaded.get("actions") or []:
+        if (
+            row.get("action") != "ORPHAN"
+            or row.get("legacy") is not True
+            or row.get("review_only") is not True
+        ):
+            continue
+        raw_path = str(row.get("path") or "")
+        if not raw_path or raw_path in seen:
+            continue
+        seen.add(raw_path)
+        reason = str(row.get("reason") or "reviewed legacy orphan archived")
+        sources.append((raw_path, reason))
+    return sources
+
+
+def _archive_destination(archive_root: Path, relative_path: str) -> Path:
+    root = Path(archive_root).resolve()
+    destination = (root / relative_path).resolve()
+    try:
+        destination.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"archive path would escape archive root: {relative_path}") from exc
+    return destination
 
 
 def _legacy_identity(
