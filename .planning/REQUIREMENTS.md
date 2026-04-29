@@ -40,7 +40,7 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 - [x] **GOD-01**: User sees code-derived god nodes exported as `CODE_<repo>_<node>` notes rather than generic Things.
 - [ ] **GOD-02**: User sees CODE notes linked to their related concept MOC through frontmatter or body wikilinks.
 - [x] **GOD-03**: User sees concept MOCs list their important CODE member notes, preserving bidirectional navigation.
-- [ ] **GOD-04**: User is protected from filename collisions between CODE notes and concept MOCs.
+- [x] **GOD-04**: User is protected from filename collisions between CODE notes and concept MOCs.
 
 ### Repo Identity
 
@@ -120,7 +120,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GOD-01 | Phase 34 | Complete |
 | GOD-02 | Phase 34 | Pending |
 | GOD-03 | Phase 34 | Complete |
-| GOD-04 | Phase 34 | Pending |
+| GOD-04 | Phase 34 | Complete |
 | REPO-01 | Phase 33 | Complete |
 | REPO-02 | Phase 33 | Complete |
 | REPO-03 | Phase 33 | Complete |

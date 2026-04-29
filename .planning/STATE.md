@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: executing
-stopped_at: Completed 34-02-PLAN.md
-last_updated: "2026-04-29T03:52:29.363Z"
+stopped_at: Completed 34-03-PLAN.md
+last_updated: "2026-04-29T04:04:57.341Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 12
-  completed_plans: 10
-  percent: 83
+  completed_plans: 11
+  percent: 92
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 ## Current Position
 
 Phase: 34 (mapping-cluster-quality-note-classes) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-04-29
 
-Progress: [████████░░] 83%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [████████░░] 83%
 | Phase 33 P04 | 12min | 3 tasks | 5 files |
 | Phase 34 P1 | 6min | 2 tasks | 5 files |
 | Phase 34 P2 | 8min | 2 tasks | 2 files |
+| Phase 34 P03 | 6min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,9 @@ Locked v1.8 choices:
 - [Phase 34 Plan 02]: Mapping now emits standalone, hosted, and bucketed routing metadata as the source of truth for downstream export/template behavior.
 - [Phase 34 Plan 02]: CODE note eligibility is limited to code-backed god nodes with non-empty string source_file values and synthetic-node exclusions.
 - [Phase 34 Plan 02]: Concept MOC CODE member context is sorted by degree descending, then label and node id, and capped at 10.
+- [Phase 34]: [Phase 34 Plan 03]: CODE filename identity is generated in graphify.naming and injected once in to_obsidian after repo identity resolution. — Keeps repo normalization and filename identity centralized while preserving the existing export/render pipeline.
+- [Phase 34]: [Phase 34 Plan 03]: Colliding CODE stems suffix every colliding member with an 8-character SHA-256 hash derived from node id and source file. — Makes collision handling deterministic and independent of graph insertion order.
+- [Phase 34]: [Phase 34 Plan 03]: Normal Obsidian export coerces legacy community note requests to MOC rendering instead of calling the community overview renderer. — Satisfies MOC-only community output while retaining migration diagnostics for later phases.
 
 ### Pending Todos
 
@@ -116,6 +120,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T03:52:29.360Z
-Stopped at: Completed 34-02-PLAN.md
-Next action: `/gsd-discuss-phase 34 --chain`
+Last session: 2026-04-29T04:04:57.329Z
+Stopped at: Completed 34-03-PLAN.md
+Next action: `/gsd-execute-phase 34`
