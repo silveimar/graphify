@@ -728,7 +728,7 @@ def test_deep_merge_preserves_new_defaults():
 def test_default_profile_includes_topology_and_mapping_keys():
     from graphify.profile import _DEFAULT_PROFILE
     assert _DEFAULT_PROFILE["topology"]["god_node"]["top_n"] == 10
-    assert _DEFAULT_PROFILE["mapping"]["min_community_size"] == 3
+    assert _DEFAULT_PROFILE["mapping"]["min_community_size"] == 6
     assert "moc_threshold" not in _DEFAULT_PROFILE["mapping"]
 
 
@@ -747,7 +747,7 @@ def test_deep_merge_respects_topology_section():
     merged = _deep_merge(_DEFAULT_PROFILE, override)
     assert merged["topology"]["god_node"]["top_n"] == 25
     # Unrelated defaults preserved
-    assert merged["mapping"]["min_community_size"] == 3
+    assert merged["mapping"]["min_community_size"] == 6
     assert merged["folder_mapping"]["moc"] == "Atlas/Sources/Graphify/MOCs/"
 
 
@@ -967,7 +967,7 @@ def test_profile_v18_default_taxonomy(tmp_path):
     assert result["folder_mapping"]["person"] == "Atlas/Sources/Graphify/People/"
     assert result["folder_mapping"]["source"] == "Atlas/Sources/Graphify/Sources/"
     assert result["folder_mapping"]["default"] == "Atlas/Sources/Graphify/Things/"
-    assert result["mapping"]["min_community_size"] == 3
+    assert result["mapping"]["min_community_size"] == 6
     assert "moc_threshold" not in result["mapping"]
 
 
@@ -1626,7 +1626,7 @@ def test_dataview_queries_validates_against_known_types():
     """Every member of _KNOWN_NOTE_TYPES is accepted as a key."""
     from graphify.profile import _KNOWN_NOTE_TYPES
     assert _KNOWN_NOTE_TYPES == frozenset(
-        {"moc", "community", "thing", "statement", "person", "source"}
+        {"moc", "community", "thing", "statement", "person", "source", "code"}
     )
     profile = {
         "dataview_queries": {
@@ -1634,6 +1634,12 @@ def test_dataview_queries_validates_against_known_types():
             for note_type in _KNOWN_NOTE_TYPES
         }
     }
+    assert validate_profile(profile) == []
+
+
+def test_dataview_queries_accepts_code_note_type():
+    """CODE notes can declare a dedicated Dataview query."""
+    profile = {"dataview_queries": {"code": "TABLE file.link"}}
     assert validate_profile(profile) == []
 
 
