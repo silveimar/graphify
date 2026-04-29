@@ -211,6 +211,29 @@ def test_run_repo_identity_flag_overrides_profile(tmp_path):
     assert "profile-repo (source=profile)" not in result.stderr
 
 
+def test_run_profile_repo_identity_used_without_flag(tmp_path):
+    pytest.importorskip("yaml")
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / ".obsidian").mkdir()
+    (vault / ".graphify").mkdir()
+    (vault / ".graphify" / "profile.yaml").write_text(
+        _V18_PROFILE_BASE
+        + "repo:\n  identity: profile-repo\n"
+        + "output:\n  mode: vault-relative\n  path: Atlas/Generated\n",
+        encoding="utf-8",
+    )
+    custom = tmp_path / "graphify-out"
+
+    result = _graphify(
+        ["run", "--output", str(custom), "--router"],
+        cwd=vault,
+    )
+
+    assert "[graphify] repo identity: profile-repo (source=profile)" in result.stderr
+    assert result.stderr.count("[graphify] repo identity:") == 1
+
+
 def test_obsidian_repo_identity_flag_overrides_profile(tmp_path):
     pytest.importorskip("yaml")
     vault = tmp_path / "vault"
@@ -242,6 +265,20 @@ def test_obsidian_repo_identity_flag_overrides_profile(tmp_path):
     assert "[graphify] repo identity: cli-repo (source=cli-flag)" in result.stderr
     assert result.stderr.count("[graphify] repo identity:") == 1
     assert "profile-repo (source=profile)" not in result.stderr
+
+
+def test_run_repo_identity_missing_value_exits_two(tmp_path):
+    result = _graphify(["run", "--repo-identity"], cwd=tmp_path)
+
+    assert result.returncode == 2
+    assert "error: --repo-identity requires a value" in result.stderr
+
+
+def test_obsidian_repo_identity_missing_value_exits_two(tmp_path):
+    result = _graphify(["--obsidian", "--repo-identity"], cwd=tmp_path)
+
+    assert result.returncode == 2
+    assert "error: --repo-identity requires a value" in result.stderr
 
 
 # ---------------------------------------------------------------------------
