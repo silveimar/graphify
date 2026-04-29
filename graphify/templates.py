@@ -48,7 +48,7 @@ KNOWN_VARS: frozenset[str] = frozenset({
 })
 
 _NOTE_TYPES: frozenset[str] = frozenset({
-    "moc", "community", "thing", "statement", "person", "source",
+    "moc", "community", "thing", "statement", "person", "source", "code",
 })
 
 # ---------------------------------------------------------------------------
@@ -546,6 +546,7 @@ _REQUIRED_PER_TYPE: dict[str, set[str]] = {
     "statement": {"frontmatter", "label"},
     "person": {"frontmatter", "label"},
     "source": {"frontmatter", "label"},
+    "code": {"frontmatter", "label"},
 }
 
 
@@ -570,7 +571,7 @@ def _load_builtin_template(note_type: str) -> string.Template:
 
 
 def load_templates(vault_dir: Path) -> dict[str, string.Template]:
-    """Discover and load templates for all 6 note types.
+    """Discover and load templates for all supported note types.
 
     For each type, prefers a user override at
     `<vault_dir>/.graphify/templates/<type>.md` if it exists, validates, and
@@ -985,7 +986,7 @@ def render_note(
     vault_dir: "Path | None" = None,
     created: "datetime.date | None" = None,
 ) -> tuple[str, str]:
-    """Render a non-MOC note (thing/statement/person/source).
+    """Render a non-MOC note (thing/statement/person/source/code).
 
     Returns (filename, rendered_text). Filename includes `.md` extension.
 
@@ -999,7 +1000,7 @@ def render_note(
     Defaults to `datetime.date.today()` for backward compatibility.
     """
     # WARNING 1: both input-validation failures raise ValueError for consistency.
-    _KNOWN_NOTE_TYPES = ("thing", "statement", "person", "source")
+    _KNOWN_NOTE_TYPES = ("thing", "statement", "person", "source", "code")
     if note_type not in _KNOWN_NOTE_TYPES:
         raise ValueError(
             f"render_note: note_type {note_type!r} not in {sorted(_KNOWN_NOTE_TYPES)}"
@@ -1085,7 +1086,7 @@ def render_note(
     )
 
     # Phase 31 (TMPL-03): consult per-note-type Dataview query for non-MOC
-    # notes. Built-in `thing/statement/person/source.md` templates do not
+    # notes. Built-in `thing/statement/person/source/code.md` templates do not
     # currently expose a `${dataview_block}` slot, so the resolved value is
     # only surfaced if a vault override template adds the slot — but the
     # lookup itself runs unconditionally so all six note types participate
@@ -1109,7 +1110,7 @@ def render_note(
         "sub_communities_callout": "",
         # Phase 31 (TMPL-03): per-note-type Dataview block. Empty when the
         # built-in template lacks `${dataview_block}` (today's thing/statement/
-        # person/source.md), populated when a vault override adds the slot.
+        # person/source/code.md), populated when a vault override adds the slot.
         "dataview_block": note_dataview_block,
     }
 
@@ -1118,7 +1119,7 @@ def render_note(
     else:
         templates = {
             nt: _load_builtin_template(nt)
-            for nt in ("thing", "statement", "person", "source", "moc", "community")
+            for nt in ("thing", "statement", "person", "source", "code", "moc", "community")
         }
     template = templates[note_type]
     # Phase 31 (D-16): expand `{{#…}}…{{/…}}` blocks BEFORE safe_substitute so
@@ -1347,7 +1348,7 @@ def _render_moc_like(
         if vault_dir is not None
         else {
             nt: _load_builtin_template(nt)
-            for nt in ("thing", "statement", "person", "source", "moc", "community")
+            for nt in ("thing", "statement", "person", "source", "code", "moc", "community")
         }
     )
     default_template = templates[template_key]
