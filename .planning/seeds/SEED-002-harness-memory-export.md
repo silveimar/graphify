@@ -1,6 +1,7 @@
 ---
 name: SEED-002
 description: Export graphify memory artifacts (SOUL.md, HEARTBEAT.md, operating-model.json) in a harness-agnostic format so Claude Code, Letta, OpenClaw, Cursor, etc. can all consume without lock-in
+status: dormant
 trigger_when: Multi-harness support becomes a real user ask — OR lock-in friction appears in a UAT — OR v1.4 Phase 13 (Agent Capability Manifest) is being planned (natural companion)
 planted_during: v1.3 scoping (2026-04-16)
 planted_date: 2026-04-16

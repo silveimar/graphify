@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
-**Current focus:** Phase 37 — Validation Metadata Ratification
+**Current focus:** Phase 38 — Dormant seed and quick-task reconciliation
 
 ## Current Position
 
-Phase: 37
-Plan: 37.2 complete
-Status: Ready to execute
-Last activity: 2026-04-29 -- Phase 38 planning complete
+Phase: 38
+Plan: 38.1 complete, 38.2 pending
+Status: Executing
+Last activity: 2026-04-29 -- Phase 38 execution in progress
 
 Progress: [██████████] 100%
 
@@ -154,8 +154,8 @@ Items carried forward outside v1.8 scope:
 
 | Category | Item | Status |
 |----------|------|--------|
-| seed | SEED-001 tacit-to-explicit elicitation | Dormant; revisit when onboarding/discovery is milestone theme |
-| seed | SEED-002 multi-harness/inverse import | Deferred pending prompt-injection defenses |
+| seed | SEED-001 tacit-to-explicit elicitation | Dormant; activate only for onboarding/discovery milestones or explicit tacit-knowledge-only user demand |
+| seed | SEED-002 multi-harness/inverse import | Dormant; activate only on real multi-harness portability demand after SEED-001/Phase 14 prerequisites |
 | vault-selection | Explicit `--vault` flag and multi-vault selector | Future milestone |
 | baseline-test | `test_detect_skips_dotfiles`, `test_collect_files_from_dir` | Separate `/gsd-debug` session |
 

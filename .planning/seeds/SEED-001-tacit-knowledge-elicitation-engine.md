@@ -1,6 +1,7 @@
 ---
 name: SEED-001
 description: Structured interview engine that extracts operational/tacit knowledge from humans and produces SOUL.md/HEARTBEAT.md/USER.md artifacts alongside graph nodes
+status: dormant
 trigger_when: Future milestone focuses on onboarding or discovery — OR a user says they can't articulate what graphify should ingest — OR v1.5+ scoping considers "upstream" features before extraction
 planted_during: v1.3 scoping (2026-04-16)
 planted_date: 2026-04-16
