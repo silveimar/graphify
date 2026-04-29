@@ -629,7 +629,11 @@ def load_manifest(manifest_path: str = _MANIFEST_PATH) -> dict[str, float]:
 
 
 def save_manifest(files: dict[str, list[str]], manifest_path: str = _MANIFEST_PATH) -> None:
-    """Save current file mtimes so the next --update run can diff against them."""
+    """Save current file mtimes so the next --update run can diff against them.
+
+    Written atomically (tmp + fsync + os.replace) like ``_save_output_manifest`` so
+    concurrent runs or crashes cannot leave a truncated ``manifest.json``.
+    """
     manifest: dict[str, float] = {}
     for file_list in files.values():
         for f in file_list:
@@ -637,8 +641,23 @@ def save_manifest(files: dict[str, list[str]], manifest_path: str = _MANIFEST_PA
                 manifest[f] = Path(f).stat().st_mtime
             except OSError:
                 pass  # file deleted between detect() and manifest write - skip it
-    Path(manifest_path).parent.mkdir(parents=True, exist_ok=True)
-    Path(manifest_path).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    dest = Path(manifest_path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(manifest, indent=2, sort_keys=True)
+    tmp = dest.with_suffix(".json.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, dest)
+    except OSError:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        raise
 
 
 def detect_incremental(root: Path, manifest_path: str = _MANIFEST_PATH) -> dict:

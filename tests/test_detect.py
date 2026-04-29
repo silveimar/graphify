@@ -562,6 +562,29 @@ def test_save_output_manifest_atomic_no_partial_on_oserror(tmp_path, monkeypatch
     assert not (artifacts_dir / "output-manifest.json").exists()
 
 
+def test_save_mtime_manifest_round_trip(tmp_path):
+    """Incremental ``manifest.json`` (mtime map) round-trips and uses atomic replace."""
+    import json
+
+    import pytest
+
+    from graphify.detect import load_manifest, save_manifest
+
+    src = tmp_path / "mod.py"
+    src.write_text("x = 1\n")
+    manifest_file = tmp_path / "graphify-out" / "manifest.json"
+    files_map = {"code": [str(src)]}
+
+    save_manifest(files_map, manifest_path=str(manifest_file))
+
+    assert manifest_file.exists()
+    raw = json.loads(manifest_file.read_text(encoding="utf-8"))
+    assert isinstance(raw, dict)
+    assert set(raw.keys()) == {str(src)}
+    loaded = load_manifest(str(manifest_file))
+    assert loaded[str(src)] == pytest.approx(Path(src).stat().st_mtime)
+
+
 def test_detect_skips_prior_files_from_manifest(tmp_path):
     """VAULT-13 D-27: detect() prunes files listed in output-manifest.json prior runs."""
     from graphify.detect import _save_output_manifest

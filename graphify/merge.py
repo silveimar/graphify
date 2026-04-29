@@ -1090,15 +1090,19 @@ def _is_manifest_reserved_key(key: str) -> bool:
 
 
 def _save_manifest(manifest_path: Path, manifest: dict[str, dict]) -> None:
-    """Write manifest atomically via tmp + os.replace (D-05).
+    """Write manifest atomically via tmp + fsync + os.replace (D-05).
 
     Creates parent directories if absent. Raises OSError on failure
     (after best-effort tmp cleanup).
     """
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = manifest_path.with_suffix(".json.tmp")
+    payload = json.dumps(manifest, indent=2, sort_keys=True)
     try:
-        tmp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp, manifest_path)
     except OSError:
         tmp.unlink(missing_ok=True)
