@@ -22,6 +22,7 @@ from graphify.templates import ClassificationContext, _NOTE_TYPES
 
 _MAX_PATTERN_LEN = 512
 _MAX_CANDIDATE_LEN = 2048
+_MAX_CODE_MEMBERS = 10
 
 _VALID_ATTR_OPS = frozenset({"equals", "in", "contains", "regex"})
 _VALID_TOPOLOGY_KINDS = frozenset({
@@ -222,6 +223,24 @@ def _norm_ext_from_path(path: str) -> str:
     return "." + base.rsplit(".", 1)[-1].lower()
 
 
+def _is_code_note_candidate(
+    G: nx.Graph,
+    node_id: str,
+    god_node_ids: frozenset[str] | set[str],
+) -> bool:
+    """Return true when a god node is eligible for a CODE note."""
+    attrs = G.nodes[node_id]
+    source_file = attrs.get("source_file")
+    return (
+        node_id in god_node_ids
+        and attrs.get("file_type") == "code"
+        and isinstance(source_file, str)
+        and bool(source_file.strip())
+        and not _is_concept_node(G, node_id)
+        and not _is_file_node(G, node_id)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Folder resolution (D-46: per-rule override falls back to folder_mapping)
 # ---------------------------------------------------------------------------
@@ -375,9 +394,13 @@ def classify(
                 )
             )
         else:
-            # (3) Built-in topology fallback — god node → thing, else statement.
+            # (3) Built-in topology fallback — code god node → code,
+            #     other god node → thing, else statement.
             if node_id in god_ids:
-                note_type = "thing"
+                if _is_code_note_candidate(G, node_id, god_ids):
+                    note_type = "code"
+                else:
+                    note_type = "thing"
             else:
                 note_type = "statement"
             folder = _resolve_folder(note_type, None, folder_mapping)
@@ -459,6 +482,36 @@ def _build_sibling_labels(
         key=lambda m: (-G.degree(m), m),
     )
     return [str(G.nodes[m].get("label", m)) for m in ranked[:cap]]
+
+
+def _build_code_members(
+    G: nx.Graph,
+    node_ids: list[str],
+    per_node: dict[str, ClassificationContext],
+    *,
+    cap: int = _MAX_CODE_MEMBERS,
+) -> list[dict]:
+    """Return capped CODE member descriptors sorted for deterministic rendering."""
+    ranked = sorted(
+        (
+            node_id
+            for node_id in node_ids
+            if per_node.get(node_id, {}).get("note_type") == "code"
+        ),
+        key=lambda node_id: (
+            -G.degree(node_id),
+            str(G.nodes[node_id].get("label", node_id)),
+            node_id,
+        ),
+    )
+    return [
+        {
+            "id": node_id,
+            "label": str(G.nodes[node_id].get("label", node_id)),
+            "degree": G.degree(node_id),
+        }
+        for node_id in ranked[:cap]
+    ]
 
 
 def _inter_community_edges(
@@ -595,7 +648,11 @@ def _assemble_communities(
             community_name=name,
             parent_moc_label=name,  # MOC is its own anchor for Phase 2 fallback
             community_tag=tag,
-            members_by_type={"thing": [], "statement": [], "person": [], "source": []},
+            members_by_type={
+                "thing": [], "statement": [], "person": [], "source": [], "code": [],
+            },
+            code_members=[],
+            code_member_labels=[],
             sub_communities=[],
             sibling_labels=[],
             # W-2 fix: populate cohesion so templates.py:705-706 renders a
@@ -630,7 +687,11 @@ def _assemble_communities(
             community_name=bucket_name,
             parent_moc_label=bucket_name,
             community_tag=safe_tag(bucket_name),
-            members_by_type={"thing": [], "statement": [], "person": [], "source": []},
+            members_by_type={
+                "thing": [], "statement": [], "person": [], "source": [], "code": [],
+            },
+            code_members=[],
+            code_member_labels=[],
             sub_communities=[],
             sibling_labels=[],
             # Bucket MOC has no real community to score — 0.0 sentinel.
@@ -643,6 +704,28 @@ def _assemble_communities(
         else:
             for cid in hostless_below:
                 below_to_host[cid] = -1
+
+    # --- CODE members for MOC navigation ------------------------------------
+    code_member_nodes_by_host: dict[int, list[str]] = {
+        cid: list(communities[cid])
+        for cid in above_cids
+    }
+    if -1 in per_community:
+        code_member_nodes_by_host[-1] = []
+    for below_cid, host_cid in below_to_host.items():
+        if host_cid not in per_community:
+            continue
+        code_member_nodes_by_host.setdefault(host_cid, []).extend(
+            communities[below_cid]
+        )
+    for host_cid, member_ids in code_member_nodes_by_host.items():
+        if host_cid not in per_community:
+            continue
+        code_members = _build_code_members(G, member_ids, per_node)
+        per_community[host_cid]["code_members"] = code_members
+        per_community[host_cid]["code_member_labels"] = [
+            member["label"] for member in code_members
+        ]
 
     # --- Fill sub_communities for host MOCs ---------------------------------
     # Iterate below_to_host in ascending below_cid order so sub_communities
