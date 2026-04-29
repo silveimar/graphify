@@ -648,12 +648,52 @@ def to_obsidian(
     merged_labels = dict(resolved_labels)
     if community_labels:
         merged_labels.update(community_labels)
+    original_labels = {
+        cid: (
+            ctx.get("community_name")
+            or ctx.get("parent_moc_label")
+            or f"Community {cid}"
+        )
+        for cid, ctx in per_community.items()
+    }
     for cid, label in merged_labels.items():
         if cid in per_community:
             ctx = dict(per_community[cid])
             ctx["community_name"] = label
             ctx["community_tag"] = safe_tag(label)
             per_community[cid] = ctx
+    final_labels = {
+        cid: (
+            ctx.get("community_name")
+            or ctx.get("parent_moc_label")
+            or f"Community {cid}"
+        )
+        for cid, ctx in per_community.items()
+    }
+    original_to_final_label = {
+        str(original): str(final_labels[cid])
+        for cid, original in original_labels.items()
+        if cid in final_labels
+    }
+    node_to_community = _node_community_map(communities)
+    for node_id, ctx in list(per_node.items()):
+        if not isinstance(ctx, dict):
+            continue
+        parent_label = None
+        cid = node_to_community.get(node_id)
+        if cid in final_labels:
+            parent_label = str(final_labels[cid])
+        else:
+            current_parent = ctx.get("parent_moc_label")
+            if current_parent:
+                parent_label = original_to_final_label.get(str(current_parent))
+        if not parent_label:
+            continue
+        updated_ctx = dict(ctx)
+        updated_ctx["parent_moc_label"] = parent_label
+        updated_ctx["community_name"] = parent_label
+        updated_ctx["community_tag"] = safe_tag(parent_label)
+        per_node[node_id] = updated_ctx
 
     code_candidates: list[dict] = []
     for node_id, ctx in per_node.items():
@@ -677,6 +717,28 @@ def to_obsidian(
         ctx = dict(per_node[node_id])
         ctx.update(stem_info)
         per_node[node_id] = ctx
+    for cid, ctx in list(per_community.items()):
+        enriched_members: list[dict] = []
+        changed = False
+        for member in ctx.get("code_members", []) or []:
+            if not isinstance(member, dict):
+                continue
+            enriched = dict(member)
+            stem_info = code_filename_stems.get(str(member.get("id") or ""))
+            if stem_info:
+                enriched.update(stem_info)
+                changed = True
+            enriched_members.append(enriched)
+        if not changed:
+            continue
+        updated_ctx = dict(ctx)
+        updated_ctx["code_members"] = enriched_members
+        updated_ctx["code_member_labels"] = [
+            member.get("filename_stem") or member.get("label")
+            for member in enriched_members
+            if member.get("filename_stem") or member.get("label")
+        ]
+        per_community[cid] = updated_ctx
 
     rendered_notes: dict[str, RenderedNote] = {}
 

@@ -92,6 +92,8 @@ class ClassificationContext(TypedDict, total=False):
     parent_moc_label: str
     community_tag: str
     members_by_type: dict
+    code_members: list
+    code_member_labels: list
     sub_communities: list
     sibling_labels: list
     # community_name: Phase 3-populated display name for the community
@@ -866,6 +868,38 @@ def _build_members_section(members_by_type: dict, convention: str) -> str:
     return _wrap_sentinel("members", body)
 
 
+def _code_member_display_labels(
+    code_members: list,
+    code_member_labels: list,
+) -> list[str]:
+    """Return CODE member labels from structured context, preserving order."""
+    labels: list[str] = []
+    for member in code_members:
+        if not isinstance(member, dict):
+            continue
+        label = member.get("filename_stem") or member.get("label")
+        if label:
+            labels.append(str(label))
+    if not labels:
+        labels = [str(label) for label in code_member_labels if label]
+    return labels
+
+
+def _build_code_members_section(
+    code_members: list,
+    code_member_labels: list,
+    convention: str,
+) -> str:
+    """Build a MOC section linking to important CODE notes from context."""
+    labels = _code_member_display_labels(code_members, code_member_labels)
+    if not labels:
+        return ""
+    lines = ["> [!info] Important CODE Notes"]
+    for label in labels:
+        lines.append(f"> - {_emit_wikilink(label, convention)}")
+    return "\n\n" + "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Sub-communities callout (D-29) — below-threshold communities inline
 # ---------------------------------------------------------------------------
@@ -1057,6 +1091,11 @@ def render_note(
         # IN-05: caller-supplied date wins; default to today for back-compat.
         created=created if created is not None else datetime.date.today(),
     )
+    if isinstance(ctx, dict) and ctx.get("filename_collision"):
+        frontmatter_fields["filename_collision"] = True
+        collision_hash = ctx.get("filename_collision_hash")
+        if collision_hash:
+            frontmatter_fields["filename_collision_hash"] = str(collision_hash)
 
     # Phase 10 D-15: forward-map wikilinks from eliminated IDs via Obsidian aliases.
     # Only emitted when merged_from is non-empty; absent = byte-identical to pre-Phase-10.
@@ -1285,6 +1324,9 @@ def _render_moc_like(
     members_by_type = ctx.get("members_by_type", {})
     sub_communities = ctx.get("sub_communities", [])
     sibling_labels = ctx.get("sibling_labels", [])
+    code_members = ctx.get("code_members", [])
+    code_member_labels = ctx.get("code_member_labels", [])
+    code_labels = _code_member_display_labels(code_members, code_member_labels)
     # Cast to plain float so numpy.float64 (not a Python float subclass) renders
     # correctly as "0.82" rather than "numpy.float64(0.82)" (WR-06).
     _raw_cohesion = ctx.get("cohesion")
@@ -1295,7 +1337,9 @@ def _render_moc_like(
         profile.get("obsidian", {}).get("atlas_root", "Atlas"),
         convention,
     )]
-    related_list = [_emit_wikilink(lab, convention) for lab in sibling_labels if lab]
+    related_labels = list(sibling_labels or [])
+    related_labels.extend(label for label in code_labels if label not in related_labels)
+    related_list = [_emit_wikilink(lab, convention) for lab in related_labels if lab]
     tags = [f"community/{community_tag}", "graphify/moc"]
     fm_fields = _build_frontmatter_fields(
         up=up_list,
@@ -1324,6 +1368,11 @@ def _render_moc_like(
         convention=convention,
     )
     members_section = _build_members_section(members_by_type, convention)
+    members_section += _build_code_members_section(
+        code_members,
+        code_member_labels,
+        convention,
+    )
     sub_communities_callout = _build_sub_communities_callout(sub_communities, convention)
     # Phase 31 (TMPL-03): note_type drives per-note-type Dataview query lookup.
     # When the caller did not supply note_type, fall back to template_key

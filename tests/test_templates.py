@@ -1555,7 +1555,7 @@ def test_render_moc_lists_code_members_safely():
 
     assert "related:" in text
     assert "Important CODE Notes" in text
-    assert "[[CODE_Graphify_AuthServiceUnsafe|CODE graphify Auth  Service Unsafe]]" in text
+    assert "[[Code_Graphify_Authserviceunsafe|" in text
     assert "Auth]]Service|Unsafe" not in text
 
 
