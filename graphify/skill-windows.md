@@ -677,7 +677,7 @@ print()
 print(f'Open {obsidian_dir}/ as a vault in Obsidian.')
 print('  Graph view   - nodes colored by community (set automatically)')
 print('  graph.canvas - structured layout with communities as groups')
-print('  _COMMUNITY_* - overview notes with cohesion scores and dataview queries')
+print('  MOCs        - community notes with cohesion scores and Dataview queries')
 "
 ```
 
