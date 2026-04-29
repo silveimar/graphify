@@ -667,6 +667,20 @@ def _emit_wikilink(label: str, convention: str) -> str:
     return f"[[{fname}|{alias}]]"
 
 
+def _sanitize_generated_title(label: str) -> str:
+    """Normalize unsafe generated community titles before they reach sinks."""
+    text = str(label)
+    if not re.search(
+        r'[\\/:*?"<>|#^[\]{}\x00-\x1f\x7f\u0085\u2028\u2029]|\.\.',
+        text,
+    ):
+        return text
+    words = re.findall(r"[A-Za-z0-9]+", text)
+    if not words:
+        return "Community"
+    return " ".join(word.capitalize() for word in words)
+
+
 # ---------------------------------------------------------------------------
 # Frontmatter field dict builder (D-23, D-24, D-25, D-26, D-27)
 # ---------------------------------------------------------------------------
@@ -1257,6 +1271,7 @@ def _render_moc_like(
         or ctx.get("parent_moc_label")
         or f"Community {community_id}"
     )
+    community_name = _sanitize_generated_title(community_name)
     community_tag = ctx.get("community_tag") or safe_tag(community_name)
     folder = ctx.get("folder", "Atlas/Maps/")
     members_by_type = ctx.get("members_by_type", {})
