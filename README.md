@@ -38,6 +38,8 @@ dist/
 
 Same syntax as `.gitignore`. Patterns match against file paths relative to the folder you run graphify on.
 
+**Discovery-first / empty corpus:** When there is almost nothing to ingest yet, use `graphify elicit` and read [docs/ELICITATION.md](docs/ELICITATION.md) for artifact layout and merge behavior.
+
 ## How it works
 
 graphify runs in three passes. First, a deterministic AST pass extracts structure from code files (classes, functions, imports, call graphs, docstrings, rationale comments) with no LLM needed. Second, video and audio files are transcribed locally with faster-whisper using a domain-aware prompt derived from corpus god nodes — transcripts are cached so re-runs are instant. Third, Claude subagents run in parallel over docs, papers, images, and transcripts to extract concepts, relationships, and design rationale. The results are merged into a NetworkX graph, clustered with Leiden community detection, and exported as interactive HTML, queryable JSON, and a plain-language audit report.

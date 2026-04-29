@@ -1259,6 +1259,8 @@ def main() -> None:
         print("  benchmark [graph.json]  measure token reduction vs naive full-corpus approach")
         print("  capability [--stdout|--validate]  MCP capability manifest JSON / drift gate (Phase 13)")
         print("  harness export [--target claude]  Emit SOUL/HEARTBEAT/USER harness files (Phase 13 / SEED-002)")
+        print("  elicit [--output PATH] [--dry-run] [--demo] [--force]")
+        print("                            tacit-to-explicit interview; prefer when corpus is empty/tiny (Phase 39)")
         print("  run [path] [--router]     AST extract with optional heterogeneous model routing (Phase 12)")
         print("    --repo-identity <slug>  override profile/fallback repo identity for generated artifacts")
         print("  hook install            install post-commit/post-checkout git hooks (all platforms)")
@@ -2178,6 +2180,86 @@ def main() -> None:
             sys.exit(code)
         print("Usage: graphify capability --stdout | graphify capability --validate", file=sys.stderr)
         sys.exit(2)
+    elif cmd == "elicit":
+        # graphify elicit [--output PATH] [--dry-run] [--demo] [--force]
+        # Phase 39 — onboarding / empty-corpus path (library: graphify.elicit).
+        import argparse as _ap
+
+        from graphify.output import resolve_output
+
+        parser = _ap.ArgumentParser(
+            prog="graphify elicit",
+            description=(
+                "Run the tacit-to-explicit elicitation interview. "
+                "Prefer this when the corpus is empty or tiny (onboarding)."
+            ),
+        )
+        parser.add_argument(
+            "--output",
+            default=None,
+            help="Override artifacts root (same precedence as graphify run)",
+        )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Print resolved paths and extraction stats only; no writes",
+        )
+        parser.add_argument(
+            "--demo",
+            action="store_true",
+            help="Use sample answers (offline demo). Default is empty scripted answers.",
+        )
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Overwrite elicitation.json when merging would normally apply",
+        )
+        opts = parser.parse_args(sys.argv[2:])
+
+        def _demo_answers() -> dict[str, str]:
+            return {
+                "rhythms": "Daily standup, weekly retro",
+                "decisions": "Prefer small PRs",
+                "dependencies": "Platform team for deploys",
+                "knowledge": "Internal runbooks are outdated",
+                "friction": "Context switching",
+            }
+
+        resolved = resolve_output(Path.cwd(), cli_output=opts.output)
+        artifacts = resolved.artifacts_dir
+
+        from graphify.elicit import (
+            build_extraction_from_session,
+            maybe_deepen_session,
+            run_scripted_elicitation,
+            save_elicitation_sidecar,
+            write_elicitation_harness_markdown,
+        )
+
+        answers = _demo_answers() if opts.demo else {k: "" for k in _demo_answers()}
+        session = run_scripted_elicitation(answers, auto_confirm=True)
+        session = maybe_deepen_session(session)
+        extraction = build_extraction_from_session(session)
+
+        if opts.dry_run:
+            print(
+                json.dumps(
+                    {
+                        "artifacts_dir": str(artifacts),
+                        "node_count": len(extraction.get("nodes", [])),
+                        "edge_count": len(extraction.get("edges", [])),
+                        "demo": opts.demo,
+                    },
+                    indent=2,
+                )
+            )
+            sys.exit(0)
+
+        save_elicitation_sidecar(artifacts, extraction, force=opts.force)
+        written = write_elicitation_harness_markdown(artifacts, session)
+        for p in written:
+            print(str(p))
+        sys.exit(0)
     elif cmd == "harness":
         # graphify harness export [--target claude] [--out PATH]
         #   [--include-annotations] [--secrets-mode {redact,error}]

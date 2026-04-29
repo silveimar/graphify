@@ -9,6 +9,10 @@ capability_manifest: graphify-out/capability.json
 
 Turn any folder of files into a navigable knowledge graph with community detection, an honest audit trail, and three outputs: interactive HTML, GraphRAG-ready JSON, and a plain-language GRAPH_REPORT.md.
 
+## Empty or tiny corpus (elicitation)
+
+When there is almost nothing to extract yet, use: `graphify elicit` (see `docs/ELICITATION.md`). Use full `/graphify` once you have files to ingest.
+
 ## Usage
 
 ```

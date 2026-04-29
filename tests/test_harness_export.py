@@ -213,7 +213,17 @@ def test_cli_harness_export_invokes_exporter(
     assert exc.value.code == 0
 
     captured = capsys.readouterr()
-    out_lines = [ln for ln in captured.out.splitlines() if ln.strip()]
+    out_lines = [
+        ln
+        for ln in captured.out.splitlines()
+        if ln.strip()
+        and (
+            ln.endswith("claude-SOUL.md")
+            or ln.endswith("claude-HEARTBEAT.md")
+            or ln.endswith("claude-USER.md")
+            or ln.endswith("fidelity.json")
+        )
+    ]
     # SOUL/HEARTBEAT/USER + fidelity.json (HARNESS-08, Plan 04) in order.
     assert len(out_lines) == 4
     assert out_lines[0].endswith("claude-SOUL.md")

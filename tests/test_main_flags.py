@@ -1,4 +1,6 @@
 """Integration tests for --output flag wiring in graphify CLI (Phase 27)."""
+
+# Phase 39: elicit onboarding CLI smoke tests live here alongside output wiring.
 from __future__ import annotations
 
 import json
@@ -540,3 +542,17 @@ def test_update_vault_help_lists_command_shape(tmp_path):
     assert "Back up the target vault before apply" in result.stdout
     assert "--apply --plan-id <id>" in result.stdout
     assert "graphify-out/migrations/archive/" in result.stdout
+
+
+def test_elicit_help_onboarding(tmp_path):
+    result = _graphify(["elicit", "--help"], cwd=tmp_path)
+    assert result.returncode == 0
+    low = result.stdout.lower()
+    assert "empty" in low or "tiny" in low or "onboarding" in low
+
+
+def test_elicit_dry_run_demo(tmp_path):
+    result = _graphify(["elicit", "--dry-run", "--demo"], cwd=tmp_path)
+    assert result.returncode == 0
+    assert "artifacts_dir" in result.stdout
+    assert "node_count" in result.stdout

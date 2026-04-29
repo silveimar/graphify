@@ -66,7 +66,12 @@ def build_from_json(extraction: dict, *, directed: bool = False) -> nx.Graph:
     return G
 
 
-def build(extractions: list[dict], *, directed: bool = False) -> nx.Graph:
+def build(
+    extractions: list[dict],
+    *,
+    directed: bool = False,
+    elicitation: dict | None = None,
+) -> nx.Graph:
     """Merge multiple extraction results into one graph.
 
     directed=True produces a DiGraph that preserves edge direction (source→target).
@@ -76,9 +81,16 @@ def build(extractions: list[dict], *, directed: bool = False) -> nx.Graph:
     extraction's attributes win (NetworkX add_node overwrites). Pass AST
     results before semantic results so semantic labels take precedence, or
     reverse the order if you prefer AST source_location precision to win.
+
+    When *elicitation* is provided, it is merged **after** all entries in
+    *extractions* so interview-derived nodes overwrite duplicate IDs from
+    earlier passes (elicitation wins on collision).
     """
+    seq = list(extractions)
+    if elicitation is not None:
+        seq = seq + [elicitation]
     combined: dict = {"nodes": [], "edges": [], "hyperedges": [], "input_tokens": 0, "output_tokens": 0}
-    for ext in extractions:
+    for ext in seq:
         combined["nodes"].extend(ext.get("nodes", []))
         combined["edges"].extend(ext.get("edges", []))
         combined["hyperedges"].extend(ext.get("hyperedges", []))
