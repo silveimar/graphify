@@ -954,6 +954,21 @@ def test_render_note_all_non_moc_types_work():
         assert f"type: {note_type}" in text, f"{note_type}: type not in frontmatter"
 
 
+def test_render_note_uses_filename_stem_from_context_for_code_notes():
+    from tests.fixtures.template_context import make_min_graph, make_classification_context
+    from graphify.templates import render_note
+
+    G = make_min_graph()
+    ctx = make_classification_context()
+    ctx["filename_stem"] = "CODE_graphify_Auth_Service"
+    profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
+
+    fname, text = render_note("n_transformer", G, profile, "code", ctx)
+
+    assert fname == "CODE_graphify_Auth_Service.md"
+    assert "type: code" in text
+
+
 def test_render_note_wikilink_alias_human_label():
     from tests.fixtures.template_context import make_min_graph, make_classification_context
     from graphify.templates import render_note

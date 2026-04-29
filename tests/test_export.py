@@ -272,6 +272,7 @@ def test_to_obsidian_resolves_concept_names_for_moc_paths(tmp_path):
     obsidian_dir = out_root / "obsidian"
     profile = json.loads(json.dumps(_DEFAULT_PROFILE))
     profile["naming"]["concept_names"]["budget"] = 1.0
+    profile["mapping"]["min_community_size"] = 1
 
     plan = to_obsidian(
         G,
@@ -360,3 +361,125 @@ def test_to_obsidian_fallback_repo_identity_records_sidecar(tmp_path, monkeypatc
     assert payload["source"] == "fallback-directory"
     assert payload["raw_value"] == "my-project"
     assert payload["warnings"] == []
+
+
+def _code_paths_from_plan(plan, obsidian_dir: Path) -> list[str]:
+    return sorted(
+        action.path.relative_to(obsidian_dir).as_posix()
+        for action in plan.actions
+        if action.action == "CREATE" and action.path.name.startswith("CODE_")
+    )
+
+
+def test_to_obsidian_dry_run_uses_repo_prefixed_code_paths(tmp_path):
+    from graphify.export import to_obsidian
+    from graphify.profile import _DEFAULT_PROFILE
+
+    G, communities = _phase33_graph()
+    out_root = tmp_path / "graphify-out"
+    obsidian_dir = out_root / "obsidian"
+    profile = json.loads(json.dumps(_DEFAULT_PROFILE))
+    profile["repo"] = {"identity": "graphify"}
+    profile["naming"]["concept_names"]["enabled"] = False
+
+    plan = to_obsidian(
+        G,
+        communities,
+        output_dir=str(obsidian_dir),
+        profile=profile,
+        dry_run=True,
+    )
+
+    relative_paths = [
+        action.path.relative_to(obsidian_dir).as_posix()
+        for action in plan.actions
+        if action.action == "CREATE"
+    ]
+    code_paths = _code_paths_from_plan(plan, obsidian_dir)
+
+    assert code_paths
+    assert any(path.endswith("CODE_graphify_Auth_Session.md") for path in code_paths)
+    assert not any("_COMMUNITY_" in path for path in relative_paths)
+
+
+def _code_collision_graph(order: str) -> tuple[nx.Graph, dict[int, list[str]]]:
+    G = nx.Graph()
+    nodes = [
+        (
+            "n_auth_service",
+            {
+                "label": "Auth Service",
+                "file_type": "code",
+                "source_file": "src/auth/service.py",
+                "source_location": "L10",
+                "community": 0,
+            },
+        ),
+        (
+            "n_auth_service_duplicate",
+            {
+                "label": "Auth_Service",
+                "file_type": "code",
+                "source_file": "lib/auth/service.py",
+                "source_location": "L20",
+                "community": 0,
+            },
+        ),
+        (
+            "n_login_flow",
+            {
+                "label": "Login Flow",
+                "file_type": "document",
+                "source_file": "docs/login.md",
+                "source_location": "L1",
+                "community": 0,
+            },
+        ),
+    ]
+    if order == "reversed":
+        nodes = list(reversed(nodes))
+    for node_id, attrs in nodes:
+        G.add_node(node_id, **attrs)
+    G.add_edges_from([
+        ("n_auth_service", "n_auth_service_duplicate"),
+        ("n_auth_service", "n_login_flow"),
+        ("n_auth_service_duplicate", "n_login_flow"),
+    ])
+    return G, {0: ["n_auth_service", "n_auth_service_duplicate", "n_login_flow"]}
+
+
+def test_to_obsidian_code_collision_paths_are_order_independent(tmp_path):
+    from graphify.export import to_obsidian
+    from graphify.profile import _DEFAULT_PROFILE
+
+    profile = json.loads(json.dumps(_DEFAULT_PROFILE))
+    profile["repo"] = {"identity": "graphify"}
+    profile["naming"]["concept_names"]["enabled"] = False
+
+    forward_graph, communities = _code_collision_graph("forward")
+    forward_dir = tmp_path / "forward" / "obsidian"
+    forward = to_obsidian(
+        forward_graph,
+        communities,
+        output_dir=str(forward_dir),
+        profile=profile,
+        dry_run=True,
+    )
+
+    reversed_graph, reversed_communities = _code_collision_graph("reversed")
+    reversed_dir = tmp_path / "reversed" / "obsidian"
+    reversed_plan = to_obsidian(
+        reversed_graph,
+        reversed_communities,
+        output_dir=str(reversed_dir),
+        profile=profile,
+        dry_run=True,
+    )
+
+    forward_basenames = sorted(Path(path).name for path in _code_paths_from_plan(forward, forward_dir))
+    reversed_basenames = sorted(Path(path).name for path in _code_paths_from_plan(reversed_plan, reversed_dir))
+
+    assert forward_basenames == reversed_basenames
+    assert len(forward_basenames) == 2
+    assert all(name.startswith("CODE_graphify_Auth_Service_") for name in forward_basenames)
+    assert all(name.endswith(".md") for name in forward_basenames)
