@@ -51,7 +51,7 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 
 ### Migration and Rollout
 
-- [ ] **MIG-01**: User can run an automated migration command for the real `work-vault` to `ls-vault` update path.
+- [x] **MIG-01**: User can run an automated migration command for the real `work-vault` to `ls-vault` update path.
 - [x] **MIG-02**: User can preview migration effects in dry-run mode before any vault writes occur.
 - [x] **MIG-03**: User sees old managed paths mapped to new Graphify-owned paths when note identity can be matched.
 - [x] **MIG-04**: User can review CREATE, UPDATE, SKIP_PRESERVE, SKIP_CONFLICT, REPLACE, and ORPHAN outcomes before committing to the migration.
@@ -125,7 +125,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REPO-02 | Phase 33 | Complete |
 | REPO-03 | Phase 33 | Complete |
 | REPO-04 | Phase 35 | Complete |
-| MIG-01 | Phase 35 | Pending |
+| MIG-01 | Phase 35 | Complete |
 | MIG-02 | Phase 35 | Complete |
 | MIG-03 | Phase 35 | Complete |
 | MIG-04 | Phase 35 | Complete |
