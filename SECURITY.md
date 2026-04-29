@@ -56,6 +56,16 @@ graphify is a **local development tool**. It runs as a Claude Code skill and opt
 
 Traceability: **PORT-01–PORT-05** (interchange export/import surface, schema artifact, validation, round-trip scope, path policy); **SEC-01–SEC-04** (sanitization, interchange provenance metadata on export, shared MCP/CLI behavior, documentation).
 
+### Phase 40 security audit
+
+| Metric | Count |
+|--------|-------|
+| Threats reviewed | 11 |
+| Closed | 11 |
+| Open | 0 |
+
+Per-phase register and evidence: `.planning/phases/40-multi-harness-memory-inverse-import-injection-defenses/40-SECURITY.md`.
+
 ### What graphify does NOT do
 
 - Does not run a network listener (MCP server communicates over stdio only)
