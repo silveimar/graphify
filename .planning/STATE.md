@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: executing
-stopped_at: Completed 36-02-PLAN.md
-last_updated: "2026-04-29T07:45:03.456Z"
+stopped_at: Completed 36-03-PLAN.md
+last_updated: "2026-04-29T07:55:16.833Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 20
-  completed_plans: 18
-  percent: 90
+  completed_plans: 19
+  percent: 95
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 ## Current Position
 
 Phase: 36 (Migration Guide, Skill Alignment & Regression Sweep) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-04-29
 
-Progress: [█████████░] 90%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [█████████░] 90%
 | Phase 35 P03 | 9min | 3 tasks | 5 files |
 | Phase 36 P01 | 13min | 3 tasks | 4 files |
 | Phase 36 P02 | 7min | 2 tasks | 5 files |
+| Phase 36 P03 | 6min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,10 @@ Locked v1.8 choices:
 - [Phase 36 Plan 02]: The v1.8 guide is generic-first: --input is any raw corpus and --vault is the target Obsidian vault, with work-vault/raw -> ls-vault as the canonical example.
 - [Phase 36 Plan 02]: README presents --obsidian as lower-level direct export and update-vault as the reviewed existing-vault migration/update workflow.
 - [Phase 36 Plan 02]: CLI help repeats backup-before-apply, reviewed --apply --plan-id, archive path, and non-destructive legacy-note wording.
+- [Phase 36]: Skill contract drift is guarded with exact required phrases and targeted forbidden stale-claim phrases rather than full-file snapshots.
+- [Phase 36]: The shared skill wording distinguishes lower-level --obsidian export from reviewed preview-first update-vault existing-vault migration/update.
+- [Phase 36]: Legacy _COMMUNITY_* wording remains allowed only when describing reviewed legacy archive behavior, not generated v1.8 output.
+
 ### Pending Todos
 
 None.
@@ -142,6 +147,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T07:44:36.284Z
-Stopped at: Completed 36-02-PLAN.md
+Last session: 2026-04-29T07:55:16.830Z
+Stopped at: Completed 36-03-PLAN.md
 Next action: `/gsd-execute-phase 36`
