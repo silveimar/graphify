@@ -268,7 +268,9 @@ def test_load_templates_returns_all_builtins_when_no_vault_override(tmp_path):
     from graphify.templates import load_templates
 
     result = load_templates(tmp_path)
-    assert set(result.keys()) == {"moc", "community", "thing", "statement", "person", "source"}
+    assert set(result.keys()) == {
+        "moc", "community", "thing", "statement", "person", "source", "code",
+    }
     assert all(isinstance(v, string.Template) for v in result.values())
 
 
@@ -323,9 +325,21 @@ def test_load_templates_partial_override(tmp_path):
     )
     result = load_templates(tmp_path)
     # moc is user override, rest are built-ins
-    assert set(result.keys()) == {"moc", "community", "thing", "statement", "person", "source"}
+    assert set(result.keys()) == {
+        "moc", "community", "thing", "statement", "person", "source", "code",
+    }
     assert isinstance(result["thing"], string.Template)
     assert isinstance(result["moc"], string.Template)
+
+
+def test_load_templates_loads_builtin_code_template(tmp_path):
+    from graphify.templates import load_templates
+
+    result = load_templates(tmp_path)
+    assert "code" in result
+    assert "${frontmatter}" in result["code"].template
+    assert "${wayfinder_callout}" in result["code"].template
+    assert "${metadata_callout}" in result["code"].template
 
 
 # ---------------------------------------------------------------------------
@@ -926,14 +940,14 @@ def test_render_note_section_order_d32():
     assert idx_fm_end < idx_heading < idx_wayfinder < idx_connections < idx_metadata
 
 
-def test_render_note_all_four_non_moc_types_work():
+def test_render_note_all_non_moc_types_work():
     from tests.fixtures.template_context import make_min_graph, make_classification_context
     from graphify.templates import render_note
 
     G = make_min_graph()
     ctx = make_classification_context()
     profile = {"naming": {"convention": "title_case"}, "obsidian": {"atlas_root": "Atlas"}}
-    for note_type in ("thing", "statement", "person", "source"):
+    for note_type in ("thing", "statement", "person", "source", "code"):
         fname, text = render_note("n_transformer", G, profile, note_type, ctx)
         assert fname.endswith(".md"), f"{note_type}: fname missing .md"
         assert len(text) > 0, f"{note_type}: text is empty"
@@ -3263,7 +3277,7 @@ import pytest
 
 @pytest.mark.parametrize(
     "note_type",
-    ["moc", "community", "thing", "statement", "person", "source"],
+    ["moc", "community", "thing", "statement", "person", "source", "code"],
 )
 def test_dataview_queries_each_note_type_routes_correctly(note_type):
     """Every member of _KNOWN_NOTE_TYPES routes through `_build_dataview_block`
@@ -3277,12 +3291,13 @@ def test_dataview_queries_each_note_type_routes_correctly(note_type):
             "statement": "TABLE for_statement",
             "person": "TABLE for_person",
             "source": "TABLE for_source",
+            "code": "TABLE for_code",
         }
     }
     block = _build_dataview_block(profile, "tag", "Atlas/", note_type)
     assert f"TABLE for_{note_type}" in block
     # Cross-check: other note_types' strings do NOT appear.
-    for other in ("moc", "community", "thing", "statement", "person", "source"):
+    for other in ("moc", "community", "thing", "statement", "person", "source", "code"):
         if other != note_type:
             assert f"TABLE for_{other}" not in block
 
