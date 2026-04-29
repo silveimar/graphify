@@ -305,6 +305,24 @@ Plans:
 
 </details>
 
+<details>
+<summary>Phase 40: Multi-Harness Memory, Inverse Import &amp; Injection Defenses — PLANNING</summary>
+
+**Goal:** Canonical **JSON harness interchange**, **`import-harness`** into validated extraction dicts, **layered sanitization**, **MCP–CLI parity**, and **SECURITY.md** harness I/O subsection. **Requirements:** PORT-01–PORT-05, SEC-01–SEC-04. **Context:** `.planning/phases/40-multi-harness-memory-inverse-import-injection-defenses/40-CONTEXT.md` (D-01..D-07). **Phase 39** elicitation/harness contracts must not break without migration note.
+
+**Plans:** 5 plans in 4 waves
+
+Plans:
+- [ ] `40-01-PLAN.md` — [wave 1] Interchange v1 schema + `harness_interchange` export + CLI wire + tests (PORT-01, PORT-02, SEC-02; D-01)
+- [ ] `40-02-PLAN.md` — [wave 2, depends on 01] `harness_import` library + `security` sanitization + tests (PORT-03, PORT-05, SEC-01)
+- [ ] `40-03-PLAN.md` — [wave 3, depends on 02] `graphify import-harness` CLI + integration tests (PORT-03, PORT-05; D-02, D-03)
+- [ ] `40-04-PLAN.md` — [wave 3, depends on 02] MCP tools + `SECURITY.md` harness subsection + tests (SEC-03, SEC-04; D-05, D-07)
+- [ ] `40-05-PLAN.md` — [wave 4, depends on 01+03+04] Export→import semantic round-trip tests + documented limits (PORT-04; D-06)
+
+**Artifacts:** `40-RESEARCH.md`, `40-PATTERNS.md` in phase directory.
+
+</details>
+
 ---
 
 ## Progress
@@ -357,8 +375,8 @@ Plans:
 | 37. Validation Metadata Ratification | v1.8 | 2/2 | Complete   | 2026-04-29 |
 | 38. Dormant seeds & quick-task reconciliation | v1.8 | 2/2 | Complete | 2026-04-29 |
 | 39. Tacit-to-Explicit Onboarding & Elicitation | v1.9 | 0/5 | Not started | — |
-| 40. Multi-Harness Memory, Inverse Import & Injection Defenses | v1.9 | 0/? | Not started | — |
+| 40. Multi-Harness Memory, Inverse Import & Injection Defenses | v1.9 | 0/5 | Not started | — |
 | 41. Vault CLI — `--vault` & Multi-Vault Selector | v1.9 | 0/? | Not started | — |
 
 ---
-*Last updated: 2026-04-29 — Milestone v1.9 planned (Phases 39–41); v1.8 shipped — see `.planning/milestones/v1.8-ROADMAP.md` for prior phase detail.*
+*Last updated: 2026-04-29 — Phase 40 plan set added (5 plans / 4 waves); Milestone v1.9 (Phases 39–41); v1.8 shipped — see `.planning/milestones/v1.8-ROADMAP.md` for prior phase detail.*
