@@ -10,6 +10,8 @@ import unicodedata
 from pathlib import Path
 from typing import NamedTuple
 
+from graphify.naming import normalize_repo_identity
+
 
 class PreflightResult(NamedTuple):
     """Return value for validate_profile_preflight (D-77, D-77a).
@@ -81,7 +83,15 @@ _DEFAULT_PROFILE: dict = {
         "source": "Atlas/Sources/Graphify/Sources/",
         "default": "Atlas/Sources/Graphify/Things/",
     },
-    "naming": {"convention": "title_case"},
+    "repo": {},
+    "naming": {
+        "convention": "title_case",
+        "concept_names": {
+            "enabled": True,
+            "budget": 0.0,
+            "style": "readable",
+        },
+    },
     "merge": {
         "strategy": "update",
         # D-27 + D-65: `created` must survive re-runs — set ONCE at first
@@ -149,7 +159,7 @@ _DEFAULT_PROFILE: dict = {
 _VALID_TOP_LEVEL_KEYS = {
     "folder_mapping", "naming", "merge", "mapping_rules", "obsidian",
     "topology", "mapping", "tag_taxonomy", "profile_sync", "diagram_types",
-    "output", "taxonomy",
+    "output", "taxonomy", "repo",
     "extends", "includes", "community_templates",  # Phase 30 (CFG-02 / CFG-03)
     "dataview_queries",  # Phase 31 (TMPL-03, D-11)
 }
@@ -694,6 +704,29 @@ def validate_profile(profile: dict) -> list[str]:
                             )
                         )
 
+    repo = profile.get("repo")
+    if repo is not None:
+        if not isinstance(repo, dict):
+            errors.append("'repo' must be a mapping (dict)")
+        else:
+            for key in repo:
+                if key != "identity":
+                    errors.append(f"Unknown repo key 'repo.{key}' — valid keys are: ['identity']")
+            identity = repo.get("identity")
+            if identity is not None:
+                if not isinstance(identity, str):
+                    errors.append("'repo.identity' must be a non-empty string")
+                elif not identity.strip():
+                    errors.append("'repo.identity' must be a non-empty string")
+                else:
+                    try:
+                        normalize_repo_identity(identity)
+                    except ValueError:
+                        errors.append(
+                            "'repo.identity' must not contain path segments "
+                            "('/' or '\\') or '..'"
+                        )
+
     # naming section
     naming = profile.get("naming")
     if naming is not None:
@@ -706,6 +739,39 @@ def validate_profile(profile: dict) -> list[str]:
                     f"Invalid naming convention '{convention}' — "
                     f"valid values are: {sorted(_VALID_NAMING_CONVENTIONS)}"
                 )
+            if "repo" in naming:
+                errors.append(
+                    "'naming.repo' is not supported; use top-level 'repo.identity' "
+                    "for repo identity"
+                )
+            concept_names = naming.get("concept_names")
+            if concept_names is not None:
+                if not isinstance(concept_names, dict):
+                    errors.append("'naming.concept_names' must be a mapping (dict)")
+                else:
+                    for key in concept_names:
+                        if key not in {"enabled", "budget", "style"}:
+                            errors.append(
+                                f"Unknown naming.concept_names key "
+                                f"'naming.concept_names.{key}'"
+                            )
+                    enabled = concept_names.get("enabled")
+                    if enabled is not None and not isinstance(enabled, bool):
+                        errors.append("'naming.concept_names.enabled' must be bool")
+                    budget = concept_names.get("budget")
+                    if budget is not None:
+                        if isinstance(budget, bool) or not isinstance(budget, (int, float)):
+                            errors.append("'naming.concept_names.budget' must be int or float")
+                        elif budget < 0:
+                            errors.append(
+                                "'naming.concept_names.budget' must be non-negative"
+                            )
+                    style = concept_names.get("style")
+                    if style is not None:
+                        if not isinstance(style, str) or not style.strip() or len(style) > 80:
+                            errors.append(
+                                "'naming.concept_names.style' must be a short string"
+                            )
 
     # merge section
     merge = profile.get("merge")
