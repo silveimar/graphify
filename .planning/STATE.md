@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
 status: executing
-stopped_at: Completed 34-01-PLAN.md
-last_updated: "2026-04-29T03:42:33.044Z"
+stopped_at: Completed 34-02-PLAN.md
+last_updated: "2026-04-29T03:52:29.363Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 12
-  completed_plans: 9
-  percent: 75
+  completed_plans: 10
+  percent: 83
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 ## Current Position
 
 Phase: 34 (mapping-cluster-quality-note-classes) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-29
 
-Progress: [██████████] 100%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: [██████████] 100%
 | Phase 33 P03 | 5min | 3 tasks | 1 file |
 | Phase 33 P04 | 12min | 3 tasks | 5 files |
 | Phase 34 P1 | 6min | 2 tasks | 5 files |
+| Phase 34 P2 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ Locked v1.8 choices:
 - [Phase 33]: [Phase 33 Plan 04]: Unsafe generated MOC titles are normalized inside templates.py before filename/frontmatter/template sinks consume them.
 - [Phase 34]: [Phase 34 Plan 01]: CODE notes are a first-class profile/template note type while legacy community remains a compatibility token. — Phase 34 Plan 01 established the shared profile/template contract needed before mapping and export consume CODE notes.
 - [Phase 34]: [Phase 34 Plan 01]: Default mapping.min_community_size is now 6 for built-in v1.8 profiles. — D-08 selected 6 as the default cluster-quality floor while preserving literal user overrides.
+- [Phase 34 Plan 02]: Mapping now emits standalone, hosted, and bucketed routing metadata as the source of truth for downstream export/template behavior.
+- [Phase 34 Plan 02]: CODE note eligibility is limited to code-backed god nodes with non-empty string source_file values and synthetic-node exclusions.
+- [Phase 34 Plan 02]: Concept MOC CODE member context is sorted by degree descending, then label and node id, and capped at 10.
 
 ### Pending Todos
 
@@ -112,6 +116,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T03:42:33.040Z
-Stopped at: Completed 34-01-PLAN.md
+Last session: 2026-04-29T03:52:29.360Z
+Stopped at: Completed 34-02-PLAN.md
 Next action: `/gsd-discuss-phase 34 --chain`

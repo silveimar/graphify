@@ -23,8 +23,8 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 ### Cluster Quality Floor
 
 - [x] **CLUST-01**: User can set `mapping.min_community_size` in the vault profile to control the minimum size for standalone MOC generation.
-- [ ] **CLUST-02**: User sees isolate communities omitted from standalone MOC generation while their nodes remain available in graph data and non-community exports.
-- [ ] **CLUST-03**: User sees tiny connected communities below the configured floor routed deterministically into an `_Unclassified` MOC.
+- [x] **CLUST-02**: User sees isolate communities omitted from standalone MOC generation while their nodes remain available in graph data and non-community exports.
+- [x] **CLUST-03**: User sees tiny connected communities below the configured floor routed deterministically into an `_Unclassified` MOC.
 - [x] **CLUST-04**: User receives a deterministic validation failure when legacy `mapping.moc_threshold` is present, including when `mapping.min_community_size` is also present.
 
 ### Concept Naming
@@ -39,7 +39,7 @@ Requirements for the v1.8 milestone. Each maps to exactly one roadmap phase.
 
 - [x] **GOD-01**: User sees code-derived god nodes exported as `CODE_<repo>_<node>` notes rather than generic Things.
 - [ ] **GOD-02**: User sees CODE notes linked to their related concept MOC through frontmatter or body wikilinks.
-- [ ] **GOD-03**: User sees concept MOCs list their important CODE member notes, preserving bidirectional navigation.
+- [x] **GOD-03**: User sees concept MOCs list their important CODE member notes, preserving bidirectional navigation.
 - [ ] **GOD-04**: User is protected from filename collisions between CODE notes and concept MOCs.
 
 ### Repo Identity
@@ -109,8 +109,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMM-02 | Phase 35 | Pending |
 | COMM-03 | Phase 32 | Complete |
 | CLUST-01 | Phase 32 | Complete |
-| CLUST-02 | Phase 34 | Pending |
-| CLUST-03 | Phase 34 | Pending |
+| CLUST-02 | Phase 34 | Complete |
+| CLUST-03 | Phase 34 | Complete |
 | CLUST-04 | Phase 32 | Complete |
 | NAME-01 | Phase 33 | Complete |
 | NAME-02 | Phase 33 | Complete |
@@ -119,7 +119,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAME-05 | Phase 33 | Complete |
 | GOD-01 | Phase 34 | Complete |
 | GOD-02 | Phase 34 | Pending |
-| GOD-03 | Phase 34 | Pending |
+| GOD-03 | Phase 34 | Complete |
 | GOD-04 | Phase 34 | Pending |
 | REPO-01 | Phase 33 | Complete |
 | REPO-02 | Phase 33 | Complete |
