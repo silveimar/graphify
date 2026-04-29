@@ -382,7 +382,7 @@ Plans:
 | 32. Profile Contract & Defaults | v1.8 | 4/4 | Complete    | 2026-04-29 |
 | 33. Naming & Repo Identity Helpers | v1.8 | 4/4 | Complete    | 2026-04-29 |
 | 34. Mapping, Cluster Quality & Note Classes | v1.8 | 5/5 | Complete   | 2026-04-29 |
-| 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 3/3 | Complete   | 2026-04-29 |
+| 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 3/3 | Complete    | 2026-04-29 |
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 0/TBD | Not started | - |
 
 ---
