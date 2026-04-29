@@ -150,15 +150,46 @@ def test_classify_rule_folder_override():
     assert result["per_node"]["n_softmax"]["note_type"] == "statement"
 
 
-def test_classify_topology_fallback_god_node_becomes_thing():
-    """VALIDATION row 3-01-03: god node falls through to thing when no rule matches."""
+def test_classify_topology_fallback_code_god_node_becomes_code():
+    """Phase 34: code-backed god node falls through to code when no rule matches."""
     from graphify.mapping import classify
 
     G, communities = make_classification_fixture()
     result = classify(G, communities, _profile())
     # n_transformer has degree 5 → top god node
-    assert result["per_node"]["n_transformer"]["note_type"] == "thing"
+    assert result["per_node"]["n_transformer"]["note_type"] == "code"
     assert result["per_node"]["n_transformer"]["folder"] == "Atlas/Sources/Graphify/Things/"
+
+
+def test_non_code_god_node_keeps_thing_fallback():
+    import networkx as nx
+
+    from graphify.mapping import classify
+
+    G = nx.Graph()
+    G.add_node(
+        "doc_hub",
+        label="Design Hub",
+        file_type="document",
+        source_file="docs/design.md",
+        source_location="L1",
+    )
+    G.add_node(
+        "code_leaf",
+        label="Code Leaf",
+        file_type="code",
+        source_file="src/leaf.py",
+        source_location="L1",
+    )
+    G.add_edge("doc_hub", "code_leaf")
+
+    result = classify(
+        G,
+        {0: ["doc_hub", "code_leaf"]},
+        _profile(topology={"god_node": {"top_n": 1}}, mapping={"min_community_size": 1}),
+    )
+
+    assert result["per_node"]["doc_hub"]["note_type"] == "thing"
 
 
 def test_classify_default_statement_when_no_match():
@@ -425,7 +456,9 @@ def test_classify_zero_god_nodes_no_crash():
     assert isinstance(result["per_node"], dict)
     # Every produced note_type must be valid.
     for ctx in result["per_node"].values():
-        assert ctx["note_type"] in {"moc", "community", "thing", "statement", "person", "source"}
+        assert ctx["note_type"] in {
+            "moc", "community", "thing", "statement", "person", "source", "code",
+        }
     # Synthetic filter still fires.
     assert "n_hub" in result["skipped_node_ids"]
 
@@ -614,6 +647,92 @@ def test_bucket_moc_absorbs_hostless_below_threshold():
     assert {
         sub["bucket_moc_label"] for sub in result["per_community"][-1]["sub_communities"]
     } == {"_Unclassified"}
+
+
+def test_code_members_sorted_by_degree_and_capped_at_ten():
+    import networkx as nx
+
+    from graphify.mapping import classify
+
+    G = nx.Graph()
+    members = []
+    for idx in range(12):
+        node_id = f"code_{idx:02d}"
+        members.append(node_id)
+        G.add_node(
+            node_id,
+            label=f"Code {idx:02d}",
+            file_type="code",
+            source_file=f"src/code_{idx:02d}.py",
+            source_location="L1",
+        )
+    for idx, node_id in enumerate(members):
+        for previous in members[:idx]:
+            G.add_edge(node_id, previous)
+
+    result = classify(
+        G,
+        {0: members},
+        _profile(topology={"god_node": {"top_n": 12}}, mapping={"min_community_size": 6}),
+    )
+
+    expected = sorted(members, key=lambda n: (-G.degree(n), G.nodes[n]["label"], n))[:10]
+    moc = result["per_community"][0]
+    assert moc["code_member_labels"] == [G.nodes[n]["label"] for n in expected]
+    assert moc["code_members"] == [
+        {"id": n, "label": G.nodes[n]["label"], "degree": G.degree(n)}
+        for n in expected
+    ]
+
+
+def test_hosted_and_bucketed_code_members_roll_up_to_parent_mocs():
+    import networkx as nx
+
+    from graphify.mapping import classify
+
+    G = nx.Graph()
+    host_members = []
+    for idx in range(6):
+        node_id = f"host_{idx}"
+        host_members.append(node_id)
+        G.add_node(
+            node_id,
+            label=f"Host {idx}",
+            file_type="document",
+            source_file=f"docs/host_{idx}.md",
+            source_location="L1",
+        )
+    G.add_node(
+        "hosted_code",
+        label="Hosted Code",
+        file_type="code",
+        source_file="src/hosted.py",
+        source_location="L1",
+    )
+    G.add_node(
+        "bucket_code",
+        label="Bucket Code",
+        file_type="code",
+        source_file="src/bucket.py",
+        source_location="L1",
+    )
+    G.add_edge("host_0", "hosted_code")
+    communities = {
+        0: host_members,
+        1: ["hosted_code"],
+        2: ["bucket_code"],
+    }
+
+    result = classify(
+        G,
+        communities,
+        _profile(topology={"god_node": {"top_n": 20}}, mapping={"min_community_size": 6}),
+    )
+
+    assert "Hosted Code" in result["per_community"][0]["code_member_labels"]
+    assert "Bucket Code" in result["per_community"][-1]["code_member_labels"]
+    assert result["per_node"]["hosted_code"]["note_type"] == "code"
+    assert result["per_node"]["bucket_code"]["note_type"] == "code"
 
 
 def test_community_tag_is_safe_tag_of_name():
@@ -869,9 +988,9 @@ def test_classify_output_round_trips_through_render_note():
     result = classify(G, communities, _profile())
 
     # n_transformer is the sole top-degree real node in cid 0 and, with
-    # top_n=1, the only god node → classified as "thing" via topology fallback.
+    # top_n=1, the only god node → classified as "code" via topology fallback.
     ctx = result["per_node"]["n_transformer"]
-    assert ctx["note_type"] == "thing"
+    assert ctx["note_type"] == "code"
     # community enrichment from Plan 02 must have landed end-to-end.
     assert ctx.get("community_name") == "Transformer"
     assert ctx.get("parent_moc_label") == "Transformer"
@@ -881,7 +1000,7 @@ def test_classify_output_round_trips_through_render_note():
         "n_transformer",
         G,
         _profile(),
-        "thing",
+        "code",
         ctx,
         created=datetime.date(2024, 1, 1),
     )
