@@ -885,18 +885,46 @@ def _code_member_display_labels(
     return labels
 
 
+def _build_code_member_links(
+    code_members: list,
+    code_member_labels: list,
+    convention: str,
+) -> list[str]:
+    """Return wikilinks for CODE members, preserving exact generated targets."""
+    links: list[str] = []
+    for member in code_members:
+        if not isinstance(member, dict):
+            continue
+        filename_stem = member.get("filename_stem")
+        if not isinstance(filename_stem, str) or not filename_stem.strip():
+            continue
+        target = safe_filename(filename_stem)
+        alias_source = member.get("label") or filename_stem
+        alias = _sanitize_wikilink_alias(str(alias_source))
+        if not alias.strip():
+            alias = target
+        links.append(f"[[{target}|{alias}]]")
+    if links:
+        return links
+    return [
+        _emit_wikilink(str(label), convention)
+        for label in code_member_labels
+        if label
+    ]
+
+
 def _build_code_members_section(
     code_members: list,
     code_member_labels: list,
     convention: str,
 ) -> str:
     """Build a MOC section linking to important CODE notes from context."""
-    labels = _code_member_display_labels(code_members, code_member_labels)
-    if not labels:
+    links = _build_code_member_links(code_members, code_member_labels, convention)
+    if not links:
         return ""
     lines = ["> [!info] Important CODE Notes"]
-    for label in labels:
-        lines.append(f"> - {_emit_wikilink(label, convention)}")
+    for link in links:
+        lines.append(f"> - {link}")
     return "\n\n" + "\n".join(lines)
 
 
@@ -1326,7 +1354,7 @@ def _render_moc_like(
     sibling_labels = ctx.get("sibling_labels", [])
     code_members = ctx.get("code_members", [])
     code_member_labels = ctx.get("code_member_labels", [])
-    code_labels = _code_member_display_labels(code_members, code_member_labels)
+    code_links = _build_code_member_links(code_members, code_member_labels, convention)
     # Cast to plain float so numpy.float64 (not a Python float subclass) renders
     # correctly as "0.82" rather than "numpy.float64(0.82)" (WR-06).
     _raw_cohesion = ctx.get("cohesion")
@@ -1338,8 +1366,8 @@ def _render_moc_like(
         convention,
     )]
     related_labels = list(sibling_labels or [])
-    related_labels.extend(label for label in code_labels if label not in related_labels)
     related_list = [_emit_wikilink(lab, convention) for lab in related_labels if lab]
+    related_list.extend(link for link in code_links if link not in related_list)
     tags = [f"community/{community_tag}", "graphify/moc"]
     fm_fields = _build_frontmatter_fields(
         up=up_list,
