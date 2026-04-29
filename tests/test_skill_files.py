@@ -23,6 +23,21 @@ PLATFORM_VARIANTS = (
 )
 CORE_COMMANDS = ("/context", "/trace", "/connect", "/drift", "/emerge")
 HEADING = "## Available slash commands"
+REQUIRED_V18_OBSIDIAN_PHRASES = (
+    "MOC-only community output",
+    "Graphify-owned v1.8 subtree",
+    "preview-first update-vault",
+    "graphify update-vault --input work-vault/raw --vault ls-vault",
+    "Back up the target vault before apply",
+    "graphify-out/migrations/archive/",
+    "no destructive deletion",
+)
+FORBIDDEN_V18_OBSIDIAN_PHRASES = (
+    "generates _COMMUNITY_",
+    "generates `_COMMUNITY_",
+    "_COMMUNITY_* overview notes are generated",
+    "_COMMUNITY_* overview notes are created",
+)
 
 
 def _read(name: str) -> str:
@@ -50,3 +65,25 @@ def test_skill_files_discoverability_section_is_consistent():
     headings = {f: (HEADING in _read(f)) for f in all_files}
     missing = [f for f, present in headings.items() if not present]
     assert not missing, f"Heading '{HEADING}' missing from: {missing}"
+
+
+def test_skill_files_share_v18_obsidian_contract_phrases():
+    all_files = (PRIMARY_SKILL,) + PLATFORM_VARIANTS
+    for skill_file in all_files:
+        text = _read(skill_file)
+        missing = [
+            phrase for phrase in REQUIRED_V18_OBSIDIAN_PHRASES
+            if phrase not in text
+        ]
+        assert not missing, f"{skill_file} missing v1.8 Obsidian phrases: {missing}"
+
+
+def test_skill_files_forbid_stale_generated_community_claims():
+    all_files = (PRIMARY_SKILL,) + PLATFORM_VARIANTS
+    for skill_file in all_files:
+        text = _read(skill_file)
+        found = [
+            phrase for phrase in FORBIDDEN_V18_OBSIDIAN_PHRASES
+            if phrase in text
+        ]
+        assert not found, f"{skill_file} contains stale v1.8 Obsidian claims: {found}"
