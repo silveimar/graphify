@@ -357,21 +357,22 @@ def run_doctor(cwd: Path, *, dry_run: bool = False) -> DoctorReport:
     # --- Output destination resolution (D-13) -----------------------------
     # resolve_output() may SystemExit via _refuse() — capture stderr so the
     # underlying refusal message becomes a profile_validation_errors entry.
-    captured = io.StringIO()
-    try:
-        with contextlib.redirect_stderr(captured):
-            report.resolved_output = resolve_output(cwd_resolved)
-    except SystemExit:
-        report.resolved_output = None
-        for line in captured.getvalue().splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
-            # Strip the "[graphify] " prefix if present so _FIX_HINTS substring
-            # matching sees the underlying validator wording.
-            if stripped.startswith("[graphify] "):
-                stripped = stripped[len("[graphify] "):]
-            report.profile_validation_errors.append(stripped)
+    if not report.profile_validation_errors:
+        captured = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(captured):
+                report.resolved_output = resolve_output(cwd_resolved)
+        except SystemExit:
+            report.resolved_output = None
+            for line in captured.getvalue().splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                # Strip the "[graphify] " prefix if present so _FIX_HINTS substring
+                # matching sees the underlying validator wording.
+                if stripped.startswith("[graphify] "):
+                    stripped = stripped[len("[graphify] "):]
+                report.profile_validation_errors.append(stripped)
 
     # --- would_self_ingest (D-35 trigger) ---------------------------------
     report.would_self_ingest = _compute_would_self_ingest(
