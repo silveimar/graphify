@@ -252,7 +252,7 @@ Plans:
 
 **Milestone Goal:** Make graphify's vault output legible at a glance and give the real `work-vault` → `ls-vault` workflow a safe, step-by-step migration path.
 
-- [ ] **Phase 32: Profile Contract & Defaults** - Lock the v1.8 default taxonomy, profile keys, validation, and compatibility behavior.
+- [x] **Phase 32: Profile Contract & Defaults** - Lock the v1.8 default taxonomy, profile keys, validation, and compatibility behavior. (completed 2026-04-29)
 - [ ] **Phase 33: Naming & Repo Identity Helpers** - Resolve stable concept names and repo identities before rendering or manifest writes depend on them.
 - [ ] **Phase 34: Mapping, Cluster Quality & Note Classes** - Apply MOC-only community semantics, the cluster-quality floor, and CODE-vs-concept note classes.
 - [ ] **Phase 35: Templates, Export Plumbing & Dry-Run/Migration Visibility** - Render the new taxonomy, expose repo identity in outputs, and make migration effects previewable.
@@ -269,12 +269,12 @@ Plans:
   2. Valid v1.8 user-authored vault profiles override folder placement through `taxonomy:`, while invalid or missing v1.8 keys fail validation
   3. User can validate a v1.8 profile and receive actionable errors or warnings for unsupported taxonomy keys, invalid folder mappings, or hard-deprecated community overview output
   4. User can set `mapping.min_community_size` to control standalone MOC generation, and `mapping.moc_threshold` is invalid immediately
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 Plans:
 - [x] 32-01-PLAN.md — Reconcile v1.8 planning contract
 - [x] 32-02-PLAN.md — Add profile taxonomy defaults and validation
 - [x] 32-03-PLAN.md — Consume taxonomy in mapping/export paths
-- [ ] 32-04-PLAN.md — Share preflight findings with doctor
+- [x] 32-04-PLAN.md — Share preflight findings with doctor
 
 ### Phase 33: Naming & Repo Identity Helpers
 **Goal:** Users get stable human-readable concept names and deterministic repo identity resolution that downstream note paths can trust.
@@ -364,7 +364,7 @@ Plans:
 | 29. Doctor Diagnostics & Dry-Run Preview | v1.7 | 3/3 | Complete | 2026-04-28 |
 | 30. Profile Composition | v1.7 | 3/3 | Complete | 2026-04-28 |
 | 31. Template Engine Extensions | v1.7 | 2/2 | Complete | 2026-04-28 |
-| 32. Profile Contract & Defaults | v1.8 | 3/4 | In Progress|  |
+| 32. Profile Contract & Defaults | v1.8 | 4/4 | Complete   | 2026-04-29 |
 | 33. Naming & Repo Identity Helpers | v1.8 | 0/TBD | Not started | - |
 | 34. Mapping, Cluster Quality & Note Classes | v1.8 | 0/TBD | Not started | - |
 | 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 0/TBD | Not started | - |

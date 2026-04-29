@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Output Taxonomy & Cluster Quality
-status: executing
-stopped_at: Completed 32-03-PLAN.md
-last_updated: "2026-04-29T00:27:28.602Z"
+status: verifying
+stopped_at: Completed 32-04-PLAN.md
+last_updated: "2026-04-29T00:35:47.559Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-04-28 for v1.8)
 
 Phase: 32 (Profile Contract & Defaults) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-29
 
-Progress: [###-------] 25%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
@@ -45,6 +45,7 @@ Progress: [###-------] 25%
 | Phase 32 P01 | 4min | 2 tasks | 3 files |
 | Phase 32 P02 | 5min | 2 tasks | 3 files |
 | Phase 32 P03 | 5min | 2 tasks | 4 files |
+| Phase 32 P04 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,9 @@ Locked v1.8 choices:
 - [Phase 32]: Mapping resolves taxonomy folders into ClassificationContext.folder before Obsidian export rendering.
 - [Phase 32]: mapping.min_community_size is the only runtime standalone MOC floor key in mapping.py.
 - [Phase 32]: Hostless tiny communities route to the _Unclassified MOC bucket.
+- [Phase 32]: Doctor profile diagnostics now use validate_profile_preflight() as the shared source for errors and warnings.
+- [Phase 32]: Warning-only doctor profile findings guide migration without making is_misconfigured() true.
+- [Phase 32]: Doctor skips output resolution when fatal preflight errors exist to avoid duplicate invalid-profile diagnostics.
 
 ### Pending Todos
 
@@ -91,6 +95,6 @@ Items carried forward outside v1.8 scope:
 
 ## Session Continuity
 
-Last session: 2026-04-29T00:27:28.599Z
-Stopped at: Completed 32-03-PLAN.md
-Next action: `/gsd-execute-phase 32`
+Last session: 2026-04-29T00:35:47.556Z
+Stopped at: Completed 32-04-PLAN.md
+Next action: `/gsd-verify-work 32`
