@@ -461,6 +461,67 @@ def test_update_vault_profile_output_outside_vault_previews_and_applies(tmp_path
         assert list(notes_dir.rglob("*.md"))
 
 
+def test_update_vault_apply_archives_legacy_notes_after_success(tmp_path):
+    """D-02/D-03/T-36-04: reviewed apply archives legacy notes and returns rollback evidence."""
+    from graphify.migration import format_migration_preview, run_update_vault
+
+    raw, vault = _make_update_vault_fixture(tmp_path)
+    legacy = _write_legacy_community(vault)
+    legacy_text = legacy.read_text(encoding="utf-8")
+    preview_result = run_update_vault(input_dir=raw, vault_dir=vault)
+    plan_id = preview_result["preview"]["plan_id"]
+
+    apply_result = run_update_vault(
+        input_dir=raw,
+        vault_dir=vault,
+        apply=True,
+        plan_id=plan_id,
+    )
+
+    archived = apply_result["archived_legacy_notes"]
+    assert apply_result["result"].failed == []
+    assert len(archived) == 1
+    assert archived[0]["relative_path"] == legacy.relative_to(vault).as_posix()
+    assert "graphify-out/migrations/archive/" in archived[0]["archive_path"]
+    archive_path = Path(archived[0]["archive_path"])
+    assert not legacy.exists()
+    assert archive_path.read_text(encoding="utf-8") == legacy_text
+    rendered = format_migration_preview(apply_result["preview"])
+    assert "Archived legacy notes" in rendered
+    assert "graphify-out/migrations/archive/" in rendered
+
+
+def test_update_vault_apply_failure_does_not_archive_legacy_notes(tmp_path, monkeypatch):
+    """T-36-02: failed merge writes must not move legacy notes into archive."""
+    from graphify import migration
+    from graphify.migration import run_update_vault
+
+    class FailedResult:
+        succeeded: list[Path] = []
+        failed = [(Path("Atlas/Sources/Graphify/MOCs/Broken.md"), "write failed")]
+        skipped: list[Path] = []
+
+    raw, vault = _make_update_vault_fixture(tmp_path)
+    legacy = _write_legacy_community(vault)
+    legacy_text = legacy.read_text(encoding="utf-8")
+    preview_result = run_update_vault(input_dir=raw, vault_dir=vault)
+    plan_id = preview_result["preview"]["plan_id"]
+    monkeypatch.setattr(migration, "apply_merge_plan", lambda *args, **kwargs: FailedResult())
+
+    apply_result = run_update_vault(
+        input_dir=raw,
+        vault_dir=vault,
+        apply=True,
+        plan_id=plan_id,
+    )
+
+    assert apply_result["result"].failed
+    assert apply_result["archived_legacy_notes"] == []
+    assert legacy.exists()
+    assert legacy.read_text(encoding="utf-8") == legacy_text
+    assert not (tmp_path / "graphify-out" / "migrations" / "archive").exists()
+
+
 def test_repo_identity_drift_becomes_skip_conflict(tmp_path):
     """D-18/REPO-04: concrete existing repo drift is visible as SKIP_CONFLICT evidence."""
     from graphify.merge import MergeAction, MergePlan
