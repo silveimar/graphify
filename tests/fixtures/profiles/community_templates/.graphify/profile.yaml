@@ -5,6 +5,19 @@ folder_mapping:
   community: 07-Communities
 naming:
   convention: kebab-case
+taxonomy:
+  version: v1.8
+  root: .
+  folders:
+    moc: 06-MOCs
+    thing: 01-Things
+    statement: 02-Statements
+    person: People
+    source: Sources
+    default: 01-Things
+    unclassified: 06-MOCs
+mapping:
+  min_community_size: 3
 community_templates:
   - match: label
     pattern: "transformer*"

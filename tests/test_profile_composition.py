@@ -106,12 +106,11 @@ def test_extends_then_includes_then_own_fields_order(tmp_path):
 
 
 def test_neither_extends_nor_includes_unchanged_behavior(tmp_path):
-    """Back-compat: a profile.yaml with no extends/includes loads identically
-    to pre-Phase-30 behavior."""
+    """A profile.yaml with no extends/includes still loads as a composed v1.8 profile."""
     vault = _copy_fixture("single_file", tmp_path)
     result = load_profile(vault)
-    assert result["folder_mapping"]["thing"] == "01-Things"
-    assert result["folder_mapping"]["statement"] == "02-Statements"
+    assert result["folder_mapping"]["thing"] == "01-Things/"
+    assert result["folder_mapping"]["statement"] == "02-Statements/"
     assert result["naming"]["convention"] == "kebab-case"
     # Defaults still merged in
     assert result["folder_mapping"]["moc"] == "Atlas/Maps/"
@@ -216,8 +215,8 @@ def test_partial_fragment_validates_when_composed(tmp_path):
     vault = _copy_fixture("partial_fragment", tmp_path)
     result = load_profile(vault)
     # Composition succeeded → folder_mapping comes from profile.yaml
-    assert result["folder_mapping"]["thing"] == "01-Things"
-    assert result["folder_mapping"]["statement"] == "02-Statements"
+    assert result["folder_mapping"]["thing"] == "01-Things/"
+    assert result["folder_mapping"]["statement"] == "02-Statements/"
     assert result["naming"]["convention"] == "kebab-case"
 
 
@@ -753,6 +752,19 @@ def test_validate_profile_lost_fields_after_extends_removal(tmp_path):
         "folder_mapping:\n"
         "  thing: from-child/Things\n"
         "  statement: from-child/Statements\n"
+        "taxonomy:\n"
+        "  version: v1.8\n"
+        "  root: .\n"
+        "  folders:\n"
+        "    moc: Atlas/Maps\n"
+        "    thing: from-child/Things\n"
+        "    statement: from-child/Statements\n"
+        "    person: People\n"
+        "    source: Sources\n"
+        "    default: from-child/Things\n"
+        "    unclassified: Atlas/Maps\n"
+        "mapping:\n"
+        "  min_community_size: 3\n"
     )
 
     proc_after = _run_validate(vault)

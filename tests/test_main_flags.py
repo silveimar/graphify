@@ -36,6 +36,23 @@ def _graphify(args: list[str], cwd: Path, env: dict | None = None) -> subprocess
     )
 
 
+_V18_PROFILE_BASE = (
+    "taxonomy:\n"
+    "  version: v1.8\n"
+    "  root: Atlas/Sources/Graphify\n"
+    "  folders:\n"
+    "    moc: MOCs\n"
+    "    thing: Things\n"
+    "    statement: Statements\n"
+    "    person: People\n"
+    "    source: Sources\n"
+    "    default: Things\n"
+    "    unclassified: MOCs\n"
+    "mapping:\n"
+    "  min_community_size: 3\n"
+)
+
+
 # ---------------------------------------------------------------------------
 # D-12 backcompat: no vault, no --output
 # ---------------------------------------------------------------------------
@@ -69,7 +86,7 @@ def test_run_in_vault_emits_detection_report(tmp_path):
     (vault / ".obsidian").mkdir()
     (vault / ".graphify").mkdir()
     (vault / ".graphify" / "profile.yaml").write_text(
-        "output:\n  mode: vault-relative\n  path: Atlas/Generated\n"
+        _V18_PROFILE_BASE + "output:\n  mode: vault-relative\n  path: Atlas/Generated\n"
     )
     result = _graphify(["run", "--router"], cwd=vault)
     assert "[graphify] vault detected at" in result.stderr
@@ -95,7 +112,7 @@ def test_run_in_vault_profile_no_output_block_refuses(tmp_path):
     vault.mkdir()
     (vault / ".obsidian").mkdir()
     (vault / ".graphify").mkdir()
-    (vault / ".graphify" / "profile.yaml").write_text("naming:\n  convention: kebab-case\n")
+    (vault / ".graphify" / "profile.yaml").write_text(_V18_PROFILE_BASE)
     result = _graphify(["run", "--router"], cwd=vault)
     assert result.returncode != 0
     assert "no 'output:' block" in result.stderr
@@ -112,7 +129,7 @@ def test_run_output_flag_overrides_profile_emits_d09_line(tmp_path):
     (vault / ".obsidian").mkdir()
     (vault / ".graphify").mkdir()
     (vault / ".graphify" / "profile.yaml").write_text(
-        "output:\n  mode: vault-relative\n  path: Atlas/Generated\n"
+        _V18_PROFILE_BASE + "output:\n  mode: vault-relative\n  path: Atlas/Generated\n"
     )
     custom = tmp_path / "elsewhere"
     result = _graphify(["run", "--output", str(custom), "--router"], cwd=vault)
@@ -154,7 +171,7 @@ def test_obsidian_output_flag_takes_precedence_over_obsidian_dir(tmp_path):
     (vault / ".obsidian").mkdir()
     (vault / ".graphify").mkdir()
     (vault / ".graphify" / "profile.yaml").write_text(
-        "output:\n  mode: vault-relative\n  path: Atlas/Generated\n"
+        _V18_PROFILE_BASE + "output:\n  mode: vault-relative\n  path: Atlas/Generated\n"
     )
     (vault / "graph.json").write_text(
         '{"directed":false,"multigraph":false,"graph":{},"nodes":[],"links":[]}'
@@ -175,6 +192,7 @@ def test_obsidian_output_flag_takes_precedence_over_obsidian_dir(tmp_path):
 # ---------------------------------------------------------------------------
 
 _DOCTOR_VALID_PROFILE = (
+    _V18_PROFILE_BASE +
     "output:\n"
     "  mode: vault-relative\n"
     "  path: Atlas/Generated\n"
@@ -215,6 +233,7 @@ def test_doctor_misconfig_exit_one(tmp_path):
     pytest.importorskip("yaml")
     # Profile with invalid output.mode → resolve_output _refuse() → exit 1.
     bad = (
+        _V18_PROFILE_BASE +
         "output:\n"
         "  mode: nonsense\n"
         "  path: Atlas/Generated\n"

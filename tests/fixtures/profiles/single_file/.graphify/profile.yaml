@@ -3,3 +3,16 @@ folder_mapping:
   statement: 02-Statements
 naming:
   convention: kebab-case
+taxonomy:
+  version: v1.8
+  root: .
+  folders:
+    moc: Atlas/Maps
+    thing: 01-Things
+    statement: 02-Statements
+    person: People
+    source: Sources
+    default: 01-Things
+    unclassified: Atlas/Maps
+mapping:
+  min_community_size: 3

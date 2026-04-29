@@ -1,2 +1,15 @@
 folder_mapping:
   thing: from-parent/Things
+taxonomy:
+  version: v1.8
+  root: .
+  folders:
+    moc: Atlas/Maps
+    thing: from-parent/Things
+    statement: from-parent/Statements
+    person: People
+    source: Sources
+    default: from-parent/Things
+    unclassified: Atlas/Maps
+mapping:
+  min_community_size: 3

@@ -71,13 +71,13 @@ def test_to_obsidian_default_profile_returns_merge_result(tmp_path):
 def test_to_obsidian_default_profile_writes_atlas_layout(tmp_path):
     G, communities, labels = _minimal_graph()
     to_obsidian(G, communities, str(tmp_path), community_labels=labels)
-    # Per _DEFAULT_PROFILE folder_mapping: thing→Atlas/Dots/Things, moc→Atlas/Maps
-    things_dir = tmp_path / "Atlas" / "Dots" / "Things"
-    maps_dir = tmp_path / "Atlas" / "Maps"
+    # Per _DEFAULT_PROFILE taxonomy: all generated vault notes live under Graphify.
+    things_dir = tmp_path / "Atlas" / "Sources" / "Graphify" / "Things"
+    maps_dir = tmp_path / "Atlas" / "Sources" / "Graphify" / "MOCs"
     produced_any = (
         things_dir.exists()
         or maps_dir.exists()
-        or (tmp_path / "Atlas" / "Dots" / "Statements").exists()
+        or (tmp_path / "Atlas" / "Sources" / "Graphify" / "Statements").exists()
     )
     assert produced_any, (
         f"No Atlas/-shaped output found under {tmp_path}; "

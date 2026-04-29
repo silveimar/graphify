@@ -8,6 +8,23 @@ import pytest
 from graphify.output import ResolvedOutput, is_obsidian_vault, resolve_output
 
 
+_V18_PROFILE_BASE = (
+    "taxonomy:\n"
+    "  version: v1.8\n"
+    "  root: Atlas/Sources/Graphify\n"
+    "  folders:\n"
+    "    moc: MOCs\n"
+    "    thing: Things\n"
+    "    statement: Statements\n"
+    "    person: People\n"
+    "    source: Sources\n"
+    "    default: Things\n"
+    "    unclassified: MOCs\n"
+    "mapping:\n"
+    "  min_community_size: 3\n"
+)
+
+
 # ---------------------------------------------------------------------------
 # is_obsidian_vault — D-04 strict CWD-only detection
 # ---------------------------------------------------------------------------
@@ -70,7 +87,7 @@ def test_resolve_output_vault_profile_no_output_block_refuses(tmp_path, capsys):
     (tmp_path / ".obsidian").mkdir()
     (tmp_path / ".graphify").mkdir()
     # Profile present but no output: block
-    (tmp_path / ".graphify" / "profile.yaml").write_text("naming:\n  convention: kebab-case\n")
+    (tmp_path / ".graphify" / "profile.yaml").write_text(_V18_PROFILE_BASE)
     pytest.importorskip("yaml")
     with pytest.raises(SystemExit):
         resolve_output(tmp_path)
@@ -88,7 +105,7 @@ def _setup_vault(tmp_path: Path, output_yaml: str) -> Path:
     vault.mkdir()
     (vault / ".obsidian").mkdir()
     (vault / ".graphify").mkdir()
-    (vault / ".graphify" / "profile.yaml").write_text(output_yaml)
+    (vault / ".graphify" / "profile.yaml").write_text(_V18_PROFILE_BASE + output_yaml)
     return vault
 
 

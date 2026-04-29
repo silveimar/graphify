@@ -590,7 +590,24 @@ def test_vault06_profile_writeback_opt_out(tmp_path):
     graphify_dir = vault / ".graphify"
     graphify_dir.mkdir(parents=True, exist_ok=True)
     profile_path = graphify_dir / "profile.yaml"
-    initial_profile = {"profile_sync": {"auto_update": False}, "tag_taxonomy": {"tech": ["existing"]}}
+    initial_profile = {
+        "taxonomy": {
+            "version": "v1.8",
+            "root": "Atlas/Sources/Graphify",
+            "folders": {
+                "moc": "MOCs",
+                "thing": "Things",
+                "statement": "Statements",
+                "person": "People",
+                "source": "Sources",
+                "default": "Things",
+                "unclassified": "MOCs",
+            },
+        },
+        "mapping": {"min_community_size": 3},
+        "profile_sync": {"auto_update": False},
+        "tag_taxonomy": {"tech": ["existing"]},
+    }
     profile_path.write_text(yaml.dump(initial_profile), encoding="utf-8")
     original_bytes = profile_path.read_bytes()
 
