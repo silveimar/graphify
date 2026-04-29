@@ -266,10 +266,15 @@ Plans:
 **Requirements:** TAX-01, TAX-02, TAX-03, TAX-04, COMM-03, CLUST-01, CLUST-04
 **Success Criteria** (what must be TRUE):
   1. User can run graphify with no vault profile and see generated notes routed into a Graphify-owned default subtree, including concept MOCs under `Atlas/Sources/Graphify/MOCs/`
-  2. User-authored vault profiles continue to override default folder placement without requiring profile rewrites
+  2. Valid v1.8 user-authored vault profiles override folder placement through `taxonomy:`, while invalid or missing v1.8 keys fail validation
   3. User can validate a v1.8 profile and receive actionable errors or warnings for unsupported taxonomy keys, invalid folder mappings, or hard-deprecated community overview output
-  4. User can set `clustering.min_community_size` and see it take deterministic precedence over legacy `mapping.moc_threshold` when both are present
-**Plans:** TBD
+  4. User can set `mapping.min_community_size` to control standalone MOC generation, and `mapping.moc_threshold` is invalid immediately
+**Plans:** 4 plans
+Plans:
+- [ ] 32-01-PLAN.md — Reconcile v1.8 planning contract
+- [ ] 32-02-PLAN.md — Add profile taxonomy defaults and validation
+- [ ] 32-03-PLAN.md — Consume taxonomy in mapping/export paths
+- [ ] 32-04-PLAN.md — Share preflight findings with doctor
 
 ### Phase 33: Naming & Repo Identity Helpers
 **Goal:** Users get stable human-readable concept names and deterministic repo identity resolution that downstream note paths can trust.
@@ -359,7 +364,7 @@ Plans:
 | 29. Doctor Diagnostics & Dry-Run Preview | v1.7 | 3/3 | Complete | 2026-04-28 |
 | 30. Profile Composition | v1.7 | 3/3 | Complete | 2026-04-28 |
 | 31. Template Engine Extensions | v1.7 | 2/2 | Complete | 2026-04-28 |
-| 32. Profile Contract & Defaults | v1.8 | 0/TBD | Not started | - |
+| 32. Profile Contract & Defaults | v1.8 | 0/4 | Not started | - |
 | 33. Naming & Repo Identity Helpers | v1.8 | 0/TBD | Not started | - |
 | 34. Mapping, Cluster Quality & Note Classes | v1.8 | 0/TBD | Not started | - |
 | 35. Templates, Export Plumbing & Dry-Run/Migration Visibility | v1.8 | 0/TBD | Not started | - |
