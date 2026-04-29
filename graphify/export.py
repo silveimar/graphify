@@ -613,7 +613,11 @@ def to_obsidian(
     if profile is None:
         profile = load_profile(out)
     artifacts_dir = out.resolve().parent
-    from graphify.naming import resolve_concept_names, resolve_repo_identity
+    from graphify.naming import (
+        build_code_filename_stems,
+        resolve_concept_names,
+        resolve_repo_identity,
+    )
     resolved_repo_identity = resolve_repo_identity(
         Path.cwd(),
         cli_identity=repo_identity,
@@ -650,6 +654,29 @@ def to_obsidian(
             ctx["community_name"] = label
             ctx["community_tag"] = safe_tag(label)
             per_community[cid] = ctx
+
+    code_candidates: list[dict] = []
+    for node_id, ctx in per_node.items():
+        if ctx.get("note_type") != "code" or node_id not in G:
+            continue
+        node = G.nodes[node_id]
+        code_candidates.append(
+            {
+                "node_id": node_id,
+                "label": node.get("label", node_id),
+                "source_file": node.get("source_file", ""),
+            }
+        )
+    code_filename_stems = build_code_filename_stems(
+        code_candidates,
+        resolved_repo_identity.identity,
+    )
+    for node_id, stem_info in code_filename_stems.items():
+        if node_id not in per_node:
+            continue
+        ctx = dict(per_node[node_id])
+        ctx.update(stem_info)
+        per_node[node_id] = ctx
 
     rendered_notes: dict[str, RenderedNote] = {}
 
@@ -693,22 +720,30 @@ def to_obsidian(
     # ---- Per-community MOC notes ----
     for cid, ctx in per_community.items():
         note_type = ctx.get("note_type", "moc")
-        render_fn = render_moc if note_type == "moc" else None
-        if render_fn is None:
-            # community-overview shape: Phase 2's render_community_overview
-            from graphify.templates import render_community_overview
-            render_fn = render_community_overview
+        if note_type == "community":
+            print(
+                "[graphify] warning: note_type 'community' is deprecated; "
+                "rendering as MOC-only output",
+                file=sys.stderr,
+            )
+            note_type = "moc"
+        if note_type != "moc":
+            print(
+                f"[graphify] to_obsidian: skipping community {cid} "
+                f"({note_type}): unsupported community note type",
+                file=sys.stderr,
+            )
+            continue
         try:
-            filename, rendered_text = render_fn(
+            filename, rendered_text = render_moc(
                 cid, G, communities, profile, ctx, vault_dir=out,
             )
         except (ValueError, FileNotFoundError) as exc:
             # Same diagnostic discipline as the per-node loop above: surface
             # silently-skipped MOC/overview renders so CI logs catch regressions.
-            # Mirrors the per-node except clause — ValueError from render_moc /
-            # render_community_overview (unknown shape, missing community) plus
-            # FileNotFoundError from load_templates() if a template file
-            # vanished mid-run.
+            # Mirrors the per-node except clause — ValueError from render_moc
+            # (unknown shape, missing community) plus FileNotFoundError from
+            # load_templates() if a template file vanished mid-run.
             print(
                 f"[graphify] to_obsidian: skipping community {cid} "
                 f"({note_type}): {exc}",

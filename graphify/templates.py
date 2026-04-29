@@ -86,6 +86,9 @@ def _wrap_sentinel(name: str, content: str) -> str:
 class ClassificationContext(TypedDict, total=False):
     note_type: str
     folder: str
+    filename_stem: str
+    filename_collision: bool
+    filename_collision_hash: str
     parent_moc_label: str
     community_tag: str
     members_by_type: dict
@@ -1136,7 +1139,11 @@ def render_note(
     expanded_source = _expand_blocks(template.template, block_ctx)
     text = _BlockTemplate(expanded_source).safe_substitute(substitution_ctx)
 
-    filename = resolve_filename(label, convention) + ".md"
+    filename_stem = ctx.get("filename_stem") if isinstance(ctx, dict) else None
+    if isinstance(filename_stem, str) and filename_stem.strip():
+        filename = safe_filename(filename_stem) + ".md"
+    else:
+        filename = resolve_filename(label, convention) + ".md"
     return filename, text
 
 

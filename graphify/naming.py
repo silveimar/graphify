@@ -243,6 +243,45 @@ def _filename_stem(title: str) -> str:
     return name
 
 
+def build_code_filename_stems(
+    candidates: list[dict],
+    repo_identity: str,
+) -> dict[str, dict]:
+    """Return deterministic CODE note filename stems keyed by node id."""
+    repo_stem = normalize_repo_identity(repo_identity).replace("-", "_")
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for candidate in candidates:
+        node_id = str(candidate.get("node_id") or "")
+        if not node_id:
+            continue
+        label = str(candidate.get("label") or node_id)
+        source_file = str(candidate.get("source_file") or "")
+        base_stem = f"CODE_{repo_stem}_{_filename_stem(label)}"
+        grouped.setdefault(base_stem, []).append(
+            {
+                "node_id": node_id,
+                "source_file": source_file,
+            }
+        )
+
+    result: dict[str, dict] = {}
+    for base_stem, group in grouped.items():
+        collision = len(group) > 1
+        for item in sorted(group, key=lambda entry: entry["node_id"]):
+            collision_hash = ""
+            filename_stem = base_stem
+            if collision:
+                payload = f"{item['node_id']}\0{item['source_file']}".encode("utf-8")
+                collision_hash = hashlib.sha256(payload).hexdigest()[:8]
+                filename_stem = f"{base_stem}_{collision_hash}"
+            result[item["node_id"]] = {
+                "filename_stem": filename_stem,
+                "filename_collision": collision,
+                "filename_collision_hash": collision_hash,
+            }
+    return result
+
+
 def _load_concept_name_cache(artifacts_dir: Path) -> dict:
     """Load concept name sidecar cache, returning an empty cache on corruption."""
     cache_path = Path(artifacts_dir) / _CONCEPT_CACHE_NAME
