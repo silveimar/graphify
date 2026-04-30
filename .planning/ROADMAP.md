@@ -459,14 +459,14 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 **Goal:** `.graphifyignore` patterns match how nested **`graphify-out/`** paths are surfaced so graphify **stops prompting** to add ignores that are **already declared**. Stop creating or relying on **nested** `graphify-out/` directories under arbitrary corpus subtrees; consolidate writes to the **canonical per-run output root** (default top-level `graphify-out/` / `ResolvedOutput.artifacts_dir`), with regression tests.
 
 **Depends on:** Phase 45 (detect / corpus eligibility semantics).  
-**Requirements:** TBD (map to REQ rows in `/gsd-plan-phase`).
+**Requirements:** **HYG-04**, **HYG-05** (see `.planning/REQUIREMENTS.md`).
 
 **Success Criteria** (what must be TRUE):
 
 1. If `.graphifyignore` already excludes nested graphify output paths (e.g. `**/graphify-out/**` or equivalent), diagnostics and agent prompts **do not** ask to add duplicate entries.
 2. New runs do not sprawl additional **`graphify-out/`** trees inside raw input folders when a single canonical output directory is configured; behavior documented and covered by tests.
 
-**Plans:** TBD after `/gsd-discuss-phase` / `/gsd-plan-phase`.
+**Plans:** `.planning/phases/48-fix-graphifyignore-nested-graphify-out/` — `48-01-PLAN.md` (ignore/doctor alignment), `48-02-PLAN.md` (canonical output + tests).
 
 **Artifacts:** `.planning/phases/48-fix-graphifyignore-nested-graphify-out/`
 
