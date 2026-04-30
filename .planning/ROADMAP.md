@@ -323,6 +323,17 @@ Plans:
 
 </details>
 
+<details>
+<summary>Phase 41: Vault CLI — explicit vault flag &amp; Multi-Vault Selector — PLANNING</summary>
+
+**Goal:** Deterministic **`--vault &lt;path&gt;`** vault root selection, **multi-vault discovery/selection** UX suitable for scripts and CI, and alignment of **`doctor`**, **dry-run**, and **preview** messaging with resolved vault + output from v1.7–v1.8. **Requirements:** VCLI-01–VCLI-06. **Depends on:** v1.7 `ResolvedOutput` / vault detection (shipped); **Phase 40** does not deliver vault selector surface.
+
+**Plans:** TBD after research/plan-phase.
+
+**Artifacts:** `41-RESEARCH.md`, `41-PATTERNS.md`, `41-CONTEXT.md` in phase directory.
+
+</details>
+
 ---
 
 ## Progress
