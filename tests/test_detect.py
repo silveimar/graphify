@@ -585,6 +585,30 @@ def test_save_mtime_manifest_round_trip(tmp_path):
     assert loaded[str(src)] == pytest.approx(Path(src).stat().st_mtime)
 
 
+def test_detect_stderr_manifest_skip_summary(tmp_path, capsys):
+    """Phase 45 D-45.01: one stderr line when manifest skips occur."""
+    from graphify.detect import _save_output_manifest
+    from graphify.output import ResolvedOutput
+
+    old_notes = tmp_path / "notes"
+    old_notes.mkdir()
+    prior_note = old_notes / "note.md"
+    prior_note.write_text("# Prior\n")
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    _save_output_manifest(artifacts_dir, old_notes, [str(prior_note)])
+
+    new_notes = tmp_path / "notes2"
+    new_notes.mkdir()
+    (new_notes / "fresh.md").write_text("# Fresh\n")
+
+    resolved = ResolvedOutput(False, None, new_notes, artifacts_dir, "profile", ())
+    detect(tmp_path, resolved=resolved)
+    err = capsys.readouterr().err
+    assert "[graphify]" in err
+    assert "manifest" in err
+
+
 def test_detect_skips_prior_files_from_manifest(tmp_path):
     """VAULT-13 D-27: detect() prunes files listed in output-manifest.json prior runs."""
     from graphify.detect import _save_output_manifest

@@ -22,7 +22,10 @@ def _check_skill_version(skill_dst: Path) -> None:
         return
     installed = version_file.read_text(encoding="utf-8").strip()
     if installed != __version__:
-        print(f"  warning: skill is from graphify {installed}, package is {__version__}. Run 'graphify install' to update.")
+        print(
+            f"  warning: skill is from graphify {installed}, package is {__version__}. Run 'graphify install' to update.",
+            file=sys.stderr,
+        )
 
 _SETTINGS_HOOK = {
     "matcher": "Glob|Grep",
@@ -1293,8 +1296,13 @@ def main() -> None:
 
     # Check all known skill install locations for a stale version stamp.
     # Skip during install/uninstall (hook writes trigger a fresh check anyway).
+    # Skip on -h/--help so usage output stays readable (warning goes to stderr when shown).
     # Deduplicate paths so platforms sharing the same install dir don't warn twice.
-    if not any(arg in ("install", "uninstall") for arg in sys.argv):
+    argv_rest = sys.argv[1:]
+    _skip_skill_version_check = any(arg in ("install", "uninstall") for arg in sys.argv) or (
+        len(argv_rest) >= 1 and argv_rest[0] in ("-h", "--help")
+    )
+    if not _skip_skill_version_check:
         for skill_dst in {Path.home() / cfg["skill_dst"] for cfg in _PLATFORM_CONFIG.values()}:
             _check_skill_version(skill_dst)
 

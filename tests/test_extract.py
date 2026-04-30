@@ -56,6 +56,22 @@ def test_extract_merges_multiple_files():
     assert result["input_tokens"] == 0
 
 
+def test_collect_files_skips_nested_graphify_out(tmp_path):
+    """Phase 45 D-45.08: collect_files prunes nested graphify-out like detect()."""
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    go = nested / "graphify-out"
+    go.mkdir()
+    (go / "x.py").write_text("x = 1\n")
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "y.py").write_text("y = 1\n")
+
+    files = collect_files(tmp_path, resolved=None)
+    assert any(f.name == "y.py" for f in files)
+    assert not any("graphify-out" in f.as_posix() for f in files)
+
+
 def test_collect_files_from_dir():
     files = collect_files(FIXTURES)
     supported = {".py", ".js", ".ts", ".tsx", ".go", ".rs",

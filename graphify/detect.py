@@ -14,6 +14,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from graphify.output import ResolvedOutput
 
+from graphify.corpus_prune import (
+    _OUTPUT_MANIFEST_NAME,
+    _OUTPUT_MANIFEST_VERSION,
+    _load_output_manifest,
+    build_prior_files,
+    dir_prune_reason,
+)
+
 
 class FileType(str, Enum):
     CODE = "code"
@@ -241,16 +249,6 @@ def count_words(path: Path) -> int:
         return 0
 
 
-# Directory names to always skip - venvs, caches, build artifacts, deps
-_SKIP_DIRS = {
-    "venv", ".venv", "env", ".env",
-    "node_modules", "__pycache__", ".git",
-    "dist", "build", "target", "out",
-    "site-packages", "lib64",
-    ".pytest_cache", ".mypy_cache", ".ruff_cache",
-    ".tox", ".eggs", "*.egg-info",
-}
-
 # graphify's own output directory — always pruned by default to prevent
 # self-ingestion loops (e.g. re-running --obsidian from a vault root would
 # otherwise re-ingest prior exported notes as fresh document inputs).
@@ -258,9 +256,6 @@ _SKIP_DIRS = {
 # via the scan_paths allow-list below.
 _SELF_OUTPUT_DIRS = {"graphify-out", "graphify_out"}
 
-# Phase 28 (VAULT-13): output-manifest constants
-_OUTPUT_MANIFEST_NAME = "output-manifest.json"
-_OUTPUT_MANIFEST_VERSION = 1
 _OUTPUT_MANIFEST_MAX_RUNS = 5
 
 # Large generated files that are never useful to extract
@@ -269,32 +264,6 @@ _SKIP_FILES = {
     "Cargo.lock", "poetry.lock", "Gemfile.lock",
     "composer.lock", "go.sum", "go.work.sum",
 }
-
-def _is_nested_output(part: str, resolved_basenames: frozenset[str]) -> bool:
-    """Return True if dirname matches any known graphify output location (D-18).
-
-    Covers the literal _SELF_OUTPUT_DIRS set plus any basenames from the
-    current run's ResolvedOutput (notes_dir, artifacts_dir).
-    """
-    if part in _SELF_OUTPUT_DIRS:
-        return True
-    if part in resolved_basenames:
-        return True
-    return False
-
-
-def _is_noise_dir(part: str) -> bool:
-    """Return True if this directory name looks like a venv, cache, or dep dir."""
-    if part in _SKIP_DIRS:
-        return True
-    if part in _SELF_OUTPUT_DIRS:
-        return True
-    # Catch *_venv, *_repo/site-packages patterns
-    if part.endswith("_venv") or part.endswith("_env"):
-        return True
-    if part.endswith(".egg-info"):
-        return True
-    return False
 
 
 def _load_graphifyignore(root: Path) -> list[str]:
@@ -358,28 +327,6 @@ def _is_ignored(path: Path, root: Path, patterns: list[str]) -> bool:
             if fnmatch.fnmatch("/".join(parts[:i + 1]), p):
                 return True
     return False
-
-
-def _load_output_manifest(artifacts_dir: Path) -> dict:
-    """Load output-manifest.json; return empty envelope on any failure (D-25).
-
-    Missing file → silent empty envelope (no warning).
-    Malformed JSON or unexpected shape → emit one warning to stderr, return empty envelope.
-    """
-    manifest_path = artifacts_dir / _OUTPUT_MANIFEST_NAME
-    if not manifest_path.exists():
-        return {"version": _OUTPUT_MANIFEST_VERSION, "runs": []}
-    try:
-        data = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict) or "runs" not in data:
-            raise ValueError("unexpected shape")
-        return data
-    except Exception:
-        print(
-            "[graphify] WARNING: output-manifest.json unreadable, ignoring history",
-            file=sys.stderr,
-        )
-        return {"version": _OUTPUT_MANIFEST_VERSION, "runs": []}
 
 
 def _save_output_manifest(
@@ -490,14 +437,8 @@ def detect(
 
     nested_paths: list[str] = []
 
-    # Phase 28 (D-21/D-26/D-27): build prior_files set from output-manifest
-    # Only loaded when resolved is provided (stable artifacts_dir anchor).
-    # Silent skip — D-27: no warning emitted when a file is pruned.
-    prior_files: set[str] = set()
-    if resolved is not None:
-        manifest_data = _load_output_manifest(resolved.artifacts_dir)
-        for run in manifest_data.get("runs", []):
-            prior_files.update(run.get("files", []))
+    # Phase 45 (D-45.02/D-45.03): manifest paths from resolved artifacts_dir and/or default graphify-out.
+    prior_files = build_prior_files(root, resolved)
 
     # Always include graphify-out/memory/ - query results filed back into the graph
     memory_dir = root / "graphify-out" / "memory"
@@ -523,15 +464,17 @@ def detect(
                 # Accumulate nesting paths separately for the D-20 single-line warning.
                 pruned: set[str] = set()
                 for d in dirnames:
-                    if d.startswith(".") or _is_noise_dir(d):
-                        _record_skip("noise-dir", str(dp / d))
-                        pruned.add(d)
-                    elif _is_ignored(dp / d, root, all_ignore_patterns):
-                        _record_skip("exclude-glob", str(dp / d))
-                        pruned.add(d)
-                    elif _is_nested_output(d, resolved_basenames):
-                        nested_paths.append(str(dp / d))
-                        _record_skip("nesting", str(dp / d))
+                    reason = dir_prune_reason(
+                        d,
+                        dp,
+                        root,
+                        resolved_basenames=resolved_basenames,
+                        patterns=all_ignore_patterns,
+                    )
+                    if reason:
+                        _record_skip(reason, str(dp / d))
+                        if reason == "nesting":
+                            nested_paths.append(str(dp / d))
                         pruned.add(d)
                 dirnames[:] = [d for d in dirnames if d not in pruned]
             for fname in filenames:
@@ -590,6 +533,14 @@ def detect(
             files[ftype].append(str(p))
             if ftype != FileType.VIDEO:
                 total_words += count_words(p)
+
+    if skipped["manifest"]:
+        n = len(skipped["manifest"]) + skipped_overflow["manifest"]
+        print(
+            f"[graphify] skipped {n} prior-output file(s) per output-manifest.json "
+            "— see graphify doctor --dry-run for detail",
+            file=sys.stderr,
+        )
 
     total_files = sum(len(v) for v in files.values())
     needs_graph = total_words >= CORPUS_WARN_THRESHOLD

@@ -10,10 +10,13 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Any, TYPE_CHECKING
+
+from graphify.corpus_prune import build_prior_files, dir_prune_reason
 from datetime import datetime, timezone
 from .cache import load_cached, save_cached, file_hash
 
 if TYPE_CHECKING:
+    from graphify.output import ResolvedOutput
     from graphify.routing import Router
     from graphify.routing_audit import RoutingAudit
 
@@ -2855,7 +2858,16 @@ def extract(
     }
 
 
-def collect_files(target: Path, *, follow_symlinks: bool = False, root: Path | None = None) -> list[Path]:
+def collect_files(
+    target: Path,
+    *,
+    follow_symlinks: bool = False,
+    root: Path | None = None,
+    resolved: ResolvedOutput | None = None,
+) -> list[Path]:
+    """Collect code paths under *target* using the same directory pruning as ``detect()`` (Phase 45)."""
+    from graphify.detect import _SKIP_FILES, _is_ignored, _load_graphifyignore
+
     if target.is_file():
         return [target]
     _EXTENSIONS = {
@@ -2865,39 +2877,65 @@ def collect_files(target: Path, *, follow_symlinks: bool = False, root: Path | N
         ".lua", ".toc", ".zig", ".ps1",
         ".m", ".mm",
     }
-    from graphify.detect import _load_graphifyignore, _is_ignored
     ignore_root = root if root is not None else target
-    patterns = _load_graphifyignore(ignore_root)
+    ignore_patterns = _load_graphifyignore(ignore_root)
+    exclude_globs = list(resolved.exclude_globs) if resolved else []
+    patterns = list(ignore_patterns) + exclude_globs
 
-    def _ignored(p: Path) -> bool:
-        return bool(patterns and _is_ignored(p, ignore_root, patterns))
+    resolved_basenames: frozenset[str] = frozenset()
+    if resolved is not None:
+        resolved_basenames = frozenset({
+            resolved.notes_dir.name,
+            resolved.artifacts_dir.name,
+        }) - {"graphify-out", "graphify_out"}
 
-    if not follow_symlinks:
-        results: list[Path] = []
-        for ext in sorted(_EXTENSIONS):
-            results.extend(
-                p for p in target.rglob(f"*{ext}")
-                if not any(part.startswith(".") for part in p.parts)
-                and not _ignored(p)
-            )
-        return sorted(results)
-    # Walk with symlink following + cycle detection
-    results = []
-    for dirpath, dirnames, filenames in os.walk(target, followlinks=True):
-        if os.path.islink(dirpath):
+    prior_files = build_prior_files(ignore_root, resolved)
+    converted_dir = ignore_root / "graphify-out" / "converted"
+
+    results: list[Path] = []
+    seen: set[Path] = set()
+
+    def _maybe_take_file(p: Path) -> None:
+        if p in seen:
+            return
+        if p.name.startswith("."):
+            return
+        if p.name in _SKIP_FILES:
+            return
+        if str(p).startswith(str(converted_dir)):
+            return
+        if _is_ignored(p, ignore_root, patterns):
+            return
+        if prior_files and str(p.resolve()) in prior_files:
+            return
+        if p.suffix.lower() not in _EXTENSIONS:
+            return
+        seen.add(p)
+        results.append(p)
+
+    for dirpath, dirnames, filenames in os.walk(target, followlinks=follow_symlinks):
+        if follow_symlinks and os.path.islink(dirpath):
             real = os.path.realpath(dirpath)
             parent_real = os.path.realpath(os.path.dirname(dirpath))
             if parent_real == real or parent_real.startswith(real + os.sep):
                 dirnames.clear()
                 continue
         dp = Path(dirpath)
-        if any(part.startswith(".") for part in dp.parts):
-            dirnames.clear()
-            continue
+        pruned: set[str] = set()
+        for d in dirnames:
+            reason = dir_prune_reason(
+                d,
+                dp,
+                ignore_root,
+                resolved_basenames=resolved_basenames,
+                patterns=patterns,
+            )
+            if reason:
+                pruned.add(d)
+        dirnames[:] = [d for d in dirnames if d not in pruned]
         for fname in filenames:
-            p = dp / fname
-            if p.suffix in _EXTENSIONS and not fname.startswith(".") and not _ignored(p):
-                results.append(p)
+            _maybe_take_file(dp / fname)
+
     return sorted(results)
 
 
