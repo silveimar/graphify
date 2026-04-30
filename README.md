@@ -49,6 +49,7 @@ Same syntax as `.gitignore`. Patterns match against file paths relative to the f
 | [Vault profile configuration](docs/PROFILE-CONFIGURATION.md) | `.graphify/profile.yaml` keys, validation, composition |
 | [v1.8 Obsidian migration](docs/MIGRATION_V1_8.md) | `update-vault` preview, backup, apply, rollback |
 | [v1.5 configuration](docs/CONFIGURING_V1_5.md) | `vault-promote`, diagram seeds, Excalidraw templates, MCP seed tools |
+| [ls-vault update runbook](docs/LS-VAULT-UPDATE-GUIDE.md) | Vault-specific step-by-step update guide for `/Users/silveimar/Documents/ls-vault/` |
 
 ## How it works
 
