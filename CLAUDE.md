@@ -23,6 +23,8 @@ python scripts/sync_mcp_server_json.py
 pytest tests/ -q
 ```
 
+**Skill install stamp:** `graphify install` writes `.graphify_version` next to each platform `SKILL.md`. If that file is missing, the CLI does not emit skill-vs-package drift warnings (nothing to compare); run `graphify install` to create or refresh the stamp.
+
 No linter or formatter is configured. CI runs pytest on Python 3.10 and 3.12.
 
 ## Architecture
