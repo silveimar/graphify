@@ -64,7 +64,26 @@ Traceability: **PORT-01–PORT-05** (interchange export/import surface, schema a
 | Closed | 11 |
 | Open | 0 |
 
-Per-phase register and evidence: `.planning/phases/40-multi-harness-memory-inverse-import-injection-defenses/40-SECURITY.md`.
+Per-phase register and evidence: `.planning/phases/40-multi-harness-memory-inverse-import-injection-defenses/40-SECURITY.md` (path as documented; file may be absent until that phase’s audit is materialized).
+
+### Phase 49 security audit (2026-04-30)
+
+**Scope:** CLI `--version` / `-V`, success-path version footer, consolidated `package_version()`, and related changes per `.planning/phases/49-add-version-flag-to-graphify-command-and-also-print-current-/49-01-PLAN.md` `<threat_model>`. Verification is **code-evidence only** (no “intended” mitigations without a grep-backed call site).
+
+**Executive summary:** All three Phase 49 declared mitigations are **implemented and traceable**. Version resolution is centralized in `graphify.version` with no `graphify.*` imports at module import time (avoiding circular import risk). The success footer runs only inside `_cli_exit` when `code == 0`. Install/uninstall (and platform `install`/`uninstall` subcommands) are excluded from the footer via `_suppress_success_version_footer`. The `--version` / `-V` early exit uses `raise SystemExit(0)` and therefore does not emit the stderr footer or run the skill-stamp loop, matching CLI-VER acceptance criteria. **No SUMMARY.md `## Threat Flags`** was present under the phase 49 directory; nothing logged as unregistered attack surface for this pass.
+
+| Threat (plan register) | Mitigation (expected) | Status | Evidence |
+|------------------------|------------------------|--------|----------|
+| Circular imports | `graphify.version` depends on stdlib only at import time; lazy `importlib.metadata` inside `package_version()` | **COVERED** | `graphify/version.py` — module body is `from __future__ import annotations` + `def package_version()` with `from importlib.metadata import version` only inside the function (lines 6–13). No `import graphify` / no sibling package imports. |
+| Footer on error paths | Emit `[graphify] version …` only on success (`code == 0`) | **COVERED** | `graphify/__main__.py` `_cli_exit` (lines 62–65): `if code == 0 and not _suppress_success_version_footer(sys.argv):` then print; all `_cli_exit(` call sites use `0` only. Non-zero exits use `sys.exit(n)` / `raise SystemExit` elsewhere and do not invoke the footer. |
+| Install / uninstall noise | Suppress success footer on help, `install`, and `<platform> install\|uninstall` | **COVERED** | `graphify/__main__.py` `_suppress_success_version_footer` (lines 51–59): `argv[1]` in `-h`/`--help`/`install`; or `len(argv) >= 3` and `argv[2]` in `install`/`uninstall`. Matches documented CLI shapes (`graphify install`, `graphify claude uninstall`, `graphify hook uninstall`, etc.). |
+
+**Counts (Phase 49 register only):** COVERED **3** · PARTIAL **0** · MISSING **0**
+
+**Prioritized recommendations**
+
+1. **Low — defensive completeness:** If a future command adds a bare two-token `graphify uninstall` (with `uninstall` as `argv[1]`), extend `_suppress_success_version_footer` to treat `argv[1] == "uninstall"` like `install`. Not required for current documented CLI.
+2. **Informational:** Keep `package_version()` as the single non-test reader of `importlib.metadata.version("graphifyy")` when adding new modules (already migrated in `__main__.py`, `capability.py`, `harness_interchange.py`, `elicit.py` per repository grep).
 
 ### What graphify does NOT do
 
