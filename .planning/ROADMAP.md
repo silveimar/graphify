@@ -536,8 +536,8 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 
 ### Phase 47: MCP & Trace Integration
 
-**Goal:** Agents and narrative commands can **find and walk** typed concept↔implementation links through **MCP** and **`/trace` or `entity_trace`**, with documentation updated when capability surfaces change.  
-**Depends on:** Phase 46 (typed edges live in validated graph artifacts).  
+**Goal:** Agents and narrative commands can **find and walk** typed concept↔implementation links through **MCP** and **`/trace` or `entity_trace`**, with documentation updated when capability surfaces change.
+**Depends on:** Phase 46 (typed edges live in validated graph artifacts).
 **Requirements:** **CCODE-03**, **CCODE-04**.
 
 **Success Criteria** (what must be TRUE):
@@ -545,7 +545,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 1. At least one MCP tool or structured graph-query path exposes or traverses concept↔implementation edges; **manifest/capability** and skill docs reflect any new tools or parameters (**CCODE-03**).
 2. **`/trace`** (slash workflow) **or** **`entity_trace`** MCP follows concept↔code hops in **at least one golden-path scenario** backed by automated tests (**CCODE-04**).
 
-**Plans:** TBD after `/gsd-plan-phase`.
+**Plans:** `.planning/phases/47-mcp-trace-integration/` — `47-01-PLAN.md` (wave 1: MCP `concept_code_hops` + tests), `47-02-PLAN.md` (wave 2: docs, `server.json`, skills).
 
 **UI hint**: yes — slash **`/trace`** command surface ties to conversational UX workflows.
 
