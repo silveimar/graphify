@@ -29,7 +29,7 @@ Each stage is a single function in its own module. They communicate through plai
 | `cache.py` | `check_semantic_cache / save_semantic_cache` | files → (cached, uncached) split |
 | `security.py` | validation helpers | URL / path / label → validated or raises |
 | `validate.py` | `validate_extraction(data)` | extraction dict → raises on schema errors |
-| `serve.py` | `serve()` / stdio server | graph file path → MCP stdio server (tool schemas co-owned with `mcp_tool_registry.py`) |
+| `serve.py` | `serve()` / stdio server | graph file path → MCP stdio server (tool schemas co-owned with `mcp_tool_registry.py`). Helpers include **`_run_concept_code_hops`** for MCP tool **`concept_code_hops`**, which walks only **`implements`** edges (Phase 46 normalization; semantic direction via `_src` / `_tgt`) for bounded concept↔code linkage — distinct from **`entity_trace`**, which follows snapshot timelines. |
 | `watch.py` | `watch(root, flag_path)` | directory → writes flag file on change |
 | `benchmark.py` | `run_benchmark(graph_path)` | graph file → corpus vs subgraph token comparison |
 

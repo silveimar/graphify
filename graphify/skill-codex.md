@@ -115,7 +115,7 @@ is complete and reproducible.
 
 After `graphify install`, these commands are available in Claude Code:
 - `/context` — full graph-backed summary (god nodes, top communities, recent deltas)
-- `/trace <entity>` — evolution of a named entity across snapshots
+- `/trace <entity>` — temporal evolution across snapshots (MCP `entity_trace`); for **concept↔code** hops on `implements` edges, use MCP **`concept_code_hops`** (same slash workflow when tracing implementation linkage vs history)
 - `/connect <topic-a> <topic-b>` — shortest path + surprising bridges
 - `/drift` — nodes trending across recent snapshots
 - `/emerge` — new clusters formed since the last snapshot
@@ -816,7 +816,7 @@ print('graph.graphml written - open in Gephi, yEd, or any GraphML tool')
 python3 -m graphify.serve graphify-out/graph.json
 ```
 
-This starts a stdio MCP server that exposes tools: `query_graph`, `get_node`, `get_neighbors`, `get_community`, `god_nodes`, `graph_stats`, `shortest_path`. Add to Claude Desktop or any MCP-compatible agent orchestrator so other agents can query the graph live.
+This starts a stdio MCP server that exposes tools including `query_graph`, `get_node`, `get_neighbors`, `get_community`, `god_nodes`, `graph_stats`, `shortest_path`, `entity_trace`, `concept_code_hops` (concept↔code via `implements`; complements temporal `/trace`), and others — see `graphify/mcp_tool_registry.py`. Add to Claude Desktop or any MCP-compatible agent orchestrator so other agents can query the graph live.
 
 To configure in Claude Desktop, add to `claude_desktop_config.json`:
 ```json

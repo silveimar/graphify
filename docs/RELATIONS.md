@@ -11,6 +11,13 @@ Authoritative registry for **`edge.relation`** strings (extract JSON) and **`hyp
 
 Non-code endpoints (both ends non-`code` `file_type`): orientation is left as emitted after `implemented_by` removal.
 
+### MCP surfaces (Phase 47)
+
+| MCP tool | Uses `implements` / concept↔code |
+|----------|-----------------------------------|
+| `concept_code_hops` | Traverses **only** `implements` edges on the live graph (bounded hops); implementation in `graphify/serve.py` (`_run_concept_code_hops`). |
+| `query_graph`, `shortest_path`, … | May include `implements` among other relations depending on query — not relation-filtered to `implements` alone. |
+
 ## Structural / extractor edges
 
 Includes **imports**, **imports_from**, **contains**, **method**, **inherits**, **defines**, **case_of** (Swift enums), **calls**, **includes**, **uses_component**, **binds_method**, **uses**, **rationale_for**.
