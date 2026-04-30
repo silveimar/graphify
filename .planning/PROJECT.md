@@ -16,7 +16,7 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 - Deliver quick-task **`260427-rc7-fix-detect-self-ingestion`** and verify detect behavior against regressions.
 - Resolve or intentionally reconcile **`test_detect_skips_dotfiles`** and **`test_collect_files_from_dir`** with documented contracts.
-- **Concept↔code MVP:** validated relation type(s), build/extract pathway, MCP query surfaces, and at least one golden-path **`/trace`** / `entity_trace` scenario backed by tests.
+- **Concept↔code MVP:** validated relation type(s), build/extract pathway, MCP query surfaces, and at least one golden-path **`/trace`** / `entity_trace` scenario backed by tests. *(Phase 46 shipped schema + build merge + report sanitization for **CCODE-01/02/05**; MCP/trace = Phase 47.)*
 
 **Phases:** Continue numbering from **Phase 45** (see `.planning/ROADMAP.md`). Requirements: `.planning/REQUIREMENTS.md`.
 
@@ -280,4 +280,4 @@ This document evolves at phase transitions and milestone boundaries.
 - Template engine items still under **Deferred** (TMPL/CFG backlog).
 
 ---
-*Last updated: 2026-04-30 — Milestone v1.10 opened (`/gsd-new-milestone`)*
+*Last updated: 2026-04-30 — Phase 46 (CCODE-01/02/05) complete; MCP/trace remains Phase 47.*

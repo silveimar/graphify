@@ -419,7 +419,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 </details>
 
 <details>
-<summary>Phase 46: Concept↔Code Schema, Build Merge & Security — PLANNING</summary>
+<summary>Phase 46: Concept↔Code Schema, Build Merge & Security — COMPLETE (2026-04-30)</summary>
 
 **Goal:** New concept↔code relation type(s) are **first-class** in validation and **`build`/graph merge**, persist through **`graph.json` round-trip assumptions**, with **labels/paths** flowing through **`security.py`** everywhere new surface appears.  
 **Depends on:** Phase 45 (clean baseline for graph/detect tests).  
@@ -431,7 +431,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 2. Concept↔code edges merge into the NetworkX graph deterministically; fixture-backed tests cover export/import (**`graph.json`**) parity with expectations used elsewhere (**CCODE-02**).
 3. New labels/paths are sanitized consistently with existing patterns (**`security.py`**); regression tests guard templates and MCP-style payloads against injection regressions (**CCODE-05**).
 
-**Plans:** TBD after `/gsd-plan-phase`.
+**Plans:** `.planning/phases/046-concept-code-schema-build-merge-security/` — `046-01` … `046-03` (3/3 complete). **Artifacts:** `046-VERIFICATION.md`, `tests/test_concept_code_edges.py`, `docs/RELATIONS.md`.
 
 </details>
 
@@ -530,7 +530,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 43. Elicitation ↔ run pipeline ELIC-02 (gap closure) | v1.9 | 3/3 | Complete | 2026-04-30 |
 | 44. Verification / Nyquist artifacts TRACE-01 (gap closure) | v1.9 | 4/4 | Complete | 2026-04-30 |
 | 45. Baselines & Detect Self-Ingestion | v1.10 | 0/TBD | Not started | — |
-| 46. Concept↔Code Schema, Build Merge & Security | v1.10 | 0/TBD | Not started | — |
+| 46. Concept↔Code Schema, Build Merge & Security | v1.10 | 3/3 | Complete | 2026-04-30 |
 | 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
 | 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 0/TBD | Not started | — |
 
@@ -545,4 +545,4 @@ Plans:
 - [ ] TBD (run /gsd-plan-phase 49 to break down)
 
 ---
-*Last updated: 2026-04-30 — v1.10 roadmap: Phases 45–49 (Phase 49 = CLI `--version`, version echo on runs, skill/package version alignment); Phase 48 = `.graphifyignore` + canonical output root; concept↔code MVP phases at 46–47.*
+*Last updated: 2026-04-30 — v1.10 roadmap: Phase 46 concept↔code schema shipped; Phases 45–49 overall; Phase 47 = MCP/trace; Phase 48 = `.graphifyignore` + canonical output root; Phase 49 = CLI `--version` + version echo.*
