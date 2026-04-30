@@ -12,18 +12,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 from graphify.validate import validate_extraction
+from graphify.version import package_version
 
 INTERCHANGE_SCHEMA_ID = "graphify.harness.interchange/v1"
 INTERCHANGE_FILENAME = "harness_memory.v1.json"
 
 
 def _package_version() -> str:
-    try:
-        from importlib.metadata import version
-
-        return version("graphifyy")
-    except Exception:
-        return "unknown"
+    return package_version()
 
 
 def _system_clock() -> datetime:

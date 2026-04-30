@@ -556,3 +556,29 @@ def test_elicit_dry_run_demo(tmp_path):
     assert result.returncode == 0
     assert "artifacts_dir" in result.stdout
     assert "node_count" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# Phase 49: --version / -V + success footer (CLI-VER-01 / CLI-VER-02)
+# ---------------------------------------------------------------------------
+
+
+def test_cli_version_stdout(tmp_path):
+    result = _graphify(["--version"], cwd=tmp_path)
+    assert result.returncode == 0
+    line = result.stdout.strip()
+    assert line.startswith("graphify ")
+    assert len(line) > len("graphify ")
+    assert "[graphify] version" not in result.stderr
+
+
+def test_cli_version_alias_v(tmp_path):
+    result = _graphify(["-V"], cwd=tmp_path)
+    assert result.returncode == 0
+    assert result.stdout.strip().startswith("graphify ")
+
+
+def test_cli_validate_profile_success_includes_version_footer(tmp_path):
+    result = _graphify(["--validate-profile", str(tmp_path)], cwd=tmp_path)
+    assert result.returncode == 0
+    assert "[graphify] version" in result.stderr

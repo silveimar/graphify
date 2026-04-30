@@ -337,12 +337,9 @@ def write_elicitation_harness_markdown(
     from graphify.harness_schemas import schema_path
     from graphify.security import validate_graph_path
 
-    try:
-        from importlib.metadata import version as pkg_version
+    from graphify.version import package_version as _pkg_version
 
-        graphify_version = pkg_version("graphifyy")
-    except Exception:
-        graphify_version = "unknown"
+    graphify_version = _pkg_version()
 
     base = Path(artifacts_dir).resolve()
     base.mkdir(parents=True, exist_ok=True)

@@ -19,6 +19,11 @@
 - [ ] **CCODE-04:** **Trace:** `/trace` (slash) **or** `entity_trace` MCP uses typed concept↔code hops in at least one golden-path scenario with automated coverage.
 - [x] **CCODE-05:** **Security:** All new labels/paths pass through existing sanitization patterns (`security.py`); no injection regressions in templates or MCP payloads. — Phase 46 (2026-04-30)
 
+## v1.10 — CLI version & provenance (Phase 49)
+
+- [x] **CLI-VER-01:** `graphify --version` and `graphify -V` print a single stdout line (`graphify <version>`) and exit **0** without running skill-version sidecar checks; `graphify.version.package_version()` is the single runtime reader for the `graphifyy` distribution version (with tests). — Phase 49 (2026-04-30)
+- [x] **CLI-VER-02:** Successful non-install / non-subcommand-install CLI exits emit one stderr line `[graphify] version <version>`; skill `.graphify_version` mismatch warnings use directional copy (older vs newer stamp). — Phase 49 (2026-04-30)
+
 ## Future (not v1.10)
 
 - Full multi-repo concept identity federation, autoreason predicates over “is implementation of,” and rich drift graphs — **defer** unless pulled into a later milestone explicitly.
@@ -42,3 +47,5 @@
 | CCODE-05 | **46** | `security.py` for new labels/paths; MCP/template injection regressions |
 | CCODE-03 | **47** | MCP listing/traversal; manifest/skill docs if surface changes |
 | CCODE-04 | **47** | `/trace` or `entity_trace` golden-path + automated coverage |
+| CLI-VER-01 | **49** | `--version` / `-V`; `graphify.version`; subprocess tests |
+| CLI-VER-02 | **49** | Success footer; directional skill stamp warnings |

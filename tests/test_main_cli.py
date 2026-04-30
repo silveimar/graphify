@@ -78,6 +78,7 @@ def test_validate_profile_empty_vault_exits_0(tmp_path):
     assert "profile ok" in result.stdout
     assert "0 rules" in result.stdout
     assert "0 templates validated" in result.stdout
+    assert "[graphify] version" in result.stderr
 
 
 def test_validate_profile_no_arg_exits_2(tmp_path):

@@ -5,19 +5,17 @@ import hashlib
 import json
 import os
 import textwrap
-from importlib import metadata
 from pathlib import Path
 from typing import Any
 
+from graphify.version import package_version
+
 _MANIFEST_VERSION = "1"
-_PKG = "graphifyy"
 
 
 def _graphify_version() -> str:
-    try:
-        return metadata.version(_PKG)
-    except metadata.PackageNotFoundError:
-        return "0.0.0"
+    v = package_version()
+    return v if v != "unknown" else "0.0.0"
 
 
 def _tool_meta_path() -> Path:

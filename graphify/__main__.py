@@ -8,24 +8,61 @@ import shutil
 import sys
 from pathlib import Path
 
-try:
-    from importlib.metadata import version as _pkg_version
-    __version__ = _pkg_version("graphifyy")
-except Exception:
-    __version__ = "unknown"
+from graphify.version import package_version
+
+__version__ = package_version()
+
+
+def _numeric_version_prefix_tuple(s: str) -> tuple[int, ...]:
+    """Best-effort version ordering from digit runs (no extra dependencies)."""
+    nums = [int(m) for m in re.findall(r"\d+", s)]
+    return tuple(nums) if nums else (0,)
 
 
 def _check_skill_version(skill_dst: Path) -> None:
-    """Warn if the installed skill is from an older graphify version."""
+    """Warn when the installed skill stamp does not match the running package."""
     version_file = skill_dst.parent / ".graphify_version"
     if not version_file.exists():
         return
     installed = version_file.read_text(encoding="utf-8").strip()
-    if installed != __version__:
-        print(
-            f"  warning: skill is from graphify {installed}, package is {__version__}. Run 'graphify install' to update.",
-            file=sys.stderr,
+    pkg = __version__
+    if installed == pkg:
+        return
+    it = _numeric_version_prefix_tuple(installed)
+    pt = _numeric_version_prefix_tuple(pkg)
+    n = max(len(it), len(pt))
+    it_pad = it + (0,) * (n - len(it))
+    pt_pad = pt + (0,) * (n - len(pt))
+    if it_pad < pt_pad:
+        hint = "older than the installed package; run 'graphify install' to update the skill."
+    elif it_pad > pt_pad:
+        hint = (
+            "newer than the installed package (unusual for an editable or mixed install); "
+            "reinstall graphify if unintended."
         )
+    else:
+        hint = "differs from the installed package; run 'graphify install' to align versions."
+    print(
+        f"  warning: skill stamp ({installed!r}) is {hint} (package is {pkg!r}).",
+        file=sys.stderr,
+    )
+
+
+def _suppress_success_version_footer(argv: list[str]) -> bool:
+    """Paths where a trailing ``[graphify] version`` line would be noise (49-CONTEXT D-49.03)."""
+    if len(argv) < 2:
+        return True
+    if argv[1] in ("-h", "--help", "install"):
+        return True
+    if len(argv) >= 3 and argv[2] in ("install", "uninstall"):
+        return True
+    return False
+
+
+def _cli_exit(code: int) -> None:
+    if code == 0 and not _suppress_success_version_footer(sys.argv):
+        print(f"[graphify] version {package_version()}", file=sys.stderr)
+    raise SystemExit(code)
 
 _SETTINGS_HOOK = {
     "matcher": "Glob|Grep",
@@ -1294,13 +1331,18 @@ def main() -> None:
     # Phase 41: ``graphify [--vault P] [--vault-list F] <command>`` — strip globals before dispatch.
     sys.argv, g_vault_exp, g_vault_list = _strip_leading_vault_global_argv(sys.argv)
 
+    argv_head = sys.argv[1:]
+    if len(argv_head) >= 1 and argv_head[0] in ("--version", "-V"):
+        print(f"graphify {__version__}")
+        raise SystemExit(0)
+
     # Check all known skill install locations for a stale version stamp.
     # Skip during install/uninstall (hook writes trigger a fresh check anyway).
-    # Skip on -h/--help so usage output stays readable (warning goes to stderr when shown).
+    # Skip on -h/--help/--version so usage / introspection stays readable.
     # Deduplicate paths so platforms sharing the same install dir don't warn twice.
     argv_rest = sys.argv[1:]
     _skip_skill_version_check = any(arg in ("install", "uninstall") for arg in sys.argv) or (
-        len(argv_rest) >= 1 and argv_rest[0] in ("-h", "--help")
+        len(argv_rest) >= 1 and argv_rest[0] in ("-h", "--help", "--version", "-V")
     )
     if not _skip_skill_version_check:
         for skill_dst in {Path.home() / cfg["skill_dst"] for cfg in _PLATFORM_CONFIG.values()}:
@@ -1513,7 +1555,7 @@ def main() -> None:
 
         if result.errors:
             sys.exit(1)
-        sys.exit(0)
+        _cli_exit(0)
 
     # --obsidian [--graph <path>] [--obsidian-dir <path>] [--dry-run] (D-78, MRG-03, MRG-05)
     # Thin wrapper over graphify.export.to_obsidian. Loads an already-built
@@ -1654,7 +1696,7 @@ def main() -> None:
                 from graphify.detect import _save_output_manifest
                 written = [str(p) for p in getattr(result, "succeeded", [])]
                 _save_output_manifest(resolved.artifacts_dir, resolved.notes_dir, written)
-        sys.exit(0)
+        _cli_exit(0)
 
     # --diagram-seeds [options] (Phase 20, SEED-01/04/05/06/07/08)
     # Reads an already-built graphify-out/graph.json, composes god_nodes() +
@@ -1704,7 +1746,7 @@ def main() -> None:
         from graphify.seed import build_all_seeds
         summary = build_all_seeds(G, graphify_out=gp.parent, vault=vault_path)
         print(f"[graphify] diagram-seeds complete: {summary}")
-        sys.exit(0)
+        _cli_exit(0)
 
     # --init-diagram-templates [--vault PATH] [--force]  (Phase 21, TMPL-01..05)
     # Writes .excalidraw.md stubs (one per profile diagram_types entry, or the
@@ -1751,7 +1793,7 @@ def main() -> None:
             f"[graphify] init-diagram-templates complete: "
             f"wrote {len(written)} stub(s) (force={force_flag})"
         )
-        sys.exit(0)
+        _cli_exit(0)
 
     # --dedup [options] (Phase 10, GRAPH-02, GRAPH-03)
     # Reads graphify-out/extraction.json or graph.json, runs dedup(),
@@ -1885,7 +1927,7 @@ def main() -> None:
             f"Reports: {out_dir / 'dedup_report.json'!s}, {out_dir / 'dedup_report.md'!s}",
             file=sys.stderr,
         )
-        sys.exit(0)
+        _cli_exit(0)
 
     if cmd == "snapshot":
         graph_path = "graphify-out/graph.json"
@@ -2046,7 +2088,7 @@ def main() -> None:
             proposals = _list_pending_proposals(out_dir)
             if not proposals:
                 print("No pending proposals.")
-                sys.exit(0)
+                _cli_exit(0)
             print(f"Pending proposals ({len(proposals)}):\n")
             print(f"  {'ID':8s}  {'Title':40s}  {'Type':12s}  {'Peer':12s}  {'Timestamp':25s}")
             _hr = "\u2500"
@@ -2055,7 +2097,7 @@ def main() -> None:
                 print(_format_proposal_summary(p))
             print(f"\nApprove: graphify approve <id> --vault <path>")
             print(f"Reject:  graphify approve --reject <id>")
-            sys.exit(0)
+            _cli_exit(0)
 
         # --reject-all: reject all pending
         if reject_all:
@@ -2064,7 +2106,7 @@ def main() -> None:
                 _reject_proposal(proposals_dir, p["record_id"])
                 print(f"Rejected: {p['record_id'][:8]} \u2014 {p.get('title', 'untitled')}")
             print(f"\n{len(proposals)} proposal(s) rejected.")
-            sys.exit(0)
+            _cli_exit(0)
 
         # --reject <id>: reject single
         if reject and target_id:
@@ -2074,7 +2116,7 @@ def main() -> None:
             except FileNotFoundError as exc:
                 print(f"error: {exc}", file=sys.stderr)
                 sys.exit(1)
-            sys.exit(0)
+            _cli_exit(0)
 
         if reject and not target_id:
             print("error: --reject requires a proposal ID", file=sys.stderr)
@@ -2088,14 +2130,14 @@ def main() -> None:
             proposals = _list_pending_proposals(out_dir)
             if not proposals:
                 print("No pending proposals to approve.")
-                sys.exit(0)
+                _cli_exit(0)
             for p in proposals:
                 try:
                     _approve_and_write_proposal(proposals_dir, p["record_id"], vault_path, force=force)
                     print(f"Approved: {p['record_id'][:8]} \u2014 {p.get('title', 'untitled')}")
                 except Exception as exc:
                     print(f"error approving {p['record_id'][:8]}: {exc}", file=sys.stderr)
-            sys.exit(0)
+            _cli_exit(0)
 
         # <id> --vault <path>: approve single
         if target_id:
@@ -2111,7 +2153,7 @@ def main() -> None:
             except Exception as exc:
                 print(f"error: {exc}", file=sys.stderr)
                 sys.exit(1)
-            sys.exit(0)
+            _cli_exit(0)
 
     if cmd == "install":
         # Default to windows platform on Windows, claude elsewhere
@@ -2275,7 +2317,7 @@ def main() -> None:
         scored = _score_nodes(G, terms)
         if not scored:
             print("No matching nodes found.")
-            sys.exit(0)
+            _cli_exit(0)
         start = [nid for _, nid in scored[:5]]
         nodes, edges = (_dfs if use_dfs else _bfs)(G, start, depth=2)
         print(_subgraph_to_text(G, nodes, edges, token_budget=budget))
@@ -2305,7 +2347,7 @@ def main() -> None:
 
         if "--stdout" in rest:
             print_manifest_stdout()
-            sys.exit(0)
+            _cli_exit(0)
         if "--validate" in rest:
             code, err = validate_cli()
             if err:
@@ -2392,13 +2434,13 @@ def main() -> None:
                     indent=2,
                 )
             )
-            sys.exit(0)
+            _cli_exit(0)
 
         save_elicitation_sidecar(artifacts, extraction, force=opts.force)
         written = write_elicitation_harness_markdown(artifacts, session)
         for p in written:
             print(str(p))
-        sys.exit(0)
+        _cli_exit(0)
     elif cmd == "harness":
         # graphify harness export [--target claude] [--out PATH]
         #   [--include-annotations] [--secrets-mode {redact,error}]
@@ -2461,7 +2503,7 @@ def main() -> None:
             sys.exit(3)
         for p in written:
             print(str(p))
-        sys.exit(0)
+        _cli_exit(0)
     elif cmd == "import-harness":
         # graphify import-harness PATH [--format auto|json|claude] [--strict] [--output PATH]
         import argparse as _ap
@@ -2533,7 +2575,7 @@ def main() -> None:
         )
         os.replace(tmp, out_json)
         print(str(out_json))
-        sys.exit(0)
+        _cli_exit(0)
     elif cmd == "run":
         # graphify run [path] [--router] [--output <path>]
         # Phase 27 (VAULT-08, VAULT-09, VAULT-10): vault-aware output resolution.
@@ -2823,7 +2865,7 @@ def main() -> None:
                 action = "applied" if opts.apply_dot_graphify_track else "would add"
                 print(f"[graphify] {action} tracked_paths ({len(added)}): {added}", file=sys.stderr)
             print(f"[graphify] tracked_paths total after merge preview: {len(merged)}", file=sys.stderr)
-            sys.exit(0)
+            _cli_exit(0)
 
         from graphify.doctor import run_doctor, format_report
         # Resolution may SystemExit (invalid profile in CWD vault); doctor still prints a full
@@ -2900,7 +2942,7 @@ def main() -> None:
             print(f"error: {exc}", file=sys.stderr)
             sys.exit(1)
         print(format_migration_preview(result["preview"], verbose=opts.verbose))
-        sys.exit(0)
+        _cli_exit(0)
     elif cmd == "vault-promote":
         # graphify vault-promote --vault PATH [--threshold N] [--graph PATH]
         import argparse as _ap
@@ -2933,7 +2975,7 @@ def main() -> None:
         promoted_str = ", ".join(f"{k}={v}" for k, v in promoted.items() if v > 0) or "none"
         skipped_str = ", ".join(f"{r}={len(paths)}" for r, paths in skipped.items()) or "none"
         print(f"[graphify] vault-promote complete: promoted={promoted_str}; skipped={skipped_str}")
-        sys.exit(0)
+        _cli_exit(0)
     else:
         print(f"error: unknown command '{cmd}'", file=sys.stderr)
         print("Run 'graphify --help' for usage.", file=sys.stderr)

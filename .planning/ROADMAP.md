@@ -551,13 +551,13 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 
 ### Phase 49: add --version flag to graphify command, and also print current version on each command result, Fix skill vs package version validations (graphify update-vault warning: skill is from graphify 0.4.7, package is 1.0.0)
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** CLI `--version` / `-V`, stderr `[graphify] version` on successful non-install commands, directional skill-stamp warnings, `graphify.version.package_version()` as single metadata reader.
+**Requirements:** **CLI-VER-01**, **CLI-VER-02**
 **Depends on:** Phase 48
-**Plans:** 0 plans
+**Plans:** 1 plan (wave 1)
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 49 to break down)
+- [x] `49-01-PLAN.md` — `graphify.version`, CLI flags, `_cli_exit` footer, skill stamp copy, tests (`test_main_cli` / `test_main_flags`)
 
 ---
 *Last updated: 2026-04-30 — v1.10 roadmap: Phase 46 concept↔code schema shipped; Phases 45–49 overall; Phase 47 = MCP/trace; Phase 48 = `.graphifyignore` + canonical output root; Phase 49 = CLI `--version` + version echo.*
