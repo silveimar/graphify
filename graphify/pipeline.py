@@ -19,16 +19,17 @@ def run_corpus(
 ) -> dict:
     """detect → extract (optional Router + audit flush). AST-only structural pass.
 
-    When out_dir is None, preserve the v1.0 default: target/'graphify-out' for
-    directory targets, target.parent/'graphify-out' for file targets (D-12).
+    When out_dir is None, use :func:`graphify.output.default_graphify_artifacts_dir`
+    (HYG-05: non-vault default output is cwd-relative, not nested under *target*).
     """
     from graphify.detect import detect
     from graphify.extract import extract
+    from graphify.output import default_graphify_artifacts_dir
     from graphify.routing import default_router
     from graphify.routing_audit import RoutingAudit
 
     if out_dir is None:
-        out_dir = target / "graphify-out" if target.is_dir() else target.parent / "graphify-out"
+        out_dir = default_graphify_artifacts_dir(target, resolved=resolved)
 
     if target.is_file():
         paths = [target.resolve()]

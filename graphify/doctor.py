@@ -33,6 +33,7 @@ from typing import Optional
 from graphify.corpus_prune import nested_output_dirname
 from graphify.detect import (
     _SELF_OUTPUT_DIRS,
+    _is_ignored,
     _load_graphifyignore,
     _load_output_manifest,
 )
@@ -233,6 +234,31 @@ def _build_ignore_list(cwd: Path, resolved: Optional[ResolvedOutput]) -> dict[st
     return ignore
 
 
+def self_ingest_graphifyignore_hint_redundant(cwd: Path, resolved: ResolvedOutput) -> bool:
+    """True when WOULD_SELF_INGEST graphifyignore fix duplicates effective ignores (HYG-04 / Phase 48)."""
+    if resolved.source == "default":
+        return False
+    if not _compute_would_self_ingest(cwd, resolved):
+        return False
+    cwd_r = cwd.resolve()
+    patterns: list[str] = list(_load_graphifyignore(cwd_r)) + list(resolved.exclude_globs)
+    self_dirs = frozenset(_SELF_OUTPUT_DIRS)
+    saw_trigger = False
+    for dest in (resolved.notes_dir, resolved.artifacts_dir):
+        try:
+            dest_abs = dest.resolve() if dest.is_absolute() else (cwd_r / dest).resolve()
+            rel = dest_abs.relative_to(cwd_r)
+        except (ValueError, OSError):
+            continue
+        if not any(nested_output_dirname(part, self_dirs) for part in rel.parts):
+            continue
+        saw_trigger = True
+        probe = dest_abs / "__graphify_ignore_probe__.txt"
+        if not _is_ignored(probe, cwd_r, patterns):
+            return False
+    return saw_trigger
+
+
 # ---------------------------------------------------------------------------
 # Recommended fixes (D-41) — one per detected issue, detection order
 # ---------------------------------------------------------------------------
@@ -241,6 +267,9 @@ def _build_recommended_fixes(
     profile_validation_errors: list[str],
     would_self_ingest: bool,
     profile_validation_warnings: list[str] | None = None,
+    *,
+    cwd: Path | None = None,
+    resolved: ResolvedOutput | None = None,
 ) -> list[str]:
     """Map issues to fix lines via _FIX_HINTS substring match (first-match-wins)."""
     fixes: list[str] = []
@@ -265,10 +294,16 @@ def _build_recommended_fixes(
             seen_fixes.add(fix)
 
     if would_self_ingest:
-        fix = _match("WOULD_SELF_INGEST")
-        if fix is not None and fix not in seen_fixes:
-            fixes.append(fix)
-            seen_fixes.add(fix)
+        skip_graphify_hint = (
+            cwd is not None
+            and resolved is not None
+            and self_ingest_graphifyignore_hint_redundant(cwd, resolved)
+        )
+        if not skip_graphify_hint:
+            fix = _match("WOULD_SELF_INGEST")
+            if fix is not None and fix not in seen_fixes:
+                fixes.append(fix)
+                seen_fixes.add(fix)
 
     return fixes
 
@@ -413,6 +448,8 @@ def run_doctor(
         report.profile_validation_errors,
         report.would_self_ingest,
         report.profile_validation_warnings,
+        cwd=cwd_resolved,
+        resolved=report.resolved_output,
     )
 
     # --- Dry-run preview (D-38, D-39) -------------------------------------

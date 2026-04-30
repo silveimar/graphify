@@ -48,6 +48,22 @@ class ResolvedOutput(NamedTuple):
     exclude_globs: tuple[str, ...] = ()   # Phase 28 D-14
 
 
+def default_graphify_artifacts_dir(
+    target: Path,
+    *,
+    resolved: ResolvedOutput | None = None,
+) -> Path:
+    """Directory for routing audits and sidecars when no explicit ``out_dir`` is passed.
+
+    For ``source=default`` (non-vault), use :attr:`Path.cwd` plus profile-relative
+    ``artifacts_dir`` so output stays a single top-level ``graphify-out/`` instead
+    of nesting under an arbitrary corpus subdirectory (**HYG-05** / Phase 48).
+    """
+    if resolved is not None and resolved.source == "default":
+        return (Path.cwd() / resolved.artifacts_dir).resolve()
+    return target / "graphify-out" if target.is_dir() else target.parent / "graphify-out"
+
+
 def is_obsidian_vault(path: Path) -> bool:
     """Strict CWD-only detection (D-04). No parent-walking."""
     return (path / ".obsidian").is_dir()

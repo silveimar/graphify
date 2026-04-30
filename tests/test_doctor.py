@@ -258,6 +258,24 @@ def test_run_doctor_self_ingest_detected(tmp_path):
     assert report.is_misconfigured() is True
 
 
+def test_hyg04_graphifyignore_suppresses_redundant_self_ingest_hint(tmp_path):
+    """HYG-04 / Phase 48: do not suggest adding graphify-out/** when already ignored."""
+    pytest.importorskip("yaml")
+    nested = _valid_profile_with(
+        "output:\n"
+        "  mode: vault-relative\n"
+        "  path: graphify-out/notes\n"
+    )
+    vault = _make_vault(tmp_path, profile_text=nested)
+    # fnmatch-based matcher (detect/doctor) treats `**` literally; use a pattern
+    # that matches nested notes tree (same intent as gitignore `**/graphify-out/**`).
+    (vault / ".graphifyignore").write_text("graphify-out/**\n", encoding="utf-8")
+    report = run_doctor(vault)
+    assert report.would_self_ingest is True
+    fix_line = next(fl for pat, fl in _FIX_HINTS if pat == "WOULD_SELF_INGEST")
+    assert fix_line not in report.recommended_fixes
+
+
 # ---------------------------------------------------------------------------
 # 7. test_run_doctor_default_paths_not_self_ingest (D-12 backcompat)
 # ---------------------------------------------------------------------------

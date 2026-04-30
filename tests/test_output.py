@@ -5,7 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from graphify.output import ResolvedOutput, is_obsidian_vault, resolve_execution_paths, resolve_output
+from graphify.output import (
+    ResolvedOutput,
+    default_graphify_artifacts_dir,
+    is_obsidian_vault,
+    resolve_execution_paths,
+    resolve_output,
+)
 
 
 _V18_PROFILE_BASE = (
@@ -436,3 +442,30 @@ def test_resolve_execution_paths_list_no_valid_vault_refuses(tmp_path, capsys):
     with pytest.raises(SystemExit):
         resolve_execution_paths(tmp_path, vault_list_file=lst)
     assert "No valid Obsidian vault" in capsys.readouterr().err
+
+
+def test_default_graphify_artifacts_dir_nonvault_uses_cwd_not_target_subdir(
+    tmp_path, monkeypatch,
+):
+    """HYG-05 / Phase 48: default ResolvedOutput writes to cwd graphify-out/, not target/."""
+    monkeypatch.chdir(tmp_path)
+    sub = tmp_path / "deep" / "src"
+    sub.mkdir(parents=True)
+    resolved = ResolvedOutput(
+        False,
+        None,
+        Path("graphify-out/obsidian"),
+        Path("graphify-out"),
+        "default",
+    )
+    out = default_graphify_artifacts_dir(sub, resolved=resolved)
+    assert out == (tmp_path / "graphify-out").resolve()
+
+
+def test_default_graphify_artifacts_dir_legacy_target_relative_without_resolved(
+    tmp_path,
+):
+    """When *resolved* is None, preserve target-adjacent graphify-out (migration, tests)."""
+    sub = tmp_path / "pkg" / "src"
+    sub.mkdir(parents=True)
+    assert default_graphify_artifacts_dir(sub, resolved=None) == (sub / "graphify-out").resolve()

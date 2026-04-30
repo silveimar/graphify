@@ -35,7 +35,7 @@ graphify is a Claude Code skill backed by a Python CLI library. The skill file (
 detect() → extract() → build_graph() → cluster() → analyze() → report() → export()
 ```
 
-Each stage is a single function in its own module under `graphify/`. They communicate through plain dicts and NetworkX graphs — no shared state, no side effects outside `graphify-out/`.
+Each stage is a single function in its own module under `graphify/`. They communicate through plain dicts and NetworkX graphs — no shared state, no side effects outside `graphify-out/`. For **non-vault** runs (`ResolvedOutput.source == "default"`), routing-audit and related artifact paths use a **single cwd-relative** `graphify-out/` via `default_graphify_artifacts_dir()` (not a nested `…/corpus-subdir/graphify-out/`). Legacy nested folders may still exist on disk; graphify does not delete them.
 
 ### Key modules
 

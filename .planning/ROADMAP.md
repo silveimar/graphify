@@ -454,7 +454,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 </details>
 
 <details>
-<summary>Phase 48: Graphifyignore & nested graphify-out consolidation — PLANNING</summary>
+<summary>Phase 48: Graphifyignore & nested graphify-out consolidation — Complete</summary>
 
 **Goal:** `.graphifyignore` patterns match how nested **`graphify-out/`** paths are surfaced so graphify **stops prompting** to add ignores that are **already declared**. Stop creating or relying on **nested** `graphify-out/` directories under arbitrary corpus subtrees; consolidate writes to the **canonical per-run output root** (default top-level `graphify-out/` / `ResolvedOutput.artifacts_dir`), with regression tests.
 
@@ -532,7 +532,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 45. Baselines & Detect Self-Ingestion | v1.10 | 0/TBD | Not started | — |
 | 46. Concept↔Code Schema, Build Merge & Security | v1.10 | 3/3 | Complete | 2026-04-30 |
 | 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
-| 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 2/2 planned | Not started | — |
+| 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 2/2 | Complete | 2026-04-30 |
 
 ### Phase 47: MCP & Trace Integration
 

@@ -2586,11 +2586,14 @@ def main() -> None:
             print(f"error: path not found: {target}", file=sys.stderr)
             sys.exit(2)
 
-        # Determine artifacts out_dir per ResolvedOutput contract (D-11, D-12)
-        if resolved.source == "default":
-            out_dir = target / "graphify-out" if target.is_dir() else target.parent / "graphify-out"
-        else:
-            out_dir = resolved.artifacts_dir
+        # Determine artifacts out_dir per ResolvedOutput contract (D-11, D-12, HYG-05)
+        from graphify.output import default_graphify_artifacts_dir
+
+        out_dir = (
+            default_graphify_artifacts_dir(target, resolved=resolved)
+            if resolved.source == "default"
+            else resolved.artifacts_dir
+        )
 
         lock_fd = _foreground_acquire_enrichment_lock(out_dir, timeout_seconds=30.0)
         try:
