@@ -36,7 +36,7 @@ EOF
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${REPO:="$(cd "${_SCRIPT_DIR}/.." && pwd)"}"
 : "${VAULT:=/Users/silveimar/Documents/ls-vault}"
-: "${RAW:=work-vault/raw}"
+: "${RAW:=/Users/silveimar/Documents/work-vault/raw}"
 
 _SKIP_PULL=0
 _NO_BACKUP=0
