@@ -356,11 +356,16 @@ Plans:
 
 **Goal:** Close **ELIC-02** audit partial: explicit product decision + implementation and/or documentation so elicitation-shaped extraction joins **`build`** on the path users expect (`graphify run` vs skill-only). **Source:** `.planning/v1.9-MILESTONE-AUDIT.md`.
 
-**Requirements:** **ELIC-02** (completion). **Depends on:** Phase 39 deliverables (library + sidecar).
+**Requirements:** **ELIC-02** (completion), **ELIC-07** (docs). **Depends on:** Phase 39 deliverables (library + sidecar).
 
-**Plans:** TBD (`/gsd-plan-phase 43`).
+**Plans:** 3 plans in 2 waves
 
-**Artifacts:** `43-CONTEXT.md` in phase directory.
+Plans:
+- [ ] `43-01-PLAN.md` — [wave 1] `run_update_vault`: merge `elicitation.json` before `build()` + migration tests (ELIC-02)
+- [ ] `43-02-PLAN.md` — [wave 1] `watch._rebuild_code`: merge sidecar before `build()` + watch tests (ELIC-02)
+- [ ] `43-03-PLAN.md` — [wave 2, depends on 01+02] `docs/ELICITATION.md` + `run` CLI help — merge surfaces vs extract-only `run` (ELIC-07)
+
+**Artifacts:** `43-CONTEXT.md`, `43-RESEARCH.md`, `43-01-PLAN.md` … `43-03-PLAN.md` in phase directory.
 
 </details>
 
