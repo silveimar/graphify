@@ -134,11 +134,11 @@ Scoped from `/gsd-new-milestone` input and seeds `SEED-001`, `SEED-002`, `SEED-v
 
 ### Gap closure (post v1.9 milestone audit, 2026-04-30)
 
-From `.planning/v1.9-MILESTONE-AUDIT.md` — **pending** until gap phases ship:
+Status reconciled **2026-04-30** (Phases **42–44**):
 
-| Audit / REQ | Phase | Action |
-|-------------|-------|--------|
-| **VCLI-03** (doctor preflight vs pinned vault) | **42** | Code + tests: `validate_profile_preflight` uses profile root when vault pinned |
-| **ELIC-02** (elicitation → build / run path) | **43** | Product + implementation or documented contract |
-| **TRACE-01** (no `*-VERIFICATION.md`) | **44** | Add verification (+ optional Nyquist) artifacts for phases 39–41 min. |
-| Phase 38 health (**38-02** summary) | **44** (or 38 follow-up) | Close PLAN/SUMMARY debt if still open |
+| Audit / REQ | Phase | Resolution |
+|-------------|-------|------------|
+| **VCLI-03** (doctor preflight vs pinned vault) | **42** | **Done** — see `.planning/phases/42-doctor-preflight-pinned-vault-parity/42-VERIFICATION.md` |
+| **ELIC-02** (elicitation → build path) | **43** | **Done** — see `.planning/phases/43-elicitation-run-pipeline-elic02/43-VERIFICATION.md` |
+| **TRACE-01** (phase `*-VERIFICATION.md` for 39–41) | **44** | **Done** — `39-VERIFICATION.md`, `40-VERIFICATION.md`, `41-VERIFICATION.md` under respective phase dirs |
+| Phase 38 health (**38-02** summary debt) | **44** | **Done** — `.planning/phases/38-with-dormant-seeds-and-pending-quick-task/38-02-SUMMARY.md` |

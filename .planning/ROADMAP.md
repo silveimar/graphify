@@ -278,7 +278,7 @@ Activate **SEED-001** (tacit-to-explicit elicitation), **SEED-002** (multi-harne
 - [ ] **Phase 41: Vault CLI — `--vault` & Multi-Vault Selector** — Deterministic vault root flag, discovery/selection UX, `doctor` + dry-run alignment. **Requirements:** VCLI-01–VCLI-06. **Depends on:** v1.7 `ResolvedOutput` / vault detection (shipped).
 - [x] **Phase 42: Milestone gap — Doctor profile preflight vs pinned vault** — Closes **VCLI-03** audit gap: `validate_profile_preflight` must use the same vault root as resolved profile paths when `--vault` / env / list pins apply (see `.planning/v1.9-MILESTONE-AUDIT.md`). **Gap closure** — not greenfield scope.
 - [x] **Phase 43: Milestone gap — Elicitation ↔ `run` pipeline (ELIC-02)** — Merge sidecar at `build()` callers (`update-vault`, `watch`); document extract-only `run`; tests for ELIC-02. **Gap closure (shipped).**
-- [ ] **Phase 44: Milestone gap — Verification & Nyquist artifacts (TRACE-01)** — Persist `*-VERIFICATION.md` (minimum phases 39–41), optional `*-VALIDATION.md`; close **38-02** SUMMARY debt if still open. **Gap closure.**
+- [x] **Phase 44: Milestone gap — Verification & Nyquist artifacts (TRACE-01)** — `39`/`40`/`41`-VERIFICATION.md + **`38-02-SUMMARY.md`**; REQUIREMENTS + audit updated. **Gap closure (shipped).**
 
 **Success criteria (milestone):**
 
@@ -379,12 +379,12 @@ Plans:
 **Plans:** 4 plans in 2 waves
 
 Plans:
-- [ ] `44-01-PLAN.md` — [wave 1] `39-VERIFICATION.md` (ELIC-01–07, TRACE-01)
-- [ ] `44-02-PLAN.md` — [wave 1] `40-VERIFICATION.md` (PORT/SEC, TRACE-01)
-- [ ] `44-03-PLAN.md` — [wave 1] `41-VERIFICATION.md` (VCLI, TRACE-01)
-- [ ] `44-04-PLAN.md` — [wave 2, depends on 01–03] `38-02-SUMMARY.md` + REQUIREMENTS + `v1.9-MILESTONE-AUDIT.md` TRACE-01 hygiene
+- [x] `44-01-PLAN.md` — [wave 1] `39-VERIFICATION.md` (ELIC-01–07, TRACE-01)
+- [x] `44-02-PLAN.md` — [wave 1] `40-VERIFICATION.md` (PORT/SEC, TRACE-01)
+- [x] `44-03-PLAN.md` — [wave 1] `41-VERIFICATION.md` (VCLI, TRACE-01)
+- [x] `44-04-PLAN.md` — [wave 2, depends on 01–03] `38-02-SUMMARY.md` + REQUIREMENTS + `v1.9-MILESTONE-AUDIT.md` TRACE-01 hygiene
 
-**Artifacts:** `44-CONTEXT.md`, `44-RESEARCH.md`, `44-01-PLAN.md` … `44-04-PLAN.md` in phase directory.
+**Artifacts:** `44-CONTEXT.md`, `44-RESEARCH.md`, `44-*-PLAN.md`, `44-*-SUMMARY.md`, `44-VERIFICATION.md` in phase directory.
 
 </details>
 
