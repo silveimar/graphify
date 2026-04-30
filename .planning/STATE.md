@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (milestone v1.9)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
-**Current focus:** Phase 39 — tacit-to-explicit-onboarding-elicitation
+**Current focus:** Phase 41 — vault CLI (`--vault`, multi-vault selector)
 
 ## Current Position
 
-Phase: 41 (vault-cli-vault-flag-multi-vault-selector) — pending discussion (no phase dir yet)
+Phase: 41 (vault-cli-vault-flag-multi-vault-selector) — context gathered; ready to plan
 Plan: —
-Status: Phases 39–40 UAT completed via `/gsd-next --chain --auto` (2026-04-30)
-Last activity: 2026-04-30 — automated UAT pass + pytest gate for v1.9 phases 39–40
+Status: `41-CONTEXT.md` written (requirements-locked discuss); Phase 39–40 shipped/UAT prior session
+Last activity: 2026-04-30 — Phase 41 discuss-phase (`--chain`); ROADMAP Phase 41 block added
 
 ## Performance Metrics
 
@@ -174,4 +174,4 @@ Open artifact audit items acknowledged at ship; no runtime blockers:
 
 Last session: 2026-04-30T01:07:45.823Z
 Stopped at: Phase 41 context gathered
-Next action: `/gsd-discuss-phase 41`
+Next action: `/gsd-plan-phase 41 --auto` (chain continuation after discuss)
