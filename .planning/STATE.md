@@ -1,34 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.9
-milestone_name: Onboarding, Harness Portability & Vault CLI
-status: milestone_complete
-stopped_at: Milestone v1.9 archived and ready for next-milestone setup
-last_updated: "2026-04-30T18:20:00.000Z"
-last_activity: 2026-04-30 -- /gsd-complete-milestone
+milestone: v1.10
+milestone_name: Stability, Baselines & Concept↔Code MVP
+status: planning
+last_updated: "2026-04-30T18:30:24.363Z"
+last_activity: 2026-04-30
 progress:
-  total_phases: 13
-  completed_phases: 13
-  total_plans: 48
-  completed_plans: 48
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (post-v1.9 archive state)
+See: `.planning/PROJECT.md` (current milestone **v1.10**).
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
-**Current focus:** Start next milestone definition (`/gsd-new-milestone`) and carry forward deferred open items.
+
+**Current focus:** Define and execute **v1.10** — baselines + detect self-ingestion + concept↔code MVP per `.planning/REQUIREMENTS.md`.
 
 ## Current Position
 
-Phase: **44** (milestone-verification-artifacts-trace01) — **complete** (4/4 plans, `44-VERIFICATION.md`)
-Plan: executed — `44-01-SUMMARY.md` … `44-04-SUMMARY.md`
-Status: **`TRACE-01`** satisfied; **`REQUIREMENTS.md`** gap table updated
-Last activity: 2026-04-30
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-30 — Milestone v1.10 started
 
 ## Performance Metrics
 

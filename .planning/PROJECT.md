@@ -8,6 +8,18 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
+## Current Milestone: v1.10 Stability, Baselines & Concept↔Code MVP
+
+**Goal:** Close carried-forward hygiene (detect self-ingestion quick task, inherited baseline test failures) and ship a scoped MVP for first-class concept↔code relationships in the NetworkX graph—typed edges, validation, and MCP/`/trace` surfacing aligned with **SEED-bidirectional-concept-code-links**.
+
+**Target features:**
+
+- Deliver quick-task **`260427-rc7-fix-detect-self-ingestion`** and verify detect behavior against regressions.
+- Resolve or intentionally reconcile **`test_detect_skips_dotfiles`** and **`test_collect_files_from_dir`** with documented contracts.
+- **Concept↔code MVP:** validated relation type(s), build/extract pathway, MCP query surfaces, and at least one golden-path **`/trace`** / `entity_trace` scenario backed by tests.
+
+**Phases:** Continue numbering from **Phase 45** (see `.planning/ROADMAP.md`). Requirements: `.planning/REQUIREMENTS.md`.
+
 ## Shipped: v1.8 Output Taxonomy & Cluster Quality (2026-04-29)
 
 Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community output, `mapping.min_community_size` cluster floor, concept naming with cache and fallbacks, repo identity resolution, CODE vs concept note classes, preview-first `update-vault` migration, platform skill alignment, Nyquist validation metadata ratification, and Phase 38 docs-only dormant-seed/quick-task reconciliation. Full detail: `.planning/milestones/v1.8-ROADMAP.md`.
@@ -138,7 +150,7 @@ Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community out
 
 ### Active
 
-v1.9 is archived. Define the next milestone with `/gsd-new-milestone` and a fresh `.planning/REQUIREMENTS.md`.
+**v1.10 — Stability, Baselines & Concept↔Code MVP:** Scoped requirements and phased roadmap live in `.planning/REQUIREMENTS.md` and `.planning/ROADMAP.md` (phases **45+**).
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -256,13 +268,16 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Shipped v1.8** (2026-04-29) — Output taxonomy, cluster-quality floor, naming/repo identity, CODE notes, migration/update vault path, skill and regression alignment. 7 phases (32–38), 25 plans, 33/33 requirements. Archives under `.planning/milestones/v1.8-*`.
 
+**Shipped v1.9** (2026-04-30) — Onboarding & elicitation, harness portability + defenses, vault CLI (`--vault`, multi-vault), gap closures (ELIC-02, TRACE-01). Phases 39–44. Archives under `.planning/milestones/v1.9-*`.
+
+**In planning: v1.10** — Baselines, detect self-ingestion quick task, concept↔code graph MVP; see `.planning/REQUIREMENTS.md`.
+
 ## Next Milestone Goals
 
-Start with `/gsd-new-milestone`, then carry these forward as explicit candidate scope:
+**v1.10 is active.** Candidates outside current v1.10 scope for future milestones:
 
-- Quick-task carryover: `260427-rc7-fix-detect-self-ingestion` (still missing).
-- Seed carryover: **SEED-bidirectional-concept-code-links** (dormant, ready for explicit scoping).
-- 2 pre-existing baseline test failures (`test_detect_skips_dotfiles`, `test_collect_files_from_dir`) — continue as `/gsd-debug` track unless promoted into milestone scope.
+- Full **SEED-001** / **SEED-002** expansion beyond what v1.9 shipped (only if explicitly re-scoped).
+- Template engine items still under **Deferred** (TMPL/CFG backlog).
 
 ---
-*Last updated: 2026-04-30 — Milestone v1.9 shipped and archived*
+*Last updated: 2026-04-30 — Milestone v1.10 opened (`/gsd-new-milestone`)*
