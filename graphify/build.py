@@ -21,9 +21,122 @@
 #    before any graph construction happens.
 #
 from __future__ import annotations
+
 import sys
+from typing import Any
+
 import networkx as nx
+
 from .validate import validate_extraction
+
+_CONF_RANK = {"EXTRACTED": 3, "INFERRED": 2, "AMBIGUOUS": 1}
+
+
+def _edge_priority(edge: dict[str, Any]) -> tuple[float, int]:
+    """Higher tuple compares better for choosing dominant duplicate edge."""
+    conf = str(edge.get("confidence", "AMBIGUOUS"))
+    rank = _CONF_RANK.get(conf, 0)
+    raw = edge.get("confidence_score")
+    try:
+        score = float(raw) if raw is not None else -1.0
+    except (TypeError, ValueError):
+        score = -1.0
+    return (score, rank)
+
+
+def _merge_edge_fields(primary: dict[str, Any], secondary: dict[str, Any]) -> dict[str, Any]:
+    """Merge two edges with same (source, target, relation); secondary loses unless stronger."""
+    if _edge_priority(secondary) > _edge_priority(primary):
+        base, other = secondary, primary
+    else:
+        base, other = primary, secondary
+    out = dict(base)
+    sf_b = base.get("source_file", "")
+    sf_o = other.get("source_file", "")
+    if isinstance(sf_b, str) and isinstance(sf_o, str) and sf_o and sf_o != sf_b:
+        out["source_file"] = f"{sf_b}; {sf_o}" if sf_b else sf_o
+    loc_b = base.get("source_location", "")
+    loc_o = other.get("source_location", "")
+    if isinstance(loc_b, str) and isinstance(loc_o, str) and loc_o and loc_o != loc_b:
+        out["source_location"] = f"{loc_b}; {loc_o}" if loc_b else loc_o
+    wt_b = base.get("weight", 1.0)
+    wt_o = other.get("weight", 1.0)
+    try:
+        out["weight"] = float(wt_b) + float(wt_o)
+    except (TypeError, ValueError):
+        out["weight"] = wt_b
+    return out
+
+
+def _normalize_concept_code_edges(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> None:
+    """Normalize implements / implemented_by pairs, orient code→concept, merge duplicates."""
+    types: dict[str, str] = {}
+    for n in nodes:
+        if isinstance(n, dict) and "id" in n:
+            types[str(n["id"])] = str(n.get("file_type", ""))
+
+    def orient(src: str, tgt: str) -> tuple[str, str]:
+        fs, ft = types.get(src, ""), types.get(tgt, "")
+        if fs == "code" and ft != "code":
+            return src, tgt
+        if ft == "code" and fs != "code":
+            return tgt, src
+        return src, tgt
+
+    for e in edges:
+        rel = e.get("relation")
+        if rel == "implemented_by":
+            e["relation"] = "implements"
+            e["source"], e["target"] = e["target"], e["source"]
+            rel = "implements"
+        if rel == "implements":
+            s, t = orient(str(e["source"]), str(e["target"]))
+            e["source"], e["target"] = s, t
+
+    # Directed duplicate merge for all relation types
+    merged_map: dict[tuple[str, str, str], dict[str, Any]] = {}
+    key_order: list[tuple[str, str, str]] = []
+    for e in edges:
+        key = (str(e["source"]), str(e["target"]), str(e.get("relation", "")))
+        if key not in merged_map:
+            merged_map[key] = dict(e)
+            key_order.append(key)
+        else:
+            merged_map[key] = _merge_edge_fields(merged_map[key], dict(e))
+
+    directed_edges = [merged_map[k] for k in key_order]
+
+    # Collapse opposite-direction implements pairs sharing the same node pair
+    impl_buckets: dict[frozenset[str], list[dict[str, Any]]] = {}
+    rest: list[dict[str, Any]] = []
+    for e in directed_edges:
+        if e.get("relation") != "implements":
+            rest.append(e)
+            continue
+        impl_buckets.setdefault(frozenset((str(e["source"]), str(e["target"]))), []).append(dict(e))
+
+    impl_out: list[dict[str, Any]] = []
+    for pair, grp in impl_buckets.items():
+        if len(pair) != 2:
+            impl_out.extend(grp)
+            continue
+        a, b = tuple(pair)
+        ca = types.get(a, "") == "code"
+        cb = types.get(b, "") == "code"
+        if ca and not cb:
+            canon_src, canon_tgt = a, b
+        elif cb and not ca:
+            canon_src, canon_tgt = b, a
+        else:
+            canon_src, canon_tgt = str(grp[0]["source"]), str(grp[0]["target"])
+        merged = grp[0]
+        for extra in grp[1:]:
+            merged = _merge_edge_fields(merged, extra)
+        merged["source"], merged["target"] = canon_src, canon_tgt
+        merged["relation"] = "implements"
+        impl_out.append(merged)
+
+    edges[:] = rest + impl_out
 
 
 def build_from_json(extraction: dict, *, directed: bool = False) -> nx.Graph:
@@ -35,6 +148,16 @@ def build_from_json(extraction: dict, *, directed: bool = False) -> nx.Graph:
     # NetworkX <= 3.1 serialised edges as "links"; remap to "edges" for compatibility.
     if "edges" not in extraction and "links" in extraction:
         extraction = dict(extraction, edges=extraction["links"])
+    extraction = dict(extraction)
+    extraction["nodes"] = list(extraction.get("nodes", []))
+    extraction["edges"] = [dict(e) for e in extraction.get("edges", [])]
+    hyper_in = extraction.get("hyperedges")
+    if hyper_in is not None:
+        extraction["hyperedges"] = [dict(h) for h in hyper_in]
+
+    nodes_for_norm = [n for n in extraction["nodes"] if isinstance(n, dict)]
+    _normalize_concept_code_edges(nodes_for_norm, extraction["edges"])
+
     errors = validate_extraction(extraction)
     # Dangling edges (stdlib/external imports) are expected - only warn about real schema errors.
     real_errors = [e for e in errors if "does not match any node id" not in e]

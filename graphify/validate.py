@@ -1,10 +1,88 @@
 # validate extraction JSON against the graphify schema before graph assembly
 from __future__ import annotations
 
+import sys
+
 VALID_FILE_TYPES = {"code", "document", "paper", "image", "rationale"}
 VALID_CONFIDENCES = {"EXTRACTED", "INFERRED", "AMBIGUOUS"}
 REQUIRED_NODE_FIELDS = {"id", "label", "file_type", "source_file"}
 REQUIRED_EDGE_FIELDS = {"source", "target", "relation", "confidence", "source_file"}
+
+# Known relation strings emitted by extractors, analyze/export helpers, MCP, and tests.
+# Unknown values warn once per validation pass (stderr) but do not fail schema validation.
+KNOWN_EDGE_RELATIONS: frozenset[str] = frozenset({
+    "implements",
+    "implemented_by",
+    "calls",
+    "contains",
+    "method",
+    "inherits",
+    "defines",
+    "imports",
+    "imports_from",
+    "includes",
+    "uses_component",
+    "binds_method",
+    "uses",
+    "rationale_for",
+    "references",
+    "cites",
+    "conceptually_related_to",
+    "shares_data_with",
+    "semantically_similar_to",
+    "derived_shortcut",
+    "related",
+    "related_to",
+})
+
+# Hyperedge relation vocabulary (separate from edge relations). Kept permissive for skill payloads.
+KNOWN_HYPEREDGE_RELATIONS: frozenset[str] = frozenset({
+    "participate_in",
+    "implement",
+    "implements",
+    "form",
+})
+
+
+def warn_unknown_relations(data: dict) -> None:
+    """Emit one stderr line per distinct unknown edge or hyperedge relation (non-blocking)."""
+    warned: set[str] = set()
+    edge_list = data.get("edges")
+    if edge_list is None and "links" in data:
+        edge_list = data.get("links")
+    if isinstance(edge_list, list):
+        for edge in edge_list:
+            if not isinstance(edge, dict):
+                continue
+            rel = edge.get("relation")
+            if not isinstance(rel, str) or not rel:
+                continue
+            if rel in KNOWN_EDGE_RELATIONS:
+                continue
+            if rel not in warned:
+                warned.add(rel)
+                print(
+                    f"[graphify] unknown edge relation {rel!r} — document in docs/RELATIONS.md",
+                    file=sys.stderr,
+                )
+
+    hyperedges = data.get("hyperedges")
+    if isinstance(hyperedges, list):
+        for h in hyperedges:
+            if not isinstance(h, dict):
+                continue
+            rel = h.get("relation")
+            if not isinstance(rel, str) or not rel:
+                continue
+            if rel in KNOWN_HYPEREDGE_RELATIONS:
+                continue
+            key = f"hyperedge:{rel}"
+            if key not in warned:
+                warned.add(key)
+                print(
+                    f"[graphify] unknown hyperedge relation {rel!r} — document in docs/RELATIONS.md",
+                    file=sys.stderr,
+                )
 
 
 def validate_extraction(data: dict) -> list[str]:
@@ -80,6 +158,8 @@ def validate_extraction(data: dict) -> list[str]:
                 errors.append(f"Edge {i} source '{edge['source']}' does not match any node id")
             if "target" in edge and node_ids and edge["target"] not in node_ids:
                 errors.append(f"Edge {i} target '{edge['target']}' does not match any node id")
+
+    warn_unknown_relations(data)
 
     return errors
 
