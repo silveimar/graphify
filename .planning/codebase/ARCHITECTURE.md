@@ -27,7 +27,7 @@ detect() → extract() → build_graph() → cluster() → analyze() → report(
 2. `extract()` - Dual extraction: tree-sitter AST for code, LLM for docs/images
    - Returns: `{"nodes": [...], "edges": [...], "hyperedges": [...], "input_tokens": int, "output_tokens": int}`
    - Node schema: `{id, label, file_type, source_file, source_location}`
-   - Edge schema: `{source, target, relation, confidence, source_file}`
+   - Edge schema: `{source, target, relation, confidence, source_file}` — canonical `relation` vocabulary and hyperedge verbs: `docs/RELATIONS.md`
    - Confidences: `EXTRACTED` (AST), `INFERRED` (LLM with score), `AMBIGUOUS` (uncertain)
 
 3. `build_graph()` - Merges extraction results into NetworkX undirected graph

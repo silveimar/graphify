@@ -1,4 +1,5 @@
 # validate extraction JSON against the graphify schema before graph assembly
+# Relation vocabulary: docs/RELATIONS.md — KNOWN_EDGE_RELATIONS / KNOWN_HYPEREDGE_RELATIONS below.
 from __future__ import annotations
 
 import sys

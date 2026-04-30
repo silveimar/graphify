@@ -32,8 +32,8 @@ from .validate import validate_extraction
 _CONF_RANK = {"EXTRACTED": 3, "INFERRED": 2, "AMBIGUOUS": 1}
 
 
-def _edge_priority(edge: dict[str, Any]) -> tuple[float, int]:
-    """Higher tuple compares better for choosing dominant duplicate edge."""
+def _edge_priority(edge: dict[str, Any]) -> tuple[int, float]:
+    """Higher tuple compares better: confidence ladder first, then confidence_score tie-break."""
     conf = str(edge.get("confidence", "AMBIGUOUS"))
     rank = _CONF_RANK.get(conf, 0)
     raw = edge.get("confidence_score")
@@ -41,7 +41,7 @@ def _edge_priority(edge: dict[str, Any]) -> tuple[float, int]:
         score = float(raw) if raw is not None else -1.0
     except (TypeError, ValueError):
         score = -1.0
-    return (score, rank)
+    return (rank, score)
 
 
 def _merge_edge_fields(primary: dict[str, Any], secondary: dict[str, Any]) -> dict[str, Any]:

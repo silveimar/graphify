@@ -4,7 +4,7 @@ import re
 import statistics
 from datetime import date
 import networkx as nx
-from graphify.security import sanitize_label
+from graphify.security import sanitize_label, sanitize_label_md
 
 
 def _fmt_source(value) -> str:
@@ -134,7 +134,8 @@ def generate(
     lines += ["", "## Surprising Connections (you probably didn't know these)"]
     if surprise_list:
         for s in surprise_list:
-            relation = s.get("relation", "related_to")
+            relation_raw = s.get("relation", "related_to")
+            relation = sanitize_label_md(str(relation_raw))
             note = s.get("note", "")
             files = s.get("source_files", ["", ""])
             conf = s.get("confidence", "EXTRACTED")
@@ -143,7 +144,7 @@ def generate(
                 conf_tag = f"INFERRED {cscore:.2f}"
             else:
                 conf_tag = conf
-            sem_tag = " [semantically similar]" if relation == "semantically_similar_to" else ""
+            sem_tag = " [semantically similar]" if relation_raw == "semantically_similar_to" else ""
             lines += [
                 f"- `{s['source']}` --{relation}--> `{s['target']}`  [{conf_tag}]{sem_tag}",
                 f"  {_fmt_source(files[0])} → {_fmt_source(files[1])}" + (f"  _{note}_" if note else ""),
@@ -183,9 +184,10 @@ def generate(
         for u, v, d in ambiguous:
             ul = G.nodes[u].get("label", u)
             vl = G.nodes[v].get("label", v)
+            rel_amb = sanitize_label_md(str(d.get("relation", "unknown")))
             lines += [
                 f"- `{ul}` → `{vl}`  [AMBIGUOUS]",
-                f"  {d.get('source_file', '')} · relation: {d.get('relation', 'unknown')}",
+                f"  {d.get('source_file', '')} · relation: {rel_amb}",
             ]
 
     # --- Gaps section ---
