@@ -97,8 +97,9 @@ def _rebuild_code(watch_path: Path, *, follow_symlinks: bool = False) -> bool:
     try:
         from graphify.extract import extract
         from graphify.detect import detect
-        from graphify.build import build_from_json
+        from graphify.build import build
         from graphify.cluster import cluster, score_all
+        from graphify.elicit import merge_elicitation_into_build_inputs
         from graphify.analyze import god_nodes, surprising_connections, suggest_questions
         from graphify.report import generate
         from graphify.export import to_json
@@ -140,7 +141,7 @@ def _rebuild_code(watch_path: Path, *, follow_symlinks: bool = False) -> bool:
             "total_words": detected.get("total_words", 0),
         }
 
-        G = build_from_json(result)
+        G = build(merge_elicitation_into_build_inputs([result], out))
         communities = cluster(G)
         cohesion = score_all(G, communities)
         gods = god_nodes(G)

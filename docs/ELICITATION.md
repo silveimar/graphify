@@ -7,7 +7,7 @@ This guide covers graphify’s **discovery-first** path when you have little or 
 - **Empty or tiny corpus** — onboarding before code/docs exist (see Phase 39 D-02).
 - You need **SOUL/HEARTBEAT/USER-shaped** harness markdown and a **`elicitation.json`** sidecar merged into the graph pipeline.
 
-Use the full **`graphify run`** / **`/graphify`** pipeline once you have real files to extract.
+Use **`graphify watch`**, **`graphify update-vault`**, or the **`/graphify`** skill pipeline when you need a persisted **`graph.json`** with sidecar merge. **`graphify run`** performs detect → extract only (no graph assembly); see `--help` under **`run`**.
 
 ## CLI (canonical)
 
@@ -33,6 +33,16 @@ Paths follow **`resolve_output()`** (see `graphify/output.py`): with a vault + p
 ## Merge order in `build()`
 
 `graphify/build.py`: list extractions are merged in order; **`elicitation`** (or sidecar appended via `merge_elicitation_into_build_inputs`) comes **after** file extractions so duplicate node **`id`** values favor elicitation.
+
+## Where sidecar merge runs (ELIC-02 / ELIC-07)
+
+These paths resolve `<artifacts_dir>/elicitation.json` (when present) and pass **`merge_elicitation_into_build_inputs(...)`** before **`build()`**:
+
+| Workflow | What happens |
+|----------|----------------|
+| **`graphify update-vault`** (`run_update_vault`) | Preview/apply builds the graph from corpus extraction plus sidecar under the vault’s resolved **`artifacts_dir`** (typically a sibling **`graphify-out/`**). |
+| **`graphify watch`** (`_rebuild_code`) | Incremental rebuild merges sidecar from **`<project>/graphify-out/`** after AST extraction (and optional semantic carry-over from existing **`graph.json`**). |
+| **`graphify run`** | **Does not** call **`build()`** or write **`graph.json`** — extract-only. Use **`watch`**, **`update-vault`**, or the full skill-driven pipeline when you need graph assembly with elicitation merge. |
 
 ## Non-goals (other phases)
 

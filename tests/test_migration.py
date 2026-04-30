@@ -700,3 +700,69 @@ def test_repo_identity_drift_becomes_skip_conflict(tmp_path):
     assert drift_rows[0]["existing_repo_identity"] == "other-repo"
     assert drift_rows[0]["repo_identity"] == "graphify"
     assert "repo_identity_drift" in json.dumps(preview, sort_keys=True)
+
+
+# ---------------------------------------------------------------------------
+# Phase 43 (ELIC-02): elicitation sidecar merged before build in update-vault
+# ---------------------------------------------------------------------------
+
+
+def test_run_update_vault_build_receives_merged_extractions_with_sidecar(tmp_path, monkeypatch):
+    """ELIC-02: corpus extraction + elicitation.json when sidecar exists."""
+    import graphify.build as build_module
+
+    from graphify.elicit import (
+        build_extraction_from_session,
+        run_scripted_elicitation,
+        save_elicitation_sidecar,
+    )
+    from graphify.migration import run_update_vault
+    from graphify.output import resolve_output
+
+    raw, vault = _make_update_vault_fixture(tmp_path)
+    resolved = resolve_output(vault)
+    resolved.artifacts_dir.mkdir(parents=True, exist_ok=True)
+    session = run_scripted_elicitation(
+        {
+            "rhythms": "Daily standup, weekly retro",
+            "decisions": "Prefer small PRs",
+            "dependencies": "Platform team for deploys",
+            "knowledge": "Internal runbooks are outdated",
+            "friction": "Context switching",
+        },
+        auto_confirm=True,
+    )
+    ext = build_extraction_from_session(session)
+    save_elicitation_sidecar(resolved.artifacts_dir, ext, force=True)
+
+    captured: list = []
+    orig_build = build_module.build
+
+    def spy(seq, **kw):
+        captured.append(seq)
+        return orig_build(seq, **kw)
+
+    monkeypatch.setattr(build_module, "build", spy)
+    run_update_vault(input_dir=raw, vault_dir=vault)
+    assert len(captured) == 1
+    assert len(captured[0]) == 2
+
+
+def test_run_update_vault_build_single_extraction_without_sidecar(tmp_path, monkeypatch):
+    """No elicitation.json — merge helper yields one extraction."""
+    import graphify.build as build_module
+
+    from graphify.migration import run_update_vault
+
+    raw, vault = _make_update_vault_fixture(tmp_path)
+    captured: list = []
+    orig_build = build_module.build
+
+    def spy(seq, **kw):
+        captured.append(seq)
+        return orig_build(seq, **kw)
+
+    monkeypatch.setattr(build_module, "build", spy)
+    run_update_vault(input_dir=raw, vault_dir=vault)
+    assert len(captured) == 1
+    assert len(captured[0]) == 1

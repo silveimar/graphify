@@ -185,6 +185,7 @@ def run_update_vault(
 
     from graphify.build import build
     from graphify.cluster import cluster
+    from graphify.elicit import merge_elicitation_into_build_inputs
     from graphify.export import to_obsidian
     from graphify.merge import _load_manifest
     from graphify.naming import resolve_repo_identity
@@ -206,7 +207,8 @@ def run_update_vault(
         out_dir=resolved.artifacts_dir,
         resolved=None,
     )
-    G = build([extraction])
+    merged = merge_elicitation_into_build_inputs([extraction], resolved.artifacts_dir)
+    G = build(merged)
     communities = cluster(G)
     render_context = to_obsidian(
         G,

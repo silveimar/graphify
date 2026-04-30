@@ -152,3 +152,49 @@ def test_watch_atexit_terminates_child(monkeypatch):
         assert terminated == [True]
     finally:
         watch_mod._active_enrichment_child = None
+
+
+# ---------------------------------------------------------------------------
+# Phase 43 (ELIC-02): watch rebuild merges elicitation sidecar
+# ---------------------------------------------------------------------------
+
+
+def test_rebuild_code_includes_elicitation_sidecar_nodes(tmp_path):
+    """ELIC-02: watch rebuild merges graphify-out/elicitation.json before build."""
+    import json
+
+    from graphify.elicit import (
+        build_extraction_from_session,
+        run_scripted_elicitation,
+        save_elicitation_sidecar,
+    )
+    from graphify.watch import _rebuild_code
+
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "tiny.py").write_text(
+        "def foo():\n    return 42\n",
+        encoding="utf-8",
+    )
+    out = proj / "graphify-out"
+    out.mkdir(parents=True)
+    session = run_scripted_elicitation(
+        {
+            "rhythms": "Daily standup, weekly retro",
+            "decisions": "Prefer small PRs",
+            "dependencies": "Platform team for deploys",
+            "knowledge": "Internal runbooks are outdated",
+            "friction": "Context switching",
+        },
+        auto_confirm=True,
+    )
+    ext = build_extraction_from_session(session)
+    save_elicitation_sidecar(out, ext, force=True)
+
+    ok = _rebuild_code(proj)
+    assert ok is True
+    graph_path = out / "graph.json"
+    assert graph_path.exists()
+    data = json.loads(graph_path.read_text(encoding="utf-8"))
+    node_ids = {n["id"] for n in data.get("nodes", [])}
+    assert "elicitation_hub" in node_ids

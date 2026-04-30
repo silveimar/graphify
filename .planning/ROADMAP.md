@@ -277,7 +277,7 @@ Activate **SEED-001** (tacit-to-explicit elicitation), **SEED-002** (multi-harne
 - [ ] **Phase 40: Multi-Harness Memory, Inverse Import & Injection Defenses** — Extend harness export/import, canonical schemas, MCP parity, SECURITY.md threats; sanitize imported harness content. **Requirements:** PORT-01–PORT-05, SEC-01–SEC-04. **Depends on:** Phase 39 recommended for coherent artifact story (SOUL/HEARTBEAT provenance); can proceed in parallel if interfaces are frozen early.
 - [ ] **Phase 41: Vault CLI — `--vault` & Multi-Vault Selector** — Deterministic vault root flag, discovery/selection UX, `doctor` + dry-run alignment. **Requirements:** VCLI-01–VCLI-06. **Depends on:** v1.7 `ResolvedOutput` / vault detection (shipped).
 - [x] **Phase 42: Milestone gap — Doctor profile preflight vs pinned vault** — Closes **VCLI-03** audit gap: `validate_profile_preflight` must use the same vault root as resolved profile paths when `--vault` / env / list pins apply (see `.planning/v1.9-MILESTONE-AUDIT.md`). **Gap closure** — not greenfield scope.
-- [ ] **Phase 43: Milestone gap — Elicitation ↔ `run` pipeline (ELIC-02)** — Decide and implement or document: merge elicitation sidecar into `run_corpus` / `build` path vs skill-only merge; tests proving acceptance criteria. **Gap closure.**
+- [x] **Phase 43: Milestone gap — Elicitation ↔ `run` pipeline (ELIC-02)** — Merge sidecar at `build()` callers (`update-vault`, `watch`); document extract-only `run`; tests for ELIC-02. **Gap closure (shipped).**
 - [ ] **Phase 44: Milestone gap — Verification & Nyquist artifacts (TRACE-01)** — Persist `*-VERIFICATION.md` (minimum phases 39–41), optional `*-VALIDATION.md`; close **38-02** SUMMARY debt if still open. **Gap closure.**
 
 **Success criteria (milestone):**
@@ -361,11 +361,11 @@ Plans:
 **Plans:** 3 plans in 2 waves
 
 Plans:
-- [ ] `43-01-PLAN.md` — [wave 1] `run_update_vault`: merge `elicitation.json` before `build()` + migration tests (ELIC-02)
-- [ ] `43-02-PLAN.md` — [wave 1] `watch._rebuild_code`: merge sidecar before `build()` + watch tests (ELIC-02)
-- [ ] `43-03-PLAN.md` — [wave 2, depends on 01+02] `docs/ELICITATION.md` + `run` CLI help — merge surfaces vs extract-only `run` (ELIC-07)
+- [x] `43-01-PLAN.md` — [wave 1] `run_update_vault`: merge `elicitation.json` before `build()` + migration tests (ELIC-02)
+- [x] `43-02-PLAN.md` — [wave 1] `watch._rebuild_code`: merge sidecar before `build()` + watch tests (ELIC-02)
+- [x] `43-03-PLAN.md` — [wave 2, depends on 01+02] `docs/ELICITATION.md` + `run` CLI help — merge surfaces vs extract-only `run` (ELIC-07)
 
-**Artifacts:** `43-CONTEXT.md`, `43-RESEARCH.md`, `43-01-PLAN.md` … `43-03-PLAN.md` in phase directory.
+**Artifacts:** `43-CONTEXT.md`, `43-RESEARCH.md`, `43-*-PLAN.md`, `43-*-SUMMARY.md`, `43-VERIFICATION.md` in phase directory.
 
 </details>
 
