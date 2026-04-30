@@ -378,7 +378,7 @@ Plans:
 
 **Plans:** TBD (`/gsd-plan-phase 44`).
 
-**Artifacts:** `44-CONTEXT.md` in phase directory.
+**Artifacts:** `44-CONTEXT.md` (discuss-phase complete — decisions locked); executable plans pending.
 
 </details>
 
