@@ -72,6 +72,7 @@ Last activity: 2026-04-30 — Phase 48 added (graphifyignore + canonical graphif
 - Phase 38 added: with dormant seeds and pending quick task
 - Phase 38 scope ratified as docs-only reconciliation (dormant seeds + quick-task lifecycle) with runtime modules unchanged.
 - Phase 48 added: `.graphifyignore` loading / matching fixes for nested `graphify-out` (stop false prompts); consolidate outputs under canonical `graphify-out` instead of nested trees under input (`gsd-add-phase`; numbered **48** after resolving duplicate Phase 46 collision with Concept↔Code roadmap slot).
+- Phase 49 added: `--version` flag on graphify CLI; print package version on command results; fix skill vs installed package version mismatch warnings (e.g. update-vault reporting stale embedded skill version vs PyPI/package version).
 
 ### Decisions
 

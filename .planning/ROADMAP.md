@@ -12,7 +12,7 @@
 - ✅ **v1.7 Vault Adapter UX & Template Polish** — Phases 27–31 (shipped 2026-04-28)
 - ✅ **v1.8 Output Taxonomy & Cluster Quality** — Phases 32–38 (shipped 2026-04-29)
 - ✅ **v1.9 Onboarding, Harness Portability & Vault CLI** — Phases 39–44 (shipped 2026-04-30)
-- 📋 **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–48 (in planning)
+- 📋 **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–49 (in planning)
 
 ## Phases
 
@@ -534,5 +534,15 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
 | 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 0/TBD | Not started | — |
 
+### Phase 49: add --version flag to graphify command, and also print current version on each command result, Fix skill vs package version validations (graphify update-vault warning: skill is from graphify 0.4.7, package is 1.0.0)
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 48
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 49 to break down)
+
 ---
-*Last updated: 2026-04-30 — v1.10 roadmap: Phases 45–48 (Phase 48 = `.graphifyignore` + canonical output root); concept↔code MVP phases renumbered unchanged at 46–47.*
+*Last updated: 2026-04-30 — v1.10 roadmap: Phases 45–49 (Phase 49 = CLI `--version`, version echo on runs, skill/package version alignment); Phase 48 = `.graphifyignore` + canonical output root; concept↔code MVP phases at 46–47.*
