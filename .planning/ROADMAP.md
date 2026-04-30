@@ -12,7 +12,7 @@
 - ✅ **v1.7 Vault Adapter UX & Template Polish** — Phases 27–31 (shipped 2026-04-28)
 - ✅ **v1.8 Output Taxonomy & Cluster Quality** — Phases 32–38 (shipped 2026-04-29)
 - ✅ **v1.9 Onboarding, Harness Portability & Vault CLI** — Phases 39–44 (shipped 2026-04-30)
-- 📋 **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–47 (in planning)
+- 📋 **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–48 (in planning)
 
 ## Phases
 
@@ -390,11 +390,11 @@ Plans:
 </details>
 
 <details>
-<summary>📋 v1.10 Stability, Baselines & Concept↔Code MVP (Phases 45–47) — IN PLANNING</summary>
+<summary>📋 v1.10 Stability, Baselines & Concept↔Code MVP (Phases 45–48) — IN PLANNING</summary>
 
-Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fix-detect-self-ingestion`**, inherited baseline failures in detect/collect-files) and ship a scoped MVP for first-class concept↔code relationships: typed edges, validation, deterministic graph merge with security sanitization, and MCP / trace surfacing aligned with **SEED-bidirectional-concept-code-links**.
+Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fix-detect-self-ingestion`**, inherited baseline failures in detect/collect-files), **`.graphifyignore` / nested `graphify-out/` correctness**, and ship a scoped MVP for first-class concept↔code relationships: typed edges, validation, deterministic graph merge with security sanitization, and MCP / trace surfacing aligned with **SEED-bidirectional-concept-code-links**.
 
-**Totals:** 3 phases planned; REQ coverage HYG-01..03 + CCODE-01..05.
+**Totals:** 4 phases planned; REQ coverage HYG-01..03 + CCODE-01..05 + output/ignore hygiene (Phase 48).
 
 </details>
 
@@ -449,6 +449,25 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 **Plans:** TBD after `/gsd-plan-phase`.
 
 **UI hint**: yes — slash **`/trace`** command surface ties to conversational UX workflows.
+
+</details>
+
+<details>
+<summary>Phase 48: Graphifyignore & nested graphify-out consolidation — PLANNING</summary>
+
+**Goal:** `.graphifyignore` patterns match how nested **`graphify-out/`** paths are surfaced so graphify **stops prompting** to add ignores that are **already declared**. Stop creating or relying on **nested** `graphify-out/` directories under arbitrary corpus subtrees; consolidate writes to the **canonical per-run output root** (default top-level `graphify-out/` / `ResolvedOutput.artifacts_dir`), with regression tests.
+
+**Depends on:** Phase 45 (detect / corpus eligibility semantics).  
+**Requirements:** TBD (map to REQ rows in `/gsd-plan-phase`).
+
+**Success Criteria** (what must be TRUE):
+
+1. If `.graphifyignore` already excludes nested graphify output paths (e.g. `**/graphify-out/**` or equivalent), diagnostics and agent prompts **do not** ask to add duplicate entries.
+2. New runs do not sprawl additional **`graphify-out/`** trees inside raw input folders when a single canonical output directory is configured; behavior documented and covered by tests.
+
+**Plans:** TBD after `/gsd-discuss-phase` / `/gsd-plan-phase`.
+
+**Artifacts:** `.planning/phases/48-fix-graphifyignore-nested-graphify-out/`
 
 </details>
 
@@ -512,6 +531,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 45. Baselines & Detect Self-Ingestion | v1.10 | 0/TBD | Not started | — |
 | 46. Concept↔Code Schema, Build Merge & Security | v1.10 | 0/TBD | Not started | — |
 | 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
+| 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 0/TBD | Not started | — |
 
 ---
-*Last updated: 2026-04-30 — v1.10 roadmap added (Phases 45–47): baselines/detect hygiene + concept↔code MVP; prior v1.9 ship note preserved in milestones list and archives.*
+*Last updated: 2026-04-30 — v1.10 roadmap: Phases 45–48 (Phase 48 = `.graphifyignore` + canonical output root); concept↔code MVP phases renumbered unchanged at 46–47.*

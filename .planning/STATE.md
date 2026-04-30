@@ -5,7 +5,7 @@ milestone_name: milestone
 status: planning
 stopped_at: Phase 45 context gathered
 last_updated: "2026-04-30T20:17:16.298Z"
-last_activity: 2026-04-30 — v1.10 phases 45–47 added to roadmap; traceability filled in REQUIREMENTS.md
+last_activity: 2026-04-30 — Phase 48 added (graphifyignore + canonical graphify-out); v1.10 phases 45–48 in ROADMAP
 progress:
   total_phases: 1
   completed_phases: 0
@@ -27,8 +27,8 @@ See: `.planning/PROJECT.md` (current milestone **v1.10**).
 
 Phase: **45** — roadmap defined; ready for `/gsd-discuss-phase 45` or `/gsd-plan-phase 45`
 Plan: —
-Status: Roadmapped (v1.10 Phases 45–47 in `.planning/ROADMAP.md`)
-Last activity: 2026-04-30 — v1.10 phases 45–47 added to roadmap; traceability filled in REQUIREMENTS.md
+Status: Roadmapped (v1.10 Phases 45–48 in `.planning/ROADMAP.md`)
+Last activity: 2026-04-30 — Phase 48 added (graphifyignore + canonical graphify-out); v1.10 phases 45–48 in ROADMAP
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Last activity: 2026-04-30 — v1.10 phases 45–47 added to roadmap; traceabilit
 
 - Phase 38 added: with dormant seeds and pending quick task
 - Phase 38 scope ratified as docs-only reconciliation (dormant seeds + quick-task lifecycle) with runtime modules unchanged.
+- Phase 48 added: `.graphifyignore` loading / matching fixes for nested `graphify-out` (stop false prompts); consolidate outputs under canonical `graphify-out` instead of nested trees under input (`gsd-add-phase`; numbered **48** after resolving duplicate Phase 46 collision with Concept↔Code roadmap slot).
 
 ### Decisions
 
