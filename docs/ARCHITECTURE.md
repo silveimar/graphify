@@ -29,7 +29,7 @@ Each stage is a single function in its own module. They communicate through plai
 | `cache.py` | `check_semantic_cache / save_semantic_cache` | files → (cached, uncached) split |
 | `security.py` | validation helpers | URL / path / label → validated or raises |
 | `validate.py` | `validate_extraction(data)` | extraction dict → raises on schema errors |
-| `serve.py` | `start_server(graph_path)` | graph file path → MCP stdio server |
+| `serve.py` | `serve()` / stdio server | graph file path → MCP stdio server (tool schemas co-owned with `mcp_tool_registry.py`) |
 | `watch.py` | `watch(root, flag_path)` | directory → writes flag file on change |
 | `benchmark.py` | `run_benchmark(graph_path)` | graph file → corpus vs subgraph token comparison |
 
@@ -75,7 +75,7 @@ All external input passes through `graphify/security.py` before use:
 - Graph file paths → `validate_graph_path()` (must resolve inside `graphify-out/`)
 - Node labels → `sanitize_label()` (strips control chars, caps 256 chars, HTML-escapes)
 
-See `SECURITY.md` for the full threat model.
+See [`SECURITY.md`](../SECURITY.md) for the full threat model.
 
 ## Obsidian vault adapter (Ideaverse integration)
 

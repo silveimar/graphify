@@ -2,7 +2,7 @@
 
 How to install graphify **from this repository** (without using the PyPI package) and register it as a skill in your AI coding assistant.
 
-**Requirements:** Python 3.10+ and a supported assistant (Claude Code, Codex, OpenCode, OpenClaw, Factory Droid, Trae, etc.). See the main [README](README.md) for platform notes.
+**Requirements:** Python 3.10+ and a supported assistant (Claude Code, Codex, OpenCode, OpenClaw, Factory Droid, Trae, etc.). See the main [README](../README.md) for platform notes.
 
 ## Install from the repo
 
@@ -70,7 +70,7 @@ graphify install
 | Trae            | `graphify install --platform trae`            |
 | Trae CN         | `graphify install --platform trae-cn`       |
 
-Then invoke the skill from your assistant (for example `/graphify .` in Claude Code; Codex uses `$graphify .`). See [README](README.md) for full usage.
+Then invoke the skill from your assistant (for example `/graphify .` in Claude Code; Codex uses `$graphify .`). See [README](../README.md) for full usage.
 
 ## Using a specific Python interpreter
 

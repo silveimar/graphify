@@ -249,7 +249,7 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 - `source_location`: optional (e.g., "L42" for line number)
 <!-- GSD:conventions-end -->
 
-<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+<!-- GSD:architecture-start source:docs/ARCHITECTURE.md -->
 ## Architecture
 
 ## Pattern Overview

@@ -1,6 +1,6 @@
 # Vault profile configuration guide
 
-This guide explains how to configure graphify’s Obsidian vault adapter using `.graphify/profile.yaml`. It complements the canonical example file [`profile-example.yaml`](profile-example.yaml) at the repository root, which mirrors the built-in defaults from `graphify/profile.py` (`_DEFAULT_PROFILE`).
+This guide explains how to configure graphify’s Obsidian vault adapter using `.graphify/profile.yaml`. It complements the canonical example file [`profile-example.yaml`](../profile-example.yaml) at the repository root, which mirrors the built-in defaults from `graphify/profile.py` (`_DEFAULT_PROFILE`).
 
 ## Where the profile lives
 
@@ -11,7 +11,7 @@ If that file is missing, graphify uses the **built-in default profile** only (no
 
 ## Quick start
 
-1. Copy [`profile-example.yaml`](profile-example.yaml) to your vault as `.graphify/profile.yaml`.
+1. Copy [`profile-example.yaml`](../profile-example.yaml) to your vault as `.graphify/profile.yaml`.
 2. Edit `taxonomy`, `folder_mapping`, and any other sections you need (see below).
 3. Validate:
 
@@ -36,7 +36,7 @@ For v1.8 migration workflows, see [`MIGRATION_V1_8.md`](MIGRATION_V1_8.md). For 
    - top-level `taxonomy`
    - `mapping.min_community_size`
 
-The repository [`profile-example.yaml`](profile-example.yaml) satisfies these requirements.
+The repository [`profile-example.yaml`](../profile-example.yaml) satisfies these requirements.
 
 ## Top-level keys (reference)
 
@@ -68,7 +68,7 @@ Allowed top-level keys are enforced by schema validation. Unknown keys cause val
 
 The `taxonomy` block groups all generated notes under a logical tree.
 
-From [`profile-example.yaml`](profile-example.yaml):
+From [`profile-example.yaml`](../profile-example.yaml):
 
 ```yaml
 taxonomy:
@@ -98,7 +98,7 @@ The `unclassified` folder key participates in taxonomy metadata; the primary exp
 
 Maps **note roles** to vault-relative directories where notes are written.
 
-Example (from [`profile-example.yaml`](profile-example.yaml)):
+Example (from [`profile-example.yaml`](../profile-example.yaml)):
 
 ```yaml
 folder_mapping:
@@ -267,7 +267,7 @@ Optional automation preferences (e.g. whether graphify may refresh profile-deriv
 
 ## `diagram_types`
 
-Each entry describes a **diagram type** for seeds / Excalidraw (template path, triggers, naming, layout, output folder). See [`profile-example.yaml`](profile-example.yaml) for six built-in types (`architecture`, `workflow`, `repository-components`, `mind-map`, `cuadro-sinoptico`, `glossary-graph`) and [`CONFIGURING_V1_5.md`](CONFIGURING_V1_5.md) for the full pipeline.
+Each entry describes a **diagram type** for seeds / Excalidraw (template path, triggers, naming, layout, output folder). See [`profile-example.yaml`](../profile-example.yaml) for six built-in types (`architecture`, `workflow`, `repository-components`, `mind-map`, `cuadro-sinoptico`, `glossary-graph`) and [`CONFIGURING_V1_5.md`](CONFIGURING_V1_5.md) for the full pipeline.
 
 Per-entry keys validated include: `name`, `template_path`, `trigger_node_types`, `trigger_tags`, `min_main_nodes`, `naming_pattern`, `layout_type`, `output_path`.
 
@@ -314,7 +314,7 @@ Beyond YAML, you can place overrides under `.graphify/templates/` (e.g. `thing.m
 
 1. Run **`graphify --validate-profile <vault>`** — exercises schema, template, and path-safety layers.
 2. Watch **stderr** when running exports: profile resolution errors cause an automatic fallback to built-in defaults, which can **look** like “graphify ignored my profile”—fix validation errors until the command is clean.
-3. Ensure **`taxonomy`** and **`mapping.min_community_size`** exist in the **composed** user profile for v1.8 (see [`profile-example.yaml`](profile-example.yaml)).
+3. Ensure **`taxonomy`** and **`mapping.min_community_size`** exist in the **composed** user profile for v1.8 (see [`profile-example.yaml`](../profile-example.yaml)).
 
 ---
 
@@ -322,7 +322,7 @@ Beyond YAML, you can place overrides under `.graphify/templates/` (e.g. `thing.m
 
 | File | Role |
 |------|------|
-| [`profile-example.yaml`](profile-example.yaml) | Copy-paste baseline aligned with `_DEFAULT_PROFILE`. |
+| [`profile-example.yaml`](../profile-example.yaml) | Copy-paste baseline aligned with `_DEFAULT_PROFILE`. |
 | [`MIGRATION_V1_8.md`](MIGRATION_V1_8.md) | Reviewed vault updates and apply flow. |
 | [`CONFIGURING_V1_5.md`](CONFIGURING_V1_5.md) | Diagram seeds, Excalidraw templates, MCP. |
 | `graphify/profile.py` | Defaults, merge, validation, safety helpers. |

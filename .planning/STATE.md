@@ -170,6 +170,12 @@ Open artifact audit items acknowledged at ship; no runtime blockers:
 | seed | SEED-bidirectional-concept-code-links | dormant |
 | seed | SEED-vault-root-aware-cli | dormant |
 
+## Quick Tasks Completed
+
+| Date (UTC) | Slug | Summary |
+|------------|------|---------|
+| 2026-04-30 | docs-folder-and-guide-refresh | Moved INSTALLATION, MIGRATION_V1_8, PROFILE-CONFIGURATION, CONFIGURING_V1_5, ARCHITECTURE into `docs/`; refreshed README index and cross-links; aligned CONFIGURING with `mcp_tool_registry.py` + alias behavior; `tests/test_docs.py` path updated |
+
 ## Session Continuity
 
 Last session: 2026-04-30T12:00:00.000Z

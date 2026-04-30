@@ -226,7 +226,7 @@ The `graphify serve` MCP server exposes two tools that an agent author can call 
 
 ### `list_diagram_seeds`
 
-Verbatim tool declaration (`graphify/serve/mcp_tool_registry.py:349`):
+Verbatim tool declaration (`graphify/mcp_tool_registry.py`; register near `name="list_diagram_seeds"`):
 
 ```python
 types.Tool(
@@ -296,7 +296,7 @@ types.Tool(
 
 ### `get_diagram_seed`
 
-Verbatim tool declaration (`graphify/serve/mcp_tool_registry.py:364`):
+Verbatim tool declaration (`graphify/mcp_tool_registry.py`; register near `name="get_diagram_seed"`):
 
 ```python
 types.Tool(
@@ -325,7 +325,7 @@ types.Tool(
 | seed_id | string  | yes      | —       |
 | budget  | integer | no       | 2000    |
 
-**Return body.** Pretty-printed JSON of the SeedDict (`graphify/seed.py:295-307`):
+**Return body.** Pretty-printed JSON of the SeedDict (shape defined in `graphify/seed.py`):
 
 ```json
 {
@@ -382,33 +382,11 @@ types.Tool(
 }
 ```
 
-### Alias resolution and traversal defense
+### Alias resolution (D-16)
 
-Every MCP tool that accepts a node-id argument re-implements the same closure-local resolver. The canonical form lives at `graphify/serve.py:1234-1250`:
+Dedup aliases come from `graphify-out/dedup_report.json` (`alias_map`). MCP handlers thread that map into a closure-local `_resolve_alias` where needed.
 
-```python
-def _resolve_alias(node_id: str) -> str:
-    # WR-03: transitive resolution with cycle guard, in case dedup_report.json
-    # ever contains chained entries (e.g. {"a": "b", "b": "c"}).
-    seen: set[str] = set()
-    current = node_id
-    while current in _effective_alias_map and current not in seen:
-        seen.add(current)
-        nxt = _effective_alias_map[current]
-        if nxt == current:
-            break
-        current = nxt
-    if current != node_id:
-        aliases = _resolved_aliases.setdefault(current, [])
-        if node_id not in aliases:
-            aliases.append(node_id)
-    return current
-```
+- **Graph traversal tools** (for example `query_graph` and the Phase 17 chat path in `graphify/serve.py`) use **transitive** resolution with a cycle guard: follow `alias_map` until fixed point so chained entries like `{"a": "b", "b": "c"}` resolve `a` → `c`.
+- **Diagram seed tools** (`list_diagram_seeds`, `get_diagram_seed`) live in `graphify/serve.py` under the Phase 20 SEED section (`_run_list_diagram_seeds_core`, `_run_get_diagram_seed_core`). They apply **single-hop** lookup: `_effective_alias_map.get(node_id)` redirects to the canonical id when present; node IDs inside returned seed JSON are rewritten the same way. Meta may include `resolved_from_alias` when a rewrite occurred.
 
-The same closure is repeated at `serve.py:1399-1403, 1526, 1815, 1990, 2590, 2686`. Behavior:
-
-- The walk handles transitive aliases — `{"a": "b", "b": "c"}` resolves `a` to `c`.
-- A `seen` set guards against cycles; if the same node would be visited twice, the loop exits and the current node is returned.
-- On rewrite, the original ID is appended under the canonical key in `_resolved_aliases`, and the resolution map is surfaced via the `resolved_from_alias` field in each tool's meta envelope.
-
-The seed tools (`list_diagram_seeds`, `get_diagram_seed`) use a single-step variant at `serve.py:2590-2599` and `2686-2695`. They do not perform a transitive walk — sufficient because `seed_id` is a leaf identifier, not a graph node id traversed through chained aliases.
+Tool **schemas** are declared in `graphify/mcp_tool_registry.py`; runtime behavior is implemented in `graphify/serve.py`.

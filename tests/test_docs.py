@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-MIGRATION_GUIDE = ROOT / "MIGRATION_V1_8.md"
+MIGRATION_GUIDE = ROOT / "docs" / "MIGRATION_V1_8.md"
 README = ROOT / "README.md"
 DOC_CONTRACT_FILES = (MIGRATION_GUIDE, README)
 LOCALIZED_READMES = {

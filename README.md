@@ -40,6 +40,16 @@ Same syntax as `.gitignore`. Patterns match against file paths relative to the f
 
 **Discovery-first / empty corpus:** When there is almost nothing to ingest yet, use `graphify elicit` and read [docs/ELICITATION.md](docs/ELICITATION.md) for artifact layout and merge behavior.
 
+## Documentation
+
+| Guide | Contents |
+|-------|----------|
+| [Installation (from source)](docs/INSTALLATION.md) | Editable install, extras, `graphify install` per platform |
+| [Architecture](docs/ARCHITECTURE.md) | Pipeline stages, modules, extraction schema, Obsidian adapter |
+| [Vault profile configuration](docs/PROFILE-CONFIGURATION.md) | `.graphify/profile.yaml` keys, validation, composition |
+| [v1.8 Obsidian migration](docs/MIGRATION_V1_8.md) | `update-vault` preview, backup, apply, rollback |
+| [v1.5 configuration](docs/CONFIGURING_V1_5.md) | `vault-promote`, diagram seeds, Excalidraw templates, MCP seed tools |
+
 ## How it works
 
 graphify runs in three passes. First, a deterministic AST pass extracts structure from code files (classes, functions, imports, call graphs, docstrings, rationale comments) with no LLM needed. Second, video and audio files are transcribed locally with faster-whisper using a domain-aware prompt derived from corpus god nodes — transcripts are cached so re-runs are instant. Third, Claude subagents run in parallel over docs, papers, images, and transcripts to extract concepts, relationships, and design rationale. The results are merged into a NetworkX graph, clustered with Leiden community detection, and exported as interactive HTML, queryable JSON, and a plain-language audit report.
@@ -337,7 +347,7 @@ Graphify has two Obsidian surfaces:
 
 Use the reviewed workflow when updating a real vault. In this flow, preview is the default; apply requires `--apply --plan-id <id>` from a reviewed migration artifact, and legacy graphify-managed notes are archived by default under `graphify-out/migrations/archive/`. Graphify does not destructively delete legacy notes.
 
-For the full v1.8 flow, including backup, validation, rollback, and rerun steps, see the [v1.8 migration guide](MIGRATION_V1_8.md).
+For the full v1.8 flow, including backup, validation, rollback, and rerun steps, see the [v1.8 migration guide](docs/MIGRATION_V1_8.md).
 
 Canonical reviewed update example:
 
@@ -432,7 +442,7 @@ User-modified notes are preserved and recorded in `graphify-out/import-log.md`.
 
 ### v1.5 Configuration Guide
 
-End-to-end walkthrough of the v1.5 pipeline (`vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → skill invocation), the `.graphify/profile.yaml` `diagram_types:` schema, and the `list_diagram_seeds` / `get_diagram_seed` MCP tools. See [CONFIGURING_V1_5.md](CONFIGURING_V1_5.md).
+End-to-end walkthrough of the v1.5 pipeline (`vault-promote` → `--diagram-seeds` → `--init-diagram-templates` → `install excalidraw` → skill invocation), the `.graphify/profile.yaml` `diagram_types:` schema, and the `list_diagram_seeds` / `get_diagram_seed` MCP tools. See [CONFIGURING_V1_5.md](docs/CONFIGURING_V1_5.md).
 
 ## Worked examples
 
@@ -483,6 +493,6 @@ graphify is the graph layer. Penpax is the always-on layer on top of it — an o
 
 **Extraction bugs** - open an issue with the input file, the cache entry (`graphify-out/cache/`), and what was missed or invented.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for module responsibilities and how to add a language.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module responsibilities and how to add a language.
 
 </details>
