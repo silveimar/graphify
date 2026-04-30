@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
 status: completed
-stopped_at: Phase 41 context gathered
+stopped_at: Phase 41 planned — execute pending
 last_updated: "2026-04-30T01:07:45.830Z"
 last_activity: 2026-04-30 — automated UAT pass + pytest gate for v1.9 phases 39–40
 progress:
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (milestone v1.9)
 
 ## Current Position
 
-Phase: 41 (vault-cli-vault-flag-multi-vault-selector) — context gathered; ready to plan
-Plan: —
-Status: `41-CONTEXT.md` written (requirements-locked discuss); Phase 39–40 shipped/UAT prior session
-Last activity: 2026-04-30 — Phase 41 discuss-phase (`--chain`); ROADMAP Phase 41 block added
+Phase: 41 (vault-cli-vault-flag-multi-vault-selector) — planned (4 waves); execution pending
+Plan: 0 of 4 summaries
+Status: `41-01`..`41-04` PLAN.md committed; research/validation/patterns present
+Last activity: 2026-04-30 — `/gsd-plan-phase 41 --auto` (research + planner + checker fixes)
 
 ## Performance Metrics
 
@@ -174,4 +174,4 @@ Open artifact audit items acknowledged at ship; no runtime blockers:
 
 Last session: 2026-04-30T01:07:45.823Z
 Stopped at: Phase 41 context gathered
-Next action: `/gsd-plan-phase 41 --auto` (chain continuation after discuss)
+Next action: `/gsd-execute-phase 41 --auto` (plan-phase complete; auto-advance per config)
