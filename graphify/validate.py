@@ -19,6 +19,7 @@ KNOWN_EDGE_RELATIONS: frozenset[str] = frozenset({
     "method",
     "inherits",
     "defines",
+    "case_of",
     "imports",
     "imports_from",
     "includes",

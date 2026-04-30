@@ -13,7 +13,7 @@ Non-code endpoints (both ends non-`code` `file_type`): orientation is left as em
 
 ## Structural / extractor edges
 
-Includes **imports**, **imports_from**, **contains**, **method**, **inherits**, **defines**, **calls**, **includes**, **uses_component**, **binds_method**, **uses**, **rationale_for**.
+Includes **imports**, **imports_from**, **contains**, **method**, **inherits**, **defines**, **case_of** (Swift enums), **calls**, **includes**, **uses_component**, **binds_method**, **uses**, **rationale_for**.
 
 ## Semantic / narrative edges
 
