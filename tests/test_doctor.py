@@ -13,6 +13,7 @@ from graphify.doctor import (
     format_report,
     run_doctor,
 )
+from graphify.output import ResolvedOutput
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +162,32 @@ def test_run_doctor_resolved_output(tmp_path):
     assert report.resolved_output is not None
     assert report.resolved_output.notes_dir == (vault / "Atlas" / "Generated").resolve()
     assert report.resolved_output.source == "profile"
+
+
+def test_run_doctor_preflight_uses_pinned_vault_not_cwd(tmp_path):
+    """VCLI-03: preflight must validate profile_home, not CWD, when they differ."""
+    pytest.importorskip("yaml")
+    bad = (
+        "output:\n"
+        "  mode: not-a-mode\n"
+        "  path: Atlas/Generated\n"
+    )
+    vault = _make_vault(tmp_path, profile_text=bad)
+    cwd_elsewhere = tmp_path / "not_a_vault_cwd"
+    cwd_elsewhere.mkdir()
+    v = vault.resolve()
+    resolved = ResolvedOutput(
+        True,
+        v,
+        v / "Atlas" / "Generated",
+        v.parent / "graphify-out",
+        "vault-cli",
+        (),
+    )
+    report = run_doctor(cwd_elsewhere, resolved_output=resolved)
+    assert report.profile_validation_errors, (
+        "pinned vault has invalid profile — errors must not be masked by empty CWD tree"
+    )
 
 
 # ---------------------------------------------------------------------------

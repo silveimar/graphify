@@ -365,7 +365,7 @@ def run_doctor(
     templates_dir = profile_home / ".graphify" / "templates"
     if profile_yaml.exists() or templates_dir.exists():
         try:
-            result = validate_profile_preflight(cwd_resolved)
+            result = validate_profile_preflight(profile_home)
             report.profile_validation_errors.extend(result.errors)
             report.profile_validation_warnings.extend(result.warnings)
         except Exception as exc:
