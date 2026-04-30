@@ -376,9 +376,15 @@ Plans:
 
 **Requirements:** Process / traceability (maps to milestone audit gates). **Depends on:** none (docs-only + optional `/gsd-validate-phase`).
 
-**Plans:** TBD (`/gsd-plan-phase 44`).
+**Plans:** 4 plans in 2 waves
 
-**Artifacts:** `44-CONTEXT.md` (discuss-phase complete — decisions locked); executable plans pending.
+Plans:
+- [ ] `44-01-PLAN.md` — [wave 1] `39-VERIFICATION.md` (ELIC-01–07, TRACE-01)
+- [ ] `44-02-PLAN.md` — [wave 1] `40-VERIFICATION.md` (PORT/SEC, TRACE-01)
+- [ ] `44-03-PLAN.md` — [wave 1] `41-VERIFICATION.md` (VCLI, TRACE-01)
+- [ ] `44-04-PLAN.md` — [wave 2, depends on 01–03] `38-02-SUMMARY.md` + REQUIREMENTS + `v1.9-MILESTONE-AUDIT.md` TRACE-01 hygiene
+
+**Artifacts:** `44-CONTEXT.md`, `44-RESEARCH.md`, `44-01-PLAN.md` … `44-04-PLAN.md` in phase directory.
 
 </details>
 
