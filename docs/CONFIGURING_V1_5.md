@@ -1,5 +1,7 @@
 # v1.5 Configuration Guide
 
+**Quick checklist:** step-by-step runbook → [`CONFIGURING_V1_5-RUNBOOK.md`](CONFIGURING_V1_5-RUNBOOK.md).
+
 This guide walks through the full v1.5 pipeline end-to-end on a sample Obsidian vault: promoting graph nodes into vault folders (`vault-promote`), generating per-cluster diagram seeds (`--diagram-seeds`), writing Excalidraw template stubs (`--init-diagram-templates`), installing the Excalidraw skill (`install --platform excalidraw`), and invoking it from your AI client (`/excalidraw-diagram`). It also ships a complete annotated `.graphify/profile.yaml` reference and a reference-quality MCP tool integration section for `list_diagram_seeds` and `get_diagram_seed`.
 
 ## Prerequisites
