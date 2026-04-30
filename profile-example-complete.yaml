@@ -1,0 +1,295 @@
+# -----------------------------------------------------------------------------
+# Complete vault profile example — tuned for ls-vault layout
+# -----------------------------------------------------------------------------
+# Intended vault (author workstation): /Users/silveimar/Documents/ls-vault/
+#
+# Usage:
+#   cp profile-example-complete.yaml /Users/silveimar/Documents/ls-vault/.graphify/profile.yaml
+#   graphify --validate-profile /Users/silveimar/Documents/ls-vault
+#
+# Diff vs profile-example.yaml: explicit repo.identity, merge.field_policies,
+# dataview_queries samples, richer mapping_rules (path + topology + lang rules).
+#
+# Rules are first-match-wins — put the most specific source_file_matches rules first.
+# -----------------------------------------------------------------------------
+
+taxonomy:
+  version: v1.8
+  root: Atlas/Sources/Graphify
+  folders:
+    # Mirrors typical ls-vault: communities/maps live under Graphify/Maps (not …/MOCs).
+    moc: Maps
+    thing: Things
+    statement: Statements
+    person: People
+    source: Sources
+    default: Things
+    unclassified: Maps
+
+folder_mapping:
+  moc: Atlas/Sources/Graphify/Maps/
+  thing: Atlas/Sources/Graphify/Things/
+  statement: Atlas/Sources/Graphify/Statements/
+  person: Atlas/Sources/Graphify/People/
+  source: Atlas/Sources/Graphify/Sources/
+  default: Atlas/Sources/Graphify/Things/
+
+# Stable slug for monorepo / multi-root exports (no path segments or "..").
+repo:
+  identity: ls-vault
+
+naming:
+  convention: title_case
+  concept_names:
+    enabled: true
+    budget: 0.0
+    style: readable
+
+merge:
+  strategy: update
+  preserve_fields:
+    - rank
+    - mapState
+    - tags
+    - created
+    - aliases
+  field_policies:
+    tags: union
+
+# -----------------------------------------------------------------------------
+# Mapping rules — ls-vault-oriented (paths observed under that vault)
+# -----------------------------------------------------------------------------
+mapping_rules:
+  # Graphify CLI/query artifacts — keep alongside existing memory/*.human.md corpus.
+  - when:
+      source_file_matches: Atlas/Sources/Graphify/memory/.+
+    then:
+      note_type: thing
+      folder: Atlas/Sources/Graphify/memory/
+
+  # Imported articles / snippets already living under Atlas clippings.
+  - when:
+      source_file_matches: Atlas/Sources/Clippings/.+
+    then:
+      note_type: source
+      folder: Atlas/Sources/Clippings/
+
+  # Study notebooks (Efforts capture area).
+  - when:
+      source_file_matches: Efforts/Works/Notebooks/.+
+    then:
+      note_type: thing
+      folder: Efforts/Works/Notebooks/
+
+  # Scratch / ticket markdown at vault root under "+/" (e.g. LS-35590-plan.md).
+  - when:
+      source_file_matches: \+/.*
+    then:
+      note_type: thing
+      folder: "+/"
+
+  # Code-shaped nodes — route CODE notes into Sources for trace-to-repo linkage.
+  - when:
+      source_file_ext:
+        - .py
+        - .ts
+        - .tsx
+        - .js
+        - .jsx
+        - .go
+        - .rs
+        - .java
+    then:
+      note_type: code
+      folder: Atlas/Sources/Graphify/Sources/
+
+  # Explicit person nodes from extraction / rationale.
+  - when:
+      attr: file_type
+      equals: person
+    then:
+      note_type: person
+      folder: Atlas/Sources/Graphify/People/
+
+  # Design assertions → Statements bucket.
+  - when:
+      attr: file_type
+      equals: rationale
+    then:
+      note_type: statement
+      folder: Atlas/Sources/Graphify/Statements/
+
+  # Hub nodes — emphasize as Things (still eligible for god-node styling downstream).
+  - when:
+      topology: god_node
+    then:
+      note_type: thing
+      folder: Atlas/Sources/Graphify/Things/
+
+obsidian:
+  atlas_root: Atlas
+  dataview:
+    moc_query: |-
+      TABLE file.folder as Folder, type, source_file
+      FROM #community/${community_tag}
+      SORT file.name ASC
+
+# Optional per-note-type Dataview overrides (non-empty strings only).
+dataview_queries:
+  thing: |-
+    LIST
+    FROM #community/${community_tag}
+    WHERE type = "thing"
+    SORT file.name ASC
+  source: |-
+    TABLE file.folder as Folder, type, source_file
+    FROM #community/${community_tag}
+    WHERE type = "source"
+    SORT file.name ASC
+  code: |-
+    TABLE file.folder as Folder, type, source_file
+    FROM #community/${community_tag}
+    WHERE type = "code"
+    SORT file.name ASC
+
+topology:
+  god_node:
+    top_n: 12
+
+mapping:
+  min_community_size: 6
+
+tag_taxonomy:
+  garden:
+    - plant
+    - cultivate
+    - probe
+    - repot
+    - revitalize
+    - revisit
+    - question
+  graph:
+    - component
+    - domain
+    - workflow
+    - decision
+    - concept
+    - integration
+    - service
+    - dataset
+    - team
+    - extracted
+    - inferred
+    - ambiguous
+    - merchant-monitoring
+    - audit
+    - workbench
+  source:
+    - confluence
+    - readme
+    - doc
+    - code
+    - paper
+    - pdf
+    - jira
+    - slack
+    - github
+    - notion
+    - obsidian
+    - web
+    - clipping
+  tech:
+    - python
+    - typescript
+    - javascript
+    - go
+    - rust
+    - java
+    - sql
+    - graphql
+    - docker
+    - k8s
+
+profile_sync:
+  auto_update: true
+
+diagram_types:
+  - name: architecture
+    template_path: Excalidraw/Templates/architecture.excalidraw.md
+    trigger_node_types:
+      - module
+      - service
+    trigger_tags:
+      - architecture
+    min_main_nodes: 3
+    naming_pattern: '{topic}-architecture'
+    layout_type: architecture
+    output_path: Excalidraw/Diagrams/
+  - name: workflow
+    template_path: Excalidraw/Templates/workflow.excalidraw.md
+    trigger_node_types:
+      - function
+      - process
+    trigger_tags:
+      - workflow
+      - pipeline
+    min_main_nodes: 3
+    naming_pattern: '{topic}-workflow'
+    layout_type: workflow
+    output_path: Excalidraw/Diagrams/
+  - name: repository-components
+    template_path: Excalidraw/Templates/repository-components.excalidraw.md
+    trigger_node_types:
+      - module
+      - file
+    trigger_tags:
+      - repo
+      - components
+    min_main_nodes: 3
+    naming_pattern: '{topic}-repository-components'
+    layout_type: repository-components
+    output_path: Excalidraw/Diagrams/
+  - name: mind-map
+    template_path: Excalidraw/Templates/mind-map.excalidraw.md
+    trigger_node_types:
+      - concept
+    trigger_tags:
+      - mind-map
+      - brainstorm
+    min_main_nodes: 3
+    naming_pattern: '{topic}-mind-map'
+    layout_type: mind-map
+    output_path: Excalidraw/Diagrams/
+  - name: cuadro-sinoptico
+    template_path: Excalidraw/Templates/cuadro-sinoptico.excalidraw.md
+    trigger_node_types:
+      - concept
+      - category
+    trigger_tags:
+      - synoptic
+      - cuadro-sinoptico
+    min_main_nodes: 3
+    naming_pattern: '{topic}-cuadro-sinoptico'
+    layout_type: cuadro-sinoptico
+    output_path: Excalidraw/Diagrams/
+  - name: glossary-graph
+    template_path: Excalidraw/Templates/glossary-graph.excalidraw.md
+    trigger_node_types:
+      - concept
+      - term
+    trigger_tags:
+      - glossary
+      - definitions
+    min_main_nodes: 3
+    naming_pattern: '{topic}-glossary-graph'
+    layout_type: glossary-graph
+    output_path: Excalidraw/Diagrams/
+
+# -----------------------------------------------------------------------------
+# Optional: redirect structured export writes (uncomment if you use output pinning).
+# -----------------------------------------------------------------------------
+# output:
+#   mode: vault-relative
+#   path: Atlas/Sources/Graphify/export-staging/
+#   exclude:
+#     - Atlas/Sources/Graphify/memory/**
