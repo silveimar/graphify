@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (milestone v1.9)
 
 ## Current Position
 
-Phase: 39 (tacit-to-explicit-onboarding-elicitation) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 39
-Last activity: 2026-04-29 -- Phase 39 execution started
+Phase: 41 (vault-cli-vault-flag-multi-vault-selector) — pending discussion (no phase dir yet)
+Plan: —
+Status: Phases 39–40 UAT completed via `/gsd-next --chain --auto` (2026-04-30)
+Last activity: 2026-04-30 — automated UAT pass + pytest gate for v1.9 phases 39–40
 
 ## Performance Metrics
 
@@ -172,6 +172,6 @@ Open artifact audit items acknowledged at ship; no runtime blockers:
 
 ## Session Continuity
 
-Last session: 2026-04-29T19:41:51.946Z
-Stopped at: Phase 40 context gathered
-Next action: `/gsd-new-milestone`
+Last session: 2026-04-30 (gsd-next chain+auto)
+Stopped at: Phase 39–40 UAT complete (39-UAT.md, 40-UAT.md)
+Next action: `/gsd-discuss-phase 41`
