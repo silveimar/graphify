@@ -534,6 +534,21 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
 | 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 0/TBD | Not started | — |
 
+### Phase 47: MCP & Trace Integration
+
+**Goal:** Agents and narrative commands can **find and walk** typed concept↔implementation links through **MCP** and **`/trace` or `entity_trace`**, with documentation updated when capability surfaces change.  
+**Depends on:** Phase 46 (typed edges live in validated graph artifacts).  
+**Requirements:** **CCODE-03**, **CCODE-04**.
+
+**Success Criteria** (what must be TRUE):
+
+1. At least one MCP tool or structured graph-query path exposes or traverses concept↔implementation edges; **manifest/capability** and skill docs reflect any new tools or parameters (**CCODE-03**).
+2. **`/trace`** (slash workflow) **or** **`entity_trace`** MCP follows concept↔code hops in **at least one golden-path scenario** backed by automated tests (**CCODE-04**).
+
+**Plans:** TBD after `/gsd-plan-phase`.
+
+**UI hint**: yes — slash **`/trace`** command surface ties to conversational UX workflows.
+
 ### Phase 49: add --version flag to graphify command, and also print current version on each command result, Fix skill vs package version validations (graphify update-vault warning: skill is from graphify 0.4.7, package is 1.0.0)
 
 **Goal:** [To be planned]
