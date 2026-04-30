@@ -12,6 +12,7 @@
 - ✅ **v1.7 Vault Adapter UX & Template Polish** — Phases 27–31 (shipped 2026-04-28)
 - ✅ **v1.8 Output Taxonomy & Cluster Quality** — Phases 32–38 (shipped 2026-04-29)
 - ✅ **v1.9 Onboarding, Harness Portability & Vault CLI** — Phases 39–44 (shipped 2026-04-30)
+- 📋 **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–47 (in planning)
 
 ## Phases
 
@@ -388,6 +389,69 @@ Plans:
 
 </details>
 
+<details>
+<summary>📋 v1.10 Stability, Baselines & Concept↔Code MVP (Phases 45–47) — IN PLANNING</summary>
+
+Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fix-detect-self-ingestion`**, inherited baseline failures in detect/collect-files) and ship a scoped MVP for first-class concept↔code relationships: typed edges, validation, deterministic graph merge with security sanitization, and MCP / trace surfacing aligned with **SEED-bidirectional-concept-code-links**.
+
+**Totals:** 3 phases planned; REQ coverage HYG-01..03 + CCODE-01..05.
+
+</details>
+
+<details>
+<summary>Phase 45: Baselines & Detect Self-Ingestion — PLANNING</summary>
+
+**Goal:** CI baselines match declared contracts for detect/dotfiles/collect-files, and detect no longer mishandles **self-ingestion** as defined by **`260427-rc7-fix-detect-self-ingestion`**.  
+**Depends on:** v1.9 shipped (baseline context).  
+**Requirements:** **HYG-01**, **HYG-02**, **HYG-03**.
+
+**Success Criteria** (what must be TRUE):
+
+1. Running the full regression surface for detect self-ingestion shows the quick-task scenarios fixed; automated tests lock the corrected behavior (**HYG-01**).
+2. `tests/test_detect.py::test_detect_skips_dotfiles` passes locally and on CI **or** behavior is deliberately revised with tests and docs spelling the contract (**HYG-02**).
+3. `tests/test_extract.py::test_collect_files_from_dir` passes locally and on CI **or** collect-files semantics are explicitly reconciled and documented (**HYG-03**).
+
+**Plans:** TBD after `/gsd-discuss-phase` / `/gsd-plan-phase`.
+
+**Artifacts:** Context/research patterns TBD under `.planning/phases/`.
+
+</details>
+
+<details>
+<summary>Phase 46: Concept↔Code Schema, Build Merge & Security — PLANNING</summary>
+
+**Goal:** New concept↔code relation type(s) are **first-class** in validation and **`build`/graph merge**, persist through **`graph.json` round-trip assumptions**, with **labels/paths** flowing through **`security.py`** everywhere new surface appears.  
+**Depends on:** Phase 45 (clean baseline for graph/detect tests).  
+**Requirements:** **CCODE-01**, **CCODE-02**, **CCODE-05**.
+
+**Success Criteria** (what must be TRUE):
+
+1. `validate.py` accepts the new relation type(s); confidence values align with **EXTRACTED / INFERRED / AMBIGUOUS** and are documented for authors of extractors and agents (**CCODE-01**).
+2. Concept↔code edges merge into the NetworkX graph deterministically; fixture-backed tests cover export/import (**`graph.json`**) parity with expectations used elsewhere (**CCODE-02**).
+3. New labels/paths are sanitized consistently with existing patterns (**`security.py`**); regression tests guard templates and MCP-style payloads against injection regressions (**CCODE-05**).
+
+**Plans:** TBD after `/gsd-plan-phase`.
+
+</details>
+
+<details>
+<summary>Phase 47: MCP & Trace Integration — PLANNING</summary>
+
+**Goal:** Agents and narrative commands can **find and walk** typed concept↔implementation links through **MCP** and **`/trace` or `entity_trace`**, with documentation updated when capability surfaces change.  
+**Depends on:** Phase 46 (typed edges live in validated graph artifacts).  
+**Requirements:** **CCODE-03**, **CCODE-04**.
+
+**Success Criteria** (what must be TRUE):
+
+1. At least one MCP tool or structured graph-query path exposes or traverses concept↔implementation edges; **manifest/capability** and skill docs reflect any new tools or parameters (**CCODE-03**).
+2. **`/trace`** (slash workflow) **or** **`entity_trace`** MCP follows concept↔code hops in **at least one golden-path scenario** backed by automated tests (**CCODE-04**).
+
+**Plans:** TBD after `/gsd-plan-phase`.
+
+**UI hint**: yes — slash **`/trace`** command surface ties to conversational UX workflows.
+
+</details>
+
 ---
 
 ## Progress
@@ -445,6 +509,9 @@ Plans:
 | 42. Doctor preflight vs pinned vault (gap closure) | v1.9 | 1/1 | Complete | 2026-04-30 |
 | 43. Elicitation ↔ run pipeline ELIC-02 (gap closure) | v1.9 | 3/3 | Complete | 2026-04-30 |
 | 44. Verification / Nyquist artifacts TRACE-01 (gap closure) | v1.9 | 4/4 | Complete | 2026-04-30 |
+| 45. Baselines & Detect Self-Ingestion | v1.10 | 0/TBD | Not started | — |
+| 46. Concept↔Code Schema, Build Merge & Security | v1.10 | 0/TBD | Not started | — |
+| 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
 
 ---
-*Last updated: 2026-04-30 — Milestone v1.9 shipped and archived to `.planning/milestones/v1.9-ROADMAP.md`; next milestone planning starts with `/gsd-new-milestone`.*
+*Last updated: 2026-04-30 — v1.10 roadmap added (Phases 45–47): baselines/detect hygiene + concept↔code MVP; prior v1.9 ship note preserved in milestones list and archives.*

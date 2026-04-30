@@ -30,11 +30,11 @@
 
 | REQ-ID | Phase | Plan / notes |
 |--------|-------|--------------|
-| HYG-01 — | — | Set by roadmap (`/gsd-plan-phase`) |
-| HYG-02 — | — | |
-| HYG-03 — | — | |
-| CCODE-01 — | — | |
-| CCODE-02 — | — | |
-| CCODE-03 — | — | |
-| CCODE-04 — | — | |
-| CCODE-05 — | — | |
+| HYG-01 | **45** | Quick task `260427-rc7-fix-detect-self-ingestion`; regression coverage |
+| HYG-02 | **45** | `test_detect_skips_dotfiles` fix or intentional contract change + docs |
+| HYG-03 | **45** | `test_collect_files_from_dir` fix or reconciled semantics + docs |
+| CCODE-01 | **46** | `validate.py` + docs for relation type(s); confidence aligns with EXTRACTED/INFERRED/AMBIGUOUS |
+| CCODE-02 | **46** | Deterministic merge + `graph.json` fixture round-trip parity |
+| CCODE-05 | **46** | `security.py` for new labels/paths; MCP/template injection regressions |
+| CCODE-03 | **47** | MCP listing/traversal; manifest/skill docs if surface changes |
+| CCODE-04 | **47** | `/trace` or `entity_trace` golden-path + automated coverage |

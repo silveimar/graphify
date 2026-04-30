@@ -25,10 +25,10 @@ See: `.planning/PROJECT.md` (current milestone **v1.10**).
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: **45** — roadmap defined; ready for `/gsd-discuss-phase 45` or `/gsd-plan-phase 45`
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-30 — Milestone v1.10 started
+Status: Roadmapped (v1.10 Phases 45–47 in `.planning/ROADMAP.md`)
+Last activity: 2026-04-30 — v1.10 phases 45–47 added to roadmap; traceability filled in REQUIREMENTS.md
 
 ## Performance Metrics
 
@@ -156,7 +156,7 @@ Items carried forward outside v1.8 scope:
 | seed | SEED-001 tacit-to-explicit elicitation | Dormant; activate only for onboarding/discovery milestones or explicit tacit-knowledge-only user demand |
 | seed | SEED-002 multi-harness/inverse import | Dormant; activate only on real multi-harness portability demand after prerequisite discovery/context work |
 | vault-selection | Explicit `--vault` flag and multi-vault selector | Future milestone |
-| baseline-test | `test_detect_skips_dotfiles`, `test_collect_files_from_dir` | Separate `/gsd-debug` session |
+| baseline-test | `test_detect_skips_dotfiles`, `test_collect_files_from_dir` | **Phase 45** (HYG-02/HYG-03) via roadmap |
 
 ### Milestone close acknowledgment (v1.8, 2026-04-29)
 
