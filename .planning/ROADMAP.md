@@ -399,21 +399,22 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 </details>
 
 <details>
-<summary>Phase 45: Baselines & Detect Self-Ingestion — PLANNING</summary>
+<summary>Phase 45: Baselines & Detect Self-Ingestion — EXECUTED</summary>
 
-**Goal:** CI baselines match declared contracts for detect/dotfiles/collect-files, and detect no longer mishandles **self-ingestion** as defined by **`260427-rc7-fix-detect-self-ingestion`**.  
+**Goal:** CI baselines match declared contracts for detect/dotfiles/collect-files, and detect no longer mishandles **self-ingestion** as defined by **`260427-rc7-fix-detect-self-ingestion`**. Expanded scope includes **`.graphify/` corpus policy** (`corpus.dot_graphify`), **manifest stderr** when prior-output paths are skipped, and **`collect_files`/detect parity** via **`graphify/corpus_prune.py`**.  
 **Depends on:** v1.9 shipped (baseline context).  
 **Requirements:** **HYG-01**, **HYG-02**, **HYG-03**.
 
 **Success Criteria** (what must be TRUE):
 
-1. Running the full regression surface for detect self-ingestion shows the quick-task scenarios fixed; automated tests lock the corrected behavior (**HYG-01**).
-2. `tests/test_detect.py::test_detect_skips_dotfiles` passes locally and on CI **or** behavior is deliberately revised with tests and docs spelling the contract (**HYG-02**).
-3. `tests/test_extract.py::test_collect_files_from_dir` passes locally and on CI **or** collect-files semantics are explicitly reconciled and documented (**HYG-03**).
+1. Running the full regression surface for detect self-ingestion shows the quick-task scenarios fixed; automated tests lock the corrected behavior (**HYG-01**). **`prior_files`** honors **`resolved.artifacts_dir`** and default-root **`graphify-out`** manifest when **`resolved is None`**; one **`[graphify]`** stderr line summarizes manifest skips when **`skipped["manifest"]`** is non-empty.
+2. `tests/test_detect.py::test_detect_skips_dotfiles` passes locally and on CI **or** behavior is deliberately revised with tests and docs spelling the contract (**HYG-02**). Contract revision (**D-45.07**): **`Path.parts`** hidden-segment rule with documented `.graphify` allow-list; posix **`/./`** invariant.
+3. `tests/test_extract.py::test_collect_files_from_dir` passes locally and on CI **or** collect-files semantics are explicitly reconciled and documented (**HYG-03**). **`collect_files`** uses **`os.walk`** + shared pruning; nested **`graphify-out`** dirs skipped like **`detect()`**.
+4. Optional **`corpus.dot_graphify`** in merged profile: **`include_globs` / `exclude_globs` / `tracked_paths` / `auto_track_discoveries`** validated in **`profile.py`**; **`doctor --dot-graphify-track`** previews **`tracked_paths`** merges; **`--apply-dot-graphify-track`** writes YAML; vault runs may auto-append when **`auto_track_discoveries: true`**.
 
-**Plans:** TBD after `/gsd-discuss-phase` / `/gsd-plan-phase`.
+**Plans:** `.planning/phases/45-baselines-detect-self-ingestion/` (`45-01` … `45-03`).
 
-**Artifacts:** Context/research patterns TBD under `.planning/phases/`.
+**Artifacts:** Context/research/validation under `.planning/phases/45-baselines-detect-self-ingestion/`; fixture **`tests/fixtures/phase45-mini-vault/`**.
 
 </details>
 
