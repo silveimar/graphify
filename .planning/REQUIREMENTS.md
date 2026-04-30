@@ -131,3 +131,14 @@ Scoped from `/gsd-new-milestone` input and seeds `SEED-001`, `SEED-002`, `SEED-v
 | ELIC-01–07 | 39 | Tacit-to-explicit onboarding & elicitation |
 | PORT-01–05, SEC-01–04 | 40 | Multi-harness memory, inverse import, injection defenses |
 | VCLI-01–06 | 41 | Explicit `--vault` & multi-vault selector |
+
+### Gap closure (post v1.9 milestone audit, 2026-04-30)
+
+From `.planning/v1.9-MILESTONE-AUDIT.md` — **pending** until gap phases ship:
+
+| Audit / REQ | Phase | Action |
+|-------------|-------|--------|
+| **VCLI-03** (doctor preflight vs pinned vault) | **42** | Code + tests: `validate_profile_preflight` uses profile root when vault pinned |
+| **ELIC-02** (elicitation → build / run path) | **43** | Product + implementation or documented contract |
+| **TRACE-01** (no `*-VERIFICATION.md`) | **44** | Add verification (+ optional Nyquist) artifacts for phases 39–41 min. |
+| Phase 38 health (**38-02** summary) | **44** (or 38 follow-up) | Close PLAN/SUMMARY debt if still open |
