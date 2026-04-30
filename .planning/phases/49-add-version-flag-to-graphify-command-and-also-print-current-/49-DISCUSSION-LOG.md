@@ -69,3 +69,22 @@
 
 - JSON/machine-readable version output for agents.
 - Automated `server.json` sync outside documented release flow.
+
+---
+
+## Auto session — `/gsd-discuss-phase 49 --chain --auto` (2026-04-30)
+
+**Mode:** `--auto` — single pass; no `AskUserQuestion`. `[--auto] Context exists — updating with auto-selected decisions.`
+
+| Gray area | Auto-resolution (recommended default) |
+|-----------|----------------------------------------|
+| Version flag surface | **D-49.01–D-49.02** — `--version`/`-V`, one stdout line, exit 0, no skill sidecar on introspection path |
+| Success footer | **D-49.03–D-49.04** — `[graphify] version` on stderr after success (`_cli_exit`); omit duplicate on pure `--version`; omit/noise policy for install/uninstall per CONTEXT |
+| Skill vs package | **D-49.05–D-49.06** — directional stamp messaging; silent if `.graphify_version` missing |
+| Consolidation | **D-49.07–D-49.08** — `graphify.version.package_version()` only reader outside tests |
+
+**Implementation spot-check:** `graphify/version.py`; `__main__.py` `_cli_exit`, early version argv handling; migrated imports in `capability`, `harness_interchange`, `elicit`.
+
+**Cross-reference todos:** `[auto]` skipped — `gsd-sdk query todo.match-phase` unavailable; no folded todos.
+
+**Next:** Auto-advance → `/gsd-plan-phase 49 --auto` (or close-out with `/gsd-validate-phase 49` if execution already merged).

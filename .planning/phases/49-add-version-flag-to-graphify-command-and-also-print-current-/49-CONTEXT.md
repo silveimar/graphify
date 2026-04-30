@@ -1,7 +1,7 @@
 # Phase 49: add --version flag to graphify command, and also print current version on each command result, Fix skill vs package version validations - Context
 
-**Gathered:** 2026-04-30
-**Status:** Ready for planning
+**Gathered:** 2026-04-30 (refreshed `/gsd-discuss-phase 49 --chain --auto`)
+**Status:** Decisions locked — implementation spot-checked against repo; downstream: verification / milestone close per REQUIREMENTS (**CLI-VER-01/02** marked satisfied)
 
 <domain>
 ## Phase Boundary
@@ -47,6 +47,14 @@ Ship **CLI version discoverability** and **consistent version provenance** acros
 - Exact argparse structure (`argparse` vs manual `sys.argv`) and the **single hook** where the success footer runs — left to planner/impl for minimal diff vs `main()` control flow.
 - Whether `packaging.version` comparison is worth a new dependency: **default no**; use string compare + message wording unless `packaging` already required.
 
+### Auto-discuss reaffirmation (`--chain --auto`, 2026-04-30)
+
+`[--auto] Selected all gray areas:` **Version flag surface** (`--version`/`-V`, stdout, exit 0); **Success footer** (stderr `[graphify] version`, success-only, install/uninstall suppression intent); **Skill stamp drift** (directional older/newer copy, silent missing `.graphify_version`); **`graphify.version` consolidation** (single `importlib.metadata` reader).
+
+Each area resolved to the **recommended** option — matches existing **D-49.01–D-49.08** with **no decision drift**.
+
+**Implementation alignment (spot-check, not a full audit):** `graphify/version.py` defines `package_version()`; `graphify/__main__.py` imports it, implements `_cli_exit` footer on `code == 0`, and early-handles `argv` when `--version`/`-V`; `capability.py`, `harness_interchange.py`, `elicit.py` route through `package_version`. Conflicts with this CONTEXT should be treated as bugs, not reinterpretation.
+
 </decisions>
 
 <canonical_refs>
@@ -65,10 +73,11 @@ Ship **CLI version discoverability** and **consistent version provenance** acros
 
 ### Code (integration points)
 
-- `graphify/__main__.py` — `__version__`, `_check_skill_version`, `main()` skill check loop (~1293+), install/uninstall writers of `.graphify_version`.
-- `graphify/capability.py` — `_graphify_version()`.
-- `graphify/harness_interchange.py` — `_package_version()`.
-- `graphify/elicit.py` — `pkg_version("graphifyy")` usage.
+- `graphify/version.py` — **`package_version()`** (canonical runtime reader).
+- `graphify/__main__.py` — `__version__`, `_cli_exit`, early `--version`/`-V`, `_check_skill_version`, `main()` skill check loop, install/uninstall writers of `.graphify_version`.
+- `graphify/capability.py` — `_graphify_version()` via `package_version`.
+- `graphify/harness_interchange.py` — `_package_version()` wraps `package_version`.
+- `graphify/elicit.py` — imports `package_version` for display paths.
 - `CLAUDE.md` — Package name `graphifyy`, `importlib.metadata` version note, bump/sync checklist.
 
 ### Requirements
@@ -82,8 +91,8 @@ Ship **CLI version discoverability** and **consistent version provenance** acros
 
 ### Reusable assets
 
-- `graphify/__main__.py` already defines `__version__` from `importlib.metadata.version("graphifyy")` and centralizes skill checks in `main()` with deduped `skill_dst` set and skips for `install`/`uninstall`/help.
-- `graphify/harness_interchange._package_version()` and `graphify/capability._graphify_version()` duplicate the same metadata lookup pattern.
+- `graphify/version.py` centralizes distribution version; `__main__.__version__` aliases `package_version()` at import time.
+- `graphify/__main__.py` centralizes skill checks in `main()` with deduped `skill_dst` set and skips for `install`/`uninstall`/help; `_cli_exit` is the footer gate.
 
 ### Established patterns
 
@@ -108,7 +117,7 @@ Ship **CLI version discoverability** and **consistent version provenance** acros
 - **Version in JSON / machine-readable CLI output** — not required for 49; separate phase if MCP or `graphify query` gains structured metadata.
 - **Auto-bump `server.json` / skills on every commit** — remains manual per `CLAUDE.md` release checklist.
 
-**None — discussion stayed within phase scope** for reviewed todos (no todo matches from `gsd-sdk query todo.match-phase 49`).
+Phase 49 scope only.
 
 </deferred>
 
