@@ -532,7 +532,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 45. Baselines & Detect Self-Ingestion | v1.10 | 0/TBD | Not started | — |
 | 46. Concept↔Code Schema, Build Merge & Security | v1.10 | 3/3 | Complete | 2026-04-30 |
 | 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
-| 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 0/TBD | Not started | — |
+| 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 2/2 planned | Not started | — |
 
 ### Phase 47: MCP & Trace Integration
 
