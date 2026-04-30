@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://graphify.local/schemas/harness/interchange_v1.schema.json",
+  "title": "graphify harness interchange v1",
+  "type": "object",
+  "required": ["interchange_schema_id", "provenance", "extraction"],
+  "additionalProperties": false,
+  "properties": {
+    "interchange_schema_id": {
+      "type": "string",
+      "const": "graphify.harness.interchange/v1"
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["interchange_schema_id", "generated_at", "graphify_version"],
+      "additionalProperties": true,
+      "properties": {
+        "interchange_schema_id": { "type": "string" },
+        "generated_at": { "type": "string" },
+        "graphify_version": { "type": "string" },
+        "source_run_id": { "type": "string" }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "required": ["nodes", "edges"],
+      "properties": {
+        "nodes": { "type": "array" },
+        "edges": { "type": "array" }
+      }
+    }
+  }
+}
