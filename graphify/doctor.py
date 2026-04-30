@@ -326,8 +326,16 @@ def _build_preview_section(
     )
 
 
-def run_doctor(cwd: Path, *, dry_run: bool = False) -> DoctorReport:
+def run_doctor(
+    cwd: Path,
+    *,
+    dry_run: bool = False,
+    resolved_output: ResolvedOutput | None = None,
+) -> DoctorReport:
     """Build a DoctorReport for the given working directory. Read-only.
+
+    When *resolved_output* is set (Phase 41 CLI vault pins), it is used instead of
+    calling :func:`resolve_output` on *cwd* — same tuple as ``run`` / ``--obsidian``.
 
     When dry_run=True, additionally calls the real detect() (D-39) and attaches
     a bounded PreviewSection to report.preview. When the destination is
@@ -337,13 +345,24 @@ def run_doctor(cwd: Path, *, dry_run: bool = False) -> DoctorReport:
     cwd_resolved = cwd.resolve()
     report = DoctorReport()
 
-    # --- Vault detection (D-04 / VAULT-08) --------------------------------
-    report.vault_detection = is_obsidian_vault(cwd_resolved)
-    report.vault_path = cwd_resolved if report.vault_detection else None
+    if resolved_output is not None:
+        report.resolved_output = resolved_output
+        report.vault_detection = resolved_output.vault_detected
+        report.vault_path = resolved_output.vault_path
+        profile_home = (
+            resolved_output.vault_path
+            if resolved_output.vault_path is not None
+            else cwd_resolved
+        )
+    else:
+        profile_home = cwd_resolved
+        # --- Vault detection (D-04 / VAULT-08) --------------------------------
+        report.vault_detection = is_obsidian_vault(cwd_resolved)
+        report.vault_path = cwd_resolved if report.vault_detection else None
 
     # --- Profile validation (D-36) ----------------------------------------
-    profile_yaml = cwd_resolved / ".graphify" / "profile.yaml"
-    templates_dir = cwd_resolved / ".graphify" / "templates"
+    profile_yaml = profile_home / ".graphify" / "profile.yaml"
+    templates_dir = profile_home / ".graphify" / "templates"
     if profile_yaml.exists() or templates_dir.exists():
         try:
             result = validate_profile_preflight(cwd_resolved)
@@ -357,7 +376,7 @@ def run_doctor(cwd: Path, *, dry_run: bool = False) -> DoctorReport:
     # --- Output destination resolution (D-13) -----------------------------
     # resolve_output() may SystemExit via _refuse() — capture stderr so the
     # underlying refusal message becomes a profile_validation_errors entry.
-    if not report.profile_validation_errors:
+    if resolved_output is None and not report.profile_validation_errors:
         captured = io.StringIO()
         try:
             with contextlib.redirect_stderr(captured):

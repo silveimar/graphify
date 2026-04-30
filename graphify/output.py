@@ -13,6 +13,14 @@ Decisions implemented:
   - D-11: build artifacts ALWAYS sibling-of-vault when auto-adopt fires
   - D-12: no vault, no flag -> byte-identical v1.0 paths, silent stderr
   - D-13: single ResolvedOutput data structure consumed by Phase 28/29
+
+Phase 41 (VCLI-01..02) — resolve_execution_paths precedence (single source of truth for help/README):
+  1. explicit_vault (--vault PATH)
+  2. GRAPHIFY_VAULT env (when set and non-empty)
+  3. --vault-list file: all valid vault roots on distinct lines; one root → use it; several → TTY
+     interactive pick, non-TTY → exit 2 with candidate list (Phase 41 D-03).
+  4. CWD-only resolve_output(cwd, cli_output=...) — Phase 27 behavior
+  When cli_output is set, inner resolution may yield source=cli-flag (D-02); pin kinds apply only to profile-driven rows.
 """
 from __future__ import annotations
 
@@ -20,13 +28,23 @@ import sys
 from pathlib import Path
 from typing import Literal, NamedTuple
 
+# Phase 41: vault-cli / vault-env / vault-list pin kinds for doctor/CLI banners (VCLI-01..03).
+ResolvedSource = Literal[
+    "profile",
+    "cli-flag",
+    "default",
+    "vault-cli",
+    "vault-env",
+    "vault-list",
+]
+
 
 class ResolvedOutput(NamedTuple):
     vault_detected: bool
     vault_path: Path | None
     notes_dir: Path
     artifacts_dir: Path
-    source: Literal["profile", "cli-flag", "default"]
+    source: ResolvedSource
     exclude_globs: tuple[str, ...] = ()   # Phase 28 D-14
 
 
@@ -39,6 +57,122 @@ def _refuse(msg: str) -> SystemExit:
     """Print actionable error to stderr and prepare SystemExit(1)."""
     print(f"[graphify] {msg}", file=sys.stderr)
     return SystemExit(1)
+
+
+def _ensure_vault_root(path: Path) -> Path:
+    """Resolve *path* and require a directory with `.obsidian/` (Phase 41 pin validation)."""
+    p = path.expanduser().resolve()
+    if not p.is_dir():
+        raise _refuse(f"Vault path is not a directory: {p}")
+    if not is_obsidian_vault(p):
+        raise _refuse(
+            f"Not an Obsidian vault (missing .obsidian/ directory): {p}"
+        )
+    return p
+
+
+def _list_vault_roots_from_list_file(list_file: Path, cwd_resolved: Path) -> tuple[Path, list[Path]]:
+    """Resolve list file path and return ``(list_path, vault_roots)`` in line order (D-03)."""
+    lp = list_file if list_file.is_absolute() else (cwd_resolved / list_file).resolve()
+    if not lp.is_file():
+        raise _refuse(f"--vault-list file not found: {lp}")
+    try:
+        raw = lp.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise _refuse(f"Cannot read --vault-list file {lp}: {exc}") from exc
+    roots: list[Path] = []
+    seen: set[Path] = set()
+    for line in raw.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        candidate = Path(s).expanduser()
+        root = candidate.resolve() if candidate.is_absolute() else (cwd_resolved / candidate).resolve()
+        if is_obsidian_vault(root) and root not in seen:
+            seen.add(root)
+            roots.append(root)
+    return lp, roots
+
+
+def _pick_vault_from_list_file(list_file: Path, cwd_resolved: Path) -> Path:
+    """Pick vault root from --vault-list file (single root or interactive multi-root; D-03)."""
+    lp, roots = _list_vault_roots_from_list_file(list_file, cwd_resolved)
+    if not roots:
+        raise _refuse(
+            f"No valid Obsidian vault roots found in --vault-list file: {lp}"
+        )
+    if len(roots) == 1:
+        return roots[0]
+    if sys.stderr.isatty() and sys.stdin.isatty():
+        print(
+            "[graphify] Multiple vault roots in --vault-list file; choose one:",
+            file=sys.stderr,
+        )
+        for idx, p in enumerate(roots, start=1):
+            print(f"  [{idx}] {p}", file=sys.stderr)
+        while True:
+            try:
+                raw = input("Enter number (1-{}): ".format(len(roots)))
+                n = int(raw.strip())
+                if 1 <= n <= len(roots):
+                    return roots[n - 1]
+            except (ValueError, EOFError):
+                pass
+            print("[graphify] Invalid choice; try again.", file=sys.stderr)
+    print(
+        "[graphify] Multiple vault roots in --vault-list file; non-interactive session.",
+        file=sys.stderr,
+    )
+    print(
+        "Pin one vault with --vault PATH or GRAPHIFY_VAULT, or pass a list with one candidate:",
+        file=sys.stderr,
+    )
+    for idx, p in enumerate(roots, start=1):
+        print(f"  [{idx}] {p}", file=sys.stderr)
+    raise SystemExit(2)
+
+
+def resolve_execution_paths(
+    cwd: Path,
+    *,
+    cli_output: str | None = None,
+    explicit_vault: Path | None = None,
+    env_vault: str | None = None,
+    vault_list_file: Path | None = None,
+) -> ResolvedOutput:
+    """Resolve output using optional vault pins before CWD-only detection (Phase 41).
+
+    Precedence: explicit_vault > GRAPHIFY_VAULT (non-empty) > --vault-list file > ``resolve_output(cwd)``.
+    See module docstring for full ordering. Multi-root ``--vault-list`` handling uses stdin on TTY.
+    """
+    cwd_r = cwd.resolve()
+    pin_kind: Literal["vault-cli", "vault-env", "vault-list"] | None = None
+    effective_root: Path | None = None
+
+    if explicit_vault is not None:
+        effective_root = _ensure_vault_root(explicit_vault)
+        pin_kind = "vault-cli"
+        if cwd_r != effective_root:
+            print(
+                f"[graphify] --vault pin uses vault root {effective_root} (cwd={cwd_r})",
+                file=sys.stderr,
+            )
+    elif env_vault and env_vault.strip():
+        effective_root = _ensure_vault_root(Path(env_vault.strip()).expanduser())
+        pin_kind = "vault-env"
+    elif vault_list_file is not None:
+        effective_root = _pick_vault_from_list_file(vault_list_file, cwd_r)
+        pin_kind = "vault-list"
+
+    if effective_root is None:
+        return resolve_output(cwd, cli_output=cli_output)
+
+    result = resolve_output(effective_root, cli_output=cli_output)
+    if result.source == "cli-flag":
+        return result
+    if pin_kind is not None and result.source == "profile":
+        return result._replace(source=pin_kind)
+    return result
 
 
 def resolve_output(cwd: Path, *, cli_output: str | None = None) -> ResolvedOutput:

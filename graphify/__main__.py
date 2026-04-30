@@ -1185,7 +1185,112 @@ def _foreground_release_enrichment_lock(fd: int | None) -> None:
         pass
 
 
+# Phase 41 (VCLI-01/02): resolved output sources that imply profile-driven vault adoption (cf. Phase 27 D-07).
+_PROFILE_DRIVEN_SOURCES = frozenset(
+    {"profile", "vault-cli", "vault-env", "vault-list"}
+)
+
+
+def _strip_leading_vault_global_argv(
+    argv: list[str],
+) -> tuple[list[str], Path | None, Path | None]:
+    """Pop ``--vault`` / ``--vault-list`` before the subcommand (``graphify [--vault P] run``)."""
+    out = list(argv)
+    g_exp: Path | None = None
+    g_list: Path | None = None
+    while len(out) > 1:
+        a = out[1]
+        if a == "--vault" and len(out) > 2:
+            g_exp = Path(out[2])
+            out = [out[0]] + out[3:]
+        elif a.startswith("--vault="):
+            g_exp = Path(a.split("=", 1)[1])
+            out = [out[0]] + out[2:]
+        elif a == "--vault-list" and len(out) > 2:
+            g_list = Path(out[2])
+            out = [out[0]] + out[3:]
+        elif a.startswith("--vault-list="):
+            g_list = Path(a.split("=", 1)[1])
+            out = [out[0]] + out[2:]
+        else:
+            break
+    return out, g_exp, g_list
+
+
+def _strip_vault_flags_from_tokens(
+    tokens: list[str],
+) -> tuple[Path | None, Path | None, list[str]]:
+    """Remove ``--vault`` / ``--vault-list`` from a token list (per-command flags)."""
+    explicit: Path | None = None
+    vlist: Path | None = None
+    out: list[str] = []
+    i = 0
+    while i < len(tokens):
+        t = tokens[i]
+        if t == "--vault" and i + 1 < len(tokens):
+            explicit = Path(tokens[i + 1])
+            i += 2
+        elif t.startswith("--vault="):
+            explicit = Path(t.split("=", 1)[1])
+            i += 1
+        elif t == "--vault-list" and i + 1 < len(tokens):
+            vlist = Path(tokens[i + 1])
+            i += 2
+        elif t.startswith("--vault-list="):
+            vlist = Path(t.split("=", 1)[1])
+            i += 1
+        else:
+            out.append(t)
+            i += 1
+    return explicit, vlist, out
+
+
+def _merge_vault_pins(
+    g_exp: Path | None,
+    g_list: Path | None,
+    l_exp: Path | None,
+    l_list: Path | None,
+) -> tuple[Path | None, Path | None]:
+    """Local ``--vault`` / ``--vault-list`` override global leading flags (41-RESEARCH)."""
+    used_local = l_exp is not None or l_list is not None
+    used_global = g_exp is not None or g_list is not None
+    if used_local and used_global:
+        print(
+            "[graphify] command --vault / --vault-list overrides global pin",
+            file=sys.stderr,
+        )
+    exp = l_exp if l_exp is not None else g_exp
+    vlf = l_list if l_list is not None else g_list
+    return exp, vlf
+
+
+def _resolve_cli_paths(
+    cli_output: str | None,
+    *,
+    global_explicit: Path | None,
+    global_list: Path | None,
+    local_explicit: Path | None = None,
+    local_list: Path | None = None,
+):
+    """Single vault/output resolution for run, --obsidian, elicit, import-harness, doctor (Phase 41)."""
+    from graphify.output import resolve_execution_paths
+
+    exp, vlf = _merge_vault_pins(
+        global_explicit, global_list, local_explicit, local_list
+    )
+    return resolve_execution_paths(
+        Path.cwd(),
+        cli_output=cli_output,
+        explicit_vault=exp,
+        env_vault=os.environ.get("GRAPHIFY_VAULT"),
+        vault_list_file=vlf,
+    )
+
+
 def main() -> None:
+    # Phase 41: ``graphify [--vault P] [--vault-list F] <command>`` — strip globals before dispatch.
+    sys.argv, g_vault_exp, g_vault_list = _strip_leading_vault_global_argv(sys.argv)
+
     # Check all known skill install locations for a stale version stamp.
     # Skip during install/uninstall (hook writes trigger a fresh check anyway).
     # Deduplicate paths so platforms sharing the same install dir don't warn twice.
@@ -1195,6 +1300,16 @@ def main() -> None:
 
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print("Usage: graphify <command>")
+        print()
+        print("Vault selection (global — optional flags before <command>, or on the same command;")
+        print("  applies to: run, --obsidian, doctor, elicit, import-harness). Precedence:")
+        print("  --vault > GRAPHIFY_VAULT > --vault-list file > CWD .obsidian/ detection.")
+        print("  --vault <path>           pin Obsidian vault root (directory containing .obsidian/)")
+        print("  --vault-list <file>      newline-separated vault paths; multiple valid roots:")
+        print("                            TTY prompts; non-TTY exits 2 (CI-safe). See README.")
+        print("  GRAPHIFY_VAULT           env pin when --vault is not set")
+        print("  Per-command --vault/--vault-list overrides a leading global pin (stderr note).")
+        print("  --output composes with vault pin (does not replace profile/vault context).")
         print()
         print("Commands:")
         print("  install [--platform P]  copy skill to platform config dir (claude|windows|codex|opencode|aider|claw|droid|trae|trae-cn|gemini|cursor|antigravity)")
@@ -1406,6 +1521,7 @@ def main() -> None:
         user_passed_obsidian_dir = False
         cli_output: str | None = None
         args = sys.argv[2:]
+        lv_vault, lv_vlist, args = _strip_vault_flags_from_tokens(args)
         cli_repo_identity, args = _extract_repo_identity_arg(args)
         i = 0
         while i < len(args):
@@ -1431,14 +1547,19 @@ def main() -> None:
                 print(f"error: unknown --obsidian option: {args[i]}", file=sys.stderr)
                 sys.exit(2)
 
-        # Phase 27 (VAULT-08, VAULT-09, VAULT-10): resolve vault-aware output destination.
-        from graphify.output import resolve_output
-        resolved = resolve_output(Path.cwd(), cli_output=cli_output)
+        # Phase 27/41: resolve vault-aware output destination (pins + CWD).
+        resolved = _resolve_cli_paths(
+            cli_output,
+            global_explicit=g_vault_exp,
+            global_list=g_vault_list,
+            local_explicit=lv_vault,
+            local_list=lv_vlist,
+        )
 
         # Precedence (D-08): --output > profile > --obsidian-dir > legacy default
         if cli_output is not None:
             obsidian_dir = str(resolved.notes_dir)
-        elif resolved.vault_detected and resolved.source == "profile":
+        elif resolved.vault_detected and resolved.source in _PROFILE_DRIVEN_SOURCES:
             obsidian_dir = str(resolved.notes_dir)
         elif user_passed_obsidian_dir:
             pass  # honor explicit --obsidian-dir; leave obsidian_dir as-is
@@ -2187,8 +2308,6 @@ def main() -> None:
         # Phase 39 — onboarding / empty-corpus path (library: graphify.elicit).
         import argparse as _ap
 
-        from graphify.output import resolve_output
-
         parser = _ap.ArgumentParser(
             prog="graphify elicit",
             description=(
@@ -2216,7 +2335,9 @@ def main() -> None:
             action="store_true",
             help="Overwrite elicitation.json when merging would normally apply",
         )
-        opts = parser.parse_args(sys.argv[2:])
+        _e_cli = sys.argv[2:]
+        _lv_e, _lv_e2, _e_cli = _strip_vault_flags_from_tokens(_e_cli)
+        opts = parser.parse_args(_e_cli)
 
         def _demo_answers() -> dict[str, str]:
             return {
@@ -2227,7 +2348,13 @@ def main() -> None:
                 "friction": "Context switching",
             }
 
-        resolved = resolve_output(Path.cwd(), cli_output=opts.output)
+        resolved = _resolve_cli_paths(
+            opts.output,
+            global_explicit=g_vault_exp,
+            global_list=g_vault_list,
+            local_explicit=_lv_e,
+            local_list=_lv_e2,
+        )
         artifacts = resolved.artifacts_dir
 
         from graphify.elicit import (
@@ -2331,7 +2458,6 @@ def main() -> None:
         import json as _json
 
         from graphify.harness_import import import_harness_path
-        from graphify.output import resolve_output
 
         parser = _ap.ArgumentParser(prog="graphify import-harness")
         parser.add_argument(
@@ -2354,7 +2480,9 @@ def main() -> None:
             default=None,
             help="Override artifacts root (same precedence as graphify run / elicit)",
         )
-        opts = parser.parse_args(sys.argv[2:])
+        _ih_cli = sys.argv[2:]
+        _lv_ih, _lv_ih2, _ih_cli = _strip_vault_flags_from_tokens(_ih_cli)
+        opts = parser.parse_args(_ih_cli)
 
         if opts.path in {"-", "/dev/stdin"}:
             print(
@@ -2363,7 +2491,13 @@ def main() -> None:
             )
             sys.exit(2)
 
-        resolved = resolve_output(Path.cwd(), cli_output=opts.output)
+        resolved = _resolve_cli_paths(
+            opts.output,
+            global_explicit=g_vault_exp,
+            global_list=g_vault_list,
+            local_explicit=_lv_ih,
+            local_list=_lv_ih2,
+        )
         artifacts = resolved.artifacts_dir
         artifacts.mkdir(parents=True, exist_ok=True)
 
@@ -2397,9 +2531,9 @@ def main() -> None:
         # the graph write path; SIGTERM any active enrichment PID; block until
         # the lock releases cleanly. See _foreground_acquire_enrichment_lock.
         from graphify.pipeline import run_corpus
-        from graphify.output import resolve_output
 
         rest = list(sys.argv[2:])
+        lv_vault, lv_vlist, rest = _strip_vault_flags_from_tokens(rest)
         cli_repo_identity, rest = _extract_repo_identity_arg(rest)
         use_router = "--router" in rest
         rest = [a for a in rest if a != "--router"]
@@ -2419,14 +2553,21 @@ def main() -> None:
         raw_target = rest[0] if rest else "."
 
         # Resolve output BEFORE pipeline starts (emits VAULT-08 detection report + D-09 if applicable)
-        resolved = resolve_output(Path.cwd(), cli_output=cli_output)
+        resolved = _resolve_cli_paths(
+            cli_output,
+            global_explicit=g_vault_exp,
+            global_list=g_vault_list,
+            local_explicit=lv_vault,
+            local_list=lv_vlist,
+        )
         from graphify.naming import resolve_repo_identity
         from graphify.profile import load_profile
-        profile = load_profile(Path.cwd())
+        profile_root = resolved.vault_path if resolved.vault_path is not None else Path.cwd()
+        profile = load_profile(profile_root)
         resolve_repo_identity(Path.cwd(), cli_identity=cli_repo_identity, profile=profile)
 
         # D-07: when vault auto-adopts profile, input corpus is forced to CWD
-        if resolved.vault_detected and resolved.source == "profile":
+        if resolved.vault_detected and resolved.source in _PROFILE_DRIVEN_SOURCES:
             target = Path.cwd().resolve()
         else:
             target = Path(raw_target).resolve()
@@ -2579,9 +2720,37 @@ def main() -> None:
             action="store_true",
             help="Preview which files would be ingested/skipped without writing",
         )
-        opts = _p_dr.parse_args(sys.argv[2:])
+        _dr_cli = sys.argv[2:]
+        _lv_dr, _lv_dr2, _dr_cli = _strip_vault_flags_from_tokens(_dr_cli)
+        opts = _p_dr.parse_args(_dr_cli)
         from graphify.doctor import run_doctor, format_report
-        report = run_doctor(Path.cwd(), dry_run=opts.dry_run)
+        # Resolution may SystemExit (invalid profile in CWD vault); doctor still prints a full
+        # report via resolve_output(cwd) when we omit *resolved_output* (Phase 29 misconfig tests).
+        # Pin failures (--vault / env / list) must propagate — do not swallow SystemExit then.
+        _dr_resolved = None
+        _had_pin = bool(
+            g_vault_exp
+            or g_vault_list
+            or _lv_dr
+            or _lv_dr2
+            or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+        )
+        try:
+            _dr_resolved = _resolve_cli_paths(
+                None,
+                global_explicit=g_vault_exp,
+                global_list=g_vault_list,
+                local_explicit=_lv_dr,
+                local_list=_lv_dr2,
+            )
+        except SystemExit as exc:
+            if _had_pin:
+                raise exc
+        report = run_doctor(
+            Path.cwd(),
+            dry_run=opts.dry_run,
+            resolved_output=_dr_resolved,
+        )
         print(format_report(report))
         sys.exit(1 if report.is_misconfigured() else 0)
     elif cmd == "update-vault":

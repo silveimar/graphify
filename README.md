@@ -398,6 +398,17 @@ graphify update-vault --input work-vault/raw --vault ls-vault --apply --plan-id 
 
 The adapter works with any Obsidian vault framework — Ideaverse, PARA, custom setups — driven entirely by the declarative profile. No code changes needed.
 
+### Vault selection for scripting
+
+When the shell’s current directory is not your Obsidian vault, you can pin the vault root for **`run`**, **`--obsidian`**, **`doctor`**, **`elicit`**, and **`import-harness`**. Precedence matches [`graphify/output.py`](graphify/output.py) (module docstring — single source of truth):
+
+1. **`--vault <path>`** (may appear before the subcommand or among that command’s args; per-command `--vault` overrides a leading global pin)
+2. **`GRAPHIFY_VAULT`** environment variable (non-empty)
+3. **`--vault-list <file>`** — newline-separated vault roots (`#` comments and blank lines ignored). One valid root → use it. Several valid roots → **TTY**: interactive choice; **non-TTY** (CI): **exit code 2** with the candidate list — pin with `--vault` / **`GRAPHIFY_VAULT`** or reduce the list to one entry.
+4. Otherwise **CWD-only** `.obsidian/` detection (Phase 27).
+
+**`--output`** still overrides the resolved notes/output destination when set; it does not replace the vault pin used for profile loading (compose, not substitute).
+
 ### Vault Promotion — `graphify vault-promote`
 
 Write-only promotion of `graphify-out/graph.json` into an Obsidian vault.

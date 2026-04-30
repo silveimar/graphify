@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from graphify.output import ResolvedOutput, is_obsidian_vault, resolve_output
+from graphify.output import ResolvedOutput, is_obsidian_vault, resolve_execution_paths, resolve_output
 
 
 _V18_PROFILE_BASE = (
@@ -316,3 +316,123 @@ def test_resolve_output_exclude_globs_empty_when_cli_flag(tmp_path):
 def test_resolve_output_exclude_globs_empty_when_default(tmp_path):
     result = resolve_output(tmp_path)
     assert result.exclude_globs == ()
+
+
+# ---------------------------------------------------------------------------
+# Phase 41: resolve_execution_paths — vault pins before CWD-only resolution
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_execution_paths_explicit_maps_profile_to_vault_cli(tmp_path, capsys):
+    pytest.importorskip("yaml")
+    vault = _setup_vault(tmp_path, "output:\n  mode: vault-relative\n  path: Notes\n")
+    unrelated = tmp_path / "repo"
+    unrelated.mkdir()
+    result = resolve_execution_paths(unrelated, explicit_vault=vault)
+    assert result.source == "vault-cli"
+    assert result.vault_path == vault.resolve()
+    assert result.notes_dir == (vault / "Notes").resolve()
+    err = capsys.readouterr().err
+    assert "--vault pin uses vault root" in err
+
+
+def test_resolve_execution_paths_explicit_same_cwd_no_pin_stderr(tmp_path, capsys):
+    pytest.importorskip("yaml")
+    vault = _setup_vault(tmp_path, "output:\n  mode: vault-relative\n  path: Notes\n")
+    result = resolve_execution_paths(vault, explicit_vault=vault)
+    assert result.source == "vault-cli"
+    err = capsys.readouterr().err
+    assert "--vault pin uses vault root" not in err
+
+
+def test_resolve_execution_paths_cli_output_keeps_cli_flag(tmp_path, capsys):
+    pytest.importorskip("yaml")
+    vault = _setup_vault(tmp_path, "output:\n  mode: vault-relative\n  path: Notes\n")
+    unrelated = tmp_path / "repo"
+    unrelated.mkdir()
+    result = resolve_execution_paths(unrelated, explicit_vault=vault, cli_output="custom-out")
+    assert result.source == "cli-flag"
+
+
+def test_resolve_execution_paths_env_maps_profile_to_vault_env(tmp_path, monkeypatch):
+    pytest.importorskip("yaml")
+    vault = _setup_vault(tmp_path, "output:\n  mode: vault-relative\n  path: Atlas\n")
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+    list_file = fake_home / "vaults.txt"
+    list_file.write_text("# skip\n" + str(vault) + "\n")
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    monkeypatch.setenv("GRAPHIFY_VAULT", str(vault))
+    # CLI passes env string explicitly (see __main__); list file must lose to env.
+    result = resolve_execution_paths(
+        cwd, env_vault=str(vault), vault_list_file=list_file
+    )
+    assert result.source == "vault-env"
+    assert result.vault_path == vault.resolve()
+
+
+def test_resolve_execution_paths_vault_list_single_entry(tmp_path):
+    pytest.importorskip("yaml")
+    (tmp_path / "only").mkdir()
+    vault = _setup_vault(tmp_path / "only", "output:\n  mode: vault-relative\n  path: N1\n")
+    lst = tmp_path / "list.txt"
+    lst.write_text(f"# pick this\n{vault}\n")
+    cwd = tmp_path / "repo"
+    cwd.mkdir()
+    result = resolve_execution_paths(cwd, vault_list_file=lst)
+    assert result.source == "vault-list"
+    assert result.vault_path == vault.resolve()
+
+
+def test_resolve_execution_paths_vault_list_multi_non_tty_exits_2(tmp_path, monkeypatch, capsys):
+    pytest.importorskip("yaml")
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    _setup_vault(tmp_path / "a", "output:\n  mode: vault-relative\n  path: N1\n")
+    _setup_vault(tmp_path / "b", "output:\n  mode: vault-relative\n  path: N2\n")
+    lst = tmp_path / "list.txt"
+    lst.write_text(
+        str(tmp_path / "a" / "vault") + "\n" + str(tmp_path / "b" / "vault") + "\n"
+    )
+    monkeypatch.setattr("sys.stderr.isatty", lambda: False)
+    with pytest.raises(SystemExit) as ei:
+        resolve_execution_paths(tmp_path, vault_list_file=lst)
+    assert ei.value.code == 2
+    err = capsys.readouterr().err
+    assert "Multiple vault roots" in err
+
+
+def test_resolve_execution_paths_explicit_overrides_env_and_list(tmp_path, monkeypatch):
+    pytest.importorskip("yaml")
+    (tmp_path / "pinned").mkdir()
+    (tmp_path / "ignored").mkdir()
+    pin = _setup_vault(tmp_path / "pinned", "output:\n  mode: vault-relative\n  path: P\n")
+    ignored_v = _setup_vault(tmp_path / "ignored", "output:\n  mode: vault-relative\n  path: I\n")
+    monkeypatch.setenv("GRAPHIFY_VAULT", str(ignored_v))
+    lst = tmp_path / "list.txt"
+    lst.write_text(str(ignored_v))
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    result = resolve_execution_paths(cwd, explicit_vault=pin, env_vault=str(ignored_v), vault_list_file=lst)
+    assert result.source == "vault-cli"
+    assert result.vault_path == pin.resolve()
+
+
+def test_resolve_execution_paths_invalid_explicit_refuses(tmp_path, capsys):
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    bad = tmp_path / "not-a-vault"
+    bad.mkdir()
+    with pytest.raises(SystemExit):
+        resolve_execution_paths(cwd, explicit_vault=bad)
+    assert "missing .obsidian" in capsys.readouterr().err
+
+
+def test_resolve_execution_paths_list_no_valid_vault_refuses(tmp_path, capsys):
+    lst = tmp_path / "empty.txt"
+    lst.write_text("# nothing valid\n")
+    with pytest.raises(SystemExit):
+        resolve_execution_paths(tmp_path, vault_list_file=lst)
+    assert "No valid Obsidian vault" in capsys.readouterr().err
