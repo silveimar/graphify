@@ -276,7 +276,7 @@ Activate **SEED-001** (tacit-to-explicit elicitation), **SEED-002** (multi-harne
 - [ ] **Phase 39: Tacit-to-Explicit Onboarding & Elicitation** — Guided interview/state machine → validated extraction → SOUL/HEARTBEAT/USER artifacts; docs for discovery-first workflows. **Requirements:** ELIC-01–ELIC-07. **Depends on:** None within milestone (uses existing `validate`/`build`/`security`).
 - [ ] **Phase 40: Multi-Harness Memory, Inverse Import & Injection Defenses** — Extend harness export/import, canonical schemas, MCP parity, SECURITY.md threats; sanitize imported harness content. **Requirements:** PORT-01–PORT-05, SEC-01–SEC-04. **Depends on:** Phase 39 recommended for coherent artifact story (SOUL/HEARTBEAT provenance); can proceed in parallel if interfaces are frozen early.
 - [ ] **Phase 41: Vault CLI — `--vault` & Multi-Vault Selector** — Deterministic vault root flag, discovery/selection UX, `doctor` + dry-run alignment. **Requirements:** VCLI-01–VCLI-06. **Depends on:** v1.7 `ResolvedOutput` / vault detection (shipped).
-- [ ] **Phase 42: Milestone gap — Doctor profile preflight vs pinned vault** — Closes **VCLI-03** audit gap: `validate_profile_preflight` must use the same vault root as resolved profile paths when `--vault` / env / list pins apply (see `.planning/v1.9-MILESTONE-AUDIT.md`). **Gap closure** — not greenfield scope.
+- [x] **Phase 42: Milestone gap — Doctor profile preflight vs pinned vault** — Closes **VCLI-03** audit gap: `validate_profile_preflight` must use the same vault root as resolved profile paths when `--vault` / env / list pins apply (see `.planning/v1.9-MILESTONE-AUDIT.md`). **Gap closure** — not greenfield scope.
 - [ ] **Phase 43: Milestone gap — Elicitation ↔ `run` pipeline (ELIC-02)** — Decide and implement or document: merge elicitation sidecar into `run_corpus` / `build` path vs skill-only merge; tests proving acceptance criteria. **Gap closure.**
 - [ ] **Phase 44: Milestone gap — Verification & Nyquist artifacts (TRACE-01)** — Persist `*-VERIFICATION.md` (minimum phases 39–41), optional `*-VALIDATION.md`; close **38-02** SUMMARY debt if still open. **Gap closure.**
 
@@ -345,9 +345,9 @@ Plans:
 
 **Requirements:** **VCLI-03** (completion). **Depends on:** Phase 41 shipped code paths.
 
-**Plans:** TBD (`/gsd-plan-phase 42`).
+**Plans:** `42-01-PLAN.md` (1/1 executed)
 
-**Artifacts:** `42-CONTEXT.md` in phase directory.
+**Artifacts:** `42-CONTEXT.md`, `42-01-SUMMARY.md`, `42-VERIFICATION.md` in phase directory.
 
 </details>
 
@@ -428,10 +428,10 @@ Plans:
 | 36. Migration Guide, Skill Alignment & Regression Sweep | v1.8 | 5/5 | Complete    | 2026-04-29 |
 | 37. Validation Metadata Ratification | v1.8 | 2/2 | Complete   | 2026-04-29 |
 | 38. Dormant seeds & quick-task reconciliation | v1.8 | 2/2 | Complete | 2026-04-29 |
-| 39. Tacit-to-Explicit Onboarding & Elicitation | v1.9 | 0/5 | Not started | — |
-| 40. Multi-Harness Memory, Inverse Import & Injection Defenses | v1.9 | 0/5 | Not started | — |
-| 41. Vault CLI — `--vault` & Multi-Vault Selector | v1.9 | 0/? | Not started | — |
-| 42. Doctor preflight vs pinned vault (gap closure) | v1.9 | 0/? | Not started | — |
+| 39. Tacit-to-Explicit Onboarding & Elicitation | v1.9 | 5/5 | Complete | 2026-04-30 |
+| 40. Multi-Harness Memory, Inverse Import & Injection Defenses | v1.9 | 5/5 | Complete | 2026-04-30 |
+| 41. Vault CLI — `--vault` & Multi-Vault Selector | v1.9 | 4/4 | Complete | 2026-04-30 |
+| 42. Doctor preflight vs pinned vault (gap closure) | v1.9 | 1/1 | Complete | 2026-04-30 |
 | 43. Elicitation ↔ run pipeline ELIC-02 (gap closure) | v1.9 | 0/? | Not started | — |
 | 44. Verification / Nyquist artifacts TRACE-01 (gap closure) | v1.9 | 0/? | Not started | — |
 
