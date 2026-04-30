@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.9
-milestone_name: milestone
-status: phase_complete
-stopped_at: Phase 44 verified — TRACE-01 + `38-02-SUMMARY`; v1.9 gap phases 42–44 shipped
-last_updated: "2026-04-30T22:30:00.000Z"
-last_activity: 2026-04-30 -- `/gsd-execute-phase 44 --chain`
+milestone_name: Onboarding, Harness Portability & Vault CLI
+status: milestone_complete
+stopped_at: Milestone v1.9 archived and ready for next-milestone setup
+last_updated: "2026-04-30T18:20:00.000Z"
+last_activity: 2026-04-30 -- /gsd-complete-milestone
 progress:
   total_phases: 13
   completed_phases: 13
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (milestone v1.9)
+See: .planning/PROJECT.md (post-v1.9 archive state)
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
-**Current focus:** Milestone v1.9 gap closure **complete** (Phases **42–44**); next cycle — roadmap / new milestone when planned.
+**Current focus:** Start next milestone definition (`/gsd-new-milestone`) and carry forward deferred open items.
 
 ## Current Position
 
 Phase: **44** (milestone-verification-artifacts-trace01) — **complete** (4/4 plans, `44-VERIFICATION.md`)
 Plan: executed — `44-01-SUMMARY.md` … `44-04-SUMMARY.md`
 Status: **`TRACE-01`** satisfied; **`REQUIREMENTS.md`** gap table updated
-Last activity: 2026-04-30 -- Phase 44 execute-phase complete
+Last activity: 2026-04-30
 
 ## Performance Metrics
 
@@ -169,6 +169,15 @@ Open artifact audit items acknowledged at ship; no runtime blockers:
 | seed | SEED-002 harness-memory-export | dormant |
 | seed | SEED-bidirectional-concept-code-links | dormant |
 | seed | SEED-vault-root-aware-cli | dormant |
+
+### Milestone close acknowledgment (v1.9, 2026-04-30)
+
+Open artifact audit items carried into next milestone planning:
+
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 260427-rc7-fix-detect-self-ingestion | missing — carry forward as explicit next-milestone candidate |
+| seed | SEED-bidirectional-concept-code-links | dormant — carry forward for explicit scope decision |
 
 ## Quick Tasks Completed
 

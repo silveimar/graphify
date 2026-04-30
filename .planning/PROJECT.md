@@ -12,7 +12,7 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community output, `mapping.min_community_size` cluster floor, concept naming with cache and fallbacks, repo identity resolution, CODE vs concept note classes, preview-first `update-vault` migration, platform skill alignment, Nyquist validation metadata ratification, and Phase 38 docs-only dormant-seed/quick-task reconciliation. Full detail: `.planning/milestones/v1.8-ROADMAP.md`.
 
-## Current Milestone: v1.9 Onboarding, Harness Portability & Vault CLI
+## Shipped: v1.9 Onboarding, Harness Portability & Vault CLI (2026-04-30)
 
 **Goal:** Turn discovery and onboarding into first-class graphify capabilities: structured tacit-to-explicit elicitation (SEED-001), expanded multi-harness memory export/import with prompt-injection defenses (SEED-002 follow-on), and the remaining vault-root CLI surface—explicit `--vault` plus a multi-vault selector—building on v1.7 vault detection.
 
@@ -22,7 +22,7 @@ Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community out
 - Harness portability: additional export targets, canonical schema mappings, `import-harness`, shared sanitization with MCP
 - Vault CLI: deterministic `--vault`, multi-vault discovery/selection, doctor/dry-run consistency
 
-**Phases:** 39–41 (continued after v1.8 Phase 38). Requirements: `.planning/REQUIREMENTS.md`. Roadmap: `.planning/ROADMAP.md`.
+**Phases:** 39–44 (including gap-closure phases). Full detail: `.planning/milestones/v1.9-ROADMAP.md`.
 
 ---
 
@@ -136,9 +136,9 @@ Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community out
 - ✓ Mandatory dual-artifact persistence — sentinel "Mandatory response persistence" block emitted byte-equal across all 9 platform skill variants (`skill.md`, `skill-codex.md`, `skill-opencode.md`, `skill-openclaw.md`, `skill-droid.md`, `skill-trae.md`, `skill-trae-cn.md`, copilot/antigravity); 12 parametrized tests over `_PLATFORM_CONFIG` enforce drift-lock — SKILLMEM-01..04
 - ✓ v1.5 configuration walkthrough — single-file `CONFIGURING_V1_5.md` (414 lines) covers `vault-promote → --diagram-seeds → --init-diagram-templates → install excalidraw → /excalidraw-diagram` end-to-end with annotated `.graphify/profile.yaml` (6 built-ins + custom `decision-tree`) and verbatim MCP `list_diagram_seeds` / `get_diagram_seed` / `_resolve_alias` quotes; README cross-link added — DOCS-01..04
 
-### Active (v1.9)
+### Active
 
-See `.planning/REQUIREMENTS.md` — ELIC-* (elicitation), PORT-* / SEC-* (harness portability + injection defenses), VCLI-* (vault CLI). Traceability maps requirements to Phases 39–41.
+v1.9 is archived. Define the next milestone with `/gsd-new-milestone` and a fresh `.planning/REQUIREMENTS.md`.
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -258,12 +258,11 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-After v1.9 ships, run `/gsd-complete-milestone` then `/gsd-new-milestone` for the next version label.
+Start with `/gsd-new-milestone`, then carry these forward as explicit candidate scope:
 
-**Still deferred / separate tracks:**
-
-- 2 pre-existing baseline test failures (`test_detect_skips_dotfiles`, `test_collect_files_from_dir`) — track via `/gsd-debug` unless pulled into a future milestone explicitly.
-- **SEED-bidirectional-concept-code-links** — dormant until scoped in a future milestone.
+- Quick-task carryover: `260427-rc7-fix-detect-self-ingestion` (still missing).
+- Seed carryover: **SEED-bidirectional-concept-code-links** (dormant, ready for explicit scoping).
+- 2 pre-existing baseline test failures (`test_detect_skips_dotfiles`, `test_collect_files_from_dir`) — continue as `/gsd-debug` track unless promoted into milestone scope.
 
 ---
-*Last updated: 2026-04-29 — Milestone v1.9 initialized (Onboarding, Harness Portability & Vault CLI)*
+*Last updated: 2026-04-30 — Milestone v1.9 shipped and archived*
