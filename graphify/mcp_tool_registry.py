@@ -287,6 +287,42 @@ def build_mcp_tools():
             }, "required": ["entity"]},
         ),
         types.Tool(
+            name="concept_code_hops",
+            description=(
+                "Walk concept↔implementation links on the live graph using only "
+                "`implements` edges (code→concept orientation). Respects optional hop "
+                "direction. Used by the /trace slash command for static linkage (distinct "
+                "from temporal `entity_trace`)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity": {
+                        "type": "string",
+                        "description": "Starting node label or id (concept or code)",
+                    },
+                    "max_hops": {
+                        "type": "integer",
+                        "default": 3,
+                        "minimum": 1,
+                        "maximum": 6,
+                        "description": "Maximum implements hops from the start node",
+                    },
+                    "direction": {
+                        "type": "string",
+                        "enum": ["both", "code_to_concept", "concept_to_code"],
+                        "default": "both",
+                        "description": (
+                            "both=traverse either semantic direction along implements; "
+                            "code_to_concept=only hops from code→concept; "
+                            "concept_to_code=only hops from concept→code"
+                        ),
+                    },
+                },
+                "required": ["entity"],
+            },
+        ),
+        types.Tool(
             name="get_focus_context",
             description=(
                 "Return a scoped ego-graph subgraph + community summary + citations for an "

@@ -84,6 +84,11 @@ entity_trace:
   deterministic: false
   cacheable_until: graph_mtime
   composable_from: []
+concept_code_hops:
+  cost_class: cheap
+  deterministic: true
+  cacheable_until: graph_mtime
+  composable_from: []
 drift_nodes:
   cost_class: expensive
   deterministic: false

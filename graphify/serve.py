@@ -2131,6 +2131,186 @@ def _run_entity_trace(
     return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
 
+_IMPL_EDGE_BUDGET = 500
+
+
+def _implements_hop_kind(G: nx.Graph, u: str, v: str) -> str | None:
+    """Classify hop u→v along an `implements` edge, or None if not implements."""
+    ed = G.edges[u, v]
+    if ed.get("relation") != "implements":
+        return None
+    src_m = ed.get("_src")
+    tgt_m = ed.get("_tgt")
+    if isinstance(src_m, str) and isinstance(tgt_m, str):
+        if u == src_m and v == tgt_m:
+            return "code_to_concept"
+        if u == tgt_m and v == src_m:
+            return "concept_to_code"
+    return "both"
+
+
+def _implements_hop_allowed(G: nx.Graph, u: str, v: str, direction: str) -> bool:
+    kind = _implements_hop_kind(G, u, v)
+    if kind is None:
+        return False
+    if direction == "both" or kind == "both":
+        return True
+    return kind == direction
+
+
+def _run_concept_code_hops(
+    G: nx.Graph,
+    alias_map: dict[str, str],
+    arguments: dict,
+) -> str:
+    """Pure helper for concept_code_hops MCP tool (Phase 47 CCODE-03/04).
+
+    BFS over ``implements`` edges only, respecting semantic orientation via ``_src``/``_tgt``.
+    Hard-capped ``max_hops`` (default 3, max 6) and ``_IMPL_EDGE_BUDGET`` edge traversals.
+    """
+    max_hops = int(arguments.get("max_hops", 3))
+    max_hops = max(1, min(max_hops, 6))
+
+    direction = str(arguments.get("direction") or "both")
+    if direction not in ("both", "code_to_concept", "concept_to_code"):
+        direction = "both"
+
+    entity_raw = sanitize_label(str(arguments.get("entity", "")))
+    if not entity_raw:
+        meta: dict = {
+            "status": "no_data",
+            "layer": 1,
+            "search_strategy": "concept_code_hops",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+        }
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    _resolved_aliases: dict[str, list[str]] = {}
+    _effective_alias_map: dict[str, str] = alias_map or {}
+
+    def _resolve_alias(node_id: str) -> str:
+        canonical = _effective_alias_map.get(node_id)
+        if canonical and canonical != node_id:
+            aliases = _resolved_aliases.setdefault(canonical, [])
+            if node_id not in aliases:
+                aliases.append(node_id)
+            return canonical
+        return node_id
+
+    entity_resolved = _resolve_alias(entity_raw)
+    live_matches = _find_node(G, entity_resolved)
+
+    if len(live_matches) > 1:
+        candidates = [
+            {
+                "id": m,
+                "label": G.nodes[m].get("label", m),
+                "source_file": G.nodes[m].get("source_file", ""),
+            }
+            for m in live_matches
+        ]
+        meta = {
+            "status": "ambiguous_entity",
+            "layer": 1,
+            "search_strategy": "concept_code_hops",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+            "candidates": candidates,
+        }
+        if _resolved_aliases:
+            meta["resolved_from_alias"] = _resolved_aliases
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    if not live_matches:
+        meta = {
+            "status": "entity_not_found",
+            "layer": 1,
+            "search_strategy": "concept_code_hops",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+        }
+        if _resolved_aliases:
+            meta["resolved_from_alias"] = _resolved_aliases
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+    start_id = live_matches[0]
+    depth_map: dict[str, int] = {start_id: 0}
+    parent: dict[str, str | None] = {start_id: None}
+    hop_labels: dict[str, str] = {}  # child -> implements hop kind for tree edge parent[child]->child
+    queue: deque[str] = deque([start_id])
+    traversals = 0
+    truncated = False
+
+    while queue:
+        u = queue.popleft()
+        du = depth_map[u]
+        if du >= max_hops:
+            continue
+        for v in G.neighbors(u):
+            if traversals >= _IMPL_EDGE_BUDGET:
+                truncated = True
+                queue.clear()
+                break
+            if not _implements_hop_allowed(G, u, v, direction):
+                continue
+            traversals += 1
+            kind = _implements_hop_kind(G, u, v) or "both"
+            if v not in depth_map:
+                depth_map[v] = du + 1
+                parent[v] = u
+                hop_labels[v] = kind
+                queue.append(v)
+
+    # Build summary lines for reachable nodes (excluding start): label + depth + hop kind into node
+    reachable = sorted(
+        (nid for nid in depth_map if nid != start_id),
+        key=lambda x: (depth_map[x], sanitize_label(G.nodes[x].get("label", x))),
+    )
+    start_label = sanitize_label(G.nodes[start_id].get("label", start_id))
+    lines = [
+        "## Concept↔code hops (implements)",
+        "",
+        f"**Start:** {start_label} (`{start_id}`)",
+        f"**Direction filter:** {direction}",
+        f"**Max hops:** {max_hops}",
+        "",
+    ]
+    if not reachable:
+        lines.append("*No other nodes reachable via `implements` from this start within limits.*")
+    else:
+        lines.append("**Reachable nodes:**")
+        lines.append("")
+        for nid in reachable:
+            lab = sanitize_label(G.nodes[nid].get("label", nid))
+            d = depth_map[nid]
+            hk = hop_labels.get(nid, "")
+            lines.append(f"- `{nid}` — {lab} (depth {d}, hop {hk})")
+
+    text_body = "\n".join(lines)
+    max_chars = 8000
+    if len(text_body) > max_chars:
+        text_body = text_body[:max_chars] + "\n... (truncated)"
+
+    meta = {
+        "status": "ok",
+        "layer": 1,
+        "search_strategy": "concept_code_hops",
+        "cardinality_estimate": len(reachable),
+        "continuation_token": None,
+        "start_id": start_id,
+        "max_hops": max_hops,
+        "direction": direction,
+        "truncated": truncated,
+        "implements_traversal_steps": traversals,
+        "reachable_node_ids": [start_id] + reachable,
+        "depth_by_id": {k: depth_map[k] for k in sorted(depth_map.keys())},
+    }
+    if _resolved_aliases:
+        meta["resolved_from_alias"] = _resolved_aliases
+    return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+
 def _run_drift_nodes(
     G: "nx.Graph",
     snaps_dir: "Path",
@@ -3171,6 +3351,21 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
         return _run_entity_trace(G, _out_dir.parent, _alias_map, arguments)
 
+    def _tool_concept_code_hops(arguments: dict) -> str:
+        """Phase 47 CCODE-03: walk only `implements` edges for concept↔code linkage (distinct from temporal entity_trace)."""
+        _reload_if_stale()
+        if not Path(graph_path).exists():
+            meta: dict = {
+                "status": "no_graph",
+                "layer": 1,
+                "search_strategy": "concept_code_hops",
+                "cardinality_estimate": None,
+                "continuation_token": None,
+            }
+            text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
+            return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+        return _run_concept_code_hops(G, _alias_map, arguments)
+
     def _tool_get_focus_context(arguments: dict) -> str:
         """Phase 18 FOCUS-01: pull-model focus -> D-02 envelope with scoped subgraph + community summary.
 
@@ -3389,6 +3584,7 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
         "chat": _tool_chat,
         "connect_topics": _tool_connect_topics,
         "entity_trace": _tool_entity_trace,
+        "concept_code_hops": _tool_concept_code_hops,
         "get_focus_context": _tool_get_focus_context,
         "drift_nodes": _tool_drift_nodes,
         "newly_formed_clusters": _tool_newly_formed_clusters,
