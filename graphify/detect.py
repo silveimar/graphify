@@ -386,11 +386,60 @@ def _save_output_manifest(
         raise
 
 
+def _relative_posix_under_root(path: Path, root: Path) -> str | None:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return None
+
+
+def _dot_graphify_from_profile(profile: dict | None) -> dict:
+    defaults = {
+        "include_globs": [],
+        "exclude_globs": ["**/*.yaml", "**/profile.yaml"],
+        "auto_track_discoveries": False,
+        "tracked_paths": [],
+    }
+    if not profile:
+        return dict(defaults)
+    corpus = profile.get("corpus")
+    if not isinstance(corpus, dict):
+        return dict(defaults)
+    dot = corpus.get("dot_graphify")
+    if not isinstance(dot, dict):
+        return dict(defaults)
+    out = dict(defaults)
+    for k in defaults:
+        if k in dot:
+            out[k] = dot[k]
+    return out
+
+
+def _dot_graphify_path_eligible(rel_posix: str, dot: dict) -> bool:
+    if not rel_posix.startswith(".graphify/"):
+        return True
+    low = rel_posix.lower()
+    if low.endswith(".yaml") or low.endswith(".yml"):
+        return False
+    if rel_posix.split("/")[-1] == "profile.yaml":
+        return False
+    inc = dot.get("include_globs") or []
+    exc = dot.get("exclude_globs") or []
+    if not inc:
+        return False
+    if not any(fnmatch.fnmatch(rel_posix, g) for g in inc):
+        return False
+    if any(fnmatch.fnmatch(rel_posix, g) for g in exc):
+        return False
+    return True
+
+
 def detect(
     root: Path,
     *,
     follow_symlinks: bool = False,
     resolved: "ResolvedOutput | None" = None,
+    profile: dict | None = None,
 ) -> dict:
     files: dict[FileType, list[str]] = {
         FileType.CODE: [],
@@ -496,6 +545,9 @@ def detect(
 
     converted_dir = root / "graphify-out" / "converted"
 
+    dot_cfg = _dot_graphify_from_profile(profile)
+    dot_discovered: list[str] = []
+
     for p in all_files:
         # For memory dir files, skip hidden/noise filtering
         in_memory = memory_dir.exists() and str(p).startswith(str(memory_dir))
@@ -507,6 +559,11 @@ def detect(
             # Skip files inside our own converted/ dir (avoid re-processing sidecars)
             if str(p).startswith(str(converted_dir)):
                 continue
+        rel_under = _relative_posix_under_root(p, root)
+        if rel_under is not None and rel_under.startswith(".graphify/"):
+            if not _dot_graphify_path_eligible(rel_under, dot_cfg):
+                continue
+            dot_discovered.append(rel_under)
         if _is_ignored(p, root, all_ignore_patterns):
             _record_skip("exclude-glob", str(p))
             continue
@@ -568,6 +625,7 @@ def detect(
         "skipped_sensitive": skipped_sensitive,
         "graphifyignore_patterns": len(ignore_patterns),
         "skipped": skipped,
+        "dot_graphify_discovered": sorted(set(dot_discovered)),
     }
 
 

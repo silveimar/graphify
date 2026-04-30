@@ -206,6 +206,7 @@ def run_update_vault(
         use_router=use_router,
         out_dir=resolved.artifacts_dir,
         resolved=None,
+        profile=profile,
     )
     merged = merge_elicitation_into_build_inputs([extraction], resolved.artifacts_dir)
     G = build(merged)

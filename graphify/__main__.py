@@ -2594,7 +2594,33 @@ def main() -> None:
 
         lock_fd = _foreground_acquire_enrichment_lock(out_dir, timeout_seconds=30.0)
         try:
-            run_corpus(target, use_router=use_router, out_dir=out_dir, resolved=resolved)
+            det_meta: dict[str, object] = {}
+            run_corpus(
+                target,
+                use_router=use_router,
+                out_dir=out_dir,
+                resolved=resolved,
+                profile=profile,
+                detection_meta=det_meta,
+            )
+            if resolved.vault_detected and resolved.vault_path is not None:
+                corp = profile.get("corpus")
+                dg = corp.get("dot_graphify") if isinstance(corp, dict) else None
+                if isinstance(dg, dict) and dg.get("auto_track_discoveries"):
+                    from graphify.profile import merge_dot_graphify_tracked_paths
+
+                    discovered = det_meta.get("dot_graphify_discovered") or []
+                    _merged_paths, added_paths = merge_dot_graphify_tracked_paths(
+                        resolved.vault_path,
+                        list(discovered),
+                        apply_write=True,
+                    )
+                    if added_paths:
+                        print(
+                            "[graphify] auto-appended "
+                            f"{len(added_paths)} path(s) to corpus.dot_graphify.tracked_paths",
+                            file=sys.stderr,
+                        )
             # Phase 28 (D-29): write output manifest after successful run
             # Guard: only when resolved is available; roots only (nesting guard covers via D-18)
             if resolved is not None:
@@ -2730,9 +2756,72 @@ def main() -> None:
             action="store_true",
             help="Preview which files would be ingested/skipped without writing",
         )
+        _p_dr.add_argument(
+            "--dot-graphify-track",
+            action="store_true",
+            help="Preview corpus.dot_graphify.tracked_paths updates from eligible .graphify/ files",
+        )
+        _p_dr.add_argument(
+            "--apply-dot-graphify-track",
+            action="store_true",
+            help="Write merged tracked_paths into .graphify/profile.yaml (with --dot-graphify-track)",
+        )
         _dr_cli = sys.argv[2:]
         _lv_dr, _lv_dr2, _dr_cli = _strip_vault_flags_from_tokens(_dr_cli)
         opts = _p_dr.parse_args(_dr_cli)
+        if opts.dot_graphify_track or opts.apply_dot_graphify_track:
+            from graphify.detect import detect as _dg_track_detect
+            from graphify.profile import load_profile as _dg_load_profile
+            from graphify.profile import merge_dot_graphify_tracked_paths
+
+            cwd_tr = Path.cwd().resolve()
+            _tr_resolved = None
+            _had_pin_tr = bool(
+                g_vault_exp
+                or g_vault_list
+                or _lv_dr
+                or _lv_dr2
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            )
+            try:
+                _tr_resolved = _resolve_cli_paths(
+                    None,
+                    global_explicit=g_vault_exp,
+                    global_list=g_vault_list,
+                    local_explicit=_lv_dr,
+                    local_list=_lv_dr2,
+                )
+            except SystemExit as exc:
+                if _had_pin_tr:
+                    raise exc
+            if _tr_resolved is None:
+                print(
+                    "[graphify] error: dot-graphify-track requires a resolvable vault/output context "
+                    "(run from a vault with profile or pass vault pins)",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+            vault_home = _tr_resolved.vault_path if _tr_resolved.vault_path else cwd_tr
+            prof_tr = _dg_load_profile(vault_home)
+            scan_tr = _dg_track_detect(
+                cwd_tr, resolved=_tr_resolved, profile=prof_tr
+            )
+            disc = scan_tr.get("dot_graphify_discovered") or []
+            merged, added = merge_dot_graphify_tracked_paths(
+                vault_home,
+                disc,
+                apply_write=opts.apply_dot_graphify_track,
+            )
+            print(
+                f"[graphify] dot_graphify eligible discoveries: {len(disc)} path(s)",
+                file=sys.stderr,
+            )
+            if added:
+                action = "applied" if opts.apply_dot_graphify_track else "would add"
+                print(f"[graphify] {action} tracked_paths ({len(added)}): {added}", file=sys.stderr)
+            print(f"[graphify] tracked_paths total after merge preview: {len(merged)}", file=sys.stderr)
+            sys.exit(0)
+
         from graphify.doctor import run_doctor, format_report
         # Resolution may SystemExit (invalid profile in CWD vault); doctor still prints a full
         # report via resolve_output(cwd) when we omit *resolved_output* (Phase 29 misconfig tests).

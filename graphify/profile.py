@@ -4,6 +4,7 @@ from __future__ import annotations
 import datetime
 import fnmatch  # noqa: F401  # used by Plan 30-02 community-template matcher
 import hashlib
+import os
 import re
 import sys
 import unicodedata
@@ -154,12 +155,20 @@ _DEFAULT_PROFILE: dict = {
          "min_main_nodes": 3, "naming_pattern": "{topic}-glossary-graph",
          "layout_type": "glossary-graph", "output_path": "Excalidraw/Diagrams/"},
     ],
+    "corpus": {
+        "dot_graphify": {
+            "include_globs": [],
+            "exclude_globs": ["**/*.yaml", "**/profile.yaml"],
+            "auto_track_discoveries": False,
+            "tracked_paths": [],
+        },
+    },
 }
 
 _VALID_TOP_LEVEL_KEYS = {
     "folder_mapping", "naming", "merge", "mapping_rules", "obsidian",
     "topology", "mapping", "tag_taxonomy", "profile_sync", "diagram_types",
-    "output", "taxonomy", "repo",
+    "output", "taxonomy", "repo", "corpus",
     "extends", "includes", "community_templates",  # Phase 30 (CFG-02 / CFG-03)
     "dataview_queries",  # Phase 31 (TMPL-03, D-11)
 }
@@ -665,6 +674,55 @@ def validate_profile(profile: dict) -> list[str]:
                         f"dataview_queries.{key}: query must be a non-empty string"
                     )
 
+    corpus = profile.get("corpus")
+    if corpus is not None:
+        if not isinstance(corpus, dict):
+            errors.append("'corpus' must be a mapping (dict)")
+        else:
+            for ck in corpus:
+                if ck != "dot_graphify":
+                    errors.append(
+                        f"Unknown corpus key '{ck}' — valid keys are: ['dot_graphify']"
+                    )
+            dg = corpus.get("dot_graphify")
+            if dg is not None:
+                if not isinstance(dg, dict):
+                    errors.append("corpus.dot_graphify must be a mapping (dict)")
+                else:
+                    for dk in dg:
+                        if dk not in {
+                            "include_globs",
+                            "exclude_globs",
+                            "auto_track_discoveries",
+                            "tracked_paths",
+                        }:
+                            errors.append(
+                                f"Unknown corpus.dot_graphify key '{dk}' — "
+                                "valid keys are: include_globs, exclude_globs, "
+                                "auto_track_discoveries, tracked_paths"
+                            )
+                    inc = dg.get("include_globs")
+                    if inc is not None:
+                        if not isinstance(inc, list) or not all(isinstance(x, str) for x in inc):
+                            errors.append(
+                                "corpus.dot_graphify.include_globs must be a list of strings"
+                            )
+                    exc = dg.get("exclude_globs")
+                    if exc is not None:
+                        if not isinstance(exc, list) or not all(isinstance(x, str) for x in exc):
+                            errors.append(
+                                "corpus.dot_graphify.exclude_globs must be a list of strings"
+                            )
+                    at = dg.get("auto_track_discoveries")
+                    if at is not None and not isinstance(at, bool):
+                        errors.append("corpus.dot_graphify.auto_track_discoveries must be boolean")
+                    tp = dg.get("tracked_paths")
+                    if tp is not None:
+                        if not isinstance(tp, list) or not all(isinstance(x, str) for x in tp):
+                            errors.append(
+                                "corpus.dot_graphify.tracked_paths must be a list of strings"
+                            )
+
     taxonomy = profile.get("taxonomy")
     if taxonomy is not None:
         if not isinstance(taxonomy, dict):
@@ -1044,6 +1102,65 @@ def validate_vault_path(candidate: str | Path, vault_dir: str | Path) -> Path:
             "Check folder_mapping values for path traversal sequences."
         )
     return resolved
+
+
+def merge_dot_graphify_tracked_paths(
+    vault_dir: Path,
+    additions: list[str],
+    *,
+    apply_write: bool,
+) -> tuple[list[str], list[str]]:
+    """Merge validated paths into ``corpus.dot_graphify.tracked_paths`` (sorted unique).
+
+    Returns ``(merged_paths, newly_added_paths)``. With ``apply_write=False`` no YAML write.
+    """
+    try:
+        import yaml  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise RuntimeError(
+            "PyYAML required — pip install graphifyy[obsidian]"
+        ) from exc
+
+    vault_base = Path(vault_dir).resolve()
+    profile_path = vault_base / ".graphify" / "profile.yaml"
+    validate_vault_path(Path(".graphify") / "profile.yaml", vault_base)
+
+    validated_add: list[str] = []
+    for raw in additions:
+        s = raw.strip().replace("\\", "/")
+        if not s.startswith(".graphify/"):
+            continue
+        validate_vault_path(s, vault_base)
+        validated_add.append(s)
+
+    existing: dict = {}
+    if profile_path.exists():
+        existing = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
+
+    corpus = existing.setdefault("corpus", {})
+    dg = corpus.setdefault("dot_graphify", {})
+    cur = dg.get("tracked_paths") or []
+    if not isinstance(cur, list):
+        cur = []
+    cur_norm = [str(x).strip().replace("\\", "/") for x in cur if isinstance(x, str)]
+    before = set(cur_norm)
+    merged_set = before | set(validated_add)
+    merged_sorted = sorted(merged_set)
+    newly = sorted(merged_set - before)
+
+    if apply_write:
+        dg["tracked_paths"] = merged_sorted
+        corpus["dot_graphify"] = dg
+        existing["corpus"] = corpus
+        profile_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = profile_path.with_suffix(".yaml.tmp")
+        tmp.write_text(
+            yaml.dump(existing, allow_unicode=True, sort_keys=True),
+            encoding="utf-8",
+        )
+        os.replace(tmp, profile_path)
+
+    return merged_sorted, newly
 
 
 def validate_sibling_path(candidate: str, vault_dir: str | Path) -> Path:

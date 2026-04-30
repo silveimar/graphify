@@ -14,6 +14,8 @@ def run_corpus(
     use_router: bool,
     out_dir: Path | None = None,
     resolved: "ResolvedOutput | None" = None,
+    profile: dict | None = None,
+    detection_meta: dict | None = None,
 ) -> dict:
     """detect → extract (optional Router + audit flush). AST-only structural pass.
 
@@ -31,7 +33,12 @@ def run_corpus(
     if target.is_file():
         paths = [target.resolve()]
     else:
-        det = detect(target, resolved=resolved)
+        det = detect(target, resolved=resolved, profile=profile)
+        if detection_meta is not None:
+            detection_meta.clear()
+            detection_meta["dot_graphify_discovered"] = list(
+                det.get("dot_graphify_discovered", [])
+            )
         paths = [Path(p) for p in det["files"].get("code", [])]
 
     router = default_router() if use_router else None

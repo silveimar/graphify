@@ -30,9 +30,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from graphify.corpus_prune import nested_output_dirname
 from graphify.detect import (
     _SELF_OUTPUT_DIRS,
-    _is_nested_output,
     _load_graphifyignore,
     _load_output_manifest,
 )
@@ -204,7 +204,7 @@ def _compute_would_self_ingest(cwd: Path, resolved: Optional[ResolvedOutput]) ->
             # Destination lives outside the input scan — safe.
             continue
         for part in rel.parts:
-            if _is_nested_output(part, self_dirs):
+            if nested_output_dirname(part, self_dirs):
                 return True
     return False
 
@@ -422,7 +422,12 @@ def run_doctor(
     # detect() is read-only; no disk writes here.
     if dry_run and report.resolved_output is not None:
         from graphify.detect import detect as _detect_scan
-        scan = _detect_scan(cwd_resolved)
+        from graphify.profile import load_profile
+
+        prof = load_profile(profile_home)
+        scan = _detect_scan(
+            cwd_resolved, resolved=report.resolved_output, profile=prof
+        )
         report.preview = _build_preview_section(scan, report.resolved_output)
 
     return report

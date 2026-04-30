@@ -17,6 +17,7 @@ from graphify.profile import (
     _deep_merge,
     _dump_frontmatter,
     load_profile,
+    merge_dot_graphify_tracked_paths,
     safe_filename,
     safe_frontmatter_value,
     safe_tag,
@@ -48,6 +49,22 @@ def test_deep_merge_does_not_mutate_base():
     base = {"a": {"b": 1}}
     _deep_merge(base, {"a": {"b": 99}})
     assert base == {"a": {"b": 1}}
+
+
+def test_validate_profile_corpus_dot_graphify_requires_mapping():
+    errs = validate_profile({"corpus": {"dot_graphify": "bad"}})
+    assert any("dot_graphify" in e for e in errs)
+
+
+def test_merge_dot_graphify_tracked_paths_preview(tmp_path):
+    pytest.importorskip("yaml")
+    merged, added = merge_dot_graphify_tracked_paths(
+        tmp_path,
+        [".graphify/readme.md"],
+        apply_write=False,
+    )
+    assert ".graphify/readme.md" in merged
+    assert added == [".graphify/readme.md"]
 
 
 # ---------------------------------------------------------------------------

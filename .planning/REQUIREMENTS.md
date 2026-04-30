@@ -5,7 +5,7 @@
 
 ## v1.10 — Hygiene & baseline correctness
 
-- [ ] **HYG-01:** Quick-task **`260427-rc7-fix-detect-self-ingestion`** is implemented: detect no longer mis-handles self-ingestion scenarios covered by the task; regression tests prove the fix.
+- [ ] **HYG-01:** Quick-task **`260427-rc7-fix-detect-self-ingestion`** is implemented: detect no longer mis-handles self-ingestion scenarios covered by the task; regression tests prove the fix. Includes **`graphify/corpus_prune`** shared pruning/manifest **`prior_files`** (default-root **`graphify-out`** manifest when `resolved is None`), manifest skip summary **stderr**, **`collect_files(..., resolved=)`** parity with **`detect()`**, optional **`corpus.dot_graphify`** profile policy for **`.graphify/`** corpus paths (YAML/profile hard-excluded), and **`doctor --dot-graphify-track`** / **`--apply-dot-graphify-track`** plus vault **`auto_track_discoveries`** write-back.
 - [ ] **HYG-02:** `tests/test_detect.py::test_detect_skips_dotfiles` passes **or** the contract is intentionally revised with tests and docs updated (no silent behavior drift).
 - [ ] **HYG-03:** `tests/test_extract.py::test_collect_files_from_dir` passes **or** collect-files semantics are explicitly reconciled with documented expectations and tests.
 
@@ -30,7 +30,7 @@
 
 | REQ-ID | Phase | Plan / notes |
 |--------|-------|--------------|
-| HYG-01 | **45** | Quick task `260427-rc7-fix-detect-self-ingestion`; regression coverage |
+| HYG-01 | **45** | Quick task `260427-rc7-fix-detect-self-ingestion`; `corpus_prune`; manifest stderr; default-root manifest; `collect_files(resolved=)`; profile **`corpus.dot_graphify`** + doctor tracked_paths UX |
 | HYG-02 | **45** | `test_detect_skips_dotfiles` fix or intentional contract change + docs |
 | HYG-03 | **45** | `test_collect_files_from_dir` fix or reconciled semantics + docs |
 | CCODE-01 | **46** | `validate.py` + docs for relation type(s); confidence aligns with EXTRACTED/INFERRED/AMBIGUOUS |

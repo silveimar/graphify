@@ -1,7 +1,37 @@
 from pathlib import Path
+
+import pytest
+
 from graphify.detect import classify_file, count_words, detect, FileType, _looks_like_paper, _is_ignored, _load_graphifyignore
 
 FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES_PHASE45 = FIXTURES / "phase45-mini-vault"
+
+_PHASE45_PROFILE_STUB = (
+    "taxonomy:\n"
+    "  version: v1.8\n"
+    "  root: Atlas/Sources/Graphify\n"
+    "  folders:\n"
+    "    moc: MOCs\n"
+    "    thing: Things\n"
+    "    statement: Statements\n"
+    "    person: People\n"
+    "    source: Sources\n"
+    "    default: Things\n"
+    "    unclassified: MOCs\n"
+    "mapping:\n"
+    "  min_community_size: 3\n"
+    "output:\n"
+    "  mode: vault-relative\n"
+    "  path: Atlas/Generated\n"
+    "corpus:\n"
+    "  dot_graphify:\n"
+    "    include_globs:\n"
+    '      - "**/*.md"\n'
+)
+
+# Phase 45 D-45.07: detect may legitimately emit paths under `.graphify/` when profile includes them.
+_DOTFILE_ALLOWED_PARTS = frozenset({".graphify"})
 
 def test_classify_python():
     assert classify_file(Path("foo.py")) == FileType.CODE
@@ -48,10 +78,19 @@ def test_detect_warns_small_corpus():
     assert result["warning"] is not None
 
 def test_detect_skips_dotfiles():
+    """D-45.07: hidden path segments use Path.parts; posix must not encode `/./`."""
     result = detect(FIXTURES)
     for files in result["files"].values():
         for f in files:
-            assert "/." not in f
+            parts = Path(f).parts
+            bad_hidden = [
+                part
+                for part in parts
+                if part.startswith(".") and part not in _DOTFILE_ALLOWED_PARTS
+            ]
+            assert not bad_hidden, f"unexpected hidden segments in {f!r}: {bad_hidden}"
+            posix_f = Path(f).as_posix()
+            assert "/./" not in posix_f, f"D-45.07 posix invariant failed for {f!r}"
 
 
 def test_classify_md_paper_by_signals(tmp_path):
@@ -718,3 +757,48 @@ def test_detect_return_shape_backcompat(tmp_path):
         "graphifyignore_patterns",
     ):
         assert key in result, f"detect() return is missing pre-existing key: {key}"
+
+
+def test_phase45_mini_vault_detect_smoke():
+    """Phase 45: golden mini-vault fixture smoke."""
+    result = detect(FIXTURES_PHASE45, follow_symlinks=False)
+    assert result["total_files"] >= 1
+    flat = [f for bucket in result["files"].values() for f in bucket]
+    assert not any("graphify-out" in Path(f).as_posix() for f in flat)
+
+
+def test_detect_dot_graphify_include_md_skips_yaml(tmp_path):
+    """Phase 45 D-45.05: YAML under .graphify never ingested; notes.md can be."""
+    pytest.importorskip("yaml")
+    from graphify.profile import load_profile
+
+    (tmp_path / ".obsidian").mkdir()
+    gf = tmp_path / ".graphify"
+    gf.mkdir()
+    (gf / "profile.yaml").write_text(_PHASE45_PROFILE_STUB)
+    (gf / "notes.md").write_text("# Note\n")
+    (gf / "extra.yaml").write_text("k: v\n")
+
+    prof = load_profile(tmp_path)
+    result = detect(tmp_path, profile=prof)
+    docs = result["files"].get("document", [])
+    doc_paths = {Path(x).resolve() for x in docs}
+    assert (gf / "notes.md").resolve() in doc_paths
+    joined = "\n".join(docs)
+    assert "extra.yaml" not in joined
+    assert "profile.yaml" not in joined
+
+
+def test_detect_dot_graphify_discovered_lists_eligible_paths(tmp_path):
+    pytest.importorskip("yaml")
+    from graphify.profile import load_profile
+
+    (tmp_path / ".obsidian").mkdir()
+    gf = tmp_path / ".graphify"
+    gf.mkdir()
+    (gf / "profile.yaml").write_text(_PHASE45_PROFILE_STUB)
+    (gf / "notes.md").write_text("# Note\n")
+
+    prof = load_profile(tmp_path)
+    result = detect(tmp_path, profile=prof)
+    assert ".graphify/notes.md" in result.get("dot_graphify_discovered", [])
