@@ -14,6 +14,10 @@ REQUIRED_EDGE_FIELDS = {"source", "target", "relation", "confidence", "source_fi
 KNOWN_EDGE_RELATIONS: frozenset[str] = frozenset({
     "implements",
     "implemented_by",
+    "documents",       # Phase 53: doc/code artifact → concept (D-53.01)
+    "tests",           # Phase 53: test artifact → concept (D-53.01)
+    "realizes",        # Phase 53: interface/abstract → concept (D-53.01)
+    "instantiates",    # Phase 53: concrete subtype → concept (D-53.01)
     "calls",
     "contains",
     "method",
@@ -43,6 +47,26 @@ KNOWN_HYPEREDGE_RELATIONS: frozenset[str] = frozenset({
     "implement",
     "implements",
     "form",
+})
+
+# Phase 53 (D-53.07-09): the four new concept↔code relations carry stricter rules
+# than the existing `implements`. EXTRACTED requires `evidence`; INFERRED requires
+# `confidence_score ∈ [0.0, 1.0]`; AMBIGUOUS is permitted without either.
+NEW_CONCEPT_CODE_RELATIONS: frozenset[str] = frozenset({
+    "documents",
+    "tests",
+    "realizes",
+    "instantiates",
+})
+
+# Allowed values for the conditional `evidence` field. Additive — extend in a
+# follow-up phase if extractors emit new evidence kinds. (Per RESEARCH §"evidence rule".)
+KNOWN_EVIDENCE_VALUES: frozenset[str] = frozenset({
+    "annotation",
+    "jsdoc",
+    "docstring",
+    "test_docstring",
+    "inheritance",
 })
 
 
