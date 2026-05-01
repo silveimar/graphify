@@ -13,6 +13,7 @@
 - ✅ **v1.8 Output Taxonomy & Cluster Quality** — Phases 32–38 (shipped 2026-04-29)
 - ✅ **v1.9 Onboarding, Harness Portability & Vault CLI** — Phases 39–44 (shipped 2026-04-30)
 - ✅ **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–52 (shipped 2026-05-01)
+- 🔷 **v1.11 Templates, Graph Semantics & Vault Depth** — Phases 53–58 *(active — planning/execution)*
 
 ## Phases
 
@@ -400,6 +401,28 @@ Plans:
 
 </details>
 
+<details open>
+<summary>🔷 v1.11 Templates, Graph Semantics & Vault Depth (Phases 53–58) — ACTIVE</summary>
+
+Typed **concept↔code** edges, **template** conditionals/loops/Dataview hooks, **profile overrides**, **elicitation/harness** increments, **vault CLI** parity, and **hygiene** closures. Phase numbering continues after v1.10 (**53+**).
+
+| Phase | Goal | Requirements | Success criteria (observable) |
+|-------|------|--------------|------------------------------|
+| **53** — Concept↔code **schema & build** | New relation values validated; deterministic merge in `build` | **CGRAPH-01**, **CGRAPH-02** | `validate_extraction` rejects malformed edges; golden graph shows stable merged concept↔code edges in `pytest` |
+| **54** — **MCP / trace / export** parity | Same semantic edges across MCP, slash trace, and Obsidian export | **CGRAPH-03**, **CGRAPH-04** | Documented mapping table + automated golden-path for MCP/traces; export tests cannot contradict graph edges |
+| **55** — Template **conditionals & loops** | Block syntax before `${}` substitution | **TMPL-01**, **TMPL-02** | Fixture vault templates render with conditionals + `#connections`; sanitization regression tests |
+| **56** — **Dataview** templates & **override** rules | Per-note-type Dataview + scoped overrides | **TMPL-03**, **CFG-01**, **CFG-02** | `validate_profile_preflight` errors on invalid queries; collision matrix tests for override precedence |
+| **57** — **Elicitation & harness** | Measurable uplift vs v1.9 with explicit trust boundaries | **ELIC-01**, **ELIC-02**, **HARN-01**, **HARN-02** | New elicitation scenario tests; docs updated; harness import remains **off-default** with guard tests if touched |
+| **58** — **Vault CLI & hygiene** | Doctor parity + registry closure | **VAUX-01**, **VAUX-02**, **HYG-01** | CLI/doctor parity tests; quick-task / waiver recorded with evidence |
+
+**Totals:** 6 phases — **18/18** REQ-IDs mapped (**100% coverage**).
+
+**Depends-on hints:** **53 → 54** (surface only after schema/build); **55 → 56** (blocks stable before Dataview complexity); **57** and **58** can partially parallelize after **53** lands.
+
+**Plans:** create under `.planning/phases/5[3-8]-*/` during `/gsd-plan-phase`.
+
+</details>
+
 ---
 
 ## Progress
@@ -465,6 +488,12 @@ Plans:
 | 50. v1.10 gap — Baselines verification | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 51. v1.10 gap — MCP & trace REQ sign-off | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 52. v1.10 gap — Phase 48 verification artifact | v1.10 | 1/1 | Complete    | 2026-05-01 |
+| 53. Concept↔code schema & build merge | v1.11 | 0/? | Not started | — |
+| 54. MCP, trace & Obsidian parity | v1.11 | 0/? | Not started | — |
+| 55. Template conditionals & connection loops | v1.11 | 0/? | Not started | — |
+| 56. Dataview templates & profile overrides | v1.11 | 0/? | Not started | — |
+| 57. Elicitation & harness increment | v1.11 | 0/? | Not started | — |
+| 58. Vault CLI parity & hygiene | v1.11 | 0/? | Not started | — |
 
 ### Phase 47: MCP & Trace Integration
 
@@ -492,4 +521,4 @@ Plans:
 - [x] `49-01-PLAN.md` — `graphify.version`, CLI flags, `_cli_exit` footer, skill stamp copy, tests (`test_main_cli` / `test_main_flags`)
 
 ---
-*Last updated: 2026-05-01 — v1.10 milestone shipped; live roadmap collapsed — full phase narrative in `.planning/milestones/v1.10-ROADMAP.md`.*
+*Last updated: 2026-04-30 — **v1.11** phases **53–58** added (active); v1.10 narrative archived under `.planning/milestones/v1.10-ROADMAP.md`.*

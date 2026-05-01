@@ -53,4 +53,19 @@
 
 | REQ-ID | Phase | Plan / notes |
 |--------|-------|----------------|
-| — | — | *(filled when ROADMAP.md is created)* |
+| CGRAPH-01 | 53 | Schema + extraction validation |
+| CGRAPH-02 | 53 | `build` merge / dedupe |
+| CGRAPH-03 | 54 | MCP + slash/trace surfaces |
+| CGRAPH-04 | 54 | Obsidian export parity with graph |
+| TMPL-01 | 55 | Conditional blocks |
+| TMPL-02 | 55 | `#connections` loops |
+| TMPL-03 | 56 | Per-note-type Dataview templates |
+| CFG-01 | 56 | Scoped template overrides |
+| CFG-02 | 56 | Override collision validation |
+| ELIC-01 | 57 | Additional elicitation scenario tests |
+| ELIC-02 | 57 | Documentation / trust boundaries |
+| HARN-01 | 57 | Harness mapping + tests |
+| HARN-02 | 57 | Import off-default guards |
+| VAUX-01 | 58 | CLI vs doctor parity |
+| VAUX-02 | 58 | Actionable CLI errors |
+| HYG-01 | 58 | Quick-task closure / waiver evidence |
