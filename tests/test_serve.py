@@ -3446,3 +3446,52 @@ def test_build_all_seeds_merged_seed_list_then_get_round_trip(tmp_path):
     )
     assert get_meta["seed_id"] == merged_id
     assert json.loads(get_body)["seed_id"] == merged_id
+
+
+# ---------------------------------------------------------------------------
+# Phase 54 — RED tests for entity_trace `include_concept_code` (CGRAPH-03)
+# ---------------------------------------------------------------------------
+
+
+def test_entity_trace_default_excludes_concept_code(tmp_path):
+    """D-54.04: omitting `include_concept_code` (or passing False) MUST NOT
+    add concept↔code keys to the meta envelope — Phase 11 backward compat."""
+    from pathlib import Path as _Path
+    from graphify.build import build_from_json as _build_from_json
+
+    fixture = _Path(__file__).parent / "fixtures" / "concept_code" / "round_trip.json"
+    G = _build_from_json(json.loads(fixture.read_text()))
+    # D-54.04: default path — `include_concept_code` absent
+    response = _run_entity_trace(G, tmp_path, {}, {"entity": "Klass"})
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    # Phase 11 envelope MUST be byte-identical surface-wise: new keys absent.
+    assert "concept_code_reachable" not in meta, meta
+    assert "concept_code_steps_by_relation" not in meta, meta
+
+
+def test_entity_trace_includes_concept_code_when_requested(tmp_path):
+    """D-54.04: `include_concept_code=True` adds concept↔code reachables AND
+    a per-relation step breakdown to the meta envelope."""
+    from pathlib import Path as _Path
+    from graphify.build import build_from_json as _build_from_json
+
+    fixture = _Path(__file__).parent / "fixtures" / "concept_code" / "round_trip.json"
+    G = _build_from_json(json.loads(fixture.read_text()))
+    # D-54.04: arg key is `entity` — "Klass" resolves to k_klass per the
+    # round_trip.json fixture (label-match path).
+    response = _run_entity_trace(
+        G, tmp_path, {},
+        {"entity": "Klass", "include_concept_code": True},
+    )
+    assert QUERY_GRAPH_META_SENTINEL in response
+    meta = json.loads(response.split(QUERY_GRAPH_META_SENTINEL)[1])
+    # D-54.04: list of node-ids reachable via concept↔code hops
+    assert "concept_code_reachable" in meta, meta
+    assert isinstance(meta["concept_code_reachable"], list), meta
+    # D-54.04: per-relation step breakdown — keys subset of the 5 allowed
+    assert "concept_code_steps_by_relation" in meta, meta
+    sbr = meta["concept_code_steps_by_relation"]
+    assert isinstance(sbr, dict), sbr
+    allowed = {"implements", "documents", "tests", "realizes", "instantiates"}
+    assert set(sbr.keys()).issubset(allowed), sbr

@@ -427,3 +427,37 @@ def test_subpath_isolation_capability_manifest(tmp_path: Path) -> None:
     names = {t["name"] for t in result["CAPABILITY_TOOLS"]}
     assert "tool_alpha" in names, "tool_alpha (sub_a run) must survive sub_b write"
     assert "tool_beta" in names, "tool_beta (sub_b run) must be present"
+
+
+# ---------------------------------------------------------------------------
+# Phase 54 — RED test for MCP tool inputSchema additions (CGRAPH-03)
+# ---------------------------------------------------------------------------
+
+
+def test_concept_code_hops_schema_includes_relations_and_entity_trace_includes_concept_code() -> None:
+    """D-54.01 / D-54.04: Phase 54 widens the inputSchemas of two MCP tools.
+
+    `concept_code_hops` MUST advertise a `relations` array property with
+    string items and a default of `["implements"]`. `entity_trace` MUST
+    advertise an `include_concept_code` boolean property with default `false`.
+    """
+    from graphify.mcp_tool_registry import build_mcp_tools
+
+    tools = {t.name: t for t in build_mcp_tools()}
+    assert "concept_code_hops" in tools, tools.keys()
+    assert "entity_trace" in tools, tools.keys()
+
+    # D-54.01: concept_code_hops gains `relations` array<string> default [implements]
+    cch_props = tools["concept_code_hops"].inputSchema["properties"]
+    assert "relations" in cch_props, cch_props
+    rel = cch_props["relations"]
+    assert rel.get("type") == "array", rel
+    assert rel.get("items", {}).get("type") == "string", rel
+    assert rel.get("default") == ["implements"], rel
+
+    # D-54.04: entity_trace gains `include_concept_code` boolean default false
+    et_props = tools["entity_trace"].inputSchema["properties"]
+    assert "include_concept_code" in et_props, et_props
+    icc = et_props["include_concept_code"]
+    assert icc.get("type") == "boolean", icc
+    assert icc.get("default") is False, icc
