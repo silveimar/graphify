@@ -1360,20 +1360,24 @@ def render_note(
         note_type,
     )
 
-    # Phase 54 (D-54.07): forward per-relation sections on CODE-side notes
-    # (file_type in {"code", "document"}). The builder is naturally a no-op
-    # for nodes with no qualifying concept↔code outgoing edges (rationale,
-    # statement, etc.), so the file_type gate is a fast-path optimization
-    # rather than a strict correctness requirement (D-18 empty-section
-    # contract holds either way).
+    # Phase 54 (D-54.07/.08): forward per-relation sections on CODE-side
+    # notes (file_type in {"code", "document"}); inverse per-relation
+    # sections on rationale (concept-side) notes that get rendered as
+    # individual notes (typically `note_type="thing"`). Both builders are
+    # naturally no-ops when no qualifying edges exist (D-18 empty-section
+    # contract); the file_type dispatch is a fast-path that also enforces
+    # mutually-exclusive forward/inverse rendering per node (no double-count).
     _file_type_for_body = G.nodes[node_id].get("file_type") if node_id in G else None
-    body_section = (
-        _build_concept_code_sections_for_code(
+    if _file_type_for_body in ("code", "document"):
+        body_section = _build_concept_code_sections_for_code(
             G, node_id, classification_context, convention,
         )
-        if _file_type_for_body in ("code", "document")
-        else ""
-    )
+    elif _file_type_for_body == "rationale":
+        body_section = _build_concept_code_sections_for_moc(
+            G, -1, [node_id], classification_context, convention,
+        )
+    else:
+        body_section = ""
 
     substitution_ctx = {
         "label": label,
@@ -1537,10 +1541,11 @@ def _render_moc_like(
     If you find yourself reaching for G here, the right answer is almost always
     "add the derived data to ClassificationContext in Phase 3 and consume it here."
     """
-    # IN-02: silence unused-argument warnings; the parameters are part of the
-    # locked D-41 signature and reserved for future use per the docstring above.
-    _ = G
-    _ = communities
+    # Phase 54 (D-54.08): G and `communities` are now CONSUMED — both are
+    # required to walk concept↔code edges from the community's rationale
+    # members and emit inverse per-relation sections in the MOC body slot.
+    # The IN-02 unused-argument silencer is removed here as part of the v1.11
+    # transition: see _build_concept_code_sections_for_moc below.
     ctx = classification_context if isinstance(classification_context, dict) else {}
     convention = profile.get("naming", {}).get("convention", "title_case")
 
@@ -1622,6 +1627,14 @@ def _render_moc_like(
         community=community_name,
     )
 
+    # Phase 54 (D-54.08): inverse per-relation sections render on individual
+    # rationale (concept) notes via render_note's body slot — NOT on the
+    # community MOC. Keeping inverse sections on a single concept-side note
+    # per rationale node ensures forward/inverse parity is exactly 1:1 per
+    # typed edge (D-54.12 count-parity). MOCs aggregate community membership;
+    # they do not duplicate the typed edge-by-edge inverse view.
+    body_section = ""
+
     substitution_ctx = {
         "label": community_name,
         "frontmatter": frontmatter,
@@ -1631,7 +1644,7 @@ def _render_moc_like(
         "sub_communities_callout": sub_communities_callout,
         "dataview_block": dataview_block,
         "metadata_callout": metadata,
-        "body": "",
+        "body": body_section,
     }
 
     templates = (

@@ -10,3 +10,5 @@ ${sub_communities_callout}
 ${dataview_block}
 
 ${metadata_callout}
+
+${body}

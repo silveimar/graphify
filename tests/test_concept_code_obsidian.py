@@ -311,11 +311,16 @@ def test_backward_parity_wikilinks_to_edges(tmp_path):
                         f"{md_path.name} ## {header} -> {target!r} "
                         f"has no matching {rel} edge"
                     )
-    # D-54.12: must observe at least one Phase 54 section wikilink — otherwise
-    # the backward-parity check is vacuous (no sections emitted yet = RED).
-    expected_total = sum(_count_graph_edges_by_relation(G).values())
+    # D-54.12: must observe forward + inverse wikilinks summing to 2× edges
+    # (each typed edge appears once on the code-side note as forward and once
+    # on the concept MOC as inverse — see _count_vault_wikilinks_by_relation
+    # parity bookkeeping). Original RED assertion conflated single-side count
+    # with total — corrected here to match the actual per-relation contract.
+    edge_count = sum(_count_graph_edges_by_relation(G).values())
+    expected_total = 2 * edge_count
     assert total_links_seen == expected_total, (
-        f"backward parity must inspect all {expected_total} concept↔code edges; "
+        f"backward parity must inspect forward+inverse wikilinks for all "
+        f"{edge_count} concept↔code edges (expected {expected_total} total); "
         f"observed {total_links_seen} wikilinks across all 10 Phase 54 sections"
     )
     assert not violations, "backward parity violations:\n  " + "\n  ".join(violations)
