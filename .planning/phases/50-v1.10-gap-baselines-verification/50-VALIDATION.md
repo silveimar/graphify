@@ -1,8 +1,8 @@
 ---
 phase: 50
 slug: v1-10-gap-baselines-verification
-status: draft
-nyquist_compliant: false
+status: complete
+nyquist_compliant: true
 wave_0_complete: true
 created: 2026-04-30
 ---
@@ -38,9 +38,9 @@ created: 2026-04-30
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 50-01-01 | 01 | 1 | HYG-01..03 | — | N/A (docs/traceability) | unit | `pytest tests/test_detect.py::test_detect_skips_dotfiles tests/test_extract.py::test_collect_files_from_dir tests/test_extract.py::test_collect_files_skips_nested_graphify_out -q` | ✅ | ⬜ pending |
-| 50-01-02 | 01 | 1 | HYG-01..03 | — | N/A | unit + full | `pytest tests/ -q` then grep HYG ticks in REQUIREMENTS.md | ✅ | ⬜ pending |
-| 50-01-03 | 01 | 1 | HYG-01..03 | — | N/A | grep | ROADMAP / VALIDATION / SUMMARY file checks per plan | ✅ | ⬜ pending |
+| 50-01-01 | 01 | 1 | HYG-01..03 | — | N/A (docs/traceability) | unit | `pytest tests/test_detect.py::test_detect_skips_dotfiles tests/test_extract.py::test_collect_files_from_dir tests/test_extract.py::test_collect_files_skips_nested_graphify_out -q` | ✅ | ✅ green |
+| 50-01-02 | 01 | 1 | HYG-01..03 | — | N/A | unit + full | `pytest tests/ -q` then grep HYG ticks in REQUIREMENTS.md | ✅ | ✅ green |
+| 50-01-03 | 01 | 1 | HYG-01..03 | — | N/A | grep | ROADMAP / VALIDATION / SUMMARY file checks per plan | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -64,11 +64,11 @@ created: 2026-04-30
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Full suite green before REQUIREMENTS ticks
-- [ ] `nyquist_compliant: true` set in frontmatter when Phase 50 executes
+- [x] All tasks have automated verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Full suite green before REQUIREMENTS ticks
+- [x] `nyquist_compliant: true` set in frontmatter when Phase 50 executes
 
-**Approval:** pending
+**Approval:** approved 2026-05-01

@@ -473,7 +473,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 </details>
 
 <details>
-<summary>Phase 50: v1.10 gap closure — Baselines verification — PLANNING</summary>
+<summary>Phase 50: v1.10 gap closure — Baselines verification — COMPLETE</summary>
 
 **Goal:** Close **`v1.10-MILESTONE-AUDIT`** gaps for **HYG-01**, **HYG-02**, **HYG-03**: produce **`45-VERIFICATION.md`**, reconcile REQUIREMENTS checkboxes with CI/tests and Phase **45** delivered work (`corpus_prune`, manifest stderr, dot_graphify, doctor tracks).
 
@@ -481,9 +481,9 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 
 **Requirements:** **HYG-01**, **HYG-02**, **HYG-03** (gap closure ownership).
 
-**Plans:** `50-01-PLAN.md` — verification artifact (`45-VERIFICATION.md`) + HYG-01..03 REQUIREMENTS sign-off (single wave).
+**Plans:** 1 plan — `[x] 50-01-PLAN.md` — Baselines verification artifact + REQ sign-off (HYG-01..03).
 
-**Artifacts:** `.planning/phases/50-v1.10-gap-baselines-verification/` (`50-RESEARCH.md`, `50-VALIDATION.md`, `50-01-PLAN.md`)
+**Artifacts:** `.planning/phases/45-baselines-detect-self-ingestion/45-VERIFICATION.md`; `.planning/phases/50-v1.10-gap-baselines-verification/` (`50-RESEARCH.md`, `50-VALIDATION.md`, `50-01-PLAN.md`, `50-01-SUMMARY.md`)
 
 </details>
 
@@ -579,7 +579,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
 | 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 2/2 | Complete | 2026-04-30 |
 | 49. CLI `--version`, stderr version line, skill/package stamp | v1.10 | 1/1 | Complete | 2026-05-01 |
-| 50. v1.10 gap — Baselines verification | v1.10 | 0/TBD | Not started | — |
+| 50. v1.10 gap — Baselines verification | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 51. v1.10 gap — MCP & trace REQ sign-off | v1.10 | 0/TBD | Not started | — |
 | 52. v1.10 gap — Phase 48 verification artifact | v1.10 | 0/TBD | Not started | — |
 

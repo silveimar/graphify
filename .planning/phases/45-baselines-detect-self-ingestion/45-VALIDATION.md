@@ -1,8 +1,8 @@
 ---
 phase: 45
 slug: baselines-detect-self-ingestion
-status: draft
-nyquist_compliant: false
+status: complete
+nyquist_compliant: true
 wave_0_complete: true
 created: 2026-04-30
 ---
@@ -38,18 +38,18 @@ created: 2026-04-30
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 45-01-01 | 01 | 1 | HYG-01 | T-path | Resolved paths confined to corpus root | unit | `pytest tests/test_detect.py -q` | ✅ | ⬜ pending |
-| 45-01-02 | 01 | 1 | HYG-01 | T-manifest | Manifest paths compared resolved-only | unit | `pytest tests/test_detect.py::test_*manifest* -q` | ❌ W0 add | ⬜ pending |
-| 45-02-01 | 02 | 2 | HYG-01 | T-yaml | Profile YAML never ingested as document | unit | `pytest tests/test_detect.py -q` | ✅ | ⬜ pending |
-| 45-03-01 | 03 | 3 | HYG-02 | — | Dot-path assertions pathlib + string | unit | `pytest tests/test_detect.py::test_detect_skips_dotfiles -q` | ✅ | ⬜ pending |
-| 45-03-02 | 03 | 3 | HYG-03 | — | collect_files parity | unit | `pytest tests/test_extract.py -q` | ✅ | ⬜ pending |
+| 45-01-01 | 01 | 1 | HYG-01 | T-path | Resolved paths confined to corpus root | unit | `pytest tests/test_detect.py -q` | ✅ | ✅ green |
+| 45-01-02 | 01 | 1 | HYG-01 | T-manifest | Manifest paths compared resolved-only | unit | `pytest tests/test_detect.py -q` | ✅ | ✅ green |
+| 45-02-01 | 02 | 2 | HYG-01 | T-yaml | Profile YAML never ingested as document | unit | `pytest tests/test_detect.py -q` | ✅ | ✅ green |
+| 45-03-01 | 03 | 3 | HYG-02 | — | Dot-path assertions pathlib + string | unit | `pytest tests/test_detect.py::test_detect_skips_dotfiles -q` | ✅ | ✅ green |
+| 45-03-02 | 03 | 3 | HYG-03 | — | collect_files parity | unit | `pytest tests/test_extract.py -q` | ✅ | ✅ green |
 
 ---
 
 ## Wave 0 Requirements
 
 - [x] Existing `tests/test_detect.py`, `tests/test_extract.py` — baseline
-- [ ] New tests from Plan 03 tasks — stubs acceptable after Plan 01 lands
+- [x] Plan 03 tasks landed (`test_detect_skips_dotfiles`, extract parity tests)
 
 *Wave 0 = existing infrastructure covers baseline gates until new tests land.*
 
@@ -65,8 +65,8 @@ created: 2026-04-30
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verify commands
-- [ ] Sampling continuity maintained across waves
-- [ ] `nyquist_compliant: true` after execution sign-off
+- [x] All tasks have automated verify commands
+- [x] Sampling continuity maintained across waves
+- [x] `nyquist_compliant: true` after execution sign-off
 
-**Approval:** pending
+**Approval:** approved 2026-05-01 (Phase 50 verification closure)
