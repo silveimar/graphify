@@ -1972,6 +1972,38 @@ def _run_entity_trace(
     budget = int(arguments.get("budget", 500))
     budget = max(50, min(budget, 100000))
 
+    # Plan 54-03 / D-54.04: optional concept↔code merge into the trace envelope.
+    # Coerced once up-front; truthy non-bool values activate the branch (matches
+    # existing Phase 11 idiom for boolean flags — T-54-08 mitigation). When False
+    # / absent, the meta dict is left byte-identical to Phase 11 (T-54-11).
+    include_cc = bool(arguments.get("include_concept_code", False))
+
+    def _maybe_merge_concept_code(meta_obj: dict, candidate_id: str) -> None:
+        """If ``include_cc`` and ``candidate_id`` is a real graph node, attach
+        ``concept_code_reachable`` and ``concept_code_steps_by_relation`` to
+        ``meta_obj`` in-place. No-op otherwise — preserves Phase 11 envelope
+        byte-for-byte on the default path."""
+        if not include_cc:
+            return
+        if candidate_id not in G:
+            return
+        depth_map_cc, _hop_labels_cc, steps_by_rel_cc, _trav_cc, _trunc_cc = (
+            _bfs_concept_code_from(
+                G,
+                start_id=candidate_id,
+                max_hops=2,                 # D-54.10 — fixed, no new tunable
+                direction="both",
+                relations=_ALLOWED_CONCEPT_CODE_RELATIONS,
+            )
+        )
+        meta_obj["concept_code_reachable"] = sorted(
+            nid for nid in depth_map_cc if nid != candidate_id
+        )
+        meta_obj["concept_code_steps_by_relation"] = {
+            rel: steps_by_rel_cc.get(rel, 0)
+            for rel in sorted(_ALLOWED_CONCEPT_CODE_RELATIONS)
+        }
+
     entity_raw = sanitize_label(str(arguments.get("entity", "")))
     if not entity_raw:
         meta: dict = {
@@ -1981,6 +2013,7 @@ def _run_entity_trace(
             "cardinality_estimate": None,
             "continuation_token": None,
         }
+        # No entity to anchor a concept↔code BFS — skip the merge silently.
         return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
     # Phase 10 D-16: alias resolution — scoped per-call for thread safety.
@@ -1998,6 +2031,27 @@ def _run_entity_trace(
 
     entity_resolved = _resolve_alias(entity_raw)
 
+    # Plan 54-03: pre-compute a single concept↔code anchor candidate. We use
+    # the same exact-label-match precedence as ``_run_concept_code_hops`` so
+    # ``include_concept_code=True`` works on early-return paths (e.g.
+    # ``insufficient_history``) where the temporal trace has no data but a
+    # static concept↔code merge is still meaningful. This does NOT change
+    # downstream temporal-trace logic which still calls ``_find_node`` itself.
+    cc_anchor: str | None = None
+    if include_cc:
+        cc_matches = _find_node(G, entity_resolved)
+        if len(cc_matches) > 1:
+            term_lc = entity_resolved.lower()
+            exact_cc = [
+                nid for nid in cc_matches
+                if G.nodes[nid].get("label", "").lower() == term_lc
+                or nid.lower() == term_lc
+            ]
+            if exact_cc:
+                cc_matches = exact_cc
+        if len(cc_matches) >= 1:
+            cc_anchor = cc_matches[0]
+
     # List prior snapshots from snaps_dir.
     snaps = list_snapshots(snaps_dir)
 
@@ -2014,6 +2068,8 @@ def _run_entity_trace(
         }
         if _resolved_aliases:
             meta["resolved_from_alias"] = _resolved_aliases
+        if cc_anchor is not None:
+            _maybe_merge_concept_code(meta, cc_anchor)
         return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
     # Initial resolution on the live graph — check for ambiguity first.
@@ -2037,6 +2093,8 @@ def _run_entity_trace(
         }
         if _resolved_aliases:
             meta["resolved_from_alias"] = _resolved_aliases
+        if cc_anchor is not None:
+            _maybe_merge_concept_code(meta, cc_anchor)
         return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
     # Walk snapshot chain with memory discipline: extract scalars then del G_snap.
@@ -2075,6 +2133,8 @@ def _run_entity_trace(
         }
         if _resolved_aliases:
             meta["resolved_from_alias"] = _resolved_aliases
+        if cc_anchor is not None:
+            _maybe_merge_concept_code(meta, cc_anchor)
         return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
     # Append live graph as "tip" data point.
@@ -2128,6 +2188,10 @@ def _run_entity_trace(
     }
     if _resolved_aliases:
         meta["resolved_from_alias"] = _resolved_aliases
+    # Plan 54-03 / D-54.04: optional concept↔code merge. ``entity_id_out`` is
+    # the live-graph node id when matched, falling back to the resolved alias
+    # — the helper guards against non-graph ids by checking ``in G``.
+    _maybe_merge_concept_code(meta, entity_id_out)
     return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
 
@@ -2214,6 +2278,68 @@ def _validate_relations_arg(raw: object) -> tuple[frozenset[str], str | None]:
                 f"Allowed values: {allowed_sorted}"
             )
     return frozenset(raw), None
+
+
+def _bfs_concept_code_from(
+    G: nx.Graph,
+    start_id: str,
+    max_hops: int,
+    direction: str,
+    relations: frozenset[str],
+) -> tuple[dict[str, int], dict[str, str], dict[str, int], int, bool]:
+    """Concept↔code BFS factored out of ``_run_concept_code_hops`` (Plan 54-03).
+
+    Returns ``(depth_map, hop_labels, steps_by_relation, traversals, truncated)``.
+
+    - ``depth_map`` maps every reachable node id (including ``start_id`` at depth 0)
+      to its BFS depth.
+    - ``hop_labels`` maps a child id to the direction ``kind`` of the tree edge
+      ``parent → child`` (``"code_to_concept"`` / ``"concept_to_code"`` / ``"both"``).
+    - ``steps_by_relation`` is initialised at zero for every requested relation and
+      incremented per accepted hop.
+    - ``traversals`` is the total number of accepted hops considered (capped by
+      ``_IMPL_EDGE_BUDGET``).
+    - ``truncated`` is True when the budget was hit.
+
+    Pure function: never mutates ``G``. Reused by ``_run_entity_trace`` so the
+    concept↔code traversal logic lives in exactly one place (D-54.03 / D-54.04).
+    """
+    depth_map: dict[str, int] = {start_id: 0}
+    parent: dict[str, str | None] = {start_id: None}
+    hop_labels: dict[str, str] = {}
+    queue: deque[str] = deque([start_id])
+    traversals = 0
+    steps_by_relation: dict[str, int] = {rel: 0 for rel in relations}
+    truncated = False
+
+    if start_id not in G:
+        return depth_map, hop_labels, steps_by_relation, traversals, truncated
+
+    while queue:
+        u = queue.popleft()
+        du = depth_map[u]
+        if du >= max_hops:
+            continue
+        for v in G.neighbors(u):
+            if traversals >= _IMPL_EDGE_BUDGET:
+                truncated = True
+                queue.clear()
+                break
+            allowed = _concept_code_hop_allowed(
+                G, u, v, direction, relations
+            )
+            if allowed is None:
+                continue
+            rel_name, kind = allowed
+            steps_by_relation[rel_name] = steps_by_relation.get(rel_name, 0) + 1
+            traversals += 1
+            if v not in depth_map:
+                depth_map[v] = du + 1
+                parent[v] = u
+                hop_labels[v] = kind
+                queue.append(v)
+
+    return depth_map, hop_labels, steps_by_relation, traversals, truncated
 
 
 def _run_concept_code_hops(
@@ -2322,37 +2448,11 @@ def _run_concept_code_hops(
         return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
     start_id = live_matches[0]
-    depth_map: dict[str, int] = {start_id: 0}
-    parent: dict[str, str | None] = {start_id: None}
-    hop_labels: dict[str, str] = {}  # child -> implements hop kind for tree edge parent[child]->child
-    queue: deque[str] = deque([start_id])
-    traversals = 0
-    steps_by_relation: dict[str, int] = {rel: 0 for rel in requested_relations}
-    truncated = False
-
-    while queue:
-        u = queue.popleft()
-        du = depth_map[u]
-        if du >= max_hops:
-            continue
-        for v in G.neighbors(u):
-            if traversals >= _IMPL_EDGE_BUDGET:
-                truncated = True
-                queue.clear()
-                break
-            allowed = _concept_code_hop_allowed(
-                G, u, v, direction, requested_relations
-            )
-            if allowed is None:
-                continue
-            rel_name, kind = allowed
-            steps_by_relation[rel_name] = steps_by_relation.get(rel_name, 0) + 1
-            traversals += 1
-            if v not in depth_map:
-                depth_map[v] = du + 1
-                parent[v] = u
-                hop_labels[v] = kind
-                queue.append(v)
+    depth_map, hop_labels, steps_by_relation, traversals, truncated = (
+        _bfs_concept_code_from(
+            G, start_id, max_hops, direction, requested_relations,
+        )
+    )
 
     # Build summary lines for reachable nodes (excluding start): label + depth + hop kind into node
     reachable = sorted(
