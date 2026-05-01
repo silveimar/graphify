@@ -180,6 +180,36 @@ def validate_extraction(data: dict) -> list[str]:
                     f"Edge {i} has invalid confidence '{edge['confidence']}' "
                     f"- must be one of {sorted(VALID_CONFIDENCES)}"
                 )
+            # Phase 53 (D-53.07-09): evidence/score rule for the four new concept↔code relations.
+            # `implements` is intentionally excluded (D-53.10 backward compat).
+            rel = edge.get("relation")
+            conf = edge.get("confidence")
+            if rel in NEW_CONCEPT_CODE_RELATIONS:
+                if conf == "EXTRACTED":
+                    ev = edge.get("evidence")
+                    if not isinstance(ev, str) or not ev:
+                        errors.append(
+                            f"Edge {i} relation={rel!r} confidence=EXTRACTED requires "
+                            f"non-empty 'evidence' field"
+                        )
+                    elif ev not in KNOWN_EVIDENCE_VALUES:
+                        errors.append(
+                            f"Edge {i} relation={rel!r} has unknown evidence {ev!r} - "
+                            f"must be one of {sorted(KNOWN_EVIDENCE_VALUES)}"
+                        )
+                elif conf == "INFERRED":
+                    raw = edge.get("confidence_score")
+                    score: float | None
+                    try:
+                        score = float(raw) if raw is not None else None
+                    except (TypeError, ValueError):
+                        score = None
+                    if score is None or not (0.0 <= score <= 1.0):
+                        errors.append(
+                            f"Edge {i} relation={rel!r} confidence=INFERRED requires "
+                            f"'confidence_score' in [0.0, 1.0]"
+                        )
+                # AMBIGUOUS: permitted without evidence/score (D-53.09).
             if "source" in edge and node_ids and edge["source"] not in node_ids:
                 errors.append(f"Edge {i} source '{edge['source']}' does not match any node id")
             if "target" in edge and node_ids and edge["target"] not in node_ids:
