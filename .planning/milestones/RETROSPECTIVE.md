@@ -352,6 +352,35 @@
 
 ---
 
+## Milestone: v1.10 — Stability, Baselines & Concept↔Code MVP
+
+**Shipped:** 2026-05-01  
+**Phases:** 8 tracks (45–52) | **Plans:** 14 | **Requirements:** 13/13
+
+### What Was Built
+
+- Shared **`corpus_prune`** semantics across **`detect`**, **`extract.collect_files`**, and **`doctor`** (nested output + ignore equivalence).
+- Concept↔code relation types in **`validate.py`**, deterministic normalization in **`build.py`**, MCP **`concept_code_hops`** with **`47-VERIFICATION`** / **D-51.03** REQ mapping.
+- CLI **`--version`** / **`-V`**, stderr success footer, **`graphify.version.package_version()`**, directional skill-stamp warnings.
+- Formal **`*-VERIFICATION.md`** gap closures (**50→45**, **51→47**, **52→48**) for audit parity.
+
+### What Worked
+
+- **Audit-first gap closures:** Phases **50–52** existed solely to satisfy evidence debt — predictable, low-risk closes once Phase **45/47/48** implementation was done.
+- **Milestone audit before close:** **`v1.10-MILESTONE-AUDIT.md`** (`passed`) de-risked **`/gsd-complete-milestone`**.
+
+### What Was Inefficient
+
+- **`milestone.complete` CLI stats** under-counted phases (SDK saw 2 phases vs 8 on disk) — **MILESTONES.md** corrected manually.
+- **`gsd-integration-checker`** unavailable during audit (API limit) — substituted manual wiring review; noted in audit YAML.
+
+### Key Lessons
+
+1. **Trust disk over stale SDK milestone counters** when reconciling MILESTONES.md entries after automation.
+2. **Keep gap-phase verification pointers explicit** in REQUIREMENTS traceability (50→45, etc.) so “missing VERIFICATION in phase dir” is not misread as orphan scope.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -442,4 +471,4 @@ Agent-discoverable MCP surface (introspection-driven capability manifest + harne
 
 ---
 
-_Retrospective last updated: 2026-04-23 after v1.4 milestone completion (v1.3 backfilled alongside)._
+_Retrospective last updated: 2026-05-01 after v1.10 milestone completion._

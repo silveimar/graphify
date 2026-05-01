@@ -8,17 +8,13 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: v1.10 Stability, Baselines & Concept↔Code MVP
+## Current milestone
 
-**Goal:** Close carried-forward hygiene (detect self-ingestion quick task, inherited baseline test failures) and ship a scoped MVP for first-class concept↔code relationships in the NetworkX graph—typed edges, validation, and MCP/`/trace` surfacing aligned with **SEED-bidirectional-concept-code-links**.
+**Next:** Define **v1.11** (or the next numbered milestone) via `/gsd-new-milestone`. Repo-root `.planning/REQUIREMENTS.md` was reset after **v1.10** close; numbering continues after **Phase 52**.
 
-**Target features:**
+## Shipped: v1.10 Stability, Baselines & Concept↔Code MVP (2026-05-01)
 
-- Deliver quick-task **`260427-rc7-fix-detect-self-ingestion`** and verify detect behavior against regressions.
-- Resolve or intentionally reconcile **`test_detect_skips_dotfiles`** and **`test_collect_files_from_dir`** with documented contracts.
-- **Concept↔code MVP:** validated relation type(s), build/extract pathway, MCP query surfaces, and at least one golden-path **`/trace`** / `entity_trace` scenario backed by tests. *(Phase 46 shipped schema + build merge + report sanitization for **CCODE-01/02/05**; MCP/trace = Phase 47.)*
-
-**Phases:** Continue numbering from **Phase 45** (see `.planning/ROADMAP.md`). Requirements: `.planning/REQUIREMENTS.md`.
+Detect/extract **`corpus_prune`** baselines + manifest parity (**HYG-01..03**); concept↔code schema, deterministic merge, MCP **`concept_code_hops`** + **`47-VERIFICATION`** mapping (**CCODE-01..05**); **`.graphifyignore`** / canonical **`graphify-out`** (**HYG-04/05**); CLI **`--version`** / skill stamp (**CLI-VER-01/02**). Gap closures **50–52** produced formal **`*-VERIFICATION.md`** artifacts. **13/13** requirements. Archives: `.planning/milestones/v1.10-*`.
 
 ## Shipped: v1.8 Output Taxonomy & Cluster Quality (2026-04-29)
 
@@ -51,9 +47,6 @@ Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community out
 **Seed carryover into v1.7 backlog:**
 - SEED-001 (Tacit-to-Explicit Elicitation Engine) — dormant. Trigger: onboarding/discovery becomes a milestone theme.
 - SEED-002 (Harness Memory Export) — dormant. claude.yaml shipped in v1.4; multi-harness expansion (codex/letta/honcho/AGENTS.md) + inverse-import deferred pending prompt-injection defenses.
-
-**Carryover tech debt:**
-- 2 baseline test failures (`tests/test_detect.py::test_detect_skips_dotfiles`, `tests/test_extract.py::test_collect_files_from_dir`) — pre-existing on base 24810ec; deferred to v1.7 `/gsd-debug` session.
 
 ## Requirements
 
@@ -142,6 +135,13 @@ Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community out
 - ✓ Docs, skill variants, sanitizer matrix, install guidance regression tests — VER
 - ✓ Phase 38 planning reconciliation for dormant seeds and quick-task lifecycle (docs-only) — P38-SCOPE
 
+**v1.10 — Stability, Baselines & Concept↔Code MVP:** *(Shipped 2026-05-01, phases 45–52; 13/13 requirements; milestone audit passed)*
+- ✓ **HYG-01..03** — Shared **`corpus_prune`** / **`collect_files`** parity with **`detect`**, manifest stderr, optional **`corpus.dot_graphify`** + doctor tracks; formal **`45-VERIFICATION.md`**
+- ✓ **HYG-04..05** — Doctor duplicate-ignore suppression; nested **`graphify-out`** pruning + canonical **`artifacts_dir`**; **`48-VERIFICATION.md`**
+- ✓ **CCODE-01..05** — Validated concept↔code relations, deterministic **`build`** merge, **`security.py`** sanitization on report surfaces
+- ✓ **CCODE-03..04** — MCP **`concept_code_hops`**; REQ wording reconciled vs **`/trace`** / **`entity_trace`** per **`47-VERIFICATION.md`** (**D-51.03**)
+- ✓ **CLI-VER-01..02** — **`graphify --version`** / **`-V`**, success-footer version line, directional skill-stamp warnings
+
 **v1.6 — Hardening & Onboarding:** *(Shipped 2026-04-27, phases 23 + 24 + 25 + 26; 15/15 requirements)*
 - ✓ Dedup `source_file` list-handling fix — `dedup.py` edge-merge delegates list-shape handling to `analyze._iter_sources`; cross-type regression test green (Issue #4) — DEDUP-01..03
 - ✓ Manifest writer hardening — `RoutingAudit.flush` + `write_manifest_atomic` perform read-merge-write keyed by row identity (path/tool name) before atomic `.tmp` + `os.replace`; subpath isolation regression tests assert sibling rows preserved; AUDIT.md enumerates all 5 on-disk writers with PATCHED/LOCKED/DEFERRED dispositions — MANIFEST-09..12
@@ -150,7 +150,7 @@ Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community out
 
 ### Active
 
-**v1.10 — Stability, Baselines & Concept↔Code MVP:** Scoped requirements and phased roadmap live in `.planning/REQUIREMENTS.md` and `.planning/ROADMAP.md` (phases **45+**).
+*(None — start the next milestone with `/gsd-new-milestone`.)*
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -270,14 +270,15 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Shipped v1.9** (2026-04-30) — Onboarding & elicitation, harness portability + defenses, vault CLI (`--vault`, multi-vault), gap closures (ELIC-02, TRACE-01). Phases 39–44. Archives under `.planning/milestones/v1.9-*`.
 
-**In planning: v1.10** — Baselines, detect self-ingestion quick task, concept↔code graph MVP; see `.planning/REQUIREMENTS.md`.
+**Shipped v1.10** (2026-05-01) — See **Shipped: v1.10** section above and `.planning/milestones/v1.10-*`.
 
 ## Next Milestone Goals
 
-**v1.10 is active.** Candidates outside current v1.10 scope for future milestones:
+Candidates for **v1.11+** (not committed until `/gsd-new-milestone`):
 
 - Full **SEED-001** / **SEED-002** expansion beyond what v1.9 shipped (only if explicitly re-scoped).
 - Template engine items still under **Deferred** (TMPL/CFG backlog).
+- Dormant seeds and registry quick-task hygiene (see `STATE.md` — Deferred Items after v1.10 close).
 
 ---
-*Last updated: 2026-04-30 — Phase 46 (CCODE-01/02/05) complete; MCP/trace remains Phase 47.*
+*Last updated: 2026-05-01 — v1.10 milestone shipped; planning reset for next milestone.*

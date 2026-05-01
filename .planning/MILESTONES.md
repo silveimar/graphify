@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.10 Stability, Baselines & Concept↔Code MVP (Shipped: 2026-05-01)
+
+**Phases completed:** 8 phase tracks (45–52), 14 plans
+
+**Known deferred items at close:** 5 open artifact audit items acknowledged — quick-task slug present only as registry entry; 4 dormant seeds unchanged (see `STATE.md` — Deferred Items)
+
+**Key accomplishments:**
+
+- **HYG / baselines:** Shared **`corpus_prune`** + **`build_prior_files`** across **`detect`** and **`extract.collect_files`**; manifest skip **`stderr`**; optional **`corpus.dot_graphify`** + doctor track/apply; formal **`45-VERIFICATION.md`** (Phase **50** gap closure).
+- **Concept↔code MVP:** Validated relation types, deterministic **`build`** merge + **`graph.json`** parity, **`sanitize_label_md`** on relations; MCP **`concept_code_hops`** + **`47-VERIFICATION`** / Phase **51** REQ mapping (**D-51.03**).
+- **Output hygiene:** Doctor **`self_ingest_graphifyignore_hint_redundant`**; nested **`graphify-out`** pruning + canonical **`artifacts_dir`**; **`48-VERIFICATION.md`** (Phase **52**).
+- **CLI provenance:** **`graphify --version`** / **`-V`**, success-footer **`[graphify] version`**, directional skill-stamp warnings; **`graphify.version.package_version()`** single reader.
+
+---
+
 ## v1.9 Onboarding, Harness Portability & Vault CLI (Shipped: 2026-04-30)
 
 **Phases completed:** 13 phases, 48 plans, 55 tasks
