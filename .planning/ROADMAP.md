@@ -534,7 +534,13 @@ Plans:
 2. `build` / merge produces deterministic dedupe and stable IDs for concept↔code edges across re-runs, with structural edges unaffected (**CGRAPH-02**).
 3. Extraction-output schema documentation updated; round-trip fixture demonstrates concept↔code edges surviving build (**CGRAPH-01**, **CGRAPH-02**).
 
-**Plans:** `.planning/phases/53-concept-code-schema-build-merge/` (TBD during `/gsd-plan-phase 53`).
+**Plans:** 4 plans
+
+Plans:
+- [ ] `53-01-PLAN.md` — Round-trip fixture + failing tests (RED)
+- [ ] `53-02-PLAN.md` — `validate.py`: 4 new relations + `evidence`/score rule (GREEN-schema)
+- [ ] `53-03-PLAN.md` — `build.py`: canonical `_merge_edge_fields` + 5-relation orient + final canonical sort (GREEN-build)
+- [ ] `53-04-PLAN.md` — `docs/RELATIONS.md` update + full-suite phase gate
 
 **UI hint:** no — schema and build-pipeline work, no surface change.
 
