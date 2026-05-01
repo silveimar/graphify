@@ -31,6 +31,18 @@ from .validate import validate_extraction
 
 _CONF_RANK = {"EXTRACTED": 3, "INFERRED": 2, "AMBIGUOUS": 1}
 
+# Phase 53 (D-53.02): all five concept↔code relations are oriented code → concept.
+# Note: opposite-direction collapse is intentionally NOT extended to the four new
+# relations — they have no `_by` synonym and merging cross-direction edges would
+# silently destroy user-distinct data (see 53-RESEARCH §"Extend orientation").
+CONCEPT_CODE_RELATIONS: tuple[str, ...] = (
+    "implements",
+    "documents",
+    "tests",
+    "realizes",
+    "instantiates",
+)
+
 
 def _edge_priority(edge: dict[str, Any]) -> tuple[int, float]:
     """Higher tuple compares better: confidence ladder first, then confidence_score tie-break."""
@@ -122,7 +134,7 @@ def _normalize_concept_code_edges(nodes: list[dict[str, Any]], edges: list[dict[
             e["relation"] = "implements"
             e["source"], e["target"] = e["target"], e["source"]
             rel = "implements"
-        if rel == "implements":
+        if rel in CONCEPT_CODE_RELATIONS:
             s, t = orient(str(e["source"]), str(e["target"]))
             e["source"], e["target"] = s, t
 
@@ -171,6 +183,15 @@ def _normalize_concept_code_edges(nodes: list[dict[str, Any]], edges: list[dict[
 
     edges[:] = rest + impl_out
 
+    # Phase 53 (D-53.06): canonical sort across ALL relations — concept↔code AND structural —
+    # so that edge insertion order into NetworkX is deterministic across re-runs. NetworkX
+    # >= 2.0 preserves dict insertion order on iteration.
+    edges.sort(key=lambda e: (
+        str(e.get("source", "")),
+        str(e.get("target", "")),
+        str(e.get("relation", "")),
+    ))
+
 
 def build_from_json(extraction: dict, *, directed: bool = False) -> nx.Graph:
     """Build a NetworkX graph from an extraction dict.
@@ -197,7 +218,38 @@ def build_from_json(extraction: dict, *, directed: bool = False) -> nx.Graph:
     if real_errors:
         print(f"[graphify] Extraction warning ({len(real_errors)} issues): {real_errors[0]}", file=sys.stderr)
     G: nx.Graph = nx.DiGraph() if directed else nx.Graph()
-    for node in extraction.get("nodes", []):
+    # Phase 53 (D-53.06 / W2): insert nodes in canonical-edge-source order so that
+    # NetworkX undirected edge iteration matches the (source, target, relation)
+    # ascending sort applied by _normalize_concept_code_edges. NetworkX iterates
+    # edges per-node in node insertion order; if nodes are added in arbitrary
+    # input order, edge iteration won't match the canonical sort even though the
+    # underlying edge list is sorted. Isolated nodes (not appearing as any edge
+    # endpoint) are appended afterward.
+    nodes_by_id = {node["id"]: node for node in extraction.get("nodes", []) if "id" in node}
+    insertion_order: list[str] = []
+    seen: set[str] = set()
+    # First pass: add edge SOURCES in edge order (edges already canonically sorted by
+    # _normalize_concept_code_edges). This ensures every edge endpoint listed as
+    # `source` has a lower node-insertion index than the corresponding `target`,
+    # so NetworkX undirected iteration yields (source, target) tuples in canonical order.
+    for edge in extraction.get("edges", []):
+        nid = edge.get("source")
+        if isinstance(nid, str) and nid in nodes_by_id and nid not in seen:
+            seen.add(nid)
+            insertion_order.append(nid)
+    # Second pass: add edge TARGETS not yet seen.
+    for edge in extraction.get("edges", []):
+        nid = edge.get("target")
+        if isinstance(nid, str) and nid in nodes_by_id and nid not in seen:
+            seen.add(nid)
+            insertion_order.append(nid)
+    # Third pass: append isolated nodes (those not appearing in any edge) in original input order.
+    for nid in nodes_by_id:
+        if nid not in seen:
+            insertion_order.append(nid)
+            seen.add(nid)
+    for nid in insertion_order:
+        node = nodes_by_id[nid]
         G.add_node(node["id"], **{k: v for k, v in node.items() if k != "id"})
     node_set = set(G.nodes())
     for edge in extraction.get("edges", []):
