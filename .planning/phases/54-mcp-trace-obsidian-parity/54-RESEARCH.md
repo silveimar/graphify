@@ -761,13 +761,15 @@ Assuming a single community {0: all 6 nodes}:
 | A4 | Wikilink target for CODE notes is `build_code_filename_stems` output; for MOCs is `ConceptName.filename_stem` | OQ4 / Wave 3 | If wrong, wikilinks point to non-existent files. Test caught by forward parity assertion. |
 | A5 | `graphify_version` PyPI bump deferred to milestone close, not Phase 54 | Phase 54 close-out | If planner decides to bump now, manifest_content_hash includes `graphify_version` so server.json must regenerate twice. Low cost. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **D-54.10 strictness on `moc.md` edit.** Researcher reads it as "no NEW template files, no profile knobs" — adding `${body}` to existing builtin moc.md is allowed. Planner may need to surface this in 54-VERIFICATION.md as an explicit clarification.
+1. **D-54.10 strictness on `moc.md` edit.** Researcher reads it as "no NEW template files, no profile knobs" — adding `${body}` to existing builtin moc.md is allowed.
    - **Recommendation:** Document the carve-out in 54-VERIFICATION.md mapping table (D-54.06).
+   - **RESOLVED:** A1 carve-out adopted in Plan 04 — adding the `${body}` slot to the existing builtin `moc.md` is treated as an additive edit to an existing template, NOT the creation of a new template, per D-54.10's intent ("no NEW template files, no profile knobs"). Plan 04 Task 2 documents this carve-out and emits it under the existing `_render_moc_like` substitution_ctx. 54-VERIFICATION.md will mirror the carve-out in its D-54.10 mapping row.
 
 2. **Should the `concept_code_relations` sentinel-wrapped block be inside `${body}` or sit alongside `${connections_callout}`?**
    - **Recommendation:** Inside `${body}` for both note types — keeps it a single, semantically-named substitution variable; easier round-trip.
+   - **RESOLVED:** Sentinel-wrap goes inside `${body}` for both code notes and concept MOCs. Plan 04 Task 1 (code notes) and Task 2 (MOCs) both populate `substitution_ctx["body"]` with `_wrap_sentinel("concept_code_relations", per_relation_sections)` — the wrap happens at the section-builder return, and the wrapped string substitutes into the existing `${body}` slot. This keeps the round-trip parser stable (single sentinel boundary, single substitution variable) and avoids touching `connections_callout` or any other slot.
 
 ## Environment Availability
 
