@@ -489,7 +489,7 @@ Typed **concept↔code** edges, **template** conditionals/loops/Dataview hooks, 
 | 51. v1.10 gap — MCP & trace REQ sign-off | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 52. v1.10 gap — Phase 48 verification artifact | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 53. Concept↔code schema & build merge | v1.11 | 4/4 | Complete   | 2026-05-01 |
-| 54. MCP, trace & Obsidian parity | v1.11 | 4/5 | In Progress|  |
+| 54. MCP, trace & Obsidian parity | v1.11 | 5/5 | Complete   | 2026-05-01 |
 | 55. Template conditionals & connection loops | v1.11 | 0/? | Not started | — |
 | 56. Dataview templates & profile overrides | v1.11 | 0/? | Not started | — |
 | 57. Elicitation & harness increment | v1.11 | 0/? | Not started | — |
@@ -557,14 +557,14 @@ Plans:
 1. MCP exposes typed concept↔code hop/query behavior consistent with v1.10 `concept_code_hops` and `/trace` expectations; documented mapping table lives in verification artifacts (**CGRAPH-03**).
 2. Obsidian CODE / concept MOC export reflects graph-level concept↔code edges (no divergence between graph and vault output); golden-path test asserts parity on a fixture corpus (**CGRAPH-04**).
 
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 
 Plans:
 - [x] 54-01-PLAN.md — Wave 1 (RED): failing MCP + Obsidian parity tests + vault_parity fixtures
 - [x] 54-02-PLAN.md — Wave 2 (GREEN): concept_code_hops widening with relations filter + payload shim
 - [x] 54-03-PLAN.md — Wave 3 (GREEN): entity_trace include_concept_code extension
 - [x] 54-04-PLAN.md — Wave 4 (GREEN): Obsidian per-relation sections in code+moc body slot (A1 carve-out adopted)
-- [ ] 54-05-PLAN.md — Wave 5 (close-out): docs/RELATIONS.md + server.json regen + 54-VERIFICATION.md mapping table
+- [x] 54-05-PLAN.md — Wave 5 (close-out): docs/RELATIONS.md + server.json regen + 54-VERIFICATION.md mapping table
 
 **UI hint:** yes — `/trace` slash workflow and MCP capability surfaces.
 

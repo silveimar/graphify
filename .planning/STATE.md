@@ -4,14 +4,14 @@ milestone: v1.11
 milestone_name: milestone
 status: Roadmap approved — ready for `/gsd-discuss-phase 53` or `/gsd-plan-phase 53`
 stopped_at: Phase 54 context gathered
-last_updated: "2026-05-01T05:54:01.590Z"
+last_updated: "2026-05-01T06:06:38.984Z"
 last_activity: 2026-04-30 — Milestone v1.11 roadmap **53–58** recorded
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 8
-  percent: 89
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -66,6 +66,7 @@ Last activity: 2026-04-30 — Milestone v1.11 roadmap **53–58** recorded
 | Phase 37 P02 | 5min | 2 tasks | 3 files |
 | Phase 54 P02 | 543s | 2 tasks | 3 files |
 | Phase 54 P4 | 1h | 2 tasks | 4 files |
+| Phase 54 P5 | 25min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,7 @@ Locked v1.8 choices:
 - [Phase ?]: Tuple-returning hop predicate attributes hops to relation in single lookup (concept_code_hops)
 - [Phase ?]: Backward-compat shim: implements_traversal_steps emitted only when requested set == frozenset({implements})
 - [Phase ?]: Exact-label-match precedence disambiguates substring collisions before ambiguity envelope
+- [Phase ?]: Phase 54 close: A1 carve-out ADOPTED; Plan 04 dev. #4 honestly documented (inverse sections render on rationale notes, not community MOCs)
 
 ### Pending Todos
 
@@ -207,6 +209,6 @@ Open artifact audit items acknowledged at ship (`audit-open`); no runtime blocke
 
 ## Session Continuity
 
-Last session: 2026-05-01T05:21:21.897Z
+Last session: 2026-05-01T06:06:35.715Z
 Stopped at: Phase 54 context gathered
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
