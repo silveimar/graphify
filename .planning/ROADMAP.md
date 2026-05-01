@@ -481,9 +481,9 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 
 **Requirements:** **HYG-01**, **HYG-02**, **HYG-03** (gap closure ownership).
 
-**Plans:** TBD `/gsd-plan-phase 50`.
+**Plans:** `50-01-PLAN.md` — verification artifact (`45-VERIFICATION.md`) + HYG-01..03 REQUIREMENTS sign-off (single wave).
 
-**Artifacts:** `.planning/phases/50-v1.10-gap-baselines-verification/`
+**Artifacts:** `.planning/phases/50-v1.10-gap-baselines-verification/` (`50-RESEARCH.md`, `50-VALIDATION.md`, `50-01-PLAN.md`)
 
 </details>
 
