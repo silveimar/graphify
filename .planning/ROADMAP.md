@@ -488,7 +488,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 </details>
 
 <details>
-<summary>Phase 51: v1.10 gap closure — MCP & trace REQ sign-off — PLANNING</summary>
+<summary>Phase 51: v1.10 gap closure — MCP & trace REQ sign-off — COMPLETE</summary>
 
 **Goal:** Close audit gaps for **CCODE-03**, **CCODE-04**: execute or complete Phase **47** scope, **`47-VERIFICATION.md`**, manifest/capability/skills alignment; reconcile REQ wording with **`concept_code_hops`** vs **`/trace`** / **`entity_trace`** as documented.
 
@@ -496,9 +496,9 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 
 **Requirements:** **CCODE-03**, **CCODE-04**.
 
-**Plans:** TBD `/gsd-plan-phase 51` (may wrap or extend **47** execution).
+**Plans:** 1 plan — `[x] 51-01-PLAN.md` — **`47-VERIFICATION.md`** + CCODE REQ sign-off (**D-51.03** mapping).
 
-**Artifacts:** `.planning/phases/51-v1.10-gap-mcp-trace-req-signoff/`
+**Artifacts:** `.planning/phases/47-mcp-trace-integration/47-VERIFICATION.md`; `.planning/phases/51-v1.10-gap-mcp-trace-req-signoff/` (`51-CONTEXT.md`, `51-RESEARCH.md`, `51-VALIDATION.md`, `51-01-PLAN.md`, `51-01-SUMMARY.md`)
 
 </details>
 
@@ -576,11 +576,11 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 44. Verification / Nyquist artifacts TRACE-01 (gap closure) | v1.9 | 4/4 | Complete | 2026-04-30 |
 | 45. Baselines & Detect Self-Ingestion | v1.10 | 3/3 | Executed — verification gap → **50** | — |
 | 46. Concept↔Code Schema, Build Merge & Security | v1.10 | 3/3 | Complete | 2026-04-30 |
-| 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
+| 47. MCP & Trace Integration | v1.10 | 2/2 | Complete | 2026-05-01 |
 | 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 2/2 | Complete | 2026-04-30 |
 | 49. CLI `--version`, stderr version line, skill/package stamp | v1.10 | 1/1 | Complete | 2026-05-01 |
 | 50. v1.10 gap — Baselines verification | v1.10 | 1/1 | Complete    | 2026-05-01 |
-| 51. v1.10 gap — MCP & trace REQ sign-off | v1.10 | 0/TBD | Not started | — |
+| 51. v1.10 gap — MCP & trace REQ sign-off | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 52. v1.10 gap — Phase 48 verification artifact | v1.10 | 0/TBD | Not started | — |
 
 ### Phase 47: MCP & Trace Integration

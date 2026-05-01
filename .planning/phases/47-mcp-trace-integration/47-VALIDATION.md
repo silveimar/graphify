@@ -1,8 +1,8 @@
 ---
 phase: 47
 slug: mcp-trace-integration
-status: draft
-nyquist_compliant: false
+status: complete
+nyquist_compliant: true
 wave_0_complete: true
 created: 2026-04-30
 ---
@@ -28,9 +28,9 @@ created: 2026-04-30
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Status |
 |---------|------|------|-------------|-----------|---------------------|--------|
-| 47-01-01 | 01 | 1 | CCODE-03 | unit | `pytest tests/test_concept_code_mcp.py -q` | pending |
-| 47-01-02 | 01 | 1 | CCODE-04 | unit | `pytest tests/test_concept_code_mcp.py::test_concept_code_hops_golden_path -q` | pending |
-| 47-02-01 | 02 | 2 | CCODE-03 docs | grep | `grep -q concept_code_hops docs/RELATIONS.md` | pending |
+| 47-01-01 | 01 | 1 | CCODE-03 | unit | `pytest tests/test_concept_code_mcp.py -q` | ✅ green |
+| 47-01-02 | 01 | 1 | CCODE-04 | unit | `pytest tests/test_concept_code_mcp.py::test_concept_code_hops_golden_path -q` | ✅ green |
+| 47-02-01 | 02 | 2 | CCODE-03 docs | grep | `grep -q concept_code_hops docs/RELATIONS.md` | ✅ green |
 
 ## Wave 0 Requirements
 
@@ -44,6 +44,6 @@ created: 2026-04-30
 
 ## Validation Sign-Off
 
-- [ ] `nyquist_compliant: true` after execution
+- [x] `nyquist_compliant: true` after execution
 
-**Approval:** pending
+**Approval:** approved 2026-05-01 (Phase **51** verification closure)

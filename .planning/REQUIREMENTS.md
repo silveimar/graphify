@@ -15,8 +15,8 @@
 
 - [x] **CCODE-01:** **Schema:** New edge relation type(s) for concept↔code linkage are accepted by `validate.py` and documented (confidence semantics align with EXTRACTED / INFERRED / AMBIGUOUS). — Phase 46 (2026-04-30)
 - [x] **CCODE-02:** **Build:** Concept↔code edges merge into the NetworkX graph deterministically and survive `graph.json` export/import assumptions used elsewhere (fixture-backed tests). — Phase 46 (2026-04-30)
-- [ ] **CCODE-03:** **MCP:** At least one MCP tool or structured query path lists or traverses concept↔implementation edges; capability/manifest/skill docs updated if surface area changes.
-- [ ] **CCODE-04:** **Trace:** `/trace` (slash) **or** `entity_trace` MCP uses typed concept↔code hops in at least one golden-path scenario with automated coverage.
+- [x] **CCODE-03:** **MCP:** At least one MCP tool or structured query path lists or traverses concept↔implementation edges; capability/manifest/skill docs updated if surface area changes. Verified **`47-VERIFICATION.md`** (**Phase 51** gap closure → **47**, 2026-05-01); MCP tool **`concept_code_hops`** + **`capability --validate`**.
+- [x] **CCODE-04:** **Trace:** `/trace` (slash) **or** `entity_trace` MCP uses typed concept↔code hops in at least one golden-path scenario with automated coverage. **Audit mapping (**D-51.03**):** typed **`implements`** hops proven by **`tests/test_concept_code_mcp.py::test_concept_code_hops_golden_path`** and MCP **`concept_code_hops`**; **`/trace`** / **`entity_trace`** = temporal tracing — see **`47-VERIFICATION.md`** (2026-05-01).
 - [x] **CCODE-05:** **Security:** All new labels/paths pass through existing sanitization patterns (`security.py`); no injection regressions in templates or MCP payloads. — Phase 46 (2026-04-30)
 
 ## v1.10 — CLI version & provenance (Phase 49)
