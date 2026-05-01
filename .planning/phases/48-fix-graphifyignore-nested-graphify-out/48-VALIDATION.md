@@ -72,3 +72,5 @@ Nyquist gap audit (`/gsd-validate-phase 48 --auto`): **State B** — no prior `4
 - [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** 2026-04-30 (`/gsd-validate-phase 48 --chain --auto`)
+
+**Formal verification artifact:** **`48-VERIFICATION.md`** (same directory; authored Phase **52** gap closure, 2026-04-30).

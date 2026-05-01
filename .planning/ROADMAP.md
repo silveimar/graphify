@@ -12,7 +12,7 @@
 - ✅ **v1.7 Vault Adapter UX & Template Polish** — Phases 27–31 (shipped 2026-04-28)
 - ✅ **v1.8 Output Taxonomy & Cluster Quality** — Phases 32–38 (shipped 2026-04-29)
 - ✅ **v1.9 Onboarding, Harness Portability & Vault CLI** — Phases 39–44 (shipped 2026-04-30)
-- 📋 **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–52 (in planning; **50–52** gap closure from milestone audit)
+- 📋 **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–52 (gap closure **50–52** complete 2026-04-30; milestone wrap pending audit)
 
 ## Phases
 
@@ -503,7 +503,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 </details>
 
 <details>
-<summary>Phase 52: v1.10 gap closure — Phase 48 verification artifact — PLANNING</summary>
+<summary>Phase 52: v1.10 gap closure — Phase 48 verification artifact — COMPLETE</summary>
 
 **Goal:** Add **`48-VERIFICATION.md`** for milestone three-source parity (**HYG-04**, **HYG-05** already `[x]`); implementation and **48-VALIDATION** already green.
 
@@ -511,9 +511,9 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 
 **Requirements:** **HYG-04**, **HYG-05** (verification artifact only).
 
-**Plans:** TBD `/gsd-plan-phase 52` (likely single wave).
+**Plans:** 1 plan — `[x] 52-01-PLAN.md` — **`48-VERIFICATION.md`** + **`48-VALIDATION`** pointer.
 
-**Artifacts:** `.planning/phases/52-v1.10-gap-phase48-verification/`
+**Artifacts:** `.planning/phases/48-fix-graphifyignore-nested-graphify-out/48-VERIFICATION.md`; `.planning/phases/52-v1.10-gap-phase48-verification/` (`52-CONTEXT.md`, `52-RESEARCH.md`, `52-VALIDATION.md`, `52-01-PLAN.md`, `52-01-SUMMARY.md`)
 
 </details>
 
@@ -581,7 +581,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 49. CLI `--version`, stderr version line, skill/package stamp | v1.10 | 1/1 | Complete | 2026-05-01 |
 | 50. v1.10 gap — Baselines verification | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 51. v1.10 gap — MCP & trace REQ sign-off | v1.10 | 1/1 | Complete    | 2026-05-01 |
-| 52. v1.10 gap — Phase 48 verification artifact | v1.10 | 0/TBD | Not started | — |
+| 52. v1.10 gap — Phase 48 verification artifact | v1.10 | 1/1 | Complete    | 2026-05-01 |
 
 ### Phase 47: MCP & Trace Integration
 
@@ -609,4 +609,4 @@ Plans:
 - [x] `49-01-PLAN.md` — `graphify.version`, CLI flags, `_cli_exit` footer, skill stamp copy, tests (`test_main_cli` / `test_main_flags`)
 
 ---
-*Last updated: 2026-05-01 — v1.10 roadmap: gap closure phases **50–52** added (`/gsd-plan-milestone-gaps`); Phase 49 shipped; Phases 45→50, 47→51, 48→52 verification debt.*
+*Last updated: 2026-04-30 — v1.10 gap closure phases **50–52** verification artifacts complete (**48-VERIFICATION.md** Phase 52); milestone audit/wrap optional.*
