@@ -116,3 +116,90 @@ def test_unknown_edge_relation_warns_stderr(capsys):
     assert "[graphify]" in err
     assert "totally_unknown_relation_xyz" in err
     assert "docs/RELATIONS.md" in err
+
+
+def _minimal_nodes_for(rel_test_pairs):
+    """Build a minimal node list covering all (source, target) ids referenced in edges.
+
+    Test-only id-prefix contract (W3): node ids in these tests follow a strict prefix
+    convention so file_type can be inferred without spelling it out per edge:
+      - "c_..." → file_type="rationale" (concept node)
+      - "d_..." → file_type="document"
+      - anything else (typically "k_..." for code, "t_..." for test code)
+        → file_type="code"
+    Tests that need a different file_type for a given id MUST construct the node list
+    explicitly rather than going through this helper.
+    """
+    ids = set()
+    for e in rel_test_pairs:
+        ids.add(e["source"]); ids.add(e["target"])
+    out = []
+    for nid in sorted(ids):
+        ftype = "rationale" if nid.startswith("c_") else ("document" if nid.startswith("d_") else "code")
+        out.append({"id": nid, "label": nid, "file_type": ftype, "source_file": f"{nid}.src"})
+    return out
+
+
+def test_new_relations_validate_clean_with_inferred_score():
+    from graphify.validate import validate_extraction
+    for rel in ("documents", "tests", "realizes", "instantiates"):
+        edges = [{"source": "k_a", "target": "c_b", "relation": rel,
+                  "confidence": "INFERRED", "confidence_score": 0.5, "source_file": "a.py"}]
+        data = {"nodes": _minimal_nodes_for(edges), "edges": edges}
+        errors = validate_extraction(data)
+        assert errors == [], f"{rel} INFERRED+score should validate clean, got: {errors}"
+
+
+def test_extracted_new_relation_without_evidence_rejected():
+    from graphify.validate import validate_extraction
+    edges = [{"source": "k_a", "target": "c_b", "relation": "tests",
+              "confidence": "EXTRACTED", "source_file": "a.py"}]
+    data = {"nodes": _minimal_nodes_for(edges), "edges": edges}
+    errors = validate_extraction(data)
+    assert any("evidence" in e and "tests" in e for e in errors), f"Expected evidence-required error, got: {errors}"
+
+
+def test_extracted_new_relation_unknown_evidence_rejected():
+    from graphify.validate import validate_extraction
+    edges = [{"source": "k_a", "target": "c_b", "relation": "realizes",
+              "confidence": "EXTRACTED", "evidence": "bogus", "source_file": "a.py"}]
+    data = {"nodes": _minimal_nodes_for(edges), "edges": edges}
+    errors = validate_extraction(data)
+    assert any("unknown evidence" in e or "bogus" in e for e in errors), f"Expected unknown-evidence error, got: {errors}"
+
+
+def test_extracted_new_relation_with_valid_evidence_accepted():
+    from graphify.validate import validate_extraction
+    edges = [{"source": "k_a", "target": "c_b", "relation": "instantiates",
+              "confidence": "EXTRACTED", "evidence": "inheritance", "source_file": "a.py"}]
+    data = {"nodes": _minimal_nodes_for(edges), "edges": edges}
+    errors = validate_extraction(data)
+    assert errors == [], f"Expected clean validation, got: {errors}"
+
+
+def test_ambiguous_new_relation_no_evidence_accepted():
+    from graphify.validate import validate_extraction
+    edges = [{"source": "d_a", "target": "c_b", "relation": "documents",
+              "confidence": "AMBIGUOUS", "source_file": "a.md"}]
+    data = {"nodes": _minimal_nodes_for(edges), "edges": edges}
+    errors = validate_extraction(data)
+    assert errors == [], f"AMBIGUOUS should not require evidence, got: {errors}"
+
+
+def test_inferred_new_relation_missing_score_rejected():
+    from graphify.validate import validate_extraction
+    edges = [{"source": "k_a", "target": "c_b", "relation": "tests",
+              "confidence": "INFERRED", "source_file": "a.py"}]
+    data = {"nodes": _minimal_nodes_for(edges), "edges": edges}
+    errors = validate_extraction(data)
+    assert any("confidence_score" in e for e in errors), f"Expected score-required error, got: {errors}"
+
+
+def test_implements_unchanged_extracted_no_evidence_accepted():
+    """D-53.10: `implements` confidence rules unchanged from Phase 46."""
+    from graphify.validate import validate_extraction
+    edges = [{"source": "k_a", "target": "c_b", "relation": "implements",
+              "confidence": "EXTRACTED", "source_file": "a.py"}]
+    data = {"nodes": _minimal_nodes_for(edges), "edges": edges}
+    errors = validate_extraction(data)
+    assert errors == [], f"implements EXTRACTED should validate without evidence, got: {errors}"
