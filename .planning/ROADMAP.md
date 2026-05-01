@@ -521,4 +521,112 @@ Plans:
 - [x] `49-01-PLAN.md` — `graphify.version`, CLI flags, `_cli_exit` footer, skill stamp copy, tests (`test_main_cli` / `test_main_flags`)
 
 ---
-*Last updated: 2026-04-30 — **v1.11** phases **53–58** added (active); v1.10 narrative archived under `.planning/milestones/v1.10-ROADMAP.md`.*
+
+### Phase 53: Concept↔code schema & build merge
+
+**Goal:** Promote concept↔implementation relationships to first-class, validated graph edges. `validate_extraction` accepts a typed concept↔code relation with confidence rules consistent with the existing edge schema, and `build` / merge preserves these edges with deterministic dedupe and stable IDs alongside structural edges.
+**Depends on:** v1.10 Phase 46 (typed-edge groundwork) — already shipped.
+**Requirements:** **CGRAPH-01**, **CGRAPH-02**.
+
+**Success Criteria** (what must be TRUE):
+
+1. `validate_extraction` accepts the new concept↔code relation value(s) with required fields and confidence rules matching the existing schema; rejection paths covered by unit tests (**CGRAPH-01**).
+2. `build` / merge produces deterministic dedupe and stable IDs for concept↔code edges across re-runs, with structural edges unaffected (**CGRAPH-02**).
+3. Extraction-output schema documentation updated; round-trip fixture demonstrates concept↔code edges surviving build (**CGRAPH-01**, **CGRAPH-02**).
+
+**Plans:** `.planning/phases/53-concept-code-schema-build-merge/` (TBD during `/gsd-plan-phase 53`).
+
+**UI hint:** no — schema and build-pipeline work, no surface change.
+
+---
+
+### Phase 54: MCP, trace & Obsidian parity
+
+**Goal:** Make concept↔code edges traversable through MCP + `/trace` and ensure Obsidian export does not contradict the graph as the single source of truth.
+**Depends on:** Phase 53 (validated typed edges in built graph).
+**Requirements:** **CGRAPH-03**, **CGRAPH-04**.
+
+**Success Criteria** (what must be TRUE):
+
+1. MCP exposes typed concept↔code hop/query behavior consistent with v1.10 `concept_code_hops` and `/trace` expectations; documented mapping table lives in verification artifacts (**CGRAPH-03**).
+2. Obsidian CODE / concept MOC export reflects graph-level concept↔code edges (no divergence between graph and vault output); golden-path test asserts parity on a fixture corpus (**CGRAPH-04**).
+
+**Plans:** `.planning/phases/54-mcp-trace-obsidian-parity/` (TBD during `/gsd-plan-phase 54`).
+
+**UI hint:** yes — `/trace` slash workflow and MCP capability surfaces.
+
+---
+
+### Phase 55: Template conditionals & connection loops
+
+**Goal:** Extend `string.Template`-based rendering with conditional sections and connection-iteration blocks, expanded **before** `${}` substitution and routed through existing sanitization sinks (no Jinja2 dependency).
+**Depends on:** Phase 31 (template engine extensions in v1.7).
+**Requirements:** **TMPL-01**, **TMPL-02**.
+
+**Success Criteria** (what must be TRUE):
+
+1. Authors can use conditional template sections in `.graphify/templates/` driven by profile-controlled predicates (note type / god-node / simple flags); blocks expand before `${}` substitution and outputs pass label/HTML sanitization (**TMPL-01**).
+2. `{{#connections}}…{{/connections}}` (or equivalent documented block) iterates outbound/inbound connections with deterministic ordering and sanitized labels/targets; pytest covers nested + empty-iterable cases (**TMPL-02**).
+3. Migration note documents block syntax and ordering guarantees; `validate_profile_preflight` flags malformed blocks.
+
+**Plans:** `.planning/phases/55-template-conditionals-connections/` (TBD during `/gsd-plan-phase 55`).
+
+**UI hint:** no — authoring surface change documented in MIGRATION/CONFIGURATION docs.
+
+---
+
+### Phase 56: Dataview templates & profile overrides
+
+**Goal:** Allow profiles to declare per-note-type Dataview query templates and scoped template overrides (per-community / per-mapping-rule) that compose with v1.7 `extends:` / `includes:` semantics, with deterministic validation when override precedence is ambiguous.
+**Depends on:** Phase 55 (template-engine block features) and Phase 30 (profile composition from v1.7).
+**Requirements:** **TMPL-03**, **CFG-01**, **CFG-02**.
+
+**Success Criteria** (what must be TRUE):
+
+1. Profile schema supports per-note-type Dataview templates validated at `validate_profile_preflight` time (schema + dead-rule checks) (**TMPL-03**).
+2. Composed profiles support scoped template overrides without breaking `extends:` / `includes:` merge semantics; documented in profile schema (**CFG-01**).
+3. Override-precedence collisions raise deterministic validation errors; collision matrix encoded in tests (**CFG-02**).
+
+**Plans:** `.planning/phases/56-dataview-templates-profile-overrides/` (TBD during `/gsd-plan-phase 56`).
+
+**UI hint:** no — profile/schema surface only.
+
+---
+
+### Phase 57: Elicitation & harness increment
+
+**Goal:** Deliver one observable improvement over v1.9 in the elicitation → extraction pipeline and the harness export, with documented trust boundaries and explicit guards on any import entrypoint.
+**Depends on:** Phase 39 (tacit-to-explicit onboarding) and Phase 40 (multi-harness memory) from v1.9.
+**Requirements:** **ELIC-01**, **ELIC-02**, **HARN-01**, **HARN-02**.
+
+**Success Criteria** (what must be TRUE):
+
+1. ≥1 additional scripted elicitation → extraction scenario covered by unit tests vs the v1.9 baseline, including failure modes and happy-path artifact shape (**ELIC-01**).
+2. `docs/ELICITATION.md` (or successor) states trust boundaries, artifact locations, and milestone non-goals (**ELIC-02**).
+3. Harness export adds a documented canonical mapping + tests for one incremental capability (additional target formatting, **or** inverse-import remains off-default with explicit guard tests if touched) (**HARN-01**).
+4. Any import entrypoint remains off by default and cannot write vault paths without explicit user-approved CLI/MCP semantics; guard tests prove this (**HARN-02**).
+
+**Plans:** `.planning/phases/57-elicitation-harness-increment/` (TBD during `/gsd-plan-phase 57`).
+
+**UI hint:** partial — CLI/MCP guard semantics may surface user-facing flags.
+
+---
+
+### Phase 58: Vault CLI parity & hygiene
+
+**Goal:** Ensure `--vault` / discovery behavior matches `graphify doctor` reporting, vault-related CLI failures produce actionable messages, and the v1.10-close registry/hygiene item is resolved or formally waived with in-planning evidence.
+**Depends on:** Phase 41 (vault CLI from v1.9) and v1.10 close-out artifacts.
+**Requirements:** **VAUX-01**, **VAUX-02**, **HYG-01**.
+
+**Success Criteria** (what must be TRUE):
+
+1. `--vault` / discovery vs `graphify doctor` parity is asserted by golden tests or structured parity assertions (**VAUX-01**).
+2. Vault-related CLI failures (unknown vault, ambiguous selection, dry-run mismatch) produce actionable messages covered by pytest (**VAUX-02**).
+3. v1.10-close quick-task / registry hygiene item (`260427-rc7-fix-detect-self-ingestion` or successor slug) is resolved or formally waived; VERIFICATION note records evidence (**HYG-01**).
+
+**Plans:** `.planning/phases/58-vault-cli-parity-hygiene/` (TBD during `/gsd-plan-phase 58`).
+
+**UI hint:** partial — CLI error surfaces and `doctor` reporting messages.
+
+---
+*Last updated: 2026-04-30 — **v1.11** phases **53–58** detail blocks added; v1.10 narrative archived under `.planning/milestones/v1.10-ROADMAP.md`.*
