@@ -45,26 +45,59 @@ def _edge_priority(edge: dict[str, Any]) -> tuple[int, float]:
 
 
 def _merge_edge_fields(primary: dict[str, Any], secondary: dict[str, Any]) -> dict[str, Any]:
-    """Merge two edges with same (source, target, relation); secondary loses unless stronger."""
+    """Merge two edges with same (source, target, relation); deterministic across re-runs.
+
+    Phase 53 (D-53.05) canonicalization rules:
+      - source_file: union of inputs, lex-sorted+deduped, joined with "; "
+      - source_location: lex-min of non-empty values
+      - confidence: highest tier (EXTRACTED > INFERRED > AMBIGUOUS)
+      - confidence_score: max() across present numeric values
+      - weight: sum (preserves Phase 46 semantic)
+    """
     if _edge_priority(secondary) > _edge_priority(primary):
         base, other = secondary, primary
     else:
         base, other = primary, secondary
     out = dict(base)
-    sf_b = base.get("source_file", "")
-    sf_o = other.get("source_file", "")
-    if isinstance(sf_b, str) and isinstance(sf_o, str) and sf_o and sf_o != sf_b:
-        out["source_file"] = f"{sf_b}; {sf_o}" if sf_b else sf_o
-    loc_b = base.get("source_location", "")
-    loc_o = other.get("source_location", "")
-    if isinstance(loc_b, str) and isinstance(loc_o, str) and loc_o and loc_o != loc_b:
-        out["source_location"] = f"{loc_b}; {loc_o}" if loc_b else loc_o
+
+    def _split_sf(v: Any) -> list[str]:
+        if isinstance(v, list):
+            return [s.strip() for s in v if isinstance(s, str) and s.strip()]
+        if isinstance(v, str) and v:
+            return [s.strip() for s in v.split(";") if s.strip()]
+        return []
+
+    sf_set = sorted(set(_split_sf(base.get("source_file")) + _split_sf(other.get("source_file"))))
+    if sf_set:
+        out["source_file"] = "; ".join(sf_set)
+
+    locs = [v for v in (base.get("source_location"), other.get("source_location"))
+            if isinstance(v, str) and v]
+    if locs:
+        out["source_location"] = min(locs)
+
+    rank_b = _CONF_RANK.get(str(base.get("confidence", "")), 0)
+    rank_o = _CONF_RANK.get(str(other.get("confidence", "")), 0)
+    if rank_o > rank_b and other.get("confidence"):
+        out["confidence"] = other["confidence"]
+
+    scores: list[float] = []
+    for v in (base.get("confidence_score"), other.get("confidence_score")):
+        try:
+            if v is not None:
+                scores.append(float(v))
+        except (TypeError, ValueError):
+            pass
+    if scores:
+        out["confidence_score"] = max(scores)
+
     wt_b = base.get("weight", 1.0)
     wt_o = other.get("weight", 1.0)
     try:
         out["weight"] = float(wt_b) + float(wt_o)
     except (TypeError, ValueError):
         out["weight"] = wt_b
+
     return out
 
 
