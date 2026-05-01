@@ -12,7 +12,7 @@
 - ✅ **v1.7 Vault Adapter UX & Template Polish** — Phases 27–31 (shipped 2026-04-28)
 - ✅ **v1.8 Output Taxonomy & Cluster Quality** — Phases 32–38 (shipped 2026-04-29)
 - ✅ **v1.9 Onboarding, Harness Portability & Vault CLI** — Phases 39–44 (shipped 2026-04-30)
-- 📋 **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–49 (in planning)
+- 📋 **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–52 (in planning; **50–52** gap closure from milestone audit)
 
 ## Phases
 
@@ -390,11 +390,11 @@ Plans:
 </details>
 
 <details>
-<summary>📋 v1.10 Stability, Baselines & Concept↔Code MVP (Phases 45–48) — IN PLANNING</summary>
+<summary>📋 v1.10 Stability, Baselines & Concept↔Code MVP (Phases 45–52) — IN PLANNING</summary>
 
-Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fix-detect-self-ingestion`**, inherited baseline failures in detect/collect-files), **`.graphifyignore` / nested `graphify-out/` correctness**, and ship a scoped MVP for first-class concept↔code relationships: typed edges, validation, deterministic graph merge with security sanitization, and MCP / trace surfacing aligned with **SEED-bidirectional-concept-code-links**.
+Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fix-detect-self-ingestion`**, inherited baseline failures in detect/collect-files), **`.graphifyignore` / nested `graphify-out/` correctness**, CLI version provenance (**49**), and ship a scoped MVP for first-class concept↔code relationships: typed edges, validation, deterministic graph merge with security sanitization, and MCP / trace surfacing aligned with **SEED-bidirectional-concept-code-links**. **Gap closure phases 50–52** close **`v1.10-MILESTONE-AUDIT.md`** verification and REQ sign-off debt.
 
-**Totals:** 4 phases planned; REQ coverage HYG-01..03 + CCODE-01..05 + output/ignore hygiene (Phase 48).
+**Totals:** v1.10 core phases **45–49** + gap closure **50–52**; REQ coverage HYG + CCODE + CLI-VER.
 
 </details>
 
@@ -472,6 +472,51 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 
 </details>
 
+<details>
+<summary>Phase 50: v1.10 gap closure — Baselines verification — PLANNING</summary>
+
+**Goal:** Close **`v1.10-MILESTONE-AUDIT`** gaps for **HYG-01**, **HYG-02**, **HYG-03**: produce **`45-VERIFICATION.md`**, reconcile REQUIREMENTS checkboxes with CI/tests and Phase **45** delivered work (`corpus_prune`, manifest stderr, dot_graphify, doctor tracks).
+
+**Depends on:** Phase **45** executed (plans **45-01..03**).
+
+**Requirements:** **HYG-01**, **HYG-02**, **HYG-03** (gap closure ownership).
+
+**Plans:** TBD `/gsd-plan-phase 50`.
+
+**Artifacts:** `.planning/phases/50-v1.10-gap-baselines-verification/`
+
+</details>
+
+<details>
+<summary>Phase 51: v1.10 gap closure — MCP & trace REQ sign-off — PLANNING</summary>
+
+**Goal:** Close audit gaps for **CCODE-03**, **CCODE-04**: execute or complete Phase **47** scope, **`47-VERIFICATION.md`**, manifest/capability/skills alignment; reconcile REQ wording with **`concept_code_hops`** vs **`/trace`** / **`entity_trace`** as documented.
+
+**Depends on:** Phase **46** complete; Phase **47** plans (`47-01`, `47-02`) in `.planning/phases/47-mcp-trace-integration/`.
+
+**Requirements:** **CCODE-03**, **CCODE-04**.
+
+**Plans:** TBD `/gsd-plan-phase 51` (may wrap or extend **47** execution).
+
+**Artifacts:** `.planning/phases/51-v1.10-gap-mcp-trace-req-signoff/`
+
+</details>
+
+<details>
+<summary>Phase 52: v1.10 gap closure — Phase 48 verification artifact — PLANNING</summary>
+
+**Goal:** Add **`48-VERIFICATION.md`** for milestone three-source parity (**HYG-04**, **HYG-05** already `[x]`); implementation and **48-VALIDATION** already green.
+
+**Depends on:** Phase **48** complete.
+
+**Requirements:** **HYG-04**, **HYG-05** (verification artifact only).
+
+**Plans:** TBD `/gsd-plan-phase 52` (likely single wave).
+
+**Artifacts:** `.planning/phases/52-v1.10-gap-phase48-verification/`
+
+</details>
+
 ---
 
 ## Progress
@@ -529,11 +574,14 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 42. Doctor preflight vs pinned vault (gap closure) | v1.9 | 1/1 | Complete | 2026-04-30 |
 | 43. Elicitation ↔ run pipeline ELIC-02 (gap closure) | v1.9 | 3/3 | Complete | 2026-04-30 |
 | 44. Verification / Nyquist artifacts TRACE-01 (gap closure) | v1.9 | 4/4 | Complete | 2026-04-30 |
-| 45. Baselines & Detect Self-Ingestion | v1.10 | 0/TBD | Not started | — |
+| 45. Baselines & Detect Self-Ingestion | v1.10 | 3/3 | Executed — verification gap → **50** | — |
 | 46. Concept↔Code Schema, Build Merge & Security | v1.10 | 3/3 | Complete | 2026-04-30 |
 | 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
 | 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 2/2 | Complete | 2026-04-30 |
 | 49. CLI `--version`, stderr version line, skill/package stamp | v1.10 | 1/1 | Complete | 2026-05-01 |
+| 50. v1.10 gap — Baselines verification | v1.10 | 0/TBD | Not started | — |
+| 51. v1.10 gap — MCP & trace REQ sign-off | v1.10 | 0/TBD | Not started | — |
+| 52. v1.10 gap — Phase 48 verification artifact | v1.10 | 0/TBD | Not started | — |
 
 ### Phase 47: MCP & Trace Integration
 
@@ -561,4 +609,4 @@ Plans:
 - [x] `49-01-PLAN.md` — `graphify.version`, CLI flags, `_cli_exit` footer, skill stamp copy, tests (`test_main_cli` / `test_main_flags`)
 
 ---
-*Last updated: 2026-05-01 — v1.10 roadmap: Phase 49 CLI version/footer/shipped; Phase 46 complete; Phases 45/47 remaining; Phase 48 complete.*
+*Last updated: 2026-05-01 — v1.10 roadmap: gap closure phases **50–52** added (`/gsd-plan-milestone-gaps`); Phase 49 shipped; Phases 45→50, 47→51, 48→52 verification debt.*

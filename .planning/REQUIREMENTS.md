@@ -37,15 +37,15 @@
 
 | REQ-ID | Phase | Plan / notes |
 |--------|-------|--------------|
-| HYG-01 | **45** | Quick task `260427-rc7-fix-detect-self-ingestion`; `corpus_prune`; manifest stderr; default-root manifest; `collect_files(resolved=)`; profile **`corpus.dot_graphify`** + doctor tracked_paths UX |
-| HYG-02 | **45** | `test_detect_skips_dotfiles` fix or intentional contract change + docs |
-| HYG-03 | **45** | `test_collect_files_from_dir` fix or reconciled semantics + docs |
-| HYG-04 | **48** | Duplicate-suppression for graphifyignore hints vs effective patterns (`doctor` + shared predicate) |
-| HYG-05 | **48** | Canonical output root; no nested `graphify-out` sprawl; tests + docs |
+| HYG-01 | **50** (gap closure → **45**) | **`45-VERIFICATION.md`** + tick REQ when implementation proven; original delivery **45** (`corpus_prune`, manifest, `corpus.dot_graphify`, doctor tracks) |
+| HYG-02 | **50** (gap closure → **45**) | Confirm `test_detect_skips_dotfiles` / contract + docs; closes audit gap |
+| HYG-03 | **50** (gap closure → **45**) | Confirm `test_collect_files_from_dir` / reconciled semantics + docs |
+| HYG-04 | **52** (gap closure → **48**) | Formal **`48-VERIFICATION.md`** — behavior already shipped in **48** |
+| HYG-05 | **52** (gap closure → **48**) | Same |
 | CCODE-01 | **46** | `validate.py` + docs for relation type(s); confidence aligns with EXTRACTED/INFERRED/AMBIGUOUS |
 | CCODE-02 | **46** | Deterministic merge + `graph.json` fixture round-trip parity |
 | CCODE-05 | **46** | `security.py` for new labels/paths; MCP/template injection regressions |
-| CCODE-03 | **47** | MCP listing/traversal; manifest/skill docs if surface changes |
-| CCODE-04 | **47** | `/trace` or `entity_trace` golden-path + automated coverage |
+| CCODE-03 | **51** (gap closure → **47**) | Execute **47** plans + **`47-VERIFICATION.md`**; MCP/registry/skills sign-off |
+| CCODE-04 | **51** (gap closure → **47**) | Golden-path tests + reconcile REQ wording (`concept_code_hops` vs `/trace` / `entity_trace`) |
 | CLI-VER-01 | **49** | `--version` / `-V`; `graphify.version`; subprocess tests |
 | CLI-VER-02 | **49** | Success footer; directional skill stamp warnings |
