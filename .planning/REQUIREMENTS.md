@@ -22,7 +22,7 @@
 - [ ] **CGRAPH-01**: `validate_extraction` accepts **new relation value(s)** for concept↔implementation edges with required fields and confidence rules aligned to existing edge schema.
 - [ ] **CGRAPH-02**: `build` / merge preserves **concept↔code** edges with deterministic dedupe and stable IDs alongside existing structural edges.
 - [x] **CGRAPH-03**: MCP exposes **typed concept↔code hop/query** behavior consistent with v1.10 **`concept_code_hops`** and slash **`/trace`** expectations (documented mapping table in verification).
-- [ ] **CGRAPH-04**: Obsidian **CODE / concept MOC** export does not contradict graph-level concept↔code edges (single source of truth from the graph).
+- [x] **CGRAPH-04**: Obsidian **CODE / concept MOC** export does not contradict graph-level concept↔code edges (single source of truth from the graph).
 
 ### Elicitation & harness (ELIC / HARN)
 
