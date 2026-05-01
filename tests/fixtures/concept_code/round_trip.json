@@ -1,0 +1,20 @@
+{
+  "nodes": [
+    {"id": "k_klass",      "label": "Klass",       "file_type": "code",      "source_file": "k.py",            "source_location": "L10"},
+    {"id": "k_subklass",   "label": "SubKlass",    "file_type": "code",      "source_file": "sub.py",          "source_location": "L5"},
+    {"id": "t_test_klass", "label": "test_klass",  "file_type": "code",      "source_file": "tests/test_k.py", "source_location": "L1"},
+    {"id": "d_readme",     "label": "README",      "file_type": "document",  "source_file": "README.md",       "source_location": "S2"},
+    {"id": "c_concept",    "label": "AuthService", "file_type": "rationale", "source_file": "design.md"},
+    {"id": "c_concept2",   "label": "TokenStore",  "file_type": "rationale", "source_file": "design.md"}
+  ],
+  "edges": [
+    {"source": "k_klass",      "target": "c_concept",  "relation": "implements",   "confidence": "EXTRACTED",                                  "source_file": "other.py"},
+    {"source": "k_klass",      "target": "c_concept",  "relation": "implements",   "confidence": "INFERRED",  "confidence_score": 0.6,         "source_file": "k.py"},
+    {"source": "k_subklass",   "target": "c_concept",  "relation": "instantiates", "confidence": "EXTRACTED", "evidence": "inheritance",       "source_file": "sub.py"},
+    {"source": "c_concept2",   "target": "k_klass",    "relation": "realizes",     "confidence": "INFERRED",  "confidence_score": 0.8,         "source_file": "k.py"},
+    {"source": "t_test_klass", "target": "c_concept",  "relation": "tests",        "confidence": "EXTRACTED", "evidence": "test_docstring",    "source_file": "tests/test_k.py"},
+    {"source": "d_readme",     "target": "c_concept",  "relation": "documents",    "confidence": "INFERRED",  "confidence_score": 0.5,         "source_file": "README.md"},
+    {"source": "c_concept",    "target": "k_klass",    "relation": "implements",   "confidence": "AMBIGUOUS",                                  "source_file": "design.md"},
+    {"source": "k_klass",      "target": "k_subklass", "relation": "contains",     "confidence": "EXTRACTED",                                  "source_file": "k.py"}
+  ]
+}
