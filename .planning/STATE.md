@@ -1,10 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: null
-milestone_name: null
-status: idle
-stopped_at: v1.10 milestone archived — tag v1.10 — 2026-05-01
-last_updated: "2026-05-01T02:05:00.000Z"
+milestone: v1.11
+milestone_name: Templates, Graph Semantics & Vault Depth
+status: planning
+last_updated: "2026-05-01T02:00:18.815Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 0
@@ -18,18 +17,18 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (**v1.10** shipped; next milestone via `/gsd-new-milestone`).
+See: `.planning/PROJECT.md` (**milestone v1.11** — Templates, Graph Semantics & Vault Depth).
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Planning reset — fresh `.planning/REQUIREMENTS.md`; continue phase numbering from **53**.
+**Current focus:** Define requirements and roadmap for **v1.11**; phase numbering from **53**.
 
 ## Current Position
 
-Milestone: **v1.10** complete (git tag **`v1.10`**)  
-Plan: —  
-Status: Idle until `/gsd-new-milestone` defines **v1.11+**  
-Last activity: 2026-05-01 — `/gsd-complete-milestone`
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-01 — Milestone v1.11 started
 
 ## Performance Metrics
 

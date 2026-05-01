@@ -8,9 +8,18 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current milestone
+## Current milestone: v1.11 Templates, Graph Semantics & Vault Depth
 
-**Next:** Define **v1.11** (or the next numbered milestone) via `/gsd-new-milestone`. Repo-root `.planning/REQUIREMENTS.md` was reset after **v1.10** close; numbering continues after **Phase 52**.
+**Goal:** Advance declarative vault output (template/profile backlog), make concept↔code relationships first-class in the graph and MCP where justified, deepen elicitation and harness follow-ons beyond v1.9, and tighten vault CLI plus planning/registry hygiene.
+
+**Target features:**
+
+- **TMPL/CFG:** Ship deferred template and profile capabilities — conditional sections, connection loops, per-note-type Dataview templates; profile composition (`extends` / `includes`) and related items per `.planning` backlog (phased in roadmap).
+- **Concept↔code graph:** Typed concept↔implementation edges in the NetworkX graph with validation, MCP/query alignment, and coherence with v1.10 concept↔code MVP (**SEED-bidirectional-concept-code-links**).
+- **Elicitation & harness:** Scoped expansion of **SEED-001** / **SEED-002** beyond the v1.9 baseline (explicit bounds in requirements — inverse-import only if guards are satisfied).
+- **Vault CLI & hygiene:** Vault-root/multi-vault ergonomics where gaps remain; close acknowledged quick-task/registry hygiene from v1.10 close notes.
+
+**Planning:** Phase numbering continues from **Phase 53** (after v1.10 Phase **52**). Repo-root `.planning/REQUIREMENTS.md` defines scoped REQ-IDs for this milestone.
 
 ## Shipped: v1.10 Stability, Baselines & Concept↔Code MVP (2026-05-01)
 
@@ -150,7 +159,7 @@ Phases 32–38 delivered default Graphify-owned taxonomy, MOC-only community out
 
 ### Active
 
-*(None — start the next milestone with `/gsd-new-milestone`.)*
+**v1.11 — Templates, Graph Semantics & Vault Depth** — See `.planning/REQUIREMENTS.md` and `.planning/ROADMAP.md` after `/gsd-new-milestone` completes.
 
 ### Deferred (v1.3+ — template engine extensions from v1.0)
 
@@ -274,11 +283,7 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-Candidates for **v1.11+** (not committed until `/gsd-new-milestone`):
-
-- Full **SEED-001** / **SEED-002** expansion beyond what v1.9 shipped (only if explicitly re-scoped).
-- Template engine items still under **Deferred** (TMPL/CFG backlog).
-- Dormant seeds and registry quick-task hygiene (see `STATE.md` — Deferred Items after v1.10 close).
+*v1.11 is active — goals are listed under **Current milestone** above.*
 
 ---
-*Last updated: 2026-05-01 — v1.10 milestone shipped; planning reset for next milestone.*
+*Last updated: 2026-04-30 — Started milestone **v1.11** (Templates, Graph Semantics & Vault Depth); phase numbering from **53**.*
