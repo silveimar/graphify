@@ -81,3 +81,124 @@ Includes **references**, **cites**, **conceptually_related_to**, **shares_data_w
 ---
 
 Implementation: `KNOWN_EDGE_RELATIONS` / `KNOWN_HYPEREDGE_RELATIONS` in `graphify/validate.py`.
+
+## MCP traversal (Phase 54)
+
+Phase 54 widens the existing MCP traversal surface so all five Phase 53 concept↔code relations are reachable through `concept_code_hops` and (optionally) merged into `entity_trace`. No new tools were added; existing schemas grew two new properties. Phase 47 callers continue to work unchanged.
+
+### `concept_code_hops`
+
+BFS-walk concept↔code edges from a starting node, bounded by hops and a global edge budget.
+
+| Parameter | Type | Default | Notes |
+|-----------|------|---------|-------|
+| `entity` | string | required | Node label (preferred) or node id |
+| `max_hops` | integer | `3` | Range `1..6` |
+| `direction` | enum | `"both"` | `"code_to_concept"` / `"concept_to_code"` / `"both"` |
+| `relations` | `list[string]` | `["implements"]` | Subset of the five concept↔code relations: `implements`, `documents`, `tests`, `realizes`, `instantiates` |
+
+**Validation (`graphify/serve.py:_validate_relations_arg`):**
+
+- Empty list → MCP `status=error` envelope (`"relations must not be empty"`).
+- Unknown value → MCP `status=error` envelope listing the five allowed values.
+
+**Payload (meta keys):**
+
+| Key | Shape | Notes |
+|-----|-------|-------|
+| `relations` | `list[string]` | Sorted echo of the validated input |
+| `traversal_steps` | integer | Total edges walked across all relations |
+| `steps_by_relation` | `dict[string, int]` | Per-relation traversal count; keys are a subset of the 5 relations |
+| `reachable_node_ids` | `list[string]` | Deterministic BFS output |
+| `depth_by_id` | `dict[string, int]` | Hop distance from `entity` |
+| `truncated` | boolean | True iff the global edge budget was hit |
+| `implements_traversal_steps` | integer | **Backward-compat shim** — emitted **only** when `set(relations) == {"implements"}` (D-54.03 / Phase 47 compatibility) |
+
+**Edge budget:** `_IMPL_EDGE_BUDGET = 500` (constant in `graphify/serve.py`). The same global cap applies regardless of how many relations are requested. When the cap is reached BFS halts and the payload sets `truncated=true`. The cap is not user-tunable on this tool (D-54.10 — no new params).
+
+### `entity_trace`
+
+Existing Phase 11 temporal-trace surface. Phase 54 adds an optional concept↔code merge.
+
+| Parameter | Type | Default | Notes |
+|-----------|------|---------|-------|
+| `entity` | string | required | |
+| `budget` | integer | `500` | Existing cap |
+| `include_concept_code` | boolean | `false` | When `true`, merge concept↔code reachability into the meta envelope (D-54.04) |
+
+When `include_concept_code=true`, the meta envelope gains:
+
+- `concept_code_reachable: list[string]` — node ids reachable via the typed edges
+- `concept_code_steps_by_relation: dict[string, int]` — per-relation step count
+
+The merge uses fixed `max_hops=2` and **all five** concept↔code relations (no per-call tunable). When `include_concept_code` is omitted or `false` the response is byte-identical to Phase 11.
+
+### Backward compatibility
+
+| Caller | Behaviour |
+|--------|-----------|
+| Phase 47 client omitting `relations` on `concept_code_hops` | Defaults to `["implements"]`; `implements_traversal_steps` shim is present in the payload (set-equality, not None-vs-list — explicit `relations=["implements"]` also activates the shim per D-54.03). |
+| Phase 11 client omitting `include_concept_code` on `entity_trace` | No change; trace envelope identical to Phase 11. |
+| Manifest-pinned client | `server.json::_meta.manifest_content_hash` rotates when the tool schemas change. Re-run `python scripts/sync_mcp_server_json.py` after every schema edit. |
+
+### Examples
+
+Default-args call (Phase 47-compatible):
+
+```json
+{"tool": "concept_code_hops", "arguments": {"entity": "AuthService", "max_hops": 2}}
+```
+
+Returns meta:
+
+```json
+{
+  "relations": ["implements"],
+  "traversal_steps": 7,
+  "steps_by_relation": {"implements": 7},
+  "implements_traversal_steps": 7,
+  "truncated": false
+}
+```
+
+Widened-relations call:
+
+```json
+{"tool": "concept_code_hops", "arguments": {"entity": "AuthService", "relations": ["documents", "tests"]}}
+```
+
+Returns meta (note: shim absent — non-implements-only set):
+
+```json
+{
+  "relations": ["documents", "tests"],
+  "traversal_steps": 4,
+  "steps_by_relation": {"documents": 3, "tests": 1},
+  "truncated": false
+}
+```
+
+`entity_trace` with concept↔code merge:
+
+```json
+{"tool": "entity_trace", "arguments": {"entity": "AuthService", "include_concept_code": true}}
+```
+
+Adds to the trace meta:
+
+```json
+{
+  "concept_code_reachable": ["TokenStore", "AuthService_test"],
+  "concept_code_steps_by_relation": {"implements": 2, "tests": 1}
+}
+```
+
+### Implementation references
+
+- Tool registration: `graphify/mcp_tool_registry.py` (input schemas).
+- Validation: `graphify/serve.py:_validate_relations_arg`.
+- Hop helpers: `graphify/serve.py:_concept_code_hop_kind`, `_concept_code_hop_allowed` (renamed from `_implements_hop_*` per D-54.03).
+- BFS factor-out: `graphify/serve.py:_bfs_concept_code_from`.
+- Tool body: `graphify/serve.py:_run_concept_code_hops`.
+- `entity_trace` extension: `graphify/serve.py:_run_entity_trace`.
+
