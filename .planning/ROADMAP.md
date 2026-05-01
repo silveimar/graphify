@@ -557,7 +557,14 @@ Plans:
 1. MCP exposes typed concept↔code hop/query behavior consistent with v1.10 `concept_code_hops` and `/trace` expectations; documented mapping table lives in verification artifacts (**CGRAPH-03**).
 2. Obsidian CODE / concept MOC export reflects graph-level concept↔code edges (no divergence between graph and vault output); golden-path test asserts parity on a fixture corpus (**CGRAPH-04**).
 
-**Plans:** `.planning/phases/54-mcp-trace-obsidian-parity/` (TBD during `/gsd-plan-phase 54`).
+**Plans:** 5 plans
+
+Plans:
+- [ ] 54-01-PLAN.md — Wave 1 (RED): failing MCP + Obsidian parity tests + vault_parity fixtures
+- [ ] 54-02-PLAN.md — Wave 2 (GREEN): concept_code_hops widening with relations filter + payload shim
+- [ ] 54-03-PLAN.md — Wave 3 (GREEN): entity_trace include_concept_code extension
+- [ ] 54-04-PLAN.md — Wave 4 (GREEN): Obsidian per-relation sections in code+moc body slot (A1 carve-out adopted)
+- [ ] 54-05-PLAN.md — Wave 5 (close-out): docs/RELATIONS.md + server.json regen + 54-VERIFICATION.md mapping table
 
 **UI hint:** yes — `/trace` slash workflow and MCP capability surfaces.
 
