@@ -280,10 +280,25 @@ def build_mcp_tools():
         ),
         types.Tool(
             name="entity_trace",
-            description="Return the evolution of a named entity across graph snapshots: first-seen, per-snapshot community and degree, current status. Used by the /trace slash command.",
+            description=(
+                "Return the evolution of a named entity across graph snapshots: "
+                "first-seen, per-snapshot community and degree, current status. "
+                "Used by the /trace slash command. Optional `include_concept_code` "
+                "flag merges Phase 53 typed concept↔code traversal into the trace "
+                "envelope (default: false, byte-identical to Phase 11)."
+            ),
             inputSchema={"type": "object", "properties": {
                 "entity": {"type": "string"},
                 "budget": {"type": "integer", "default": 500},
+                "include_concept_code": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "When true, merge concept↔code reachable nodes and "
+                        "per-relation step counts into the trace meta envelope "
+                        "(CGRAPH-03 / D-54.04)."
+                    ),
+                },
             }, "required": ["entity"]},
         ),
         types.Tool(
