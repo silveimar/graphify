@@ -289,10 +289,11 @@ def build_mcp_tools():
         types.Tool(
             name="concept_code_hops",
             description=(
-                "Walk concept↔implementation links on the live graph using only "
-                "`implements` edges (code→concept orientation). Respects optional hop "
-                "direction. Used by the /trace slash command for static linkage (distinct "
-                "from temporal `entity_trace`)."
+                "Walk concept↔implementation links on the live graph across the 5 "
+                "concept↔code relations (`implements`, `documents`, `tests`, "
+                "`realizes`, `instantiates`); defaults to `implements` for Phase 47 "
+                "backward compat. Respects optional hop direction. Used by the /trace "
+                "slash command for static linkage (distinct from temporal `entity_trace`)."
             ),
             inputSchema={
                 "type": "object",
@@ -306,16 +307,34 @@ def build_mcp_tools():
                         "default": 3,
                         "minimum": 1,
                         "maximum": 6,
-                        "description": "Maximum implements hops from the start node",
+                        "description": "Maximum hops from the start node",
                     },
                     "direction": {
                         "type": "string",
                         "enum": ["both", "code_to_concept", "concept_to_code"],
                         "default": "both",
                         "description": (
-                            "both=traverse either semantic direction along implements; "
+                            "both=traverse either semantic direction; "
                             "code_to_concept=only hops from code→concept; "
                             "concept_to_code=only hops from concept→code"
+                        ),
+                    },
+                    "relations": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "implements",
+                                "documents",
+                                "tests",
+                                "realizes",
+                                "instantiates",
+                            ],
+                        },
+                        "default": ["implements"],
+                        "description": (
+                            "Concept↔code edge relations to traverse. Default: "
+                            "['implements'] (Phase 47 behavior)."
                         ),
                     },
                 },

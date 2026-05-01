@@ -2223,9 +2223,23 @@ def _run_concept_code_hops(
 ) -> str:
     """Pure helper for concept_code_hops MCP tool (Phase 47 CCODE-03/04).
 
-    BFS over ``implements`` edges only, respecting semantic orientation via ``_src``/``_tgt``.
-    Hard-capped ``max_hops`` (default 3, max 6) and ``_IMPL_EDGE_BUDGET`` edge traversals.
+    BFS over concept↔code edges (Phase 54: ``relations`` filter — defaults to
+    ``["implements"]`` for Phase 47 backward compat), respecting semantic
+    orientation via ``_src``/``_tgt``. Hard-capped ``max_hops`` (default 3,
+    max 6) and ``_IMPL_EDGE_BUDGET`` edge traversals.
     """
+    requested_relations, rel_err = _validate_relations_arg(arguments.get("relations"))
+    if rel_err is not None:
+        meta_err: dict = {
+            "status": "error",
+            "error": rel_err,
+            "layer": 1,
+            "search_strategy": "concept_code_hops",
+            "cardinality_estimate": None,
+            "continuation_token": None,
+        }
+        return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta_err, ensure_ascii=False)
+
     max_hops = int(arguments.get("max_hops", 3))
     max_hops = max(1, min(max_hops, 6))
 
@@ -2258,6 +2272,21 @@ def _run_concept_code_hops(
 
     entity_resolved = _resolve_alias(entity_raw)
     live_matches = _find_node(G, entity_resolved)
+
+    # Rule 2: prefer exact (case-insensitive) label or id match when the
+    # substring matcher returns multiple candidates — necessary for
+    # disambiguating fixtures where one label is a substring of another
+    # (e.g. "Klass" vs "SubKlass"). Falls through to the ambiguity envelope
+    # only when truly multiple distinct nodes share the same label/id.
+    if len(live_matches) > 1:
+        term_lc = entity_resolved.lower()
+        exact = [
+            nid for nid in live_matches
+            if G.nodes[nid].get("label", "").lower() == term_lc
+            or nid.lower() == term_lc
+        ]
+        if len(exact) >= 1:
+            live_matches = exact
 
     if len(live_matches) > 1:
         candidates = [
@@ -2298,6 +2327,7 @@ def _run_concept_code_hops(
     hop_labels: dict[str, str] = {}  # child -> implements hop kind for tree edge parent[child]->child
     queue: deque[str] = deque([start_id])
     traversals = 0
+    steps_by_relation: dict[str, int] = {rel: 0 for rel in requested_relations}
     truncated = False
 
     while queue:
@@ -2311,12 +2341,13 @@ def _run_concept_code_hops(
                 queue.clear()
                 break
             allowed = _concept_code_hop_allowed(
-                G, u, v, direction, frozenset({"implements"})
+                G, u, v, direction, requested_relations
             )
             if allowed is None:
                 continue
+            rel_name, kind = allowed
+            steps_by_relation[rel_name] = steps_by_relation.get(rel_name, 0) + 1
             traversals += 1
-            _, kind = allowed
             if v not in depth_map:
                 depth_map[v] = du + 1
                 parent[v] = u
@@ -2362,11 +2393,18 @@ def _run_concept_code_hops(
         "start_id": start_id,
         "max_hops": max_hops,
         "direction": direction,
+        "relations": sorted(requested_relations),
         "truncated": truncated,
-        "implements_traversal_steps": traversals,
+        "traversal_steps": traversals,
+        "steps_by_relation": {
+            rel: steps_by_relation.get(rel, 0)
+            for rel in sorted(requested_relations)
+        },
         "reachable_node_ids": [start_id] + reachable,
         "depth_by_id": {k: depth_map[k] for k in sorted(depth_map.keys())},
     }
+    if requested_relations == frozenset({"implements"}):
+        meta["implements_traversal_steps"] = traversals
     if _resolved_aliases:
         meta["resolved_from_alias"] = _resolved_aliases
     return text_body + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
