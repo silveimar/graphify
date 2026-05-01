@@ -533,6 +533,7 @@ Close carried-forward hygiene (detect self-ingestion quick task **`260427-rc7-fi
 | 46. Concept↔Code Schema, Build Merge & Security | v1.10 | 3/3 | Complete | 2026-04-30 |
 | 47. MCP & Trace Integration | v1.10 | 0/TBD | Not started | — |
 | 48. Graphifyignore & nested graphify-out consolidation | v1.10 | 2/2 | Complete | 2026-04-30 |
+| 49. CLI `--version`, stderr version line, skill/package stamp | v1.10 | 1/1 | Complete | 2026-05-01 |
 
 ### Phase 47: MCP & Trace Integration
 
@@ -560,4 +561,4 @@ Plans:
 - [x] `49-01-PLAN.md` — `graphify.version`, CLI flags, `_cli_exit` footer, skill stamp copy, tests (`test_main_cli` / `test_main_flags`)
 
 ---
-*Last updated: 2026-04-30 — v1.10 roadmap: Phase 46 concept↔code schema shipped; Phases 45–49 overall; Phase 47 = MCP/trace; Phase 48 = `.graphifyignore` + canonical output root; Phase 49 = CLI `--version` + version echo.*
+*Last updated: 2026-05-01 — v1.10 roadmap: Phase 49 CLI version/footer/shipped; Phase 46 complete; Phases 45/47 remaining; Phase 48 complete.*

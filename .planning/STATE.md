@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: executing
-stopped_at: Phase 49 planned — ready to execute / verify close-out
-last_updated: "2026-04-30T23:45:00.000Z"
-last_activity: 2026-04-30 -- /gsd-plan-phase 49 --chain (plan verified, CLAUDE D-49.06)
+stopped_at: Phase 49 complete — verified (CLI-VER-01/02)
+last_updated: "2026-05-01T00:10:00.000Z"
+last_activity: 2026-05-01 -- /gsd-execute-phase 49 --auto --chain
 progress:
   total_phases: 2
   completed_phases: 0
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (current milestone **v1.10**).
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Phase 48 — fix-graphifyignore-nested-graphify-out
+**Current focus:** v1.10 — Phase 49 shipped; next roadmap phase per `.planning/ROADMAP.md` (e.g. 45, 47)
 
 ## Current Position
 
-Phase: 48 (fix-graphifyignore-nested-graphify-out) — EXECUTING
-Plan: 1 of 2
-Status: Ready to execute
-Last activity: 2026-04-30 -- Phase 49 planning complete
+Phase: 49 (CLI `--version` / footer / skill stamp) — **COMPLETE** (2026-05-01)
+Plan: 1 of 1 executed; `49-VERIFICATION.md` **passed**
+Status: Milestone v1.10 continues — outstanding phases 45, 47, etc. per ROADMAP
+Last activity: 2026-05-01 -- Phase 49 execute-phase + verification
 
 ## Performance Metrics
 

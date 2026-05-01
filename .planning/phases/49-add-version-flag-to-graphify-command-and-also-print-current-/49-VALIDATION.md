@@ -2,8 +2,8 @@
 phase: 49
 slug: add-version-flag-to-graphify-command-and-also-print-current
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-30
 ---
 
@@ -37,8 +37,8 @@ created: 2026-04-30
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 49-01-01 | 01 | 1 | CLI-VER-01 | — | N/A | unit | `pytest tests/test_main_flags.py -q -k version` | ⬜ | ⬜ pending |
-| 49-01-02 | 01 | 1 | CLI-VER-02 | — | N/A | unit | `pytest tests/test_main_cli.py -q -k validate_profile` | ⬜ | ⬜ pending |
+| 49-01-01 | 01 | 1 | CLI-VER-01 | — | N/A | unit | `pytest tests/test_main_flags.py -q -k version` | ✅ | ✅ green |
+| 49-01-02 | 01 | 1 | CLI-VER-02 | — | N/A | unit | `pytest tests/test_main_cli.py -q -k validate_profile` | ✅ | ✅ green |
 
 ---
 
@@ -56,6 +56,7 @@ created: 2026-04-30
 
 ## Validation Sign-Off
 
-- [ ] `nyquist_compliant: true` after tasks green
+- [x] `nyquist_compliant: true` after tasks green
+- [x] Full `pytest tests/` green after execution (1965 passed, 2026-05-01)
 
-**Approval:** pending
+**Approval:** 2026-05-01 (`/gsd-execute-phase 49 --auto --chain`)
