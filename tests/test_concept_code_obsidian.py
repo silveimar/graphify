@@ -142,14 +142,30 @@ def _count_vault_wikilinks_by_relation(
 
 
 def _find_md_for_label(vault_dir: Path, label: str) -> Path | None:
-    """Locate a generated MD note whose body or title references `label`.
+    """Locate a generated MD note whose H1 title is the label.
 
-    Filename conventions vary by profile; we match by content presence.
+    Filename conventions vary by profile (title_case vs kebab-case vs
+    profile-driven prefixes like `CODE_<repo>_<label>.md`); the most
+    deterministic identifier in the rendered note is the H1 line `# <label>`
+    emitted by every built-in template. Sorting `rglob` and preferring the
+    H1-title match makes label resolution reproducible across filesystems
+    where `rglob` order is filesystem-dependent (macOS APFS inode order vs.
+    Linux ext4 lexical order).
+
+    Fallback: if no H1 match is found, fall back to first whole-word body
+    match (legacy semantics) for non-titled artifacts.
     """
+    title_re = re.compile(rf"^# {re.escape(label)}\s*$", flags=re.MULTILINE)
     needle = re.compile(rf"\b{re.escape(label)}\b")
-    for md_path in vault_dir.rglob("*.md"):
-        text = md_path.read_text()
-        if needle.search(text):
+    paths = sorted(vault_dir.rglob("*.md"))
+    # Pass 1: H1 title match (deterministic single hit per label per built-in
+    # template — every note emits exactly one `# ${label}` line).
+    for md_path in paths:
+        if title_re.search(md_path.read_text()):
+            return md_path
+    # Pass 2: legacy whole-word body match (sorted for determinism).
+    for md_path in paths:
+        if needle.search(md_path.read_text()):
             return md_path
     return None
 

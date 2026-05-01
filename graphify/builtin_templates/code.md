@@ -3,8 +3,8 @@ ${frontmatter}
 
 ${wayfinder_callout}
 
-${body}
-
 ${connections_callout}
 
 ${metadata_callout}
+
+${body}

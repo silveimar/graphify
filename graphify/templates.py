@@ -64,6 +64,29 @@ _NOTE_TYPES: frozenset[str] = frozenset({
 _SENTINEL_START_FMT: str = "<!-- graphify:{name}:start -->"
 _SENTINEL_END_FMT: str = "<!-- graphify:{name}:end -->"
 
+# ---------------------------------------------------------------------------
+# Phase 54 (CGRAPH-04) — concept↔code per-relation section ordering (D-54.07/.08)
+# ---------------------------------------------------------------------------
+# Forward sections appear on CODE notes (`file_type='code'`); inverse sections
+# appear on concept MOC notes. Both are wrapped with the
+# `concept_code_relations` sentinel for round-trip preservation (D-54.11).
+
+_CONCEPT_CODE_FORWARD_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("implements",   "Implements"),
+    ("documents",    "Documents"),
+    ("tests",        "Tests"),
+    ("realizes",     "Realizes"),
+    ("instantiates", "Instantiates"),
+)
+_CONCEPT_CODE_INVERSE_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("implements",   "Implemented by"),
+    ("documents",    "Documented by"),
+    ("tests",        "Tested by"),
+    ("realizes",     "Realized by"),
+    ("instantiates", "Instantiated by"),
+)
+_CONCEPT_CODE_SENTINEL: str = "concept_code_relations"
+
 
 def _wrap_sentinel(name: str, content: str) -> str:
     """Wrap a non-empty section in paired HTML-comment sentinel markers.
@@ -766,6 +789,155 @@ def _build_wayfinder_callout(
 
 
 # ---------------------------------------------------------------------------
+# Phase 54 (CGRAPH-04) — concept↔code per-relation section builders
+# ---------------------------------------------------------------------------
+
+def _emit_concept_code_wikilink(label: str) -> str:
+    """Emit a bare `[[Label]]` wikilink for Phase 54 per-relation sections.
+
+    Uses the raw label (sanitized for `]`, `|`, newlines, control chars via
+    `_sanitize_wikilink_alias`) as both the link target and display text.
+    Matches the expected vault-parity fixture format `[[AuthService]]` and
+    preserves case across naming conventions (D-54.09 — concept-naming path
+    is case-preserving; the title_case slugifier in `resolve_filename` is
+    NOT applied to per-relation wikilinks).
+
+    Returns ``""`` if the sanitized label is empty after stripping.
+    """
+    cleaned = _sanitize_wikilink_alias(str(label)).strip()
+    if not cleaned:
+        return ""
+    return f"[[{cleaned}]]"
+
+
+def _build_concept_code_sections_for_code(
+    G,
+    node_id: str,
+    classification_context,
+    convention: str,
+) -> str:
+    """Render per-relation forward sections for a CODE note (D-54.07).
+
+    Walks the graph edges incident to ``node_id``, filtering to the five
+    Phase 53 concept↔code relations (`implements`, `documents`, `tests`,
+    `realizes`, `instantiates`). For each relation, emits an H2 section
+    (`## Implements`, etc.) listing wikilinks to the concept-side targets,
+    in canonical order with empty-section suppression.
+
+    Forward attribution rule (Phase 53): a relation appears on the CODE-side
+    note iff the edge's `_src` equals ``node_id`` (code→concept orientation
+    locked by `_normalize_concept_code_edges`).
+
+    Returns ``""`` when no qualifying edges exist (D-54.07 empty suppression);
+    otherwise wraps output in the ``concept_code_relations`` sentinel
+    (D-54.11) for round-trip preservation.
+
+    Determinism: intra-section wikilinks are sorted+deduped (Pitfall 5).
+    """
+    if node_id not in G:
+        return ""
+    by_relation: dict[str, list[str]] = {
+        rel: [] for rel, _ in _CONCEPT_CODE_FORWARD_SECTIONS
+    }
+    for u, v, data in G.edges(node_id, data=True):
+        rel = data.get("relation")
+        if rel not in by_relation:
+            continue
+        src_m = data.get("_src")
+        # Forward parity: include only when this CODE note is the code-side
+        # endpoint per Phase 53 orientation.
+        if not (isinstance(src_m, str) and src_m == node_id):
+            continue
+        target = v if u == node_id else u
+        target_node = G.nodes[target] if target in G else {}
+        target_label = str(target_node.get("label", target))
+        link = _emit_concept_code_wikilink(target_label)
+        if link:
+            by_relation[rel].append(link)
+
+    parts: list[str] = []
+    for rel, header in _CONCEPT_CODE_FORWARD_SECTIONS:
+        items = by_relation[rel]
+        if not items:
+            continue  # D-54.07: empty-section suppression
+        parts.append(f"## {header}")
+        for link in sorted(set(items)):
+            parts.append(f"- {link}")
+        parts.append("")  # blank line between sections
+    if not parts:
+        return ""
+    body = "\n".join(parts).rstrip()
+    return _wrap_sentinel(_CONCEPT_CODE_SENTINEL, body)
+
+
+def _build_concept_code_sections_for_moc(
+    G,
+    community_id: int,
+    community_members: list,
+    classification_context,
+    convention: str,
+) -> str:
+    """Render inverse per-relation sections for a concept MOC (D-54.08).
+
+    Aggregates edges across every rationale (concept-side) member of the
+    community. For each of the five Phase 53 relations, emits an inverse H2
+    section (`## Implemented by`, etc.) listing wikilinks to the code-side
+    artifacts, in canonical order with empty-section suppression.
+
+    Inverse attribution rule: a relation appears on the concept MOC iff the
+    edge's `_tgt` equals one of the rationale member node ids (concept is
+    the tgt-side of a code→concept edge per Phase 53 orientation).
+
+    Returns ``""`` for non-concept communities by construction (no rationale
+    nodes ⇒ no concept↔code edges to attribute ⇒ empty body). Otherwise
+    wraps output in the ``concept_code_relations`` sentinel (D-54.11).
+    """
+    if not community_members:
+        return ""
+    by_relation: dict[str, list[str]] = {
+        rel: [] for rel, _ in _CONCEPT_CODE_INVERSE_SECTIONS
+    }
+    seen_concept_ids: set[str] = set()
+    for member_id in community_members:
+        if not isinstance(member_id, str) or member_id not in G:
+            continue
+        if G.nodes[member_id].get("file_type") != "rationale":
+            continue
+        seen_concept_ids.add(member_id)
+
+    for concept_id in seen_concept_ids:
+        for u, v, data in G.edges(concept_id, data=True):
+            rel = data.get("relation")
+            if rel not in by_relation:
+                continue
+            tgt_m = data.get("_tgt")
+            # Inverse parity: include only when concept is the tgt-side of a
+            # code→concept edge.
+            if not (isinstance(tgt_m, str) and tgt_m == concept_id):
+                continue
+            target = v if u == concept_id else u
+            target_node = G.nodes[target] if target in G else {}
+            target_label = str(target_node.get("label", target))
+            link = _emit_concept_code_wikilink(target_label)
+            if link:
+                by_relation[rel].append(link)
+
+    parts: list[str] = []
+    for rel, header in _CONCEPT_CODE_INVERSE_SECTIONS:
+        items = by_relation[rel]
+        if not items:
+            continue
+        parts.append(f"## {header}")
+        for link in sorted(set(items)):
+            parts.append(f"- {link}")
+        parts.append("")
+    if not parts:
+        return ""
+    body = "\n".join(parts).rstrip()
+    return _wrap_sentinel(_CONCEPT_CODE_SENTINEL, body)
+
+
+# ---------------------------------------------------------------------------
 # Connections callout (D-33) — iterates outgoing edges, auto-aliases
 # ---------------------------------------------------------------------------
 
@@ -774,12 +946,28 @@ def _build_connections_callout(G, node_id: str, convention: str) -> str:
 
     Format: `> - [[target_fname|target_label]] — relation [CONFIDENCE]`
     Returns empty string when the node has no edges.
+
+    Phase 54 (D-54.07/.10): the five typed concept↔code relations
+    (`implements`, `documents`, `tests`, `realizes`, `instantiates`) are
+    rendered exclusively through the per-relation H2 section builders
+    (`_build_concept_code_sections_for_code` / `_for_moc`); they are
+    therefore filtered out of the generic Connections callout to avoid
+    double-rendering and to keep `_find_md_for_label`-style label lookups
+    unambiguous (the per-relation sections become the single source of truth
+    for these typed edges in note bodies).
     """
     if node_id not in G:
         return ""
+    _typed_concept_code = frozenset(
+        rel for rel, _ in _CONCEPT_CODE_FORWARD_SECTIONS
+    )
     lines: list[str] = []
     # networkx Graph.edges(node, data=True) → iterable of (u, v, data)
     for u, v, data in G.edges(node_id, data=True):
+        # Phase 54: skip typed concept↔code relations — rendered separately
+        # in the body slot via per-relation H2 sections.
+        if data.get("relation") in _typed_concept_code:
+            continue
         target = v if u == node_id else u
         target_label = G.nodes[target].get("label", target)
         relation = data.get("relation", "related")
@@ -1172,13 +1360,28 @@ def render_note(
         note_type,
     )
 
+    # Phase 54 (D-54.07): forward per-relation sections on CODE-side notes
+    # (file_type in {"code", "document"}). The builder is naturally a no-op
+    # for nodes with no qualifying concept↔code outgoing edges (rationale,
+    # statement, etc.), so the file_type gate is a fast-path optimization
+    # rather than a strict correctness requirement (D-18 empty-section
+    # contract holds either way).
+    _file_type_for_body = G.nodes[node_id].get("file_type") if node_id in G else None
+    body_section = (
+        _build_concept_code_sections_for_code(
+            G, node_id, classification_context, convention,
+        )
+        if _file_type_for_body in ("code", "document")
+        else ""
+    )
+
     substitution_ctx = {
         "label": label,
         "frontmatter": frontmatter,
         "wayfinder_callout": wayfinder,
         "connections_callout": connections,
         "metadata_callout": metadata,
-        "body": "",  # D-18: absent section → empty string
+        "body": body_section,  # D-54.07: forward sections (CODE only)
         # MOC-only vars provided as empty for safe_substitute idempotence
         "members_section": "",
         "sub_communities_callout": "",
