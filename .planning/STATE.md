@@ -4,14 +4,14 @@ milestone: v1.11
 milestone_name: milestone
 status: Roadmap approved — ready for `/gsd-discuss-phase 53` or `/gsd-plan-phase 53`
 stopped_at: Phase 54 context gathered
-last_updated: "2026-05-01T04:24:44.656Z"
+last_updated: "2026-05-01T05:21:25.950Z"
 last_activity: 2026-04-30 — Milestone v1.11 roadmap **53–58** recorded
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_plans: 9
+  completed_plans: 6
+  percent: 67
 ---
 
 # Project State
@@ -64,6 +64,7 @@ Last activity: 2026-04-30 — Milestone v1.11 roadmap **53–58** recorded
 | Phase 36 P05 | 6min | 2 tasks | 3 files |
 | Phase 37 P01 | 6min | 2 tasks | 1 file |
 | Phase 37 P02 | 5min | 2 tasks | 3 files |
+| Phase 54 P02 | 543s | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,9 @@ Locked v1.8 choices:
 - [Phase 36]: [Phase 36 Plan 05]: Embedded install guidance constants are covered by tests/test_skill_files.py so future drift is caught with packaged skill files. — Keeps install-time guidance and packaged skill wording under the same regression test surface.
 - [Phase 37]: [Phase 37 Plan 37.1]: Nyquist ratification keeps `status: draft` vocabulary while using `nyquist_compliant` and `wave_0_complete` as deterministic gate truth.
 - [Phase 37]: [Phase 37 Plan 37.2]: v1.8 audit debt closure is metadata-only and preserves historical requirement and phase verification facts.
+- [Phase ?]: Tuple-returning hop predicate attributes hops to relation in single lookup (concept_code_hops)
+- [Phase ?]: Backward-compat shim: implements_traversal_steps emitted only when requested set == frozenset({implements})
+- [Phase ?]: Exact-label-match precedence disambiguates substring collisions before ambiguity envelope
 
 ### Pending Todos
 
@@ -202,6 +206,6 @@ Open artifact audit items acknowledged at ship (`audit-open`); no runtime blocke
 
 ## Session Continuity
 
-Last session: 2026-05-01T04:24:44.652Z
+Last session: 2026-05-01T05:21:21.897Z
 Stopped at: Phase 54 context gathered
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
