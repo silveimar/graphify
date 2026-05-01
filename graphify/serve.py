@@ -2133,29 +2133,87 @@ def _run_entity_trace(
 
 _IMPL_EDGE_BUDGET = 500
 
+_ALLOWED_CONCEPT_CODE_RELATIONS = frozenset({
+    "implements", "documents", "tests", "realizes", "instantiates",
+})
 
-def _implements_hop_kind(G: nx.Graph, u: str, v: str) -> str | None:
-    """Classify hop u→v along an `implements` edge, or None if not implements."""
+
+def _concept_code_hop_kind(
+    G: nx.Graph, u: str, v: str, relations: frozenset[str]
+) -> tuple[str, str] | None:
+    """Classify hop u→v along a concept↔code edge, or None.
+
+    Returns ``(relation, direction_kind)`` where ``direction_kind`` is one of
+    ``"code_to_concept"`` / ``"concept_to_code"`` / ``"both"``. Only edges
+    whose ``relation`` is in ``relations`` are considered.
+    """
     ed = G.edges[u, v]
-    if ed.get("relation") != "implements":
+    rel = ed.get("relation")
+    if rel not in relations:
         return None
     src_m = ed.get("_src")
     tgt_m = ed.get("_tgt")
     if isinstance(src_m, str) and isinstance(tgt_m, str):
         if u == src_m and v == tgt_m:
-            return "code_to_concept"
+            return rel, "code_to_concept"
         if u == tgt_m and v == src_m:
-            return "concept_to_code"
-    return "both"
+            return rel, "concept_to_code"
+    return rel, "both"
 
 
-def _implements_hop_allowed(G: nx.Graph, u: str, v: str, direction: str) -> bool:
-    kind = _implements_hop_kind(G, u, v)
-    if kind is None:
-        return False
+def _concept_code_hop_allowed(
+    G: nx.Graph, u: str, v: str, direction: str, relations: frozenset[str]
+) -> tuple[str, str] | None:
+    """Return ``(relation, kind)`` if hop u→v is permitted under ``direction``
+    and within the requested ``relations`` set, else ``None``.
+    """
+    classified = _concept_code_hop_kind(G, u, v, relations)
+    if classified is None:
+        return None
+    rel, kind = classified
     if direction == "both" or kind == "both":
-        return True
-    return kind == direction
+        return rel, kind
+    if kind == direction:
+        return rel, kind
+    return None
+
+
+def _validate_relations_arg(raw: object) -> tuple[frozenset[str], str | None]:
+    """Validate a ``relations`` argument from MCP `concept_code_hops`.
+
+    Returns ``(set, err)``. ``err`` is None on success.
+
+    - ``None`` → defaults to ``frozenset({"implements"})`` (D-54.01)
+    - non-list → error
+    - empty list → error mentioning "must not be empty" (D-54.02)
+    - non-string item → error
+    - unknown item → error listing allowed relations
+    """
+    if raw is None:
+        return frozenset({"implements"}), None
+    if not isinstance(raw, list):
+        return frozenset(), (
+            "[graphify] relations must be a list of strings; "
+            f"got {type(raw).__name__}"
+        )
+    if len(raw) == 0:
+        return frozenset(), (
+            "[graphify] relations must not be empty; "
+            "omit the parameter for the default ['implements']"
+        )
+    allowed_sorted = sorted(_ALLOWED_CONCEPT_CODE_RELATIONS)
+    for item in raw:
+        if not isinstance(item, str):
+            return frozenset(), (
+                f"[graphify] relations entries must be strings; got {item!r}. "
+                f"Allowed values: {allowed_sorted}"
+            )
+        if item not in _ALLOWED_CONCEPT_CODE_RELATIONS:
+            return frozenset(), (
+                f"[graphify] unknown relation {item!r}. "
+                f"Allowed values: {allowed_sorted}"
+            )
+    return frozenset(raw), None
 
 
 def _run_concept_code_hops(
@@ -2252,10 +2310,13 @@ def _run_concept_code_hops(
                 truncated = True
                 queue.clear()
                 break
-            if not _implements_hop_allowed(G, u, v, direction):
+            allowed = _concept_code_hop_allowed(
+                G, u, v, direction, frozenset({"implements"})
+            )
+            if allowed is None:
                 continue
             traversals += 1
-            kind = _implements_hop_kind(G, u, v) or "both"
+            _, kind = allowed
             if v not in depth_map:
                 depth_map[v] = du + 1
                 parent[v] = u
