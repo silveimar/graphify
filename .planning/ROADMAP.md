@@ -488,7 +488,7 @@ Typed **concept↔code** edges, **template** conditionals/loops/Dataview hooks, 
 | 50. v1.10 gap — Baselines verification | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 51. v1.10 gap — MCP & trace REQ sign-off | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 52. v1.10 gap — Phase 48 verification artifact | v1.10 | 1/1 | Complete    | 2026-05-01 |
-| 53. Concept↔code schema & build merge | v1.11 | 0/? | Not started | — |
+| 53. Concept↔code schema & build merge | v1.11 | 4/4 | Complete   | 2026-05-01 |
 | 54. MCP, trace & Obsidian parity | v1.11 | 0/? | Not started | — |
 | 55. Template conditionals & connection loops | v1.11 | 0/? | Not started | — |
 | 56. Dataview templates & profile overrides | v1.11 | 0/? | Not started | — |
@@ -534,13 +534,13 @@ Plans:
 2. `build` / merge produces deterministic dedupe and stable IDs for concept↔code edges across re-runs, with structural edges unaffected (**CGRAPH-02**).
 3. Extraction-output schema documentation updated; round-trip fixture demonstrates concept↔code edges surviving build (**CGRAPH-01**, **CGRAPH-02**).
 
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
-- [ ] `53-01-PLAN.md` — Round-trip fixture + failing tests (RED)
-- [ ] `53-02-PLAN.md` — `validate.py`: 4 new relations + `evidence`/score rule (GREEN-schema)
-- [ ] `53-03-PLAN.md` — `build.py`: canonical `_merge_edge_fields` + 5-relation orient + final canonical sort (GREEN-build)
-- [ ] `53-04-PLAN.md` — `docs/RELATIONS.md` update + full-suite phase gate
+- [x] `53-01-PLAN.md` — Round-trip fixture + failing tests (RED)
+- [x] `53-02-PLAN.md` — `validate.py`: 4 new relations + `evidence`/score rule (GREEN-schema)
+- [x] `53-03-PLAN.md` — `build.py`: canonical `_merge_edge_fields` + 5-relation orient + final canonical sort (GREEN-build)
+- [x] `53-04-PLAN.md` — `docs/RELATIONS.md` update + full-suite phase gate
 
 **UI hint:** no — schema and build-pipeline work, no surface change.
 
