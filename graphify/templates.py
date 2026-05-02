@@ -193,6 +193,12 @@ _CONN_FIELDS: frozenset[str] = frozenset(
 )
 
 _IF_ATTR_RE = re.compile(r"^if_attr_([a-z_][a-z0-9_]*)$")
+# Phase 55 (TMPL-01): note-type conditional predicate family (D-55.04)
+_IF_NOTE_TYPE_RE = re.compile(r"^if_note_type_([a-z_]+)$")
+# Phase 55 (D-55.04): canonical set of note types recognized by if_note_type_<X>
+_KNOWN_NOTE_TYPES: frozenset[str] = frozenset(
+    ("thing", "statement", "person", "source", "code", "moc")
+)
 
 # Block parser regexes — single-pass FSM, no recursion (T-31-03 mitigation)
 _BLOCK_OPEN_RE = re.compile(r"\{\{#([a-z_][a-z0-9_]*)\}\}")
@@ -273,6 +279,10 @@ def _eval_predicate(name: str, ctx: BlockContext) -> bool:
         attr = m.group(1)
         node = ctx.graph.nodes.get(ctx.node_id, {})
         return bool(node.get(attr))
+    # Phase 55 (TMPL-01 / D-55.04): if_note_type_<X> evaluates against ctx.note_type
+    m = _IF_NOTE_TYPE_RE.match(name)
+    if m:
+        return ctx.note_type == m.group(1)
     raise KeyError(name)
 
 
@@ -517,6 +527,15 @@ def validate_template(text: str, required: set[str]) -> list[str]:
                 pass
             elif _IF_ATTR_RE.match(opener):
                 pass
+            elif _IF_NOTE_TYPE_RE.match(opener):
+                # Phase 55 (D-55.05): reject unknown note-type suffixes at preflight
+                suffix = _IF_NOTE_TYPE_RE.match(opener).group(1)
+                if suffix not in _KNOWN_NOTE_TYPES:
+                    block_errors.append(
+                        f"validate_template: unknown note type suffix {suffix!r} "
+                        f"in '{{{{#{opener}}}}}' "
+                        f"— known: {sorted(_KNOWN_NOTE_TYPES)}"
+                    )
             else:
                 block_errors.append(
                     f"validate_template: unknown predicate '{{{{#{opener}}}}}' "
@@ -1416,6 +1435,8 @@ def render_note(
         # to a non-empty fence; empty otherwise (D-31 baseline preserved when
         # no dataview_queries.<note_type> override is configured).
         dataview_nonempty=bool(note_dataview_block.strip()),
+        # Phase 55 (TMPL-01): thread note_type for if_note_type_<X> predicates
+        note_type=note_type,
     )
     expanded_source = _expand_blocks(template.template, block_ctx)
     text = _BlockTemplate(expanded_source).safe_substitute(substitution_ctx)
@@ -1674,6 +1695,9 @@ def _render_moc_like(
         node_id=community_name,
         edges=[],
         dataview_nonempty=bool(dataview_block.strip()),
+        # Phase 55 (TMPL-01): MOC/community context has no TMPL-01 note_type;
+        # if_note_type_<X> blocks in MOC templates evaluate False (safe, per Q2).
+        note_type=None,
     )
     expanded_source = _expand_blocks(template.template, block_ctx)
     text = _BlockTemplate(expanded_source).safe_substitute(substitution_ctx)
