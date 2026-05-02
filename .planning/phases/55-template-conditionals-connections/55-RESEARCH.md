@@ -445,7 +445,9 @@ The prefixes `if_attr_`, `if_note_type_`, and `if_flag_` share the `if_` prefix 
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three questions below were substantively resolved during planning (plan-checker Dimension 11). Resolutions embedded in plan actions: 55-02 Task 2 (`_render_moc_like` passes `note_type=None`), 55-03 Task 1 (both production call sites thread `flag_predicates=_compile_flag_predicates(profile)`), 55-03 Task 2 (`_validate_predicate_flags` uses local-import pattern per profile.py:1447 precedent).
 
 1. **`if_note_type_moc` in `render_note` context** — `render_note` validates `note_type` against `("thing", "statement", "person", "source", "code")` at L1255, excluding `"moc"`. If `if_note_type_moc` is added to the predicate set (D-55.04 says all 6), it can only evaluate `True` at the `_render_moc_like` call site where `note_type=None` is passed (or where `template_key="moc"` is used). The planner must decide: (a) pass `template_key` as `note_type` at the `_render_moc_like` call site, enabling `if_note_type_moc` in MOC templates; or (b) `if_note_type_moc` always evaluates `False` in `render_note` context (since `render_note` rejects `"moc"`) and evaluates `True` only in `_render_moc_like`. This is a **planner decision** — no user input needed, but the test coverage choice depends on it.
 
