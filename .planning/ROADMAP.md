@@ -490,7 +490,7 @@ Typed **concept↔code** edges, **template** conditionals/loops/Dataview hooks, 
 | 52. v1.10 gap — Phase 48 verification artifact | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 53. Concept↔code schema & build merge | v1.11 | 4/4 | Complete   | 2026-05-01 |
 | 54. MCP, trace & Obsidian parity | v1.11 | 5/5 | Complete   | 2026-05-01 |
-| 55. Template conditionals & connection loops | v1.11 | 3/6 | In Progress|  |
+| 55. Template conditionals & connection loops | v1.11 | 4/6 | In Progress|  |
 | 56. Dataview templates & profile overrides | v1.11 | 0/? | Not started | — |
 | 57. Elicitation & harness increment | v1.11 | 0/? | Not started | — |
 | 58. Vault CLI parity & hygiene | v1.11 | 0/? | Not started | — |
@@ -582,10 +582,10 @@ Plans:
 2. `{{#connections}}…{{/connections}}` (or equivalent documented block) iterates outbound/inbound connections with deterministic ordering and sanitized labels/targets; pytest covers nested + empty-iterable cases (**TMPL-02**).
 3. Migration note documents block syntax and ordering guarantees; `validate_profile_preflight` flags malformed blocks.
 
-**Plans:** 3/6 plans executed
+**Plans:** 4/6 plans executed
 - [x] 55-01-PLAN.md — Wave 0 RED scaffolds: BlockContext extension + RED tests for if_note_type_*, if_flag_*, predicate_flags validation
 - [x] 55-02-PLAN.md — GREEN: if_note_type_<X> regex + evaluator branch + validate_template guard + render_note plumbing
-- [ ] 55-03-PLAN.md — GREEN: predicate_flags: profile key + _validate_predicate_flags + if_flag_<name> evaluator + preflight cross-check
+- [x] 55-03-PLAN.md — GREEN: predicate_flags: profile key + _validate_predicate_flags + if_flag_<name> evaluator + preflight cross-check
 - [x] 55-04-PLAN.md — Doc-fence-as-fixture loader (tests/test_docs_templates_examples.py)
 - [ ] 55-05-PLAN.md — docs/TEMPLATES.md (8 sections per D-55.11) + 1-line PROFILE-CONFIGURATION.md pointer
 - [ ] 55-06-PLAN.md — 55-VERIFICATION.md + ROADMAP close-out
