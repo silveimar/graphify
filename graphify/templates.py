@@ -195,6 +195,8 @@ _CONN_FIELDS: frozenset[str] = frozenset(
 _IF_ATTR_RE = re.compile(r"^if_attr_([a-z_][a-z0-9_]*)$")
 # Phase 55 (TMPL-01): note-type conditional predicate family (D-55.04)
 _IF_NOTE_TYPE_RE = re.compile(r"^if_note_type_([a-z_]+)$")
+# Phase 55 (TMPL-01): user-defined flag predicate family (D-55.08)
+_IF_FLAG_RE = re.compile(r"^if_flag_([a-z][a-z0-9_]*)$")
 # Phase 55 (D-55.04): canonical set of note types recognized by if_note_type_<X>
 _KNOWN_NOTE_TYPES: frozenset[str] = frozenset(
     ("thing", "statement", "person", "source", "code", "moc")
@@ -266,6 +268,43 @@ _PREDICATE_CATALOG: dict[str, Callable[[BlockContext], bool]] = {
 }
 
 
+def _compile_flag_predicates(profile: dict) -> "dict[str, Callable[[BlockContext], bool]]":
+    """Compile the profile's predicate_flags dict into name→evaluator callables.
+
+    Two rule shapes are supported (Phase 55, D-55.08):
+      {attr: <name>}              → truthy check: bool(node.get(name))
+      {attr: <name>, equals: <v>} → equality check: node.get(name) == value
+
+    Invalid or missing rules are silently skipped (preflight validates them
+    earlier via validate_profile; compile-time is render-path, not error path).
+    """
+    predicate_flags: object = profile.get("predicate_flags")
+    if not isinstance(predicate_flags, dict):
+        return {}
+    result: dict[str, Callable[[BlockContext], bool]] = {}
+    for flag_name, rule in predicate_flags.items():
+        if not isinstance(rule, dict):
+            continue
+        attr = rule.get("attr")
+        if not isinstance(attr, str):
+            continue
+        if "equals" in rule:
+            value = rule["equals"]
+            # Capture attr/value in closure — default arg trick avoids late-binding.
+            def _make_eq(a: str, v: object) -> "Callable[[BlockContext], bool]":
+                def _pred(ctx: BlockContext, _a: str = a, _v: object = v) -> bool:
+                    return ctx.graph.nodes.get(ctx.node_id, {}).get(_a) == _v
+                return _pred
+            result[flag_name] = _make_eq(attr, value)
+        else:
+            def _make_truthy(a: str) -> "Callable[[BlockContext], bool]":
+                def _pred(ctx: BlockContext, _a: str = a) -> bool:
+                    return bool(ctx.graph.nodes.get(ctx.node_id, {}).get(_a))
+                return _pred
+            result[flag_name] = _make_truthy(attr)
+    return result
+
+
 def _eval_predicate(name: str, ctx: BlockContext) -> bool:
     """Dispatch a predicate name to its catalog handler or attr escape hatch.
 
@@ -283,6 +322,14 @@ def _eval_predicate(name: str, ctx: BlockContext) -> bool:
     m = _IF_NOTE_TYPE_RE.match(name)
     if m:
         return ctx.note_type == m.group(1)
+    # Phase 55 (TMPL-01 / D-55.08): if_flag_<X> dispatches to user-defined predicate.
+    # KeyError propagates if the flag name is not in ctx.flag_predicates — the
+    # caller (_expand_blocks) treats KeyError as False (defensive elision D-19).
+    m = _IF_FLAG_RE.match(name)
+    if m:
+        flag_name = m.group(1)
+        handler = ctx.flag_predicates[flag_name]  # KeyError if absent
+        return bool(handler(ctx))
     raise KeyError(name)
 
 
@@ -407,7 +454,12 @@ def _expand_blocks(text: str, ctx: BlockContext) -> str:
 # Template validation (D-22) — follows validate.py pattern: return error list
 # ---------------------------------------------------------------------------
 
-def validate_template(text: str, required: set[str]) -> list[str]:
+def validate_template(
+    text: str,
+    required: set[str],
+    *,
+    known_flag_predicates: frozenset[str] = frozenset(),
+) -> list[str]:
     """Validate a template string.
 
     Returns a list of error strings — empty means valid. Distinguishes:
@@ -535,6 +587,15 @@ def validate_template(text: str, required: set[str]) -> list[str]:
                         f"validate_template: unknown note type suffix {suffix!r} "
                         f"in '{{{{#{opener}}}}}' "
                         f"— known: {sorted(_KNOWN_NOTE_TYPES)}"
+                    )
+            elif _IF_FLAG_RE.match(opener):
+                # Phase 55 (D-55.08): if_flag_<X> accepted only if X is a
+                # declared predicate_flags entry (known_flag_predicates arg).
+                flag_name = _IF_FLAG_RE.match(opener).group(1)
+                if flag_name not in known_flag_predicates:
+                    block_errors.append(
+                        f"validate_template: unknown flag predicate '{{{{#{opener}}}}}' "
+                        f"— declare '{flag_name}' under predicate_flags in profile.yaml"
                     )
             else:
                 block_errors.append(
@@ -1437,6 +1498,8 @@ def render_note(
         dataview_nonempty=bool(note_dataview_block.strip()),
         # Phase 55 (TMPL-01): thread note_type for if_note_type_<X> predicates
         note_type=note_type,
+        # Phase 55 (TMPL-01 / D-55.08): compile user-defined flag predicates
+        flag_predicates=_compile_flag_predicates(profile),
     )
     expanded_source = _expand_blocks(template.template, block_ctx)
     text = _BlockTemplate(expanded_source).safe_substitute(substitution_ctx)
@@ -1698,6 +1761,8 @@ def _render_moc_like(
         # Phase 55 (TMPL-01): MOC/community context has no TMPL-01 note_type;
         # if_note_type_<X> blocks in MOC templates evaluate False (safe, per Q2).
         note_type=None,
+        # Phase 55 (TMPL-01 / D-55.08): compile user-defined flag predicates
+        flag_predicates=_compile_flag_predicates(profile),
     )
     expanded_source = _expand_blocks(template.template, block_ctx)
     text = _BlockTemplate(expanded_source).safe_substitute(substitution_ctx)

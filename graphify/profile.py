@@ -171,6 +171,7 @@ _VALID_TOP_LEVEL_KEYS = {
     "output", "taxonomy", "repo", "corpus",
     "extends", "includes", "community_templates",  # Phase 30 (CFG-02 / CFG-03)
     "dataview_queries",  # Phase 31 (TMPL-03, D-11)
+    "predicate_flags",  # Phase 55 (TMPL-01, D-55.08)
 }
 
 # Phase 31 (TMPL-03, D-12): per-note-type keys allowed under `dataview_queries:`.
@@ -553,6 +554,94 @@ def load_profile(vault_dir: str | Path | None) -> dict:
         return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, {}))
 
     return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, resolved.composed))
+
+
+# ---------------------------------------------------------------------------
+# Phase 55 (TMPL-01 / D-55.08): predicate_flags validation helper
+# ---------------------------------------------------------------------------
+
+def _validate_predicate_flags(predicate_flags: object) -> list[str]:
+    """Validate the predicate_flags top-level profile key.
+
+    Returns a list of error strings — empty means valid.
+
+    Rules enforced:
+      - Must be a dict (not a list/string/etc.)
+      - No more than 64 entries (T-55-FLAG-VAL count cap)
+      - Names must not start with 'attr_' (D-55.08 namespace reservation)
+      - Names must not collide with built-in _PREDICATE_CATALOG keys
+        (stripped of the 'if_' prefix — e.g. 'god_node' collides with 'if_god_node')
+      - Each rule must be a dict with an 'attr' key (string)
+      - Allowed rule keys: 'attr', 'equals' — unknown keys are rejected
+    """
+    if not isinstance(predicate_flags, dict):
+        return [
+            f"predicate_flags must be a dict, got {type(predicate_flags).__name__}"
+        ]
+
+    errors: list[str] = []
+
+    # Count cap (T-55-FLAG-VAL)
+    if len(predicate_flags) > 64:
+        errors.append(
+            f"predicate_flags: too many entries ({len(predicate_flags)}) — "
+            "maximum is 64"
+        )
+
+    # Build the set of built-in catalog names (without 'if_' prefix) for
+    # collision detection. Function-local import avoids templates↔profile cycle.
+    try:
+        from graphify.templates import _PREDICATE_CATALOG  # type: ignore[import]
+        catalog_bare = frozenset(
+            k[len("if_"):] if k.startswith("if_") else k
+            for k in _PREDICATE_CATALOG
+        )
+    except ImportError:
+        catalog_bare = frozenset()
+
+    _ALLOWED_RULE_KEYS = frozenset({"attr", "equals"})
+
+    for name, rule in predicate_flags.items():
+        # Namespace reservation: 'attr_' prefix is reserved for if_attr_<name>
+        if isinstance(name, str) and name.startswith("attr_"):
+            errors.append(
+                f"predicate_flags: name '{name}' starts with 'attr_' — "
+                "this prefix is reserved for the if_attr_<name> family"
+            )
+            continue
+
+        # Catalog collision: 'god_node' collides with built-in 'if_god_node'
+        if isinstance(name, str) and name in catalog_bare:
+            errors.append(
+                f"predicate_flags: name '{name}' collides with built-in predicate "
+                f"'if_{name}' in the predicate catalog"
+            )
+            continue
+
+        # Rule must be a dict
+        if not isinstance(rule, dict):
+            errors.append(
+                f"predicate_flags.{name}: rule must be a dict "
+                f"(got {type(rule).__name__})"
+            )
+            continue
+
+        # 'attr' key is required
+        if "attr" not in rule:
+            errors.append(
+                f"predicate_flags.{name}: rule must have an 'attr' key"
+            )
+            continue
+
+        # Unknown keys rejected
+        unknown = set(rule) - _ALLOWED_RULE_KEYS
+        if unknown:
+            errors.append(
+                f"predicate_flags.{name}: unknown keys {sorted(unknown)} — "
+                f"only 'attr' and 'equals' are allowed"
+            )
+
+    return errors
 
 
 # ---------------------------------------------------------------------------
@@ -1080,6 +1169,11 @@ def validate_profile(profile: dict) -> list[str]:
                                 f"output.exclude[{i}] must not contain '..' (path traversal)"
                             )
 
+    # Phase 55 (TMPL-01 / D-55.08): predicate_flags validation
+    pf = profile.get("predicate_flags")
+    if pf is not None:
+        errors.extend(_validate_predicate_flags(pf))
+
     return errors
 
 
@@ -1450,7 +1544,14 @@ def validate_profile_preflight(
             except OSError as exc:
                 errors.append(f"templates/{note_type}.md: read failed: {exc}")
                 continue
-            tpl_errors = _validate_template(text, required)
+            # Phase 55 (D-55.08): pass known predicate_flags names so
+            # if_flag_<X> predicates declared in profile are accepted.
+            known_flags = frozenset(
+                (user_data.get("predicate_flags") or {}).keys()
+            )
+            tpl_errors = _validate_template(
+                text, required, known_flag_predicates=known_flags
+            )
             if tpl_errors:
                 for err in tpl_errors:
                     errors.append(f"templates/{note_type}.md: {err}")
