@@ -2667,6 +2667,223 @@ def test_if_attr_disjoint_from_catalog_name():
     assert out2 == "CAT|"
 
 
+# --- Phase 55 RED: if_note_type_* predicate family ---
+# These tests MUST FAIL RED until Plan 55-02 adds _IF_NOTE_TYPE_RE + evaluator branch.
+
+
+def test_if_note_type_thing_renders_when_note_type_matches():
+    """{{#if_note_type_thing}} renders body when note_type == 'thing'."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(graph=G, node_id="n", edges=[], dataview_nonempty=False, note_type="thing")
+    out = _expand("X{{#if_note_type_thing}}T{{/if}}Y", ctx)
+    assert out == "XTY"
+
+
+def test_if_note_type_omits_when_note_type_mismatches():
+    """{{#if_note_type_thing}} omits body when note_type == 'statement'."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(graph=G, node_id="n", edges=[], dataview_nonempty=False, note_type="statement")
+    out = _expand("X{{#if_note_type_thing}}T{{/if}}Y", ctx)
+    assert out == "XY"
+
+
+def test_if_note_type_omits_when_note_type_none():
+    """{{#if_note_type_thing}} omits body when note_type is None."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(graph=G, node_id="n", edges=[], dataview_nonempty=False, note_type=None)
+    out = _expand("X{{#if_note_type_thing}}T{{/if}}Y", ctx)
+    assert out == "XY"
+
+
+def test_if_note_type_statement_renders_when_matches():
+    """{{#if_note_type_statement}} renders body when note_type == 'statement'."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(graph=G, node_id="n", edges=[], dataview_nonempty=False, note_type="statement")
+    out = _expand("X{{#if_note_type_statement}}S{{/if}}Y", ctx)
+    assert out == "XSY"
+
+
+def test_if_note_type_person_renders_when_matches():
+    """{{#if_note_type_person}} renders body when note_type == 'person'."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(graph=G, node_id="n", edges=[], dataview_nonempty=False, note_type="person")
+    out = _expand("X{{#if_note_type_person}}P{{/if}}Y", ctx)
+    assert out == "XPY"
+
+
+def test_if_note_type_source_renders_when_matches():
+    """{{#if_note_type_source}} renders body when note_type == 'source'."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(graph=G, node_id="n", edges=[], dataview_nonempty=False, note_type="source")
+    out = _expand("X{{#if_note_type_source}}R{{/if}}Y", ctx)
+    assert out == "XRY"
+
+
+def test_if_note_type_code_renders_when_matches():
+    """{{#if_note_type_code}} renders body when note_type == 'code'."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(graph=G, node_id="n", edges=[], dataview_nonempty=False, note_type="code")
+    out = _expand("X{{#if_note_type_code}}C{{/if}}Y", ctx)
+    assert out == "XCY"
+
+
+def test_if_note_type_moc_renders_when_matches():
+    """{{#if_note_type_moc}} renders body when note_type == 'moc'."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(graph=G, node_id="n", edges=[], dataview_nonempty=False, note_type="moc")
+    out = _expand("X{{#if_note_type_moc}}M{{/if}}Y", ctx)
+    assert out == "XMY"
+
+
+def test_if_note_type_all_six_types_evaluated_independently():
+    """Each of the 6 known note types is only truthy for its own type.
+
+    Verifies that all 6 evaluator branches work independently without
+    cross-match. A context with note_type='thing' must evaluate
+    {{#if_note_type_thing}} True and all other five False.
+    """
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    types = ("thing", "statement", "person", "source", "code", "moc")
+    for active_type in types:
+        ctx = BlockContext(
+            graph=G, node_id="n", edges=[], dataview_nonempty=False,
+            note_type=active_type,
+        )
+        for checked_type in types:
+            tpl = f"{{{{#if_note_type_{checked_type}}}}}HIT{{{{/if}}}}"
+            out = _expand(tpl, ctx)
+            expected = "HIT" if active_type == checked_type else ""
+            assert out == expected, (
+                f"note_type={active_type!r}: {{{{#if_note_type_{checked_type}}}}} => {out!r}, expected {expected!r}"
+            )
+
+
+def test_if_note_type_unknown_suffix_rejected_at_validate_template():
+    """validate_template rejects unknown note-type suffix per D-55.05."""
+    from graphify.templates import validate_template
+
+    errors = validate_template("{{#if_note_type_blarg}}X{{/if}}", required=set())
+    assert errors, "Expected validation errors for unknown note-type suffix"
+    combined = " ".join(errors)
+    assert "blarg" in combined or "unknown" in combined.lower(), combined
+
+
+# --- Phase 55 RED: if_flag_* predicate family ---
+# These tests MUST FAIL RED until Plan 55-02 adds _IF_FLAG_RE + evaluator branch.
+
+
+def test_if_flag_truthy_rule_renders():
+    """{{#if_flag_is_published}} renders body when handler returns True."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(
+        graph=G,
+        node_id="n",
+        edges=[],
+        dataview_nonempty=False,
+        flag_predicates={"is_published": lambda ctx: True},
+    )
+    out = _expand("X{{#if_flag_is_published}}P{{/if}}Y", ctx)
+    assert out == "XPY"
+
+
+def test_if_flag_truthy_rule_with_node_attr():
+    """{{#if_flag_reviewed}} renders when handler reads node attribute truthy."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N", reviewed=True)
+    ctx = BlockContext(
+        graph=G,
+        node_id="n",
+        edges=[],
+        dataview_nonempty=False,
+        flag_predicates={"reviewed": lambda ctx: bool(ctx.graph.nodes.get(ctx.node_id, {}).get("reviewed"))},
+    )
+    out = _expand("X{{#if_flag_reviewed}}R{{/if}}Y", ctx)
+    assert out == "XRY"
+
+
+def test_if_flag_equality_rule_renders_when_attr_equals_value():
+    """{{#if_flag_status_done}} renders when handler returns True for equality check."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N", status="done")
+    ctx = BlockContext(
+        graph=G,
+        node_id="n",
+        edges=[],
+        dataview_nonempty=False,
+        flag_predicates={"status_done": lambda ctx: ctx.graph.nodes.get(ctx.node_id, {}).get("status") == "done"},
+    )
+    out = _expand("X{{#if_flag_status_done}}D{{/if}}Y", ctx)
+    assert out == "XDY"
+
+
+def test_if_flag_equality_rule_omits_when_false():
+    """{{#if_flag_is_published}} omits body when handler returns False."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(
+        graph=G,
+        node_id="n",
+        edges=[],
+        dataview_nonempty=False,
+        flag_predicates={"is_published": lambda ctx: False},
+    )
+    out = _expand("X{{#if_flag_is_published}}P{{/if}}Y", ctx)
+    assert out == "XY"
+
+
+def test_if_flag_unknown_name_omits_at_render():
+    """{{#if_flag_missing}} evaluates False when flag not in flag_predicates."""
+    from graphify.templates import BlockContext
+
+    G = nx.Graph()
+    G.add_node("n", label="N")
+    ctx = BlockContext(
+        graph=G,
+        node_id="n",
+        edges=[],
+        dataview_nonempty=False,
+        flag_predicates={},
+    )
+    out = _expand("X{{#if_flag_missing}}P{{/if}}Y", ctx)
+    assert out == "XY"
+
+
 # --- TMPL-02: connection loops ---
 
 
@@ -3252,6 +3469,8 @@ def test_block_free_template_renders_byte_identical():
         node_id="n",
         edges=_build_edge_records(G, "n"),
         dataview_nonempty=False,
+        note_type=None,
+        flag_predicates={},
     )
     expanded = _expand_blocks(text, block_ctx)
     new_out = _BlockTemplate(expanded).safe_substitute(substitution_ctx)

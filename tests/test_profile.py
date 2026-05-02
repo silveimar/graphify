@@ -1771,3 +1771,76 @@ def test_dataview_queries_absent_key_is_legacy_compatible(tmp_path):
     assert proc.returncode == 0, proc.stderr
     # Legacy moc_query path is reachable; no preflight errors emitted.
     assert "error:" not in proc.stderr
+
+
+# ---------------------------------------------------------------------------
+# Phase 55 RED: predicate_flags validation tests
+# These tests MUST FAIL RED until Plan 55-03 adds _validate_predicate_flags
+# and extends _VALID_TOP_LEVEL_KEYS with "predicate_flags".
+# ---------------------------------------------------------------------------
+
+
+def test_predicate_flags_valid_truthy_rule():
+    """predicate_flags with truthy rule {attr: ...} produces no validation errors."""
+    profile = {"predicate_flags": {"is_published": {"attr": "is_published"}}}
+    errors = validate_profile(profile)
+    assert errors == [], errors
+
+
+def test_predicate_flags_valid_equality_rule():
+    """predicate_flags with equality rule {attr: ..., equals: ...} produces no errors."""
+    profile = {"predicate_flags": {"is_reviewed": {"attr": "status", "equals": "done"}}}
+    errors = validate_profile(profile)
+    assert errors == [], errors
+
+
+def test_predicate_flags_non_dict_rejected():
+    """predicate_flags value that is not a dict is rejected with clear error."""
+    profile = {"predicate_flags": "not a dict"}
+    errors = validate_profile(profile)
+    assert errors, "Expected validation errors for non-dict predicate_flags"
+    combined = " ".join(errors)
+    assert "must be a dict" in combined, combined
+
+
+def test_predicate_flags_catalog_collision_rejected():
+    """predicate_flags name 'god_node' collides with built-in 'if_god_node' predicate."""
+    profile = {"predicate_flags": {"god_node": {"attr": "god_node"}}}
+    errors = validate_profile(profile)
+    assert errors, "Expected error for catalog collision"
+    combined = " ".join(errors)
+    assert "collides with built-in predicate" in combined or "catalog" in combined.lower(), combined
+
+
+def test_predicate_flags_attr_prefix_rejected():
+    """predicate_flags name starting with 'attr_' is rejected (namespace collision)."""
+    profile = {"predicate_flags": {"attr_foo": {"attr": "foo"}}}
+    errors = validate_profile(profile)
+    assert errors, "Expected error for attr_ prefix"
+    combined = " ".join(errors)
+    assert "attr_" in combined, combined
+
+
+def test_predicate_flags_missing_attr_key_rejected():
+    """predicate_flags rule {} missing required 'attr' key is rejected."""
+    profile = {"predicate_flags": {"is_done": {}}}
+    errors = validate_profile(profile)
+    assert errors, "Expected error for missing attr key"
+    combined = " ".join(errors)
+    assert "attr" in combined, combined
+
+
+def test_predicate_flags_extra_keys_rejected():
+    """predicate_flags rule with unknown key 'op' is rejected."""
+    profile = {"predicate_flags": {"is_done": {"attr": "x", "op": "eq"}}}
+    errors = validate_profile(profile)
+    assert errors, "Expected error for unknown keys in rule"
+    combined = " ".join(errors)
+    assert "unknown keys" in combined or "unknown key" in combined, combined
+
+
+def test_predicate_flags_top_level_key_accepted():
+    """'predicate_flags' must be in _VALID_TOP_LEVEL_KEYS (no spurious unknown-key error)."""
+    assert "predicate_flags" in _VALID_TOP_LEVEL_KEYS, (
+        "'predicate_flags' must be in _VALID_TOP_LEVEL_KEYS to pass top-level validation"
+    )
