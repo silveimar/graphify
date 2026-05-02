@@ -220,6 +220,9 @@ class BlockContext:
     node_id: str
     edges: list[dict]
     dataview_nonempty: bool
+    # Phase 55 additions (defaulted so all existing kwargs callers stay valid):
+    note_type: str | None = None
+    flag_predicates: dict = dataclasses.field(default_factory=dict)
 
 
 def _pred_god_node(ctx: BlockContext) -> bool:
