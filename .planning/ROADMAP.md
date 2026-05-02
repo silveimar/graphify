@@ -582,13 +582,13 @@ Plans:
 2. `{{#connections}}…{{/connections}}` (or equivalent documented block) iterates outbound/inbound connections with deterministic ordering and sanitized labels/targets; pytest covers nested + empty-iterable cases (**TMPL-02**).
 3. Migration note documents block syntax and ordering guarantees; `validate_profile_preflight` flags malformed blocks.
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 - [x] 55-01-PLAN.md — Wave 0 RED scaffolds: BlockContext extension + RED tests for if_note_type_*, if_flag_*, predicate_flags validation
 - [x] 55-02-PLAN.md — GREEN: if_note_type_<X> regex + evaluator branch + validate_template guard + render_note plumbing
 - [x] 55-03-PLAN.md — GREEN: predicate_flags: profile key + _validate_predicate_flags + if_flag_<name> evaluator + preflight cross-check
 - [x] 55-04-PLAN.md — Doc-fence-as-fixture loader (tests/test_docs_templates_examples.py)
 - [x] 55-05-PLAN.md — docs/TEMPLATES.md (8 sections per D-55.11) + 1-line PROFILE-CONFIGURATION.md pointer
-- [ ] 55-06-PLAN.md — 55-VERIFICATION.md + ROADMAP close-out
+- [x] 55-06-PLAN.md — 55-VERIFICATION.md + ROADMAP close-out
 
 **UI hint:** no — authoring surface change documented in MIGRATION/CONFIGURATION docs.
 
