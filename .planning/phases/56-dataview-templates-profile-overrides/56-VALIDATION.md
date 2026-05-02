@@ -1,10 +1,11 @@
 ---
 phase: 56
 slug: dataview-templates-profile-overrides
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: planned
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-02
+updated: 2026-05-02
 ---
 
 # Phase 56 — Validation Strategy
@@ -36,11 +37,22 @@ created: 2026-05-02
 
 ## Per-Task Verification Map
 
-> Populated by planner during PLAN.md generation. Each PLAN task gets a row mapping to its automated verify command. Wave 0 dependencies marked ❌ W0 until the new test file (`tests/test_template_overrides.py`) is created.
-
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 56-XX-XX | XX | N | TMPL-03 / CFG-01 / CFG-02 | — | path-confined override loads | unit | `pytest tests/test_template_overrides.py -q` | ❌ W0 | ⬜ pending |
+| 56-01-T1 | 01 | 1 | CFG-02 | — | provenance shape change (no security surface) | unit (RED) | `pytest tests/test_profile.py::test_provenance_accumulates_across_extends_chain -x` (expect non-zero) | ✅ | ⬜ pending |
+| 56-01-T2 | 01 | 1 | CFG-02 | — | provenance accumulates all writers (no last-writer info loss) | unit (GREEN) | `pytest tests/test_profile.py -q && pytest tests/ -q` | ✅ | ⬜ pending |
+| 56-02-T1 | 02 | 2 | CFG-02 | — | preflight collision detection (defense-in-depth at validation layer) | unit (RED) | `pytest tests/test_template_overrides.py 2>&1 \| grep -E "failed"` | ✅ W0 | ⬜ pending |
+| 56-02-T2 | 02 | 2 | CFG-02 | — | deterministic error wording for 4 collision classes | unit (GREEN) | `pytest tests/test_template_overrides.py -q && pytest tests/ -q` | ✅ | ⬜ pending |
+| 56-03-T1 | 03 | 3 | CFG-01 | — | path-confined override loads (`..`, abs, `~` rejected) | unit (RED) | `pytest tests/test_profile.py tests/test_mapping.py 2>&1 \| grep -E "failed"` | ✅ | ⬜ pending |
+| 56-03-T2 | 03 | 3 | CFG-01 | T-30-V12 | path-confinement validators ported verbatim from community_templates: | unit (GREEN) | `pytest tests/test_profile.py -q` | ✅ | ⬜ pending |
+| 56-03-T3 | 03 | 3 | CFG-01 | — | mapping_rules.id slug pattern + uniqueness validated | unit (GREEN) | `pytest tests/test_mapping.py -q && pytest tests/ -q` | ✅ | ⬜ pending |
+| 56-04-T1 | 04 | 4 | TMPL-03 | — | dataview_queries dead-rule preflight | unit (RED) | `pytest tests/test_profile.py 2>&1 \| grep -E "failed"` | ✅ | ⬜ pending |
+| 56-04-T2 | 04 | 4 | TMPL-03 | — | unknown ${var} rejected (allowlist {community_tag, folder}); unreachable note_type rejected; empty-after-substitution rejected | unit (GREEN) | `pytest tests/test_profile.py -q && pytest tests/ -q` | ✅ | ⬜ pending |
+| 56-05-T1 | 05 | 5 | CFG-01 | — | ladder + warn-fallback + classify integration | unit (RED) | `pytest tests/test_template_overrides.py 2>&1 \| grep -E "failed"` | ✅ | ⬜ pending |
+| 56-05-T2 | 05 | 5 | CFG-01 | T-55-D55.14 | warn-and-fall-back per list (no abort on missing override) | unit (GREEN) | `pytest tests/test_template_overrides.py::test_classify_populates_rule_id_when_matched_rule_has_id tests/test_template_overrides.py::test_community_template_missing_file_still_warns_with_correct_list_name -x && pytest tests/ -q` | ✅ | ⬜ pending |
+| 56-05-T3 | 05 | 5 | CFG-01 | — | D-56.05 ladder order: mapping_rule > community > note_type > base | unit (GREEN) | `pytest tests/test_template_overrides.py -q && pytest tests/test_profile_composition.py -q && pytest tests/ -q` | ✅ | ⬜ pending |
+| 56-06-T1 | 06 | 5 | TMPL-03, CFG-01, CFG-02 | — | docs (no code) | manual + grep | `grep -c "mapping_rule_templates" docs/PROFILE-CONFIGURATION.md` returns >= 3 | ✅ | ⬜ pending |
+| 56-06-T2 | 06 | 5 | CFG-01 | — | docs (no code) | manual + grep | `grep -c "PROFILE-CONFIGURATION.md" docs/TEMPLATES.md` returns >= 1 | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,10 +60,10 @@ created: 2026-05-02
 
 ## Wave 0 Requirements
 
-- [ ] `tests/test_template_overrides.py` — new module covering CFG-01 ladder + CFG-02 collision matrix (parametric tests per D-56.07)
-- [ ] Existing `tests/test_profile.py` — additions for `mapping_rule_templates:` / `note_type_templates:` validators + dataview_queries dead-rule classes (no new file needed)
-- [ ] Existing `tests/test_mapping.py` — additions for `mapping_rules.id:` slug validation + uniqueness
-- [ ] No new framework install — pytest already in `pyproject.toml`
+- [x] `tests/test_template_overrides.py` — CREATED in Plan 02 Task 1 (wave 2 RED), extended in Plan 05 Task 1 (wave 3 RED). Wave 0 dependency satisfied as part of the CFG-02 RED step before any GREEN consumer task lands.
+- [x] Existing `tests/test_profile.py` — additions for `mapping_rule_templates:` / `note_type_templates:` validators (Plan 03) + dataview_queries dead-rule classes (Plan 04) + provenance shape (Plan 01). No new file needed.
+- [x] Existing `tests/test_mapping.py` — additions for `mapping_rules.id:` slug validation + uniqueness (Plan 03 Task 1).
+- [x] No new framework install — pytest already in `pyproject.toml`.
 
 ---
 
@@ -66,11 +78,11 @@ created: 2026-05-02
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (`tests/test_template_overrides.py`)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s (quick) / 120s (full)
-- [ ] `nyquist_compliant: true` set in frontmatter (after planner populates per-task map)
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify (every task has its own command)
+- [x] Wave 0 covers all MISSING references (`tests/test_template_overrides.py` created in Plan 02 Task 1)
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s (quick) / 120s (full)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** ready for execution

@@ -606,7 +606,15 @@ Plans:
 2. Composed profiles support scoped template overrides without breaking `extends:` / `includes:` merge semantics; documented in profile schema (**CFG-01**).
 3. Override-precedence collisions raise deterministic validation errors; collision matrix encoded in tests (**CFG-02**).
 
-**Plans:** `.planning/phases/56-dataview-templates-profile-overrides/` (TBD during `/gsd-plan-phase 56`).
+**Plans:** 6 plans
+
+Plans:
+- [ ] 56-01-PLAN.md — Provenance shape extension (dict[str, list[Path]]) — Wave 1
+- [ ] 56-02-PLAN.md — CFG-02 collision detectors (4 classes) + tests/test_template_overrides.py — Wave 2
+- [ ] 56-03-PLAN.md — CFG-01 schema validators (mapping_rule_templates, note_type_templates, mapping_rules.id) — Wave 3
+- [ ] 56-04-PLAN.md — TMPL-03 dataview_queries dead-rules (§1-3 implement, §4 reuses Plan 02) — Wave 4
+- [ ] 56-05-PLAN.md — CFG-01 render-time _resolve_note_template ladder + ClassificationContext.rule_id — Wave 5
+- [ ] 56-06-PLAN.md — Documentation (PROFILE-CONFIGURATION.md major update + TEMPLATES.md forward-pointer) — Wave 5 (parallel with 56-05)
 
 **UI hint:** no — profile/schema surface only.
 
