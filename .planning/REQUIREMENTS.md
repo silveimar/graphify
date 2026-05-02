@@ -8,8 +8,8 @@
 
 ### Templates & profile presentation (TMPL)
 
-- [ ] **TMPL-01**: Users can author **conditional template sections** in `.graphify/templates/` (profile-controlled predicates such as note type / god-node / simple flags) with expansion occurring **before** `${}` substitution; outputs pass through existing sanitization sinks.
-- [ ] **TMPL-02**: Users can iterate **outbound/inbound connections** via a **`{{#connections}}…{{/connections}}`** (or equivalent documented block) with deterministic ordering and sanitized labels/targets.
+- [x] **TMPL-01**: Users can author **conditional template sections** in `.graphify/templates/` (profile-controlled predicates such as note type / god-node / simple flags) with expansion occurring **before** `${}` substitution; outputs pass through existing sanitization sinks.
+- [x] **TMPL-02**: Users can iterate **outbound/inbound connections** via a **`{{#connections}}…{{/connections}}`** (or equivalent documented block) with deterministic ordering and sanitized labels/targets.
 - [ ] **TMPL-03**: Profile may declare **per-note-type Dataview query templates** validated at `validate_profile_preflight` time (schema + dead-rule checks).
 
 ### Profile overrides (CFG)
