@@ -490,7 +490,7 @@ Typed **concept↔code** edges, **template** conditionals/loops/Dataview hooks, 
 | 52. v1.10 gap — Phase 48 verification artifact | v1.10 | 1/1 | Complete    | 2026-05-01 |
 | 53. Concept↔code schema & build merge | v1.11 | 4/4 | Complete   | 2026-05-01 |
 | 54. MCP, trace & Obsidian parity | v1.11 | 5/5 | Complete   | 2026-05-01 |
-| 55. Template conditionals & connection loops | v1.11 | 5/6 | In Progress|  |
+| 55. Template conditionals & connection loops | v1.11 | 6/6 | Complete   | 2026-05-02 |
 | 56. Dataview templates & profile overrides | v1.11 | 0/? | Not started | — |
 | 57. Elicitation & harness increment | v1.11 | 0/? | Not started | — |
 | 58. Vault CLI parity & hygiene | v1.11 | 0/? | Not started | — |
