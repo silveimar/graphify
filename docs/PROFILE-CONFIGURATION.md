@@ -308,6 +308,8 @@ A list of rules to pick **custom markdown templates** for specific communities:
 
 Beyond YAML, you can place overrides under `.graphify/templates/` (e.g. `thing.md`, `moc.md`) using `${placeholder}` style substitution. Preflight validation counts and checks these templates when you run `graphify --validate-profile`.
 
+For conditional blocks (`{{#if_…}}`) and connection loops (`{{#connections}}`), see [`docs/TEMPLATES.md`](TEMPLATES.md).
+
 ---
 
 ## Validation and troubleshooting
