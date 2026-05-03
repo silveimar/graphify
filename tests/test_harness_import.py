@@ -120,3 +120,46 @@ def test_module_docstring_mentions_elicitation() -> None:
     import graphify.harness_import as hi
 
     assert hi.__doc__ and "elicitation" in hi.__doc__.lower()
+
+
+def test_import_refuses_vault_rooted_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    vault = tmp_path / "myvault"
+    (vault / ".obsidian").mkdir(parents=True)  # makes it a vault per is_obsidian_vault()
+    src = tmp_path / "harness_memory.v1.json"
+    env = export_interchange_v1(
+        json.loads(
+            (Path(__file__).parent / "fixtures" / "harness" / "graph.json").read_text(encoding="utf-8")
+        ),
+        out_path=None,
+    )
+    src.write_text(json.dumps(env), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    rc = subprocess.run(
+        [sys.executable, "-m", "graphify", "import-harness", str(src),
+         "--format", "json", "--output", str(vault)],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert rc.returncode != 0
+    assert "vault" in rc.stderr.lower()
+    assert "--allow-vault-write" in rc.stderr
+
+
+def test_import_accepts_vault_with_explicit_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    vault = tmp_path / "myvault"
+    (vault / ".obsidian").mkdir(parents=True)
+    src = tmp_path / "harness_memory.v1.json"
+    env = export_interchange_v1(
+        json.loads(
+            (Path(__file__).parent / "fixtures" / "harness" / "graph.json").read_text(encoding="utf-8")
+        ),
+        out_path=None,
+    )
+    src.write_text(json.dumps(env), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    rc = subprocess.run(
+        [sys.executable, "-m", "graphify", "import-harness", str(src),
+         "--format", "json", "--output", str(vault), "--allow-vault-write"],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert rc.returncode == 0, rc.stderr
+    assert (vault / "harness_import.json").exists()
