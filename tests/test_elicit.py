@@ -242,3 +242,63 @@ def test_sidecar_preserves_confidence_across_merge(tmp_path: Path) -> None:
     seq = merge_elicitation_into_build_inputs([base], adir)
     G = build(seq)
     assert G.edges["x", "x"]["confidence"] == "AMBIGUOUS"
+
+
+def test_malformed_sidecar_loader_returns_none(tmp_path: Path, capsys) -> None:
+    """ELIC-01 D-03: malformed JSON returns None and warns to stderr."""
+    adir = tmp_path / "art"
+    adir.mkdir()
+    (adir / "elicitation.json").write_bytes(b"{this is not json")
+    assert load_elicitation_sidecar(adir) is None
+    err = capsys.readouterr().err
+    assert "[graphify] elicitation sidecar invalid JSON" in err
+
+
+def test_sidecar_missing_required_fields_rejected(tmp_path: Path) -> None:
+    """ELIC-01 D-03: save rejects extraction missing required node fields."""
+    bad_extraction = {
+        "nodes": [{"id": "x", "label": "X", "source_file": "f.py"}],
+        "edges": [],
+    }
+    with pytest.raises(ValueError):
+        save_elicitation_sidecar(tmp_path / "art", bad_extraction, force=True)
+
+
+def test_sidecar_edge_referencing_absent_node(tmp_path: Path) -> None:
+    """ELIC-01 D-03: build() tolerates dangling edges from sidecar without exception.
+
+    The save-time validator (validate_extraction) rejects dangling edges, so we author
+    the sidecar payload directly on disk to simulate a sidecar produced by a future
+    relaxed validator or external tooling. This locks build()'s tolerance: dangling
+    edges are silently filtered (no exception), the explicit node is preserved, and
+    the absent endpoint is NOT auto-created (build_from_json filters edges where
+    either endpoint is missing from node_set — "dangling edges to external/stdlib
+    nodes — expected, not an error", per build.py).
+    """
+    adir = tmp_path / "art"
+    adir.mkdir()
+    payload = {
+        "version": 1,
+        "extraction": {
+            "nodes": [
+                {"id": "x", "label": "X", "file_type": "rationale", "source_file": ""}
+            ],
+            "edges": [
+                {
+                    "source": "x",
+                    "target": "ghost",
+                    "relation": "refs",
+                    "confidence": "AMBIGUOUS",
+                    "source_file": "",
+                }
+            ],
+        },
+        "meta": {},
+    }
+    (adir / "elicitation.json").write_text(json.dumps(payload), encoding="utf-8")
+    seq = merge_elicitation_into_build_inputs([{"nodes": [], "edges": []}], adir)
+    G = build(seq)  # must not raise
+    assert "x" in G.nodes
+    # Dangling edge is silently dropped by build_from_json (endpoint not in node_set).
+    assert "ghost" not in G.nodes
+    assert ("x", "ghost") not in G.edges and ("ghost", "x") not in G.edges
