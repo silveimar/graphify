@@ -10,12 +10,12 @@
 
 - [x] **TMPL-01**: Users can author **conditional template sections** in `.graphify/templates/` (profile-controlled predicates such as note type / god-node / simple flags) with expansion occurring **before** `${}` substitution; outputs pass through existing sanitization sinks.
 - [x] **TMPL-02**: Users can iterate **outbound/inbound connections** via a **`{{#connections}}…{{/connections}}`** (or equivalent documented block) with deterministic ordering and sanitized labels/targets.
-- [ ] **TMPL-03**: Profile may declare **per-note-type Dataview query templates** validated at `validate_profile_preflight` time (schema + dead-rule checks).
+- [x] **TMPL-03**: Profile may declare **per-note-type Dataview query templates** validated at `validate_profile_preflight` time (schema + dead-rule checks).
 
 ### Profile overrides (CFG)
 
-- [ ] **CFG-01**: Composed profiles support **scoped template overrides** (e.g., per-community or per-mapping-rule path documented in schema) without breaking `extends:` / `includes:` merge semantics from v1.7.
-- [ ] **CFG-02**: Deterministic **validation errors** when override precedence is ambiguous (collision matrix documented in tests).
+- [x] **CFG-01**: Composed profiles support **scoped template overrides** (e.g., per-community or per-mapping-rule path documented in schema) without breaking `extends:` / `includes:` merge semantics from v1.7.
+- [x] **CFG-02**: Deterministic **validation errors** when override precedence is ambiguous (collision matrix documented in tests).
 
 ### Concept ↔ code graph semantics (CGRAPH)
 
