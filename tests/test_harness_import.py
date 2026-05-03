@@ -147,7 +147,9 @@ def test_import_refuses_vault_rooted_output(tmp_path: Path, monkeypatch: pytest.
 def test_import_accepts_vault_with_explicit_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     vault = tmp_path / "myvault"
     (vault / ".obsidian").mkdir(parents=True)
-    src = tmp_path / "harness_memory.v1.json"
+    # src must live inside artifacts_root (the vault, when --output <vault> is used)
+    # so that validate_graph_path accepts it; this exercises the guard, not source validation.
+    src = vault / "harness_memory.v1.json"
     env = export_interchange_v1(
         json.loads(
             (Path(__file__).parent / "fixtures" / "harness" / "graph.json").read_text(encoding="utf-8")

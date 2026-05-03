@@ -2533,6 +2533,11 @@ def main() -> None:
             help="Reject on high-confidence injection-pattern matches",
         )
         parser.add_argument(
+            "--allow-vault-write",
+            action="store_true",
+            help="Permit --output to resolve under an Obsidian vault root (off by default; HARN-02).",
+        )
+        parser.add_argument(
             "--output",
             default=None,
             help="Override artifacts root (same precedence as graphify run / elicit)",
@@ -2556,6 +2561,14 @@ def main() -> None:
             local_list=_lv_ih2,
         )
         artifacts = resolved.artifacts_dir
+        from graphify.output import is_obsidian_vault
+        if not opts.allow_vault_write and is_obsidian_vault(artifacts):
+            print(
+                f"[graphify] refusing to write harness import under vault root {artifacts}; "
+                "pass --allow-vault-write to override",
+                file=sys.stderr,
+            )
+            sys.exit(2)
         artifacts.mkdir(parents=True, exist_ok=True)
 
         src = Path(opts.path)
