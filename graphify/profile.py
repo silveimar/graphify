@@ -6,6 +6,7 @@ import fnmatch  # noqa: F401  # used by Plan 30-02 community-template matcher
 import hashlib
 import os
 import re
+import string
 import sys
 import unicodedata
 from pathlib import Path
@@ -185,6 +186,35 @@ _VALID_TOP_LEVEL_KEYS = {
 _KNOWN_NOTE_TYPES: frozenset[str] = frozenset(
     {"moc", "community", "thing", "statement", "person", "source", "code"}
 )
+
+# Phase 56 (TMPL-03 §1, D-56.02): allowlist for `${var}` substitutions inside
+# `dataview_queries:` values. Per RESEARCH.md §1, this set is the exhaustive
+# enumeration of `_build_dataview_block` callsites at templates.py:1290-1293,
+# 1439-1444, 1707-1710 — NOT note_type, NOT vault_root (those were CONTEXT
+# speculation, ruled out by the callsite walk). Do not expand without re-running
+# that enumeration.
+_DATAVIEW_QUERY_VARS: frozenset[str] = frozenset({"community_tag", "folder"})
+
+
+def _reachable_note_types(profile: dict) -> set[str]:
+    """Phase 56 (TMPL-03 §2, D-56.02): conservative reachable-note-types set.
+
+    Built-in topology fallback (mapping.py:397-406) always produces these,
+    regardless of mapping_rules:
+        {"moc", "community", "thing", "statement", "code"}
+    Authors can extend the set via `mapping_rules[].then.note_type` entries.
+    Only "person" and "source" are ever potentially unreachable in v1.11 —
+    everything else is guaranteed reachable by the topology fallback or by
+    MOC/community emission.
+    """
+    reachable = {"moc", "community", "thing", "statement", "code"}
+    for rule in profile.get("mapping_rules") or []:
+        if not isinstance(rule, dict):
+            continue
+        then = rule.get("then")
+        if isinstance(then, dict) and isinstance(then.get("note_type"), str):
+            reachable.add(then["note_type"])
+    return reachable
 
 _VALID_NAMING_CONVENTIONS = {"title_case", "kebab-case", "preserve"}
 
@@ -883,6 +913,44 @@ def validate_profile(profile: dict) -> list[str]:
                     errors.append(
                         f"dataview_queries.{key}: query must be a non-empty string"
                     )
+                    continue
+
+                # Phase 56 (TMPL-03 §1, D-56.02): reject `${var}` references
+                # outside _DATAVIEW_QUERY_VARS (exhaustive callsite allowlist).
+                for match in string.Template.pattern.finditer(value):
+                    name = match.group("named") or match.group("braced")
+                    if name and name not in _DATAVIEW_QUERY_VARS:
+                        errors.append(
+                            f"dataview_queries.{key}: unknown ${{{name}}} — "
+                            f"valid vars are: {sorted(_DATAVIEW_QUERY_VARS)}"
+                        )
+
+                # Phase 56 (TMPL-03 §2, D-56.02): reject keys that no
+                # mapping_rule and no topology fallback can ever produce.
+                if key not in _reachable_note_types(profile):
+                    errors.append(
+                        f"dataview_queries.{key}: note_type {key!r} is not "
+                        f"reachable — no mapping_rule produces it; remove the "
+                        f"entry or add a rule"
+                    )
+
+                # Phase 56 (TMPL-03 §3, D-56.02): reject queries that strip to
+                # empty when every ${var} expands to empty (no literal content).
+                rendered = (
+                    string.Template(value)
+                    .safe_substitute(community_tag="", folder="")
+                    .strip()
+                )
+                if not rendered:
+                    errors.append(
+                        f"dataview_queries.{key}: query renders empty when "
+                        f"${{community_tag}} and ${{folder}} expand to empty "
+                        f"— add literal content"
+                    )
+
+                # TMPL-03 §4 (cross-chain dataview_queries.<note_type> duplicate)
+                # is detected by _detect_dataview_collisions (Plan 02), wired in
+                # validate_profile_preflight after this validator runs.
 
     corpus = profile.get("corpus")
     if corpus is not None:

@@ -1640,16 +1640,27 @@ def test_dataview_queries_top_level_key_accepted():
 
 
 def test_dataview_queries_validates_against_known_types():
-    """Every member of _KNOWN_NOTE_TYPES is accepted as a key."""
+    """Every member of _KNOWN_NOTE_TYPES is shape-accepted as a key.
+
+    Phase 56 (TMPL-03 §2, D-56.02) added a reachability check: `person` and
+    `source` are unreachable under the topology fallback alone, so this test
+    supplies mapping_rules that route to those note_types — proving that every
+    _KNOWN_NOTE_TYPES key is schema-acceptable when reachability is satisfied.
+    """
     from graphify.profile import _KNOWN_NOTE_TYPES
     assert _KNOWN_NOTE_TYPES == frozenset(
         {"moc", "community", "thing", "statement", "person", "source", "code"}
     )
     profile = {
+        # Augment topology fallback set so `person` and `source` are reachable.
+        "mapping_rules": [
+            {"when": {"attr": "kind", "equals": "person"}, "then": {"note_type": "person"}},
+            {"when": {"attr": "kind", "equals": "source"}, "then": {"note_type": "source"}},
+        ],
         "dataview_queries": {
             note_type: f"TABLE q FROM #t/{note_type}"
             for note_type in _KNOWN_NOTE_TYPES
-        }
+        },
     }
     assert validate_profile(profile) == []
 
@@ -1952,7 +1963,10 @@ def test_dataview_queries_unreachable_note_type_becomes_reachable_via_mapping_ru
     mapping_rules adds a `then.note_type: person` rule."""
     profile = {
         "mapping_rules": [
-            {"when": {"label_re": ".*"}, "then": {"note_type": "person"}}
+            {
+                "when": {"attr": "kind", "equals": "person"},
+                "then": {"note_type": "person"},
+            }
         ],
         "dataview_queries": {"person": "TABLE p FROM #t/person"},
     }
