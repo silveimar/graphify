@@ -740,6 +740,121 @@ def validate_profile(profile: dict) -> list[str]:
                         f"'match', 'pattern', 'template' are supported"
                     )
 
+    # Phase 56 (CFG-01, D-56.03/04): mapping_rule_templates: validator —
+    # ports community_templates: validator (above) byte-for-byte with the
+    # following swaps: variable ct→mrt; key→mapping_rule_templates;
+    # match allowlist={'rule_id'} only; pattern is slug ^[a-z][a-z0-9_-]*$.
+    # Path-confinement uses substring style (NOT Path.parts) per D-56.03.
+    _MAPPING_RULE_TEMPLATE_PATTERN_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
+    mrt = profile.get("mapping_rule_templates")
+    if mrt is not None:
+        if not isinstance(mrt, list):
+            errors.append("'mapping_rule_templates' must be a list")
+        else:
+            for idx, rule in enumerate(mrt):
+                prefix = f"mapping_rule_templates[{idx}]"
+                if not isinstance(rule, dict):
+                    errors.append(f"{prefix}: must be a mapping (dict)")
+                    continue
+                match = rule.get("match")
+                if match != "rule_id":
+                    errors.append(
+                        f"{prefix}.match must be 'rule_id' (got {match!r})"
+                    )
+                pattern = rule.get("pattern")
+                if "pattern" not in rule:
+                    errors.append(f"{prefix}.pattern is required")
+                elif not isinstance(pattern, str):
+                    errors.append(
+                        f"{prefix}.pattern must be a string "
+                        f"(got {type(pattern).__name__})"
+                    )
+                elif not _MAPPING_RULE_TEMPLATE_PATTERN_RE.fullmatch(pattern):
+                    errors.append(
+                        f"{prefix}.pattern must match slug regex "
+                        f"'^[a-z][a-z0-9_-]*$' (got {pattern!r})"
+                    )
+                template = rule.get("template")
+                if not isinstance(template, str) or not template:
+                    errors.append(f"{prefix}.template must be a non-empty string")
+                elif ".." in template:
+                    errors.append(
+                        f"{prefix}.template contains '..' — fragment paths must "
+                        f"stay inside .graphify/"
+                    )
+                elif Path(template).is_absolute():
+                    errors.append(
+                        f"{prefix}.template is an absolute path — must be "
+                        f"relative to .graphify/"
+                    )
+                elif template.startswith("~"):
+                    errors.append(
+                        f"{prefix}.template starts with '~' — must be relative "
+                        f"to .graphify/"
+                    )
+                extra = set(rule) - {"match", "pattern", "template"}
+                if extra:
+                    errors.append(
+                        f"{prefix}: unknown keys {sorted(extra)} — only "
+                        f"'match', 'pattern', 'template' are supported"
+                    )
+
+    # Phase 56 (CFG-01, D-56.03): note_type_templates: validator —
+    # mirrors mapping_rule_templates: structure with allowlist={'note_type'}
+    # and pattern restricted to _KNOWN_NOTE_TYPES.
+    ntt = profile.get("note_type_templates")
+    if ntt is not None:
+        if not isinstance(ntt, list):
+            errors.append("'note_type_templates' must be a list")
+        else:
+            for idx, rule in enumerate(ntt):
+                prefix = f"note_type_templates[{idx}]"
+                if not isinstance(rule, dict):
+                    errors.append(f"{prefix}: must be a mapping (dict)")
+                    continue
+                match = rule.get("match")
+                if match != "note_type":
+                    errors.append(
+                        f"{prefix}.match must be 'note_type' (got {match!r})"
+                    )
+                pattern = rule.get("pattern")
+                if "pattern" not in rule:
+                    errors.append(f"{prefix}.pattern is required")
+                elif not isinstance(pattern, str):
+                    errors.append(
+                        f"{prefix}.pattern must be a string "
+                        f"(got {type(pattern).__name__})"
+                    )
+                elif pattern not in _KNOWN_NOTE_TYPES:
+                    errors.append(
+                        f"{prefix}.pattern must be one of "
+                        f"{sorted(_KNOWN_NOTE_TYPES)} (got {pattern!r})"
+                    )
+                template = rule.get("template")
+                if not isinstance(template, str) or not template:
+                    errors.append(f"{prefix}.template must be a non-empty string")
+                elif ".." in template:
+                    errors.append(
+                        f"{prefix}.template contains '..' — fragment paths must "
+                        f"stay inside .graphify/"
+                    )
+                elif Path(template).is_absolute():
+                    errors.append(
+                        f"{prefix}.template is an absolute path — must be "
+                        f"relative to .graphify/"
+                    )
+                elif template.startswith("~"):
+                    errors.append(
+                        f"{prefix}.template starts with '~' — must be relative "
+                        f"to .graphify/"
+                    )
+                extra = set(rule) - {"match", "pattern", "template"}
+                if extra:
+                    errors.append(
+                        f"{prefix}: unknown keys {sorted(extra)} — only "
+                        f"'match', 'pattern', 'template' are supported"
+                    )
+
     # Phase 31 (TMPL-03, D-11/D-12): dataview_queries top-level key.
     # Restricted to per-note-type keys in _KNOWN_NOTE_TYPES; values must be
     # non-empty strings. The graph-blind preflight rejects unknown keys at
