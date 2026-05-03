@@ -1751,6 +1751,106 @@ def test_dataview_queries_provenance_in_validate_profile_output(tmp_path):
         if "dataview_queries.moc" in line
     )
     assert "profile.yaml" in moc_line
+    # Phase 56 (CFG-02 §4): provenance shape is dict[str, list[Path]] — for a
+    # 2-file extends chain where ONLY the override sets `dataview_queries.moc`,
+    # the list has length 1 and points at profile.yaml.
+    from graphify.profile import _resolve_profile_chain
+    resolved = _resolve_profile_chain(vault / ".graphify" / "profile.yaml", vault)
+    moc_sources = resolved.provenance["dataview_queries.moc"]
+    assert isinstance(moc_sources, list), (
+        f"provenance leaf must be list[Path], got {type(moc_sources).__name__}"
+    )
+    assert len(moc_sources) == 1
+    assert moc_sources[0].name == "profile.yaml"
+
+
+def test_provenance_accumulates_across_extends_chain(tmp_path):
+    """Phase 56 (CFG-02 §4): provenance records ALL contributing source paths
+    per leaf, in merge order (extends-parents → includes → own).
+
+    Composes a 3-deep extends chain (grandparent ← parent ← child) all of which
+    set `dataview_queries.code`. The provenance list for that leaf must contain
+    all three Paths, ordered grandparent → parent → child.
+    """
+    from graphify.profile import _resolve_profile_chain
+
+    vault = tmp_path / "vault"
+    graphify_dir = vault / ".graphify"
+    bases_dir = graphify_dir / "bases"
+    bases_dir.mkdir(parents=True)
+    (bases_dir / "grandparent.yaml").write_text(
+        "dataview_queries:\n"
+        "  code: \"GRAND code query\"\n",
+        encoding="utf-8",
+    )
+    (bases_dir / "parent.yaml").write_text(
+        "extends: grandparent.yaml\n"
+        "dataview_queries:\n"
+        "  code: \"PARENT code query\"\n",
+        encoding="utf-8",
+    )
+    (graphify_dir / "profile.yaml").write_text(
+        "extends: bases/parent.yaml\n"
+        + _V18_REQUIRED_YAML +
+        "dataview_queries:\n"
+        "  code: \"CHILD code query\"\n",
+        encoding="utf-8",
+    )
+    resolved = _resolve_profile_chain(graphify_dir / "profile.yaml", vault)
+    assert resolved.errors == [], resolved.errors
+    sources = resolved.provenance["dataview_queries.code"]
+    assert isinstance(sources, list)
+    assert len(sources) == 3, (
+        f"expected 3 contributors (grandparent, parent, child), got {len(sources)}: {sources}"
+    )
+    names = [p.name for p in sources]
+    assert names == ["grandparent.yaml", "parent.yaml", "profile.yaml"], names
+
+
+def test_provenance_single_source_remains_single_element(tmp_path):
+    """Phase 56: even when only one source contributes a leaf, provenance stores
+    a single-element list (NOT a bare Path). Consumers always see list shape.
+
+    Per the existing 2-file pattern (`test_dataview_queries_provenance_in_validate_profile_output`):
+    per-leaf recursion happens when both sides of a merge are dicts. Use a
+    3-file extends chain so `dataview_queries` exists in `composed` BEFORE the
+    parent merge runs — which lets the parent's `community` key be recorded as
+    a per-leaf provenance entry written by exactly one source.
+    """
+    from graphify.profile import _resolve_profile_chain
+
+    vault = tmp_path / "vault"
+    graphify_dir = vault / ".graphify"
+    bases_dir = graphify_dir / "bases"
+    bases_dir.mkdir(parents=True)
+    (bases_dir / "grand.yaml").write_text(
+        "dataview_queries:\n"
+        "  seed: \"GRAND seed query\"\n",
+        encoding="utf-8",
+    )
+    (bases_dir / "mid.yaml").write_text(
+        "extends: grand.yaml\n"
+        "dataview_queries:\n"
+        "  community: \"MID-only community query\"\n",
+        encoding="utf-8",
+    )
+    (graphify_dir / "profile.yaml").write_text(
+        "extends: bases/mid.yaml\n"
+        + _V18_REQUIRED_YAML +
+        "dataview_queries:\n"
+        "  thing: \"CHILD thing query\"\n",
+        encoding="utf-8",
+    )
+    resolved = _resolve_profile_chain(graphify_dir / "profile.yaml", vault)
+    assert resolved.errors == [], resolved.errors
+    # `community` is touched only by mid.yaml (recorded during the mid→grand
+    # merge where both sides have `dataview_queries` dict — recursion fires).
+    sources = resolved.provenance["dataview_queries.community"]
+    assert isinstance(sources, list), (
+        f"provenance leaf must be list[Path], got {type(sources).__name__}"
+    )
+    assert len(sources) == 1
+    assert sources[0].name == "mid.yaml"
 
 
 def test_dataview_queries_absent_key_is_legacy_compatible(tmp_path):
