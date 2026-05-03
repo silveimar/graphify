@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: milestone
-status: executing
-stopped_at: Phase 58 context gathered
-last_updated: "2026-05-03T23:27:02.798Z"
+status: verifying
+stopped_at: Completed 58-03-PLAN.md
+last_updated: "2026-05-03T23:32:18.561Z"
 last_activity: 2026-05-03
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 27
-  completed_plans: 25
-  percent: 93
+  completed_plans: 26
+  percent: 96
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: `.planning/PROJECT.md` (**milestone v1.11** — Templates, Graph Semantics 
 ## Current Position
 
 Phase: 58 (Vault CLI parity & hygiene) — EXECUTING
-Plan: 2 of 3
-Status: Ready to execute
+Plan: 3 of 3
+Status: Phase complete — ready for verification
 Last activity: 2026-05-03
 
 ## Performance Metrics
@@ -75,6 +75,7 @@ Last activity: 2026-05-03
 | Phase 57 P03 | 10min | 3 tasks | 3 files |
 | Phase 57 P02 | 3min | 2 tasks | 3 files |
 | Phase 58-vault-cli-parity-hygiene P01 | 329 | 2 tasks | 2 files |
+| Phase 58-vault-cli-parity-hygiene P03 | 3min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -161,6 +162,8 @@ Locked v1.8 choices:
 - [Phase ?]: 57-02: ELIC-02 doc edits in-place + HARN-01 schema-id constant locked via doc-substring drift test
 - [Phase ?]: resolve_vault_for_parity delegates to resolve_execution_paths exclusively (no duplicate logic)
 - [Phase ?]: VAUX-01 warnings dimension covers only resolve_execution_paths stderr, not _merge_vault_pins (Q1 split)
+- [Phase ?]: Use local imports inside regression-lock test body to match existing late-import pattern in test_detect.py
+- [Phase ?]: Assert equality of both _SELF_OUTPUT_DIRS copies to catch future divergence between corpus_prune and detect
 
 ### Pending Todos
 
@@ -226,6 +229,6 @@ Open artifact audit items acknowledged at ship (`audit-open`); no runtime blocke
 
 ## Session Continuity
 
-Last session: 2026-05-03T23:26:56.348Z
-Stopped at: Phase 58 context gathered
+Last session: 2026-05-03T23:32:18.557Z
+Stopped at: Completed 58-03-PLAN.md
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
