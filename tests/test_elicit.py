@@ -302,3 +302,35 @@ def test_sidecar_edge_referencing_absent_node(tmp_path: Path) -> None:
     # Dangling edge is silently dropped by build_from_json (endpoint not in node_set).
     assert "ghost" not in G.nodes
     assert ("x", "ghost") not in G.edges and ("ghost", "x") not in G.edges
+
+
+# ---------------------------------------------------------------------------
+# ELIC-02 / HARN-01 doc-content regression locks (Phase 57 Plan 02)
+# ---------------------------------------------------------------------------
+
+_DOC_PATH = Path(__file__).resolve().parents[1] / "docs" / "ELICITATION.md"
+
+
+def test_doc_has_trust_boundaries_section() -> None:
+    """ELIC-02: docs/ELICITATION.md surfaces the trust-boundary contract."""
+    text = _DOC_PATH.read_text(encoding="utf-8")
+    assert "## Trust Boundaries" in text
+    assert "resolve_output" in text
+    assert "<artifacts_dir>/elicitation.json" in text
+    assert "sanitize_harness_text" in text
+
+
+def test_doc_has_milestone_non_goals_section() -> None:
+    """ELIC-02: heading renamed in place to milestone-scoped Non-Goals."""
+    text = _DOC_PATH.read_text(encoding="utf-8")
+    assert "## Milestone Non-Goals (v1.11)" in text
+    assert "## Non-goals (other phases)" not in text
+    assert "Real inverse round-trip" in text
+
+
+def test_doc_has_canonical_mapping() -> None:
+    """HARN-01: doc carries canonical mapping section + schema id + mapping fn name."""
+    text = _DOC_PATH.read_text(encoding="utf-8")
+    assert "## Canonical Harness Interchange (v1) Mapping" in text
+    assert "graphify.harness.interchange/v1" in text
+    assert "graph_data_to_extraction" in text

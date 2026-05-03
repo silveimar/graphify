@@ -124,3 +124,16 @@ def test_export_import_semantic_ids_labels_relations(tmp_path: Path) -> None:
     orig_edges = {(e["source"], e["target"], e["relation"]) for e in raw_graph["links"]}
     got_edges = {(e["source"], e["target"], e["relation"]) for e in ingested["edges"]}
     assert got_edges == orig_edges
+
+
+def test_interchange_schema_id_locked() -> None:
+    """HARN-01: schema-id constant is pinned and matches docs/ELICITATION.md (drift lock).
+
+    Pitfall 5: doc/code drift on the canonical schema id is invisible without an
+    automated tie. This test asserts the constant value and that the same string
+    appears verbatim in the user-facing doc.
+    """
+    assert INTERCHANGE_SCHEMA_ID == "graphify.harness.interchange/v1"
+    doc_path = Path(__file__).resolve().parents[1] / "docs" / "ELICITATION.md"
+    doc_text = doc_path.read_text(encoding="utf-8")
+    assert INTERCHANGE_SCHEMA_ID in doc_text
