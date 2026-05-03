@@ -351,14 +351,19 @@ def test_provenance_records_dotted_keys(tmp_path):
     entry = vault / ".graphify" / "profile.yaml"
     result = _resolve_profile_chain(entry, vault)
     assert result.errors == []
+    # Phase 56 (CFG-02 §4): provenance is dict[str, list[Path]] — the "current
+    # writer" (winning source) is the last entry in each list; merge order is
+    # extends → includes → own.
     # thing was last touched by fusion.yaml (profile.yaml does not set it)
-    src_thing = result.provenance.get("folder_mapping.thing")
-    assert src_thing is not None
-    assert str(src_thing).endswith("bases/fusion.yaml")
+    paths_thing = result.provenance.get("folder_mapping.thing")
+    assert paths_thing is not None
+    assert isinstance(paths_thing, list) and len(paths_thing) >= 1
+    assert str(paths_thing[-1]).endswith("bases/fusion.yaml")
     # statement was last touched by profile.yaml itself
-    src_stmt = result.provenance.get("folder_mapping.statement")
-    assert src_stmt is not None
-    assert str(src_stmt).endswith("profile.yaml")
+    paths_stmt = result.provenance.get("folder_mapping.statement")
+    assert paths_stmt is not None
+    assert isinstance(paths_stmt, list) and len(paths_stmt) >= 1
+    assert str(paths_stmt[-1]).endswith("profile.yaml")
 
 
 def test_provenance_list_typed_leaves_record_at_list_level(tmp_path):

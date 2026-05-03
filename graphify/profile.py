@@ -32,7 +32,10 @@ class PreflightResult(NamedTuple):
     rule_count: int
     template_count: int
     chain: list[Path] = []                     # Phase 30, D-14
-    provenance: dict[str, Path] = {}           # Phase 30, D-14, D-15
+    # Phase 56 (CFG-02 §4): list-shape preserves the FULL contributor history
+    # per leaf (extends → includes → own merge order). Consumers wanting
+    # "current writer" semantics read paths[-1].
+    provenance: dict[str, list[Path]] = {}     # Phase 30, D-14, D-15; Phase 56
     community_template_rules: list[dict] = []  # Phase 30, D-14, D-17
 
 
@@ -47,13 +50,13 @@ class ResolvedProfile(NamedTuple):
     Fields:
       composed:                  fully-merged profile dict (NOT yet merged with _DEFAULT_PROFILE)
       chain:                     resolution order, root-ancestor first (post-order append)
-      provenance:                dotted-key -> Path of the file that contributed the leaf
+      provenance:                dotted-key -> list[Path] of all files that contributed the leaf, in merge order (extends → includes → own)
       errors:                    cycle/depth/path/parse errors (empty -> success)
       community_template_rules:  echo of composed["community_templates"] or []
     """
     composed: dict
     chain: list[Path]
-    provenance: dict[str, Path]
+    provenance: dict[str, list[Path]]  # Phase 56 (CFG-02 §4): full contributor list per leaf
     errors: list[str]
     community_template_rules: list[dict]
 
@@ -248,7 +251,7 @@ def _deep_merge_with_provenance(
     base: dict,
     override: dict,
     source_path: Path,
-    provenance: dict[str, Path],
+    provenance: dict[str, list[Path]],
     _prefix: str = "",
 ) -> dict:
     """Like ``_deep_merge`` but records ``source_path`` for every leaf write.
@@ -271,7 +274,9 @@ def _deep_merge_with_provenance(
             )
         else:
             result[key] = value
-            provenance[dotted] = source_path
+            # Phase 56 (CFG-02 §4): append (don't overwrite) so provenance
+            # preserves the FULL chain of contributors per leaf in merge order.
+            provenance.setdefault(dotted, []).append(source_path)
     return result
 
 
@@ -389,7 +394,7 @@ def _resolve_profile_chain(entry_path: Path, vault_dir: Path) -> "ResolvedProfil
 
     errors: list[str] = []
     chain: list[Path] = []
-    provenance: dict[str, Path] = {}
+    provenance: dict[str, list[Path]] = {}  # Phase 56 (CFG-02 §4)
     graphify_root = (Path(vault_dir) / ".graphify").resolve()
 
     def _is_inside_graphify(canonical: Path) -> bool:
@@ -1476,7 +1481,7 @@ def validate_profile_preflight(
     # and what feeds the merged profile for layers 3 + 4.
     user_data: dict = {}
     chain: list[Path] = []
-    provenance: dict[str, Path] = {}
+    provenance: dict[str, list[Path]] = {}  # Phase 56 (CFG-02 §4)
     community_template_rules: list[dict] = []
     if profile_path.exists():
         try:

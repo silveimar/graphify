@@ -1768,9 +1768,13 @@ def test_provenance_accumulates_across_extends_chain(tmp_path):
     """Phase 56 (CFG-02 §4): provenance records ALL contributing source paths
     per leaf, in merge order (extends-parents → includes → own).
 
-    Composes a 3-deep extends chain (grandparent ← parent ← child) all of which
-    set `dataview_queries.code`. The provenance list for that leaf must contain
-    all three Paths, ordered grandparent → parent → child.
+    Per-leaf provenance is recorded only when the recursion in
+    `_deep_merge_with_provenance` fires (both sides of a merge are dicts at the
+    parent key). To exercise that on every level, we use a 4-file chain where a
+    `seed.yaml` (pulled in via grandparent.includes) populates
+    `dataview_queries` before grandparent itself touches `code`. From then on
+    every merge step has `dataview_queries` on both sides → recursion fires →
+    each successive write of `code` is recorded.
     """
     from graphify.profile import _resolve_profile_chain
 
@@ -1778,7 +1782,14 @@ def test_provenance_accumulates_across_extends_chain(tmp_path):
     graphify_dir = vault / ".graphify"
     bases_dir = graphify_dir / "bases"
     bases_dir.mkdir(parents=True)
+    (bases_dir / "seed.yaml").write_text(
+        "dataview_queries:\n"
+        "  _seed: \"seed marker\"\n",
+        encoding="utf-8",
+    )
     (bases_dir / "grandparent.yaml").write_text(
+        "includes:\n"
+        "  - seed.yaml\n"
         "dataview_queries:\n"
         "  code: \"GRAND code query\"\n",
         encoding="utf-8",

@@ -1524,8 +1524,13 @@ def main() -> None:
         if result.provenance:
             print(f"Field provenance ({len(result.provenance)} leaf fields):")
             for dotted in sorted(result.provenance):
-                src = result.provenance[dotted]
-                print(f"  {dotted:40s} \u2190 {_rel(src)}")
+                # Phase 56 (CFG-02 \u00a74): provenance is dict[str, list[Path]];
+                # the "current writer" (winning source) is the last entry \u2014
+                # merge order is extends \u2192 includes \u2192 own.
+                paths = result.provenance[dotted]
+                src = paths[-1] if paths else None
+                if src is not None:
+                    print(f"  {dotted:40s} \u2190 {_rel(src)}")
         else:
             print("Field provenance (0 leaf fields):")
             print("  (none)")
