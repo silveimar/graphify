@@ -493,7 +493,7 @@ Typed **concept↔code** edges, **template** conditionals/loops/Dataview hooks, 
 | 55. Template conditionals & connection loops | v1.11 | 6/6 | Complete   | 2026-05-02 |
 | 56. Dataview templates & profile overrides | v1.11 | 0/? | Not started | — |
 | 57. Elicitation & harness increment | v1.11 | 3/3 | Complete   | 2026-05-03 |
-| 58. Vault CLI parity & hygiene | v1.11 | 2/3 | In Progress|  |
+| 58. Vault CLI parity & hygiene | v1.11 | 3/3 | Complete   | 2026-05-03 |
 
 ### Phase 47: MCP & Trace Integration
 
@@ -656,9 +656,9 @@ Plans:
 2. Vault-related CLI failures (unknown vault, ambiguous selection, dry-run mismatch) produce actionable messages covered by pytest (**VAUX-02**).
 3. v1.10-close quick-task / registry hygiene item (`260427-rc7-fix-detect-self-ingestion` or successor slug) is resolved or formally waived; VERIFICATION note records evidence (**HYG-01**).
 
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 - [x] 58-01-PLAN.md — VAUX-01 parity helper (resolve_vault_for_parity in graphify/output.py + tests/test_vault_parity.py)
-- [ ] 58-02-PLAN.md — VAUX-02 actionable errors (_emit_vault_error + 3 D-07 call-site migrations + subprocess tests)
+- [x] 58-02-PLAN.md — VAUX-02 actionable errors (_emit_vault_error + 3 D-07 call-site migrations + subprocess tests)
 - [x] 58-03-PLAN.md — HYG-01 regression-lock test in tests/test_detect.py (asserts both _SELF_OUTPUT_DIRS spellings + dual-source equality)
 
 **UI hint:** partial — CLI error surfaces and `doctor` reporting messages.

@@ -4,14 +4,14 @@ milestone: v1.11
 milestone_name: milestone
 status: verifying
 stopped_at: Completed 58-03-PLAN.md
-last_updated: "2026-05-03T23:32:18.561Z"
+last_updated: "2026-05-03T23:42:52.678Z"
 last_activity: 2026-05-03
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 27
-  completed_plans: 26
-  percent: 96
+  completed_plans: 27
+  percent: 100
 ---
 
 # Project State
@@ -76,6 +76,7 @@ Last activity: 2026-05-03
 | Phase 57 P02 | 3min | 2 tasks | 3 files |
 | Phase 58-vault-cli-parity-hygiene P01 | 329 | 2 tasks | 2 files |
 | Phase 58-vault-cli-parity-hygiene P03 | 3min | 1 tasks | 1 files |
+| Phase 58-vault-cli-parity-hygiene P02 | 377 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -164,6 +165,7 @@ Locked v1.8 choices:
 - [Phase ?]: VAUX-01 warnings dimension covers only resolve_execution_paths stderr, not _merge_vault_pins (Q1 split)
 - [Phase ?]: Use local imports inside regression-lock test body to match existing late-import pattern in test_detect.py
 - [Phase ?]: Assert equality of both _SELF_OUTPUT_DIRS copies to catch future divergence between corpus_prune and detect
+- [Phase ?]: _emit_vault_error() two-line format: [graphify] error: + hint: for vault CLI failures
 
 ### Pending Todos
 
@@ -229,6 +231,6 @@ Open artifact audit items acknowledged at ship (`audit-open`); no runtime blocke
 
 ## Session Continuity
 
-Last session: 2026-05-03T23:32:18.557Z
+Last session: 2026-05-03T23:42:48.611Z
 Stopped at: Completed 58-03-PLAN.md
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
