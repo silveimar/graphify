@@ -24,6 +24,8 @@ Phase 41 (VCLI-01..02) — resolve_execution_paths precedence (single source of 
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import sys
 from pathlib import Path
 from typing import Literal, NamedTuple
@@ -189,6 +191,66 @@ def resolve_execution_paths(
     if pin_kind is not None and result.source == "profile":
         return result._replace(source=pin_kind)
     return result
+
+
+def resolve_vault_for_parity(
+    cwd: Path,
+    *,
+    explicit_vault: Path | None = None,
+    env_vault: str | None = None,
+    vault_list_file: Path | None = None,
+) -> dict:
+    """Return structured parity dict for VAUX-01 test assertions.
+
+    Dict shape:
+      {
+        "vault_path": Path | None,       # resolved.vault_path
+        "source": str,                   # resolved.source
+        "profile_path": Path | None,     # vault/.graphify/profile.yaml or None
+        "profile_mode": str | None,      # output.mode from profile, or None
+        "warnings": list[str],           # stderr lines emitted during resolution
+      }
+    Calls resolve_execution_paths() — never duplicates resolution logic.
+    """
+    captured = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(captured):
+            resolved = resolve_execution_paths(
+                cwd,
+                explicit_vault=explicit_vault,
+                env_vault=env_vault,
+                vault_list_file=vault_list_file,
+            )
+    except SystemExit:
+        raise
+
+    warnings = [
+        ln.strip() for ln in captured.getvalue().splitlines() if ln.strip()
+    ]
+
+    profile_path: Path | None = None
+    profile_mode: str | None = None
+    if resolved.vault_path is not None:
+        pp = resolved.vault_path / ".graphify" / "profile.yaml"
+        if pp.exists():
+            profile_path = pp
+            try:
+                import yaml  # noqa: F401
+                from graphify.profile import load_profile
+                prof = load_profile(resolved.vault_path)
+                out_block = prof.get("output") if isinstance(prof, dict) else None
+                if isinstance(out_block, dict):
+                    profile_mode = out_block.get("mode")
+            except Exception:
+                pass
+
+    return {
+        "vault_path": resolved.vault_path,
+        "source": resolved.source,
+        "profile_path": profile_path,
+        "profile_mode": profile_mode,
+        "warnings": warnings,
+    }
 
 
 def resolve_output(cwd: Path, *, cli_output: str | None = None) -> ResolvedOutput:
