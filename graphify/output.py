@@ -77,14 +77,29 @@ def _refuse(msg: str) -> SystemExit:
     return SystemExit(1)
 
 
+def _emit_vault_error(msg: str, hint: str, *, code: int = 1) -> SystemExit:
+    """Emit [graphify] error: + hint: lines to stderr and return SystemExit(code).
+
+    VAUX-02: two-line format mirrors doctor.py _FIX_HINTS pattern (D-05).
+    Callers: raise _emit_vault_error(msg, hint, code=...)
+    """
+    print(f"[graphify] error: {msg}", file=sys.stderr)
+    print(f"  hint: {hint}", file=sys.stderr)
+    return SystemExit(code)
+
+
 def _ensure_vault_root(path: Path) -> Path:
     """Resolve *path* and require a directory with `.obsidian/` (Phase 41 pin validation)."""
     p = path.expanduser().resolve()
     if not p.is_dir():
-        raise _refuse(f"Vault path is not a directory: {p}")
+        raise _emit_vault_error(
+            f"Vault path is not a directory: {p}",
+            "Check the path exists and is a directory, not a file.",
+        )
     if not is_obsidian_vault(p):
-        raise _refuse(
-            f"Not an Obsidian vault (missing .obsidian/ directory): {p}"
+        raise _emit_vault_error(
+            f"Not an Obsidian vault (missing .obsidian/ directory): {p}",
+            "Pass the root of an Obsidian vault (must contain .obsidian/).",
         )
     return p
 
@@ -147,6 +162,10 @@ def _pick_vault_from_list_file(list_file: Path, cwd_resolved: Path) -> Path:
     )
     for idx, p in enumerate(roots, start=1):
         print(f"  [{idx}] {p}", file=sys.stderr)
+    print(
+        "  hint: Re-run from a TTY to pick interactively, or pass --vault explicitly.",
+        file=sys.stderr,
+    )
     raise SystemExit(2)
 
 
