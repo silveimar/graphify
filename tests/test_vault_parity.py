@@ -121,3 +121,99 @@ def test_parity_helper_does_not_duplicate_resolution(tmp_path):
         direct = resolve_execution_paths(tmp_path, explicit_vault=vault)
     assert parity["vault_path"] == direct.vault_path
     assert parity["source"] == direct.source
+
+
+# ---------------------------------------------------------------------------
+# VAUX-02 error format tests
+# ---------------------------------------------------------------------------
+
+def test_unknown_vault_nonexistent_path_error(tmp_path):
+    """VAUX-02: --vault /nonexistent emits [graphify] error: + hint: and exits non-zero."""
+    r = subprocess.run(
+        [sys.executable, "-m", "graphify", "--vault", str(tmp_path / "no-such-dir"), "doctor"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert r.returncode != 0
+    assert "[graphify] error:" in r.stderr
+    assert "  hint:" in r.stderr
+
+
+def test_unknown_vault_no_obsidian_marker_error(tmp_path):
+    """VAUX-02: --vault <dir-without-.obsidian> emits error+hint and mentions .obsidian."""
+    bare_dir = tmp_path / "bare"
+    bare_dir.mkdir()
+    r = subprocess.run(
+        [sys.executable, "-m", "graphify", "--vault", str(bare_dir), "doctor"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert r.returncode != 0
+    assert "[graphify] error:" in r.stderr
+    assert "  hint:" in r.stderr
+    assert ".obsidian" in r.stderr
+
+
+def test_ambiguous_vault_list_exit2(tmp_path):
+    """VAUX-02: vault-list with two valid vaults + non-TTY → exit 2 + hint line."""
+    pytest.importorskip("yaml")
+    # Create two distinct vaults under different subdirectories
+    v1 = _make_vault(tmp_path / "a")
+    v2 = _make_vault(tmp_path / "b")
+    lst = tmp_path / "vaults.txt"
+    lst.write_text(f"{v1}\n{v2}\n")
+    r = subprocess.run(
+        [sys.executable, "-m", "graphify", "--vault-list", str(lst), "doctor"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert r.returncode == 2
+    assert "  hint:" in r.stderr
+
+
+def test_global_local_override_warning_preserved(tmp_path):
+    """VAUX-02/D-09: global --vault + per-command --vault emits the existing override warning (no behavior change)."""
+    pytest.importorskip("yaml")
+    vault = _make_vault(tmp_path, profile_text=_VALID_PROFILE)
+    r = subprocess.run(
+        [
+            sys.executable, "-m", "graphify",
+            "--vault", str(vault),   # global pin
+            "doctor",
+            "--vault", str(vault),   # per-command pin (same path)
+        ],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    # Override is a warning, not an error — exit 0
+    assert r.returncode == 0
+    assert "[graphify] command --vault / --vault-list overrides global pin" in r.stderr
+
+
+def test_dry_run_mismatch_uses_parity_helper(tmp_path):
+    """VAUX-02: dry-run doctor output and parity helper agree on vault_path."""
+    pytest.importorskip("yaml")
+    vault = _make_vault(tmp_path, profile_text=_VALID_PROFILE)
+    # Run doctor via CLI (subprocess) and capture its stdout
+    r = subprocess.run(
+        [sys.executable, "-m", "graphify", "--vault", str(vault), "doctor"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert r.returncode == 0, r.stderr
+    # In-process parity helper must agree on vault_path
+    parity = resolve_vault_for_parity(tmp_path, explicit_vault=vault)
+    assert parity["vault_path"] == vault.resolve()
+    assert parity["source"] == "vault-cli"
+    # Doctor stdout must reference the vault path (parity lock)
+    assert str(vault.resolve()) in r.stdout or str(vault) in r.stdout
