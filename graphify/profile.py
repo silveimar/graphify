@@ -175,6 +175,7 @@ _VALID_TOP_LEVEL_KEYS = {
     "extends", "includes", "community_templates",  # Phase 30 (CFG-02 / CFG-03)
     "dataview_queries",  # Phase 31 (TMPL-03, D-11)
     "predicate_flags",  # Phase 55 (TMPL-01, D-55.08)
+    "mapping_rule_templates", "note_type_templates",  # Phase 56 (CFG-01, D-56.03)
 }
 
 # Phase 31 (TMPL-03, D-12): per-note-type keys allowed under `dataview_queries:`.
@@ -1179,6 +1180,114 @@ def validate_profile(profile: dict) -> list[str]:
     if pf is not None:
         errors.extend(_validate_predicate_flags(pf))
 
+    # Phase 56 (CFG-02, D-56.06 §1-3): schema-only collision detectors.
+    # §4 (cross-chain dataview_queries) lives in validate_profile_preflight
+    # because it needs the provenance map produced by _resolve_profile_chain.
+    errors.extend(_detect_mapping_rule_template_collisions(profile))
+    errors.extend(_detect_pattern_duplicate_collisions(profile))
+    errors.extend(_detect_note_type_template_collisions(profile))
+
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Phase 56 (CFG-02, D-56.06): collision detectors
+# ---------------------------------------------------------------------------
+# Each detector returns a list of error strings; empty means no collisions;
+# never raises. Detectors are graph-blind (schema-only) per D-56.06 — pattern
+# overlap (e.g. "Auth*" vs "AuthService") is explicitly out of scope.
+
+def _detect_mapping_rule_template_collisions(profile: dict) -> list[str]:
+    """D-56.06 §1: duplicate `pattern` (rule_id) in mapping_rule_templates."""
+    errors: list[str] = []
+    rules = profile.get("mapping_rule_templates") or []
+    if not isinstance(rules, list):
+        return errors
+    seen: dict[str, int] = {}
+    for idx, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            continue
+        pattern = rule.get("pattern")
+        if not isinstance(pattern, str):
+            continue
+        if pattern in seen:
+            errors.append(
+                f"mapping_rule_templates[{idx}]: duplicate pattern {pattern!r} — "
+                f"also defined at mapping_rule_templates[{seen[pattern]}]"
+            )
+        else:
+            seen[pattern] = idx
+    return errors
+
+
+def _detect_pattern_duplicate_collisions(profile: dict) -> list[str]:
+    """D-56.06 §2: duplicate exact `pattern` within community_templates,
+    mapping_rule_templates, or note_type_templates (per-list independent)."""
+    errors: list[str] = []
+    for list_name in ("community_templates", "mapping_rule_templates", "note_type_templates"):
+        rules = profile.get(list_name) or []
+        if not isinstance(rules, list):
+            continue
+        seen: dict[str, int] = {}
+        for idx, rule in enumerate(rules):
+            if not isinstance(rule, dict):
+                continue
+            pattern = rule.get("pattern")
+            if not isinstance(pattern, str):
+                continue
+            if pattern in seen:
+                errors.append(
+                    f"{list_name}[{idx}]: duplicate pattern {pattern!r} — "
+                    f"also defined at {list_name}[{seen[pattern]}]"
+                )
+            else:
+                seen[pattern] = idx
+    return errors
+
+
+def _detect_note_type_template_collisions(profile: dict) -> list[str]:
+    """D-56.06 §3: duplicate `pattern` (note_type) in note_type_templates."""
+    errors: list[str] = []
+    rules = profile.get("note_type_templates") or []
+    if not isinstance(rules, list):
+        return errors
+    seen: dict[str, int] = {}
+    for idx, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            continue
+        pattern = rule.get("pattern")
+        if not isinstance(pattern, str):
+            continue
+        if pattern in seen:
+            errors.append(
+                f"note_type_templates[{idx}]: duplicate pattern {pattern!r} — "
+                f"also defined at note_type_templates[{seen[pattern]}]"
+            )
+        else:
+            seen[pattern] = idx
+    return errors
+
+
+def _detect_dataview_collisions(provenance: dict[str, list[Path]]) -> list[str]:
+    """D-56.06 §4: cross-chain duplicate `dataview_queries.<note_type>`.
+
+    Consumes the list-shape provenance produced by _deep_merge_with_provenance
+    (Plan 01 contract). Any leaf with len(sources) > 1 surfaces all
+    contributing source paths in the error message — order is the merge order
+    (extends-parents → includes → own).
+    """
+    errors: list[str] = []
+    for dotted, sources in provenance.items():
+        if not dotted.startswith("dataview_queries."):
+            continue
+        if not isinstance(sources, list) or len(sources) <= 1:
+            continue
+        note_type = dotted.split(".", 1)[1]
+        paths = ", ".join(str(p) for p in sources)
+        errors.append(
+            f"dataview_queries.{note_type}: collision across composition chain — "
+            f"defined in: {paths}"
+        )
     return errors
 
 
@@ -1517,6 +1626,11 @@ def validate_profile_preflight(
     if profile_path.exists():
         errors.extend(_validate_required_v18_user_profile(user_data))
     errors.extend(validate_profile(user_data))
+
+    # Phase 56 (CFG-02, D-56.06 §4): cross-chain dataview_queries collision.
+    # Schema-only collisions §1-3 are aggregated by validate_profile() above;
+    # §4 needs the provenance map to enumerate all contributing sources.
+    errors.extend(_detect_dataview_collisions(provenance))
 
     # Build the effective merged profile (for layers 3 + 4).
     merged = _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, user_data))
