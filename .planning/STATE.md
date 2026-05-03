@@ -4,14 +4,14 @@ milestone: v1.11
 milestone_name: milestone
 status: executing
 stopped_at: Phase 58 context gathered
-last_updated: "2026-05-03T23:17:39.768Z"
-last_activity: 2026-05-03 -- Phase 58 planning complete
+last_updated: "2026-05-03T23:27:02.798Z"
+last_activity: 2026-05-03
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 27
-  completed_plans: 24
-  percent: 89
+  completed_plans: 25
+  percent: 93
 ---
 
 # Project State
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (**milestone v1.11** — Templates, Graph Semantics 
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Phase 57 — elicitation-harness-increment
+**Current focus:** Phase 58 — Vault CLI parity & hygiene
 
 ## Current Position
 
-Phase: 57 (elicitation-harness-increment) — EXECUTING
-Plan: 3 of 3
+Phase: 58 (Vault CLI parity & hygiene) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-05-03 -- Phase 58 planning complete
+Last activity: 2026-05-03
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Last activity: 2026-05-03 -- Phase 58 planning complete
 | Phase 57 P01 | 12m | 2 tasks | 1 files |
 | Phase 57 P03 | 10min | 3 tasks | 3 files |
 | Phase 57 P02 | 3min | 2 tasks | 3 files |
+| Phase 58-vault-cli-parity-hygiene P01 | 329 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -158,6 +159,8 @@ Locked v1.8 choices:
 - [Phase ?]: ELIC-01 sidecar collision contract regression-locked: elicitation wins on node-id collision; conflicting edge relation last-wins on (source,target); confidence preserved; malformed JSON returns None+stderr warn; missing fields raise ValueError; dangling edges silently filtered without exception (build_from_json behavior, deviates from plan's auto-create assumption)
 - [Phase ?]: HARN-02 closed: --allow-vault-write CLI flag + AST allowlist + MCP explicit-path lock (Plan 57-03)
 - [Phase ?]: 57-02: ELIC-02 doc edits in-place + HARN-01 schema-id constant locked via doc-substring drift test
+- [Phase ?]: resolve_vault_for_parity delegates to resolve_execution_paths exclusively (no duplicate logic)
+- [Phase ?]: VAUX-01 warnings dimension covers only resolve_execution_paths stderr, not _merge_vault_pins (Q1 split)
 
 ### Pending Todos
 
@@ -223,6 +226,6 @@ Open artifact audit items acknowledged at ship (`audit-open`); no runtime blocke
 
 ## Session Continuity
 
-Last session: 2026-05-03T22:52:42.401Z
+Last session: 2026-05-03T23:26:56.348Z
 Stopped at: Phase 58 context gathered
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process

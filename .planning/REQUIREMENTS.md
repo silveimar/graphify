@@ -33,7 +33,7 @@
 
 ### Vault CLI & hygiene (VAUX / HYG)
 
-- [ ] **VAUX-01**: **`--vault` / discovery** behavior matches **`graphify doctor`** reporting for equivalent inputs (golden tests or structured parity assertions).
+- [x] **VAUX-01**: **`--vault` / discovery** behavior matches **`graphify doctor`** reporting for equivalent inputs (golden tests or structured parity assertions).
 - [ ] **VAUX-02**: Vault-related CLI failures produce **actionable messages** covered by pytest (unknown vault, ambiguous selection, dry-run mismatch).
 - [ ] **HYG-01**: v1.10-close **quick-task / registry hygiene** item (`260427-rc7-fix-detect-self-ingestion` or successor slug) is **resolved or formally waived** with evidence in-planning (VERIFICATION note).
 
