@@ -146,3 +146,99 @@ def test_write_elicitation_harness_markdown_writes_blocks(tmp_path: Path) -> Non
     assert "claude-HEARTBEAT.md" in names
     assert "claude-USER.md" in names
     assert "fidelity.json" in names
+
+
+def test_sidecar_node_id_collision_elicitation_wins(tmp_path: Path) -> None:
+    """ELIC-01 D-02: elicitation node attrs win over base extraction node attrs."""
+    adir = tmp_path / "art"
+    base = {
+        "nodes": [
+            {
+                "id": "shared",
+                "label": "from code",
+                "file_type": "code",
+                "source_file": "x.py",
+            }
+        ],
+        "edges": [],
+    }
+    elic = {
+        "nodes": [
+            {
+                "id": "shared",
+                "label": "from elicit",
+                "file_type": "rationale",
+                "source_file": "",
+            }
+        ],
+        "edges": [],
+    }
+    save_elicitation_sidecar(adir, elic, force=True)
+    seq = merge_elicitation_into_build_inputs([base], adir)
+    G = build(seq)
+    assert G.nodes["shared"]["label"] == "from elicit"
+    assert G.nodes["shared"]["file_type"] == "rationale"
+
+
+def test_sidecar_edge_conflicting_relation_last_wins(tmp_path: Path) -> None:
+    """ELIC-01 D-02: elicitation relation overwrites base on same (source,target)."""
+    adir = tmp_path / "art"
+    base = {
+        "nodes": [
+            {"id": "a", "label": "A", "file_type": "code", "source_file": "f.py"},
+            {"id": "b", "label": "B", "file_type": "code", "source_file": "f.py"},
+        ],
+        "edges": [
+            {
+                "source": "a",
+                "target": "b",
+                "relation": "calls",
+                "confidence": "EXTRACTED",
+                "source_file": "f.py",
+            }
+        ],
+    }
+    elic = {
+        "nodes": [
+            {"id": "a", "label": "A", "file_type": "code", "source_file": ""},
+            {"id": "b", "label": "B", "file_type": "code", "source_file": ""},
+        ],
+        "edges": [
+            {
+                "source": "a",
+                "target": "b",
+                "relation": "depends_on",
+                "confidence": "INFERRED",
+                "source_file": "",
+            }
+        ],
+    }
+    save_elicitation_sidecar(adir, elic, force=True)
+    seq = merge_elicitation_into_build_inputs([base], adir)
+    G = build(seq)
+    assert G.edges["a","b"]["relation"] == "depends_on"
+    assert G.edges["a","b"]["confidence"] == "INFERRED"
+
+
+def test_sidecar_preserves_confidence_across_merge(tmp_path: Path) -> None:
+    """ELIC-01 D-02: confidence value is preserved across the sidecar merge."""
+    adir = tmp_path / "art"
+    base = {"nodes": [], "edges": []}
+    elic = {
+        "nodes": [
+            {"id": "x", "label": "X", "file_type": "rationale", "source_file": ""}
+        ],
+        "edges": [
+            {
+                "source": "x",
+                "target": "x",
+                "relation": "refs",
+                "confidence": "AMBIGUOUS",
+                "source_file": "",
+            }
+        ],
+    }
+    save_elicitation_sidecar(adir, elic, force=True)
+    seq = merge_elicitation_into_build_inputs([base], adir)
+    G = build(seq)
+    assert G.edges["x", "x"]["confidence"] == "AMBIGUOUS"
