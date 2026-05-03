@@ -165,3 +165,24 @@ def test_import_accepts_vault_with_explicit_flag(tmp_path: Path, monkeypatch: py
     )
     assert rc.returncode == 0, rc.stderr
     assert (vault / "harness_import.json").exists()
+
+
+def test_no_auto_invocation_of_import_harness() -> None:
+    """HARN-02 guarantee 2: import_harness_* is referenced only by allowlisted files.
+
+    Note: `harness_import.py` appears in the set because it defines the functions —
+    the FunctionDef name node is walked at body level and matched as ast.Name.
+    The allowlist intentionally includes the definition site by design.
+    """
+    import ast
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[1] / "graphify"
+    referencing_files: set[str] = set()
+    for py in root.rglob("*.py"):
+        tree = ast.parse(py.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and node.id in {"import_harness_path", "import_harness_bytes"}:
+                referencing_files.add(py.name)
+            elif isinstance(node, ast.Attribute) and node.attr in {"import_harness_path", "import_harness_bytes"}:
+                referencing_files.add(py.name)
+    assert referencing_files <= {"__main__.py", "serve.py", "harness_import.py"}, referencing_files
