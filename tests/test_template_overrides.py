@@ -277,11 +277,16 @@ def _ladder_vault(
     (tmpl_dir / "moc.md").write_text(_BASE_MOC, encoding="utf-8")
     (tmpl_dir / "thing.md").write_text(_BASE_THING, encoding="utf-8")
     # Built-ins also need to exist in load_templates() — copy minimal stubs.
-    for nt in ("statement", "person", "source", "code", "community"):
+    for nt in ("statement", "person", "source", "code"):
         (tmpl_dir / f"{nt}.md").write_text(
             "${frontmatter}\n# ${label}\n\n${dataview_block}\n",
             encoding="utf-8",
         )
+    # community.md needs ${members_section} per template validator.
+    (tmpl_dir / "community.md").write_text(
+        "${frontmatter}\n# ${label}\n\n${members_section}\n\n${dataview_block}\n",
+        encoding="utf-8",
+    )
 
     if write_mr_template:
         (tmpl_dir / "override_mr.md").write_text(_OVERRIDE_MR, encoding="utf-8")
@@ -312,6 +317,8 @@ def _ladder_vault(
             source: Sources
             default: 01-Things
             unclassified: 06-MOCs
+        mapping:
+          min_community_size: 3
         """
     ).lstrip()
     profile_yaml += profile_extras
@@ -545,9 +552,9 @@ def test_classify_populates_rule_id_when_matched_rule_has_id():
         ],
     }
     result = classify(G, communities, profile)
-    assert result.per_node["n_thing"].get("rule_id") == "thing_rule"
+    assert result["per_node"]["n_thing"].get("rule_id") == "thing_rule"
     # Rule with no id: → no rule_id key in ctx.
-    assert "rule_id" not in result.per_node["n_other"]
+    assert "rule_id" not in result["per_node"]["n_other"]
 
 
 def test_render_note_with_rule_id_picks_mapping_rule_template(tmp_path, capsys):

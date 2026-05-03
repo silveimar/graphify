@@ -122,6 +122,10 @@ class ClassificationContext(TypedDict, total=False):
     # community_name: Phase 3-populated display name for the community
     # (MOCs/Community Overviews only). Falls back to parent_moc_label when absent.
     community_name: str
+    # Phase 56 (CFG-01, D-56.04) — populated by mapping.classify() when the
+    # matched mapping_rules entry has an `id:` slug. Consumed by
+    # _resolve_note_template tier 1 (mapping_rule_templates).
+    rule_id: str
 
 
 # ---------------------------------------------------------------------------
@@ -1520,12 +1524,23 @@ def render_note(
 # Phase 30 / CFG-03: community_templates runtime dispatch (D-11..D-13)
 # ---------------------------------------------------------------------------
 
-def _load_override_template(rel_path: str, vault_dir, default_template):
+def _load_override_template(
+    rel_path: str,
+    vault_dir,
+    default_template,
+    *,
+    list_name: str = "community_templates",
+):
     """Load an override template from <vault_dir>/.graphify/<rel_path>.
 
     On any failure (path escape, missing file, unreadable, invalid placeholders)
     emit a stderr warning and return *default_template* (graceful fallback per
     D-22 / T-30-01 mitigation).
+
+    Phase 56 (CFG-01, D-56.13): the *list_name* kwarg parametrises the warn
+    message so the same loader services community_templates,
+    mapping_rule_templates, and note_type_templates without code duplication.
+    Default value preserves Phase 30 wording for legacy callers.
     """
     # Function-local import to dodge potential circular import with profile.py
     from graphify.profile import validate_vault_path
@@ -1538,13 +1553,13 @@ def _load_override_template(rel_path: str, vault_dir, default_template):
         canonical = validate_vault_path(rel_path, graphify_dir)
     except (ValueError, OSError) as exc:
         print(
-            f"[graphify] community_templates override path rejected ({rel_path}): {exc} — using default",
+            f"[graphify] {list_name} override path rejected ({rel_path}): {exc} — using default",
             file=sys.stderr,
         )
         return default_template
     if not canonical.exists():
         print(
-            f"[graphify] community_templates override missing ({rel_path}) — using default",
+            f"[graphify] {list_name} override missing ({rel_path}) — using default",
             file=sys.stderr,
         )
         return default_template
@@ -1552,7 +1567,7 @@ def _load_override_template(rel_path: str, vault_dir, default_template):
         text = canonical.read_text(encoding="utf-8")
     except OSError as exc:
         print(
-            f"[graphify] community_templates override unreadable ({rel_path}): {exc} — using default",
+            f"[graphify] {list_name} override unreadable ({rel_path}): {exc} — using default",
             file=sys.stderr,
         )
         return default_template
@@ -1560,7 +1575,7 @@ def _load_override_template(rel_path: str, vault_dir, default_template):
     if errors:
         for err in errors:
             print(
-                f"[graphify] community_templates override invalid ({rel_path}): {err} — using default",
+                f"[graphify] {list_name} override invalid ({rel_path}): {err} — using default",
                 file=sys.stderr,
             )
         return default_template

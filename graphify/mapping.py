@@ -110,7 +110,13 @@ def compile_rules(rules: list) -> list[dict]:
                         raise ValueError(
                             f"mapping_rules[{idx}].when.source_file_matches: {exc}"
                         ) from exc
-        out.append({"when": new_when, "then": then})
+        # Phase 56 (CFG-01, D-56.04): preserve optional `id:` slug so
+        # classify() can populate ClassificationContext.rule_id when this rule
+        # matches a node. Validation happens upstream in validate_rules().
+        compiled: dict = {"when": new_when, "then": then}
+        if "id" in rule:
+            compiled["id"] = rule["id"]
+        out.append(compiled)
     return out
 
 
@@ -369,11 +375,17 @@ def classify(
 
         is_file_hub = _is_file_node(G, node_id)
         matched_rule: tuple[int, dict, dict] | None = None
+        matched_rule_id: str | None = None  # Phase 56 (CFG-01, D-56.04)
         for idx, rule in enumerate(compiled_rules):
             when = rule.get("when") or {}
             then = rule.get("then") or {}
             if _match_when(when, node_id, G, ctx=ctx):
                 matched_rule = (idx, when, then)
+                # Phase 56: capture the optional slug `id:` field if present
+                # so the per-node ctx can carry it for render-time tier 1.
+                rid = rule.get("id") if isinstance(rule, dict) else None
+                if isinstance(rid, str):
+                    matched_rule_id = rid
                 break
 
         # (2) File-hub opt-in: only surfaces when the matching rule was
@@ -410,13 +422,19 @@ def classify(
                 note_type = "statement"
             folder = _resolve_folder(note_type, None, folder_mapping)
 
-        per_node[node_id] = ClassificationContext(
-            note_type=note_type,
-            folder=folder,
-            members_by_type={},
-            sub_communities=[],
-            sibling_labels=[],
-        )
+        # Phase 56 (CFG-01, D-56.04): conditionally include rule_id so the
+        # TypedDict (total=False) stays absent-keyed when no rule matched or
+        # when the matched rule had no `id:` slug.
+        ctx_kwargs: dict = {
+            "note_type": note_type,
+            "folder": folder,
+            "members_by_type": {},
+            "sub_communities": [],
+            "sibling_labels": [],
+        }
+        if matched_rule_id is not None:
+            ctx_kwargs["rule_id"] = matched_rule_id
+        per_node[node_id] = ClassificationContext(**ctx_kwargs)
 
     per_community = _assemble_communities(
         G,
