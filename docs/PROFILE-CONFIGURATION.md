@@ -61,6 +61,8 @@ Allowed top-level keys are enforced by schema validation. Unknown keys cause val
 | `extends` | Single string: path to another fragment under `.graphify/` (parent profile). |
 | `includes` | List of strings: additional fragments merged left-to-right before own keys. |
 | `community_templates` | Rules matching communities by `label` or `id` to pick a custom template file under `.graphify/`. |
+| `mapping_rule_templates` | Rules matching `mapping_rules[].id` to pick a custom template file under `.graphify/` (Phase 56). |
+| `note_type_templates` | Rules matching a known `note_type` to pick a custom template file under `.graphify/` (Phase 56). |
 
 ---
 
@@ -301,6 +303,184 @@ A list of rules to pick **custom markdown templates** for specific communities:
 | `match` | `label` or `id`. |
 | `pattern` | If `match` is `label`, a string pattern; if `id`, an integer community id. |
 | `template` | Path **relative to `.graphify/`** (non-empty, no `..`, not absolute). |
+
+---
+
+## `mapping_rules[].id` (optional)
+
+Phase 56 adds an optional `id:` field to each entry in `mapping_rules:`. The `id:` makes the rule **referenceable** from `mapping_rule_templates:` (below). Rules without `id:` continue to work exactly as before — they just cannot be targeted by a per-rule template override.
+
+Validation rules (enforced at `graphify --validate-profile`):
+
+| Constraint | Rule |
+|------------|------|
+| Type | string (when present). |
+| Slug pattern | `^[a-z][a-z0-9_-]*$` — lowercase ASCII, digits, `_`, `-`; first char must be a letter. |
+| Length | ≤ 80 characters. |
+| Uniqueness | The `id:` value must be unique across the entire `mapping_rules:` list. Duplicate ids are a preflight error citing both colliding indices. |
+| Backward compatibility | Optional. Existing profiles without any `id:` fields remain valid; opt in only when you intend to override that rule's template. |
+
+Example:
+
+```yaml
+mapping_rules:
+  - id: person-from-attr
+    when:
+      attr: file_type
+      equals: person
+    then:
+      note_type: person
+      folder: Atlas/Dots/People/
+  - id: god-node-thing
+    when:
+      topology: god_node
+    then:
+      note_type: thing
+  # Rules without id: still valid — just un-targetable from mapping_rule_templates:
+  - when:
+      source_file_ext: .py
+    then:
+      note_type: code
+```
+
+---
+
+## `mapping_rule_templates`
+
+A list of rules selecting a custom template **per matching `mapping_rules[].id`**. Each entry is a `{match, pattern, template}` mapping mirroring `community_templates:`:
+
+| Field | Meaning |
+|-------|--------|
+| `match` | Must be the literal string `rule_id` (the only allowed match kind in v1.11). |
+| `pattern` | The slug of a `mapping_rules[].id` declared elsewhere in the profile. Must match the slug regex `^[a-z][a-z0-9_-]*$`. |
+| `template` | Path **relative to `.graphify/`** (non-empty, no `..`, not absolute, no leading `~`). |
+
+Path-confinement is enforced at preflight (substring `..`, absolute paths, and `~` prefixes are rejected). At render time, a missing or unreadable override file falls back to the base note-type template and emits a single stderr warning (Phase 55 D-55.14 contract).
+
+Example:
+
+```yaml
+mapping_rules:
+  - id: service-class
+    when:
+      attr: kind
+      equals: service_class
+    then:
+      note_type: thing
+
+mapping_rule_templates:
+  - match: rule_id
+    pattern: service-class
+    template: templates/service-class.md
+```
+
+---
+
+## `note_type_templates`
+
+A list of rules selecting a custom template **per matching `note_type`**. Each entry is a `{match, pattern, template}` mapping with the same shape as the two sibling lists:
+
+| Field | Meaning |
+|-------|--------|
+| `match` | Must be the literal string `note_type`. |
+| `pattern` | One of the known note types: `code`, `community`, `moc`, `person`, `source`, `statement`, `thing`. |
+| `template` | Path **relative to `.graphify/`** (non-empty, no `..`, not absolute, no leading `~`). |
+
+Same path-confinement rules apply at preflight, and the same warn-and-fall-back contract applies at render time.
+
+Example:
+
+```yaml
+note_type_templates:
+  - match: note_type
+    pattern: code
+    template: templates/code-rich.md
+  - match: note_type
+    pattern: person
+    template: templates/person-card.md
+```
+
+---
+
+## How overrides resolve (precedence ladder)
+
+When more than one override list could supply a template for the same node, graphify picks the **most specific** scope using this strict precedence ladder (Phase 56 D-56.05). Selection happens at render time inside `_resolve_note_template`:
+
+1. **`mapping_rule_templates`** — wins if the node was classified by a `mapping_rules[]` entry that carries an `id:`, **and** a `mapping_rule_templates:` entry has `pattern:` equal to that id.
+2. **`community_templates`** — wins if the node's community matches a `community_templates:` entry (by `label` or `id`).
+3. **`note_type_templates`** — wins if the node's resolved `note_type` matches a `note_type_templates:` entry's `pattern`.
+4. **Base profile template** for the note type (built-in or `.graphify/templates/<note_type>.md`).
+
+Most-specific scope wins. **Cross-scope overlaps resolve silently** via this ladder — for example, a node that matches both a `mapping_rule_templates:` entry and a `note_type_templates:` entry simply uses the mapping-rule template; no warning is emitted, no error is raised. This is intentional design: authors edit the most-specific override knowing it always wins, and broad defaults stay safe.
+
+**Within a single list,** first-matching-rule wins. This only matters when patterns overlap inside one list (intra-list pattern overlap is **not** detected at preflight — see the next subsection).
+
+---
+
+## Override collision validation
+
+Phase 56 adds **schema-only collision detection** at `validate_profile_preflight` time (D-56.06). Four collision classes raise deterministic preflight errors that cite the offending indices and contributing source paths:
+
+| Class | Where | Detected by | Error shape |
+|-------|-------|-------------|-------------|
+| 1. Duplicate `pattern` (rule_id) within `mapping_rule_templates` | `_detect_mapping_rule_template_collisions` | Two entries with the same `pattern` slug. | `mapping_rule_templates[<idx>]: duplicate pattern '<id>' — also defined at mapping_rule_templates[<other_idx>]` |
+| 2. Duplicate exact `pattern` within a sibling list | `_detect_sibling_list_pattern_collisions` (per-list independent) | Same `pattern` string repeated within `community_templates`, `mapping_rule_templates`, or `note_type_templates`. | `<list>[<idx>]: duplicate pattern <p!r> — also defined at <list>[<other_idx>]` |
+| 3. Duplicate `pattern` (= note_type) within `note_type_templates` | `_detect_note_type_template_collisions` | Two entries targeting the same `_KNOWN_NOTE_TYPES` value. | `note_type_templates[<idx>]: duplicate pattern '<note_type>' — also defined at note_type_templates[<other_idx>]` |
+| 4. Cross-chain duplicate `dataview_queries.<note_type>` | Provenance-aware composition chain check | Composing `extends:`/`includes:` produces conflicting values for the same `dataview_queries.<note_type>` key from different source files. | Error enumerates **all** contributing source paths via the `_deep_merge_with_provenance` map. |
+
+> **Pattern overlap is intentionally NOT detected.** Detecting that two patterns *could* match the same node (e.g., `Auth*` vs `AuthService` in `community_templates:`, or two regex-style patterns covering overlapping label sets) is undecidable in the general case. Render-time list-order resolution applies — first matching rule in list order wins. If you need deterministic ordering, structure your patterns from most-specific to least-specific.
+
+---
+
+## Worked example: all three override lists for one note
+
+Consider a single conceptual note for a class named `AuthService` that:
+
+- is classified by a mapping rule with `id: service-class` (because its `kind` attribute equals `service_class`),
+- belongs to community `Authentication`,
+- has resolved `note_type: thing`.
+
+The profile below registers an override at every scope:
+
+```yaml
+mapping_rules:
+  - id: service-class
+    when:
+      attr: kind
+      equals: service_class
+    then:
+      note_type: thing
+
+community_templates:
+  - match: label
+    pattern: Authentication
+    template: templates/community-authentication.md
+
+note_type_templates:
+  - match: note_type
+    pattern: thing
+    template: templates/thing-rich.md
+
+mapping_rule_templates:
+  - match: rule_id
+    pattern: service-class
+    template: templates/service-class.md
+```
+
+Render-time resolution walks the ladder top-down:
+
+| Step | List checked | Match? | Outcome |
+|------|--------------|--------|---------|
+| 1 | `mapping_rule_templates` | Yes — node classified by `service-class`. | **Wins:** loads `.graphify/templates/service-class.md`. |
+| 2 | `community_templates` | (Skipped — already resolved.) | — |
+| 3 | `note_type_templates` | (Skipped — already resolved.) | — |
+| 4 | Base `thing` template | (Skipped — already resolved.) | — |
+
+Resolved template path: `.graphify/templates/service-class.md`.
+
+If you delete the `mapping_rule_templates:` entry, step 1 misses and the ladder advances to step 2; `community_templates` matches `Authentication`, so the resolved template becomes `.graphify/templates/community-authentication.md`. Delete that too and step 3 wins (`templates/thing-rich.md`). Delete that and step 4 wins (the built-in `thing` template, or any file at `.graphify/templates/thing.md`).
+
+If any selected override file is missing or unreadable at render time, graphify emits a single stderr warning and falls back to the base note-type template (D-56.13).
 
 ---
 
