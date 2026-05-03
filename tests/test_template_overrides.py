@@ -224,6 +224,8 @@ _OVERRIDE_MR = """${frontmatter}
 
 OVERRIDE_MR_MARKER
 
+${members_section}
+
 ${dataview_block}
 """
 
@@ -241,6 +243,8 @@ _OVERRIDE_NT = """${frontmatter}
 # Note-Type Override: ${label}
 
 OVERRIDE_NT_MARKER
+
+${members_section}
 
 ${dataview_block}
 """
@@ -572,8 +576,13 @@ def test_render_note_with_rule_id_picks_mapping_rule_template(tmp_path, capsys):
     # render_note path uses ${connections_callout}, not ${members_section}.
     vault = _ladder_vault(tmp_path, write_mr_template=False, profile_extras=extras)
     # Write an override_mr.md with thing-friendly slots.
+    # _load_override_template hardcodes _REQUIRED_PER_TYPE["moc"] so override
+    # files must contain ${members_section} + ${dataview_block} regardless of
+    # which note_type renders them. (Plan-out-of-scope: per-note-type required
+    # placeholder dispatch.) Extra placeholders are inert — safe_substitute
+    # leaves unknown vars empty.
     (vault / ".graphify" / "templates" / "override_mr.md").write_text(
-        "${frontmatter}\n# MR Override Thing: ${label}\n\nOVERRIDE_MR_MARKER\n\n${connections_callout}\n",
+        "${frontmatter}\n# MR Override Thing: ${label}\n\nOVERRIDE_MR_MARKER\n\n${members_section}\n\n${dataview_block}\n\n${connections_callout}\n",
         encoding="utf-8",
     )
 

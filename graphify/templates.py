@@ -1489,7 +1489,18 @@ def render_note(
             nt: _load_builtin_template(nt)
             for nt in ("thing", "statement", "person", "source", "code", "moc", "community")
         }
-    template = templates[note_type]
+    # Phase 56 (CFG-01) D-56.05: render-time precedence ladder. render_note
+    # is the non-MOC entry point — community_id/community_name are not
+    # available here, so tier 2 is naturally inert; tiers 1 + 3 + base remain.
+    template = _resolve_note_template(
+        rule_id=ctx.get("rule_id") if isinstance(ctx, dict) else None,
+        community_id=None,
+        community_name=None,
+        note_type=note_type,
+        profile=profile,
+        vault_dir=vault_dir,
+        default_template=templates[note_type],
+    )
     # Phase 31 (D-16): expand `{{#…}}…{{/…}}` blocks BEFORE safe_substitute so
     # node labels containing `{{`, `}}`, `#`, `${`, etc. cannot inject syntax.
     block_ctx = BlockContext(
@@ -1616,6 +1627,86 @@ def _pick_community_template(
                 continue
             if pattern == community_id:
                 return _load_override_template(template_path, vault_dir, default_template)
+    return default_template
+
+
+def _resolve_note_template(
+    *,
+    rule_id: str | None,
+    community_id: int | None,
+    community_name: str | None,
+    note_type: str,
+    profile: dict,
+    vault_dir,
+    default_template: "string.Template",
+) -> "string.Template":
+    """Phase 56 (CFG-01) D-56.05 render-time precedence ladder.
+
+    Tier order (first match wins; falls through to next tier on miss OR on
+    per-tier load-failure warn-and-fall-back per D-56.13 / Phase 55 D-55.14):
+
+      1. mapping_rule_templates  (match=rule_id, pattern=str slug)
+      2. community_templates     (existing Phase 30 surface — unchanged)
+      3. note_type_templates     (match=note_type, pattern=str slug)
+      4. base default_template
+
+    Each tier is silent on miss; per-tier override-load failures emit the
+    standard `[graphify] <list_name> override <reason>` stderr warn via
+    _load_override_template's list_name kwarg, then fall through.
+
+    The community tier delegates to _pick_community_template so existing
+    Phase 30 behavior (label glob, id exact) stays byte-for-byte identical.
+    """
+    # --- Tier 1: mapping_rule_templates ---------------------------------
+    if isinstance(rule_id, str) and rule_id:
+        rules = profile.get("mapping_rule_templates") or []
+        if isinstance(rules, list):
+            for rule in rules:
+                if not isinstance(rule, dict):
+                    continue
+                if rule.get("match") != "rule_id":
+                    continue
+                pattern = rule.get("pattern")
+                template_path = rule.get("template")
+                if not isinstance(pattern, str) or not isinstance(template_path, str):
+                    continue
+                if pattern == rule_id:
+                    return _load_override_template(
+                        template_path,
+                        vault_dir,
+                        default_template,
+                        list_name="mapping_rule_templates",
+                    )
+
+    # --- Tier 2: community_templates (delegate to existing helper) ------
+    if community_id is not None and isinstance(community_name, str):
+        picked = _pick_community_template(
+            community_id, community_name, profile, vault_dir, default_template
+        )
+        if picked is not default_template:
+            return picked
+
+    # --- Tier 3: note_type_templates ------------------------------------
+    nt_rules = profile.get("note_type_templates") or []
+    if isinstance(nt_rules, list):
+        for rule in nt_rules:
+            if not isinstance(rule, dict):
+                continue
+            if rule.get("match") != "note_type":
+                continue
+            pattern = rule.get("pattern")
+            template_path = rule.get("template")
+            if not isinstance(pattern, str) or not isinstance(template_path, str):
+                continue
+            if pattern == note_type:
+                return _load_override_template(
+                    template_path,
+                    vault_dir,
+                    default_template,
+                    list_name="note_type_templates",
+                )
+
+    # --- Tier 4: base ---------------------------------------------------
     return default_template
 
 
@@ -1758,8 +1849,20 @@ def _render_moc_like(
         }
     )
     default_template = templates[template_key]
-    template = _pick_community_template(
-        community_id, community_name, profile, vault_dir, default_template
+    # Phase 56 (CFG-01) D-56.05: route through the full ladder so MOC/Community
+    # rendering can be steered by mapping_rule_templates (when ctx carries
+    # rule_id) or note_type_templates (matching template_key) in addition to
+    # the existing community_templates surface (delegated as tier 2).
+    _ctx = classification_context if isinstance(classification_context, dict) else None
+    _rule_id = _ctx.get("rule_id") if _ctx else None
+    template = _resolve_note_template(
+        rule_id=_rule_id,
+        community_id=community_id,
+        community_name=community_name,
+        note_type=template_key,
+        profile=profile,
+        vault_dir=vault_dir,
+        default_template=default_template,
     )
     # Phase 31 (D-16): expand blocks BEFORE safe_substitute. MOCs and
     # Community Overviews operate on a community context — the synthetic
