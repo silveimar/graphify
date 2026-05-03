@@ -656,7 +656,10 @@ Plans:
 2. Vault-related CLI failures (unknown vault, ambiguous selection, dry-run mismatch) produce actionable messages covered by pytest (**VAUX-02**).
 3. v1.10-close quick-task / registry hygiene item (`260427-rc7-fix-detect-self-ingestion` or successor slug) is resolved or formally waived; VERIFICATION note records evidence (**HYG-01**).
 
-**Plans:** `.planning/phases/58-vault-cli-parity-hygiene/` (TBD during `/gsd-plan-phase 58`).
+**Plans:** 3 plans
+- [ ] 58-01-PLAN.md — VAUX-01 parity helper (resolve_vault_for_parity in graphify/output.py + tests/test_vault_parity.py)
+- [ ] 58-02-PLAN.md — VAUX-02 actionable errors (_emit_vault_error + 3 D-07 call-site migrations + subprocess tests)
+- [ ] 58-03-PLAN.md — HYG-01 regression-lock test in tests/test_detect.py (asserts both _SELF_OUTPUT_DIRS spellings + dual-source equality)
 
 **UI hint:** partial — CLI error surfaces and `doctor` reporting messages.
 
