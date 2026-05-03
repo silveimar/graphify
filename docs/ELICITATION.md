@@ -44,9 +44,43 @@ These paths resolve `<artifacts_dir>/elicitation.json` (when present) and pass *
 | **`graphify watch`** (`_rebuild_code`) | Incremental rebuild merges sidecar from **`<project>/graphify-out/`** after AST extraction (and optional semantic carry-over from existing **`graph.json`**). |
 | **`graphify run`** | **Does not** call **`build()`** or write **`graph.json`** — extract-only. Use **`watch`**, **`update-vault`**, or the full skill-driven pipeline when you need graph assembly with elicitation merge. |
 
-## Non-goals (other phases)
+## Trust Boundaries
+
+This milestone (v1.11) clarifies what `elicit` and `import-harness` will and will not do, and where the trust line sits.
+
+### Where elicitation reads / writes
+
+`graphify elicit` resolves its artifacts directory through **`resolve_output()`** (see `graphify/output.py`). With a vault + profile, the sidecar lands at `<artifacts_dir>/elicitation.json` (typically the sibling `graphify-out/` next to the vault); without a vault, it lands at `./graphify-out/elicitation.json`. The pipeline never reads vault configuration without explicit user consent (the user must invoke `--vault` or `--profile`).
+
+The sidecar merge precedence (elicitation overwrites base extraction on node-id collisions; conflicting edge attrs follow last-write-wins) is asserted by the regression suite at `tests/test_elicit.py` (Phase 57 ELIC-01 tests). That test module is the canonical record of the merge contract.
+
+### What `import-harness` will and will not do
+
+`graphify import-harness` is **off by default**: no other graphify command (`run`, `watch`, `update-vault`, `elicit`, `doctor`) invokes it transitively. It refuses to write reconstructed extractions under any vault root unless the user passes `--allow-vault-write`. The MCP `import_harness` tool requires an explicit `path` argument; missing or empty paths are rejected by `validate_graph_path`.
+
+### LLM trust posture during `elicit`
+
+Free-text answers from `--demo` and interactive elicitation are passed through `sanitize_harness_text` (`graphify/security.py`) before reaching downstream LLM calls or HTML / Obsidian export. Labels are HTML-escaped at export time (see `graphify/security.py::sanitize_label`). Size caps (`MAX_HARNESS_IMPORT_BYTES`) and prompt-injection guard patterns (`guard_harness_injection_patterns`) were established in Phase 40 and apply unchanged.
+
+## Canonical Harness Interchange (v1) Mapping
+
+The harness interchange envelope (`graphify.harness.interchange/v1`, exported by `export_interchange_v1` in `graphify/harness_interchange.py`) is the canonical input format for `graphify import-harness`. Field mapping mirrors `graph_data_to_extraction()` exactly:
+
+| Envelope field | Maps to extraction key | Notes |
+|----------------|------------------------|-------|
+| `schema` | `INTERCHANGE_SCHEMA_ID` constant (`"graphify.harness.interchange/v1"`) | Required at top level; mismatched schema is rejected by `_parse_interchange_v1`. |
+| `graph.nodes[]` | `nodes[]` | Each node carries `id`, `label`, `file_type`, `source_file`. |
+| `graph.edges[]` | `edges[]` | Each edge carries `source`, `target`, `relation`, `confidence`, `source_file`. |
+| `provenance` | dropped | Provenance is consumed for audit, not merged into the graph. |
+
+A future bump to `/v2` MUST update the `schema` row above. The schema-id constant is asserted to match this doc by `tests/test_harness_interchange.py::test_interchange_schema_id_locked`.
+
+## Milestone Non-Goals (v1.11)
 
 - **Phase 40** — harness **import**, injection defenses, inverse import.
 - **Phase 41** — **`--vault`** selector / multi-root UX productization.
+- **Real inverse round-trip** (harness export → import → graph equality) — deferred to a future harness-expansion phase.
+- **New harness target formats** beyond what is shipped today — orthogonal capability extension.
+- **Re-testing Phase 40 size caps and prompt-injection guards** (`MAX_HARNESS_IMPORT_BYTES`, `guard_harness_injection_patterns`) — already covered.
 
 For vault adapter basics, see `docs/vault-adapter.md`.
