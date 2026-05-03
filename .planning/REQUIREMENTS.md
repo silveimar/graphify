@@ -27,8 +27,8 @@
 ### Elicitation & harness (ELIC / HARN)
 
 - [x] **ELIC-01**: At least **one additional scripted elicitation → extraction** scenario is covered by unit tests versus the v1.9 baseline (failure modes + happy path artifact shape).
-- [ ] **ELIC-02**: `docs/ELICITATION.md` (or successor) states **trust boundaries**, artifact locations, and non-goals for this milestone.
-- [ ] **HARN-01**: Harness export adds **documented canonical mapping + tests** for one incremental capability (e.g., additional target formatting **or** inverse-import remains off-default with explicit guard tests if touched).
+- [x] **ELIC-02**: `docs/ELICITATION.md` (or successor) states **trust boundaries**, artifact locations, and non-goals for this milestone.
+- [x] **HARN-01**: Harness export adds **documented canonical mapping + tests** for one incremental capability (e.g., additional target formatting **or** inverse-import remains off-default with explicit guard tests if touched).
 - [x] **HARN-02**: Any **import** entrypoint remains **off by default** and cannot write vault paths without explicit user-approved CLI/MCP semantics.
 
 ### Vault CLI & hygiene (VAUX / HYG)
