@@ -1885,6 +1885,185 @@ def test_dataview_queries_absent_key_is_legacy_compatible(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Phase 56 (TMPL-03, D-56.02): dataview_queries: dead-rule preflight checks
+# §1 unknown ${var}, §2 unreachable note_type, §3 empty after substitution,
+# §4 cross-chain duplicate (delegates to Plan 02 _detect_dataview_collisions).
+# ---------------------------------------------------------------------------
+
+
+def test_dataview_queries_unknown_var_rejected():
+    """§1 positive: query with `${unknown}` is rejected; error names allowlist."""
+    profile = {"dataview_queries": {"moc": "TABLE x WHERE y = ${unknown}"}}
+    errors = validate_profile(profile)
+    assert any(
+        "dataview_queries.moc" in e
+        and "unknown" in e
+        and "${unknown}" in e
+        and "['community_tag', 'folder']" in e
+        for e in errors
+    ), errors
+
+
+def test_dataview_queries_known_vars_accepted():
+    """§1 negative: ${community_tag} and ${folder} both pass — they are the
+    exhaustive allowlist per RESEARCH §1 (templates.py:1290-1293, 1439-1444,
+    1707-1710 _build_dataview_block callsites)."""
+    profile = {
+        "dataview_queries": {
+            "moc": "TABLE x FROM #t/${community_tag}",
+            "community": "TABLE y FROM \"${folder}\"",
+        }
+    }
+    errors = validate_profile(profile)
+    # No unknown-var error for the known vars.
+    assert not any(
+        "unknown" in e and ("${community_tag}" in e or "${folder}" in e)
+        for e in errors
+    ), errors
+
+
+def test_dataview_queries_unreachable_note_type_rejected():
+    """§2 positive: dataview_queries.person without any mapping_rule producing
+    `person` is conservatively unreachable (topology fallback at
+    mapping.py:397-406 only emits {moc, community, thing, statement, code})."""
+    profile = {
+        "dataview_queries": {"person": "TABLE p FROM #t/person"},
+    }
+    errors = validate_profile(profile)
+    assert any(
+        "dataview_queries.person" in e and "not reachable" in e
+        for e in errors
+    ), errors
+
+
+def test_dataview_queries_reachable_note_type_accepted():
+    """§2 negative: dataview_queries.code accepted unconditionally — `code` is
+    in the topology fallback set, so it is always reachable."""
+    profile = {"dataview_queries": {"code": "TABLE c FROM #t/code"}}
+    errors = validate_profile(profile)
+    assert not any(
+        "dataview_queries.code" in e and "not reachable" in e
+        for e in errors
+    ), errors
+
+
+def test_dataview_queries_unreachable_note_type_becomes_reachable_via_mapping_rule():
+    """§2 augmentation: dataview_queries.person becomes reachable when
+    mapping_rules adds a `then.note_type: person` rule."""
+    profile = {
+        "mapping_rules": [
+            {"when": {"label_re": ".*"}, "then": {"note_type": "person"}}
+        ],
+        "dataview_queries": {"person": "TABLE p FROM #t/person"},
+    }
+    errors = validate_profile(profile)
+    assert not any(
+        "dataview_queries.person" in e and "not reachable" in e
+        for e in errors
+    ), errors
+
+
+def test_dataview_queries_empty_after_substitution_rejected():
+    """§3 positive: query that strips to empty when ${community_tag} and
+    ${folder} both expand to empty has no literal content."""
+    profile = {"dataview_queries": {"moc": "   ${community_tag}${folder}   "}}
+    errors = validate_profile(profile)
+    assert any(
+        "dataview_queries.moc" in e and "renders empty" in e
+        for e in errors
+    ), errors
+
+
+def test_dataview_queries_non_empty_after_substitution_accepted():
+    """§3 negative: literal content remains after substitution — accepted."""
+    profile = {
+        "dataview_queries": {"moc": "WHERE foo = bar AND tag = #${community_tag}"}
+    }
+    errors = validate_profile(profile)
+    assert not any(
+        "dataview_queries.moc" in e and "renders empty" in e
+        for e in errors
+    ), errors
+
+
+def test_dataview_queries_cross_chain_collision_via_tmpl03(tmp_path):
+    """§4 positive: TMPL-03 cross-chain collision detection delegates to
+    Plan 02's _detect_dataview_collisions wired in validate_profile_preflight.
+    This test verifies the WIRING, not duplicate logic."""
+    pytest.importorskip("yaml")
+    from textwrap import dedent
+    from graphify.profile import validate_profile_preflight
+
+    vault = tmp_path / "vault"
+    graphify_dir = vault / ".graphify"
+    graphify_dir.mkdir(parents=True)
+
+    (graphify_dir / "seed.yaml").write_text(
+        dedent("""
+            dataview_queries:
+              moc: "TABLE seed FROM #t/moc"
+        """).lstrip("\n"),
+        encoding="utf-8",
+    )
+    (graphify_dir / "parent.yaml").write_text(
+        dedent("""
+            includes:
+              - seed.yaml
+            dataview_queries:
+              code: "TABLE parent FROM #t/code"
+        """).lstrip("\n"),
+        encoding="utf-8",
+    )
+    (graphify_dir / "profile.yaml").write_text(
+        dedent("""
+            extends: parent.yaml
+            dataview_queries:
+              code: "TABLE child FROM #t/code"
+        """).lstrip("\n"),
+        encoding="utf-8",
+    )
+
+    result = validate_profile_preflight(vault)
+    assert any(
+        "dataview_queries.code" in e and "collision across composition chain" in e
+        for e in result.errors
+    ), result.errors
+
+
+def test_dataview_queries_single_source_no_cross_chain_error(tmp_path):
+    """§4 negative: single-source dvq.code emits no collision error."""
+    pytest.importorskip("yaml")
+    from textwrap import dedent
+    from graphify.profile import validate_profile_preflight
+
+    vault = tmp_path / "vault"
+    graphify_dir = vault / ".graphify"
+    graphify_dir.mkdir(parents=True)
+
+    (graphify_dir / "parent.yaml").write_text(
+        dedent("""
+            dataview_queries:
+              code: "TABLE only FROM #t/code"
+        """).lstrip("\n"),
+        encoding="utf-8",
+    )
+    (graphify_dir / "profile.yaml").write_text(
+        dedent("""
+            extends: parent.yaml
+            dataview_queries:
+              moc: "TABLE child_moc FROM #t/moc"
+        """).lstrip("\n"),
+        encoding="utf-8",
+    )
+
+    result = validate_profile_preflight(vault)
+    assert not any(
+        "dataview_queries.code" in e and "collision across composition chain" in e
+        for e in result.errors
+    ), result.errors
+
+
+# ---------------------------------------------------------------------------
 # Phase 55 RED: predicate_flags validation tests
 # These tests MUST FAIL RED until Plan 55-03 adds _validate_predicate_flags
 # and extends _VALID_TOP_LEVEL_KEYS with "predicate_flags".
