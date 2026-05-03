@@ -802,3 +802,22 @@ def test_detect_dot_graphify_discovered_lists_eligible_paths(tmp_path):
     prof = load_profile(tmp_path)
     result = detect(tmp_path, profile=prof)
     assert ".graphify/notes.md" in result.get("dot_graphify_discovered", [])
+
+
+def test_self_ingestion_dirs_constant_excludes_both_spellings():
+    """HYG-01 regression-lock: _SELF_OUTPUT_DIRS must always contain both spellings.
+
+    Named intentional guard — survives future refactors of _is_noise_dir that
+    might accidentally drop a spelling. Unlike the behavioral detect() tests
+    above, this asserts the constant directly so any rename/removal is caught
+    immediately regardless of file-scan behavior.
+
+    Cite: .planning/quick/260427-rc7-fix-detect-self-ingestion/260427-rc7-SUMMARY.md
+    Commit: 59d8b2f
+    """
+    from graphify.corpus_prune import _SELF_OUTPUT_DIRS as _CORPUS_SELF
+    from graphify.detect import _SELF_OUTPUT_DIRS as _DETECT_SELF
+    assert "graphify-out" in _CORPUS_SELF
+    assert "graphify_out" in _CORPUS_SELF
+    # Catch future divergence between the two intentionally-mirrored copies
+    assert _CORPUS_SELF == _DETECT_SELF
