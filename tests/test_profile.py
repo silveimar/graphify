@@ -1955,3 +1955,146 @@ def test_predicate_flags_top_level_key_accepted():
     assert "predicate_flags" in _VALID_TOP_LEVEL_KEYS, (
         "'predicate_flags' must be in _VALID_TOP_LEVEL_KEYS to pass top-level validation"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 56 Plan 03 (CFG-01): mapping_rule_templates: + note_type_templates:
+# validators — ports community_templates: validator (profile.py:682-735) per
+# D-56.03/04 with substring-style path-confinement (NOT Path.parts).
+# ---------------------------------------------------------------------------
+
+
+def test_mapping_rule_templates_validates_well_formed_list():
+    """Well-formed mapping_rule_templates: list validates with no errors."""
+    profile = {
+        "mapping_rule_templates": [
+            {"match": "rule_id", "pattern": "person_rule", "template": "fragments/person.md"},
+            {"match": "rule_id", "pattern": "moc_rule", "template": "fragments/moc.md"},
+        ]
+    }
+    assert validate_profile(profile) == []
+
+
+def test_mapping_rule_templates_rejects_non_list():
+    profile = {"mapping_rule_templates": "not a list"}
+    errors = validate_profile(profile)
+    assert any("'mapping_rule_templates' must be a list" in e for e in errors), errors
+
+
+def test_mapping_rule_templates_rejects_bad_match_kind():
+    """Only 'rule_id' is valid in v1.11; 'label'/'id'/missing all rejected."""
+    profile = {
+        "mapping_rule_templates": [
+            {"match": "label", "pattern": "x", "template": "fragments/a.md"},
+            {"match": "id", "pattern": "y", "template": "fragments/b.md"},
+            {"pattern": "z", "template": "fragments/c.md"},
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("mapping_rule_templates[0].match" in e and "rule_id" in e for e in errors), errors
+    assert any("mapping_rule_templates[1].match" in e and "rule_id" in e for e in errors), errors
+    assert any("mapping_rule_templates[2].match" in e and "rule_id" in e for e in errors), errors
+
+
+def test_mapping_rule_templates_rejects_non_slug_pattern():
+    """pattern must match slug regex ^[a-z][a-z0-9_-]*$."""
+    profile = {
+        "mapping_rule_templates": [
+            {"match": "rule_id", "pattern": "BadCaps", "template": "fragments/a.md"},
+            {"match": "rule_id", "pattern": "1leading", "template": "fragments/b.md"},
+            {"match": "rule_id", "pattern": "has/slash", "template": "fragments/c.md"},
+            {"match": "rule_id", "pattern": "has..dots", "template": "fragments/d.md"},
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("mapping_rule_templates[0].pattern" in e for e in errors), errors
+    assert any("mapping_rule_templates[1].pattern" in e for e in errors), errors
+    assert any("mapping_rule_templates[2].pattern" in e for e in errors), errors
+    assert any("mapping_rule_templates[3].pattern" in e for e in errors), errors
+
+
+def test_mapping_rule_templates_rejects_template_path_escapes():
+    """`..`, absolute, leading `~` rejected via substring-style checks."""
+    profile = {
+        "mapping_rule_templates": [
+            {"match": "rule_id", "pattern": "a", "template": "../escape.md"},
+            {"match": "rule_id", "pattern": "b", "template": "/abs/path.md"},
+            {"match": "rule_id", "pattern": "c", "template": "~/home.md"},
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("mapping_rule_templates[0].template" in e and ".." in e for e in errors), errors
+    assert any("mapping_rule_templates[1].template" in e and "absolute" in e for e in errors), errors
+    assert any("mapping_rule_templates[2].template" in e and "~" in e for e in errors), errors
+
+
+def test_mapping_rule_templates_rejects_unknown_keys():
+    profile = {
+        "mapping_rule_templates": [
+            {"match": "rule_id", "pattern": "x", "template": "fragments/a.md", "extra": "no"},
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("mapping_rule_templates[0]" in e and "unknown keys" in e for e in errors), errors
+
+
+def test_note_type_templates_validates_well_formed_list():
+    """Well-formed note_type_templates: list (pattern from _KNOWN_NOTE_TYPES)."""
+    profile = {
+        "note_type_templates": [
+            {"match": "note_type", "pattern": "moc", "template": "fragments/moc.md"},
+            {"match": "note_type", "pattern": "person", "template": "fragments/person.md"},
+        ]
+    }
+    assert validate_profile(profile) == []
+
+
+def test_note_type_templates_rejects_non_list():
+    profile = {"note_type_templates": "not a list"}
+    errors = validate_profile(profile)
+    assert any("'note_type_templates' must be a list" in e for e in errors), errors
+
+
+def test_note_type_templates_rejects_unknown_note_type():
+    """pattern not in _KNOWN_NOTE_TYPES is rejected."""
+    profile = {
+        "note_type_templates": [
+            {"match": "note_type", "pattern": "mocs", "template": "fragments/x.md"},
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("note_type_templates[0].pattern" in e and "mocs" in e for e in errors), errors
+
+
+def test_note_type_templates_rejects_template_path_escapes():
+    profile = {
+        "note_type_templates": [
+            {"match": "note_type", "pattern": "moc", "template": "../escape.md"},
+            {"match": "note_type", "pattern": "person", "template": "/abs/path.md"},
+            {"match": "note_type", "pattern": "thing", "template": "~/home.md"},
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("note_type_templates[0].template" in e and ".." in e for e in errors), errors
+    assert any("note_type_templates[1].template" in e and "absolute" in e for e in errors), errors
+    assert any("note_type_templates[2].template" in e and "~" in e for e in errors), errors
+
+
+def test_note_type_templates_rejects_unknown_keys():
+    profile = {
+        "note_type_templates": [
+            {"match": "note_type", "pattern": "moc", "template": "fragments/m.md", "x": 1},
+        ]
+    }
+    errors = validate_profile(profile)
+    assert any("note_type_templates[0]" in e and "unknown keys" in e for e in errors), errors
+
+
+def test_unknown_top_level_key_no_longer_rejects_mapping_rule_templates():
+    """Regression guard: 'mapping_rule_templates' is in _VALID_TOP_LEVEL_KEYS."""
+    assert "mapping_rule_templates" in _VALID_TOP_LEVEL_KEYS
+
+
+def test_unknown_top_level_key_no_longer_rejects_note_type_templates():
+    """Regression guard: 'note_type_templates' is in _VALID_TOP_LEVEL_KEYS."""
+    assert "note_type_templates" in _VALID_TOP_LEVEL_KEYS

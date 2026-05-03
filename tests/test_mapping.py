@@ -924,6 +924,89 @@ def test_validate_rules_accepts_valid_example_from_context():
     assert validate_rules(rules) == []
 
 
+# ---------------------------------------------------------------------------
+# Phase 56 Plan 03 (CFG-01, D-56.04): mapping_rules.id: optional slug field.
+# Validated by validate_rules — type, length (≤ 80), pattern ^[a-z][a-z0-9_-]*$,
+# uniqueness across rules.
+# ---------------------------------------------------------------------------
+
+
+def test_validate_rules_id_field_accepted_when_valid_slug():
+    """Valid slug ids accepted; absence of id: remains valid (backward compat)."""
+    from graphify.mapping import validate_rules
+    rules = [
+        {
+            "id": "person_rule",
+            "when": {"attr": "file_type", "equals": "person"},
+            "then": {"note_type": "person"},
+        },
+        {
+            "id": "moc-rule-2",
+            "when": {"attr": "label", "equals": "X"},
+            "then": {"note_type": "moc"},
+        },
+        {
+            # No id: — backward compat
+            "when": {"attr": "label", "equals": "Y"},
+            "then": {"note_type": "thing"},
+        },
+    ]
+    assert validate_rules(rules) == []
+
+
+def test_validate_rules_id_field_rejects_non_string():
+    from graphify.mapping import validate_rules
+    rules = [
+        {"id": 123, "when": {"attr": "label", "equals": "X"}, "then": {"note_type": "thing"}},
+        {"id": ["a"], "when": {"attr": "label", "equals": "Y"}, "then": {"note_type": "thing"}},
+    ]
+    errors = validate_rules(rules)
+    assert any("mapping_rules[0].id" in e and "string" in e for e in errors), errors
+    assert any("mapping_rules[1].id" in e and "string" in e for e in errors), errors
+
+
+def test_validate_rules_id_field_rejects_too_long():
+    from graphify.mapping import validate_rules
+    rules = [
+        {
+            "id": "a" * 81,
+            "when": {"attr": "label", "equals": "X"},
+            "then": {"note_type": "thing"},
+        },
+    ]
+    errors = validate_rules(rules)
+    assert any("mapping_rules[0].id" in e and "exceeds cap" in e for e in errors), errors
+
+
+def test_validate_rules_id_field_rejects_bad_pattern():
+    from graphify.mapping import validate_rules
+    rules = [
+        {"id": "1leading", "when": {"attr": "label", "equals": "A"}, "then": {"note_type": "thing"}},
+        {"id": "BadCaps", "when": {"attr": "label", "equals": "B"}, "then": {"note_type": "thing"}},
+        {"id": "has..dot", "when": {"attr": "label", "equals": "C"}, "then": {"note_type": "thing"}},
+        {"id": "has/slash", "when": {"attr": "label", "equals": "D"}, "then": {"note_type": "thing"}},
+    ]
+    errors = validate_rules(rules)
+    assert any("mapping_rules[0].id" in e and "pattern" in e for e in errors), errors
+    assert any("mapping_rules[1].id" in e and "pattern" in e for e in errors), errors
+    assert any("mapping_rules[2].id" in e and "pattern" in e for e in errors), errors
+    assert any("mapping_rules[3].id" in e and "pattern" in e for e in errors), errors
+
+
+def test_validate_rules_id_field_rejects_duplicate_across_rules():
+    from graphify.mapping import validate_rules
+    rules = [
+        {"id": "dup_id", "when": {"attr": "label", "equals": "A"}, "then": {"note_type": "thing"}},
+        {"id": "other", "when": {"attr": "label", "equals": "B"}, "then": {"note_type": "thing"}},
+        {"id": "dup_id", "when": {"attr": "label", "equals": "C"}, "then": {"note_type": "thing"}},
+    ]
+    errors = validate_rules(rules)
+    assert any(
+        "mapping_rules[2].id" in e and "duplicate" in e and "mapping_rules[0]" in e
+        for e in errors
+    ), errors
+
+
 def test_validate_rules_rejects_unknown_then_keys():
     # WARNING 1 fix (D-46): unknown `then:` keys must be rejected with a
     # pointed error, not silently dropped. VALIDATION row 3-03-08.
