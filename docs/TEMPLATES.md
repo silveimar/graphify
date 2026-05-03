@@ -4,6 +4,8 @@ Block engine added in Phase 31 (TMPL-01/TMPL-02). Extends graphify's `${placehol
 
 Pattern follows `docs/RELATIONS.md`: terse reference. Each section: what / when / example / pitfall.
 
+Profile-level template overrides (per-mapping-rule, per-community, per-note-type) and the precedence ladder that resolves between them are documented in [`docs/PROFILE-CONFIGURATION.md`](PROFILE-CONFIGURATION.md) (Phase 56 additions). This document scopes to the block engine; override resolution lives in the profile composition layer.
+
 ---
 
 ## Conditional blocks
