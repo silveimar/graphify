@@ -470,22 +470,25 @@ The planner MUST verify each task respects these:
 | A4 | `validate_extraction` already rejects sidecar edges with missing required fields, so the "missing required fields" failure mode (D-03) surfaces as a `ValueError` from `save_elicitation_sidecar`, not a silent skip. | ELIC-01 test design | If `validate_extraction` is more permissive than expected, the test asserts the wrong error type. Verify by running `validate_extraction({"nodes":[],"edges":[{"source":"a"}]})` once during Wave 0. |
 | A5 | The CLI smoke test `test_cli_import_harness_smoke` pattern (subprocess + `monkeypatch.chdir`) works under CI's Python 3.10/3.12 matrix without additional fixture wiring. | Pattern 2 | Already used by `tests/test_harness_import.py:82` — high confidence. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **What does the user expect when `--output` is *outside* a vault but `--allow-vault-write` is passed?**
    - What we know: Flag is additive — without it, refuse vault-rooted; with it, allow.
    - What's unclear: Should the flag be ignored (no-op) when output is already non-vault, or should it warn?
    - Recommendation: Silent no-op outside vault (zero-friction); warn only when output IS vault-rooted, telling user the flag has activated. Matches "fail loudly with actionable messages" precedent.
+   - **RESOLVED: silent no-op outside vault (per researcher recommendation).**
 
 2. **Does `validate_extraction` allow dangling edges for the "edge referencing absent node" test?**
    - What we know: `build.py` docstring at line ~310 says "dangling edges are expected for stdlib imports" — strong signal yes.
    - What's unclear: Whether the *sidecar* path (which goes through `validate_extraction` in `save_elicitation_sidecar:240`) treats it identically.
    - Recommendation: Verify in Wave 0 by writing the test; if `validate_extraction` rejects, add a node-existence test instead and document the deviation.
+   - **RESOLVED: ELIC-01 test for sidecar edge referencing absent node will assert current behavior (dangling edge accepted by build, surfaced as warning) — no behavior change required.**
 
 3. **Should the canonical-mapping prose live in `## Trust Boundaries` or its own section?**
    - What we know: D-07 says "in the trust-boundaries section."
    - What's unclear: Strict subsection or sibling H2?
    - Recommendation: Sibling H2 `## Canonical Harness Interchange (v1) Mapping` placed *between* `## Trust Boundaries` and `## Milestone Non-Goals (v1.11)`. Easier to link to from tests.
+   - **RESOLVED: sibling H2 sections in docs/ELICITATION.md per Plan 57-02 Edit A/B/C.**
 
 ## Security Domain
 

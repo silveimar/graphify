@@ -633,7 +633,12 @@ Plans:
 3. Harness export adds a documented canonical mapping + tests for one incremental capability (additional target formatting, **or** inverse-import remains off-default with explicit guard tests if touched) (**HARN-01**).
 4. Any import entrypoint remains off by default and cannot write vault paths without explicit user-approved CLI/MCP semantics; guard tests prove this (**HARN-02**).
 
-**Plans:** `.planning/phases/57-elicitation-harness-increment/` (TBD during `/gsd-plan-phase 57`).
+**Plans:** 3 plans
+
+Plans:
+- [ ] 57-01-PLAN.md — ELIC-01 sidecar collision regression tests (6 tests in tests/test_elicit.py)
+- [ ] 57-02-PLAN.md — ELIC-02 + HARN-01 docs/ELICITATION.md edit + 4 doc/constant lock tests
+- [ ] 57-03-PLAN.md — HARN-02 TDD: --allow-vault-write flag + 4 guard tests (CLI vault refusal, AST allowlist, MCP explicit-path)
 
 **UI hint:** partial — CLI/MCP guard semantics may surface user-facing flags.
 
