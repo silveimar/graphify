@@ -24,6 +24,11 @@ _MAX_PATTERN_LEN = 512
 _MAX_CANDIDATE_LEN = 2048
 _MAX_CODE_MEMBERS = 10
 
+# Phase 56 (CFG-01, D-56.04): optional `mapping_rules[].id:` slug field —
+# referenced by mapping_rule_templates: lookups in Plan 05.
+_RULE_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_-]*$")  # Phase 56 (CFG-01, D-56.04)
+_RULE_ID_MAX_LEN = 80  # Phase 56 (CFG-01, D-56.04) — mirror naming._REPO_IDENTITY_MAX_LEN
+
 _VALID_ATTR_OPS = frozenset({"equals", "in", "contains", "regex"})
 _VALID_TOPOLOGY_KINDS = frozenset({
     "god_node",
@@ -865,6 +870,22 @@ def validate_rules(rules: list) -> list[str]:
         if not isinstance(rule, dict):
             errors.append(f"{prefix}: must be a mapping (dict)")
             continue
+        # Phase 56 (CFG-01, D-56.04): optional slug id: field validation.
+        rule_id = rule.get("id")
+        if rule_id is not None:
+            if not isinstance(rule_id, str):
+                errors.append(
+                    f"{prefix}.id: must be a string (got {type(rule_id).__name__})"
+                )
+            elif len(rule_id) > _RULE_ID_MAX_LEN:
+                errors.append(
+                    f"{prefix}.id: length {len(rule_id)} exceeds cap {_RULE_ID_MAX_LEN}"
+                )
+            elif not _RULE_ID_PATTERN.fullmatch(rule_id):
+                errors.append(
+                    f"{prefix}.id: must match pattern '^[a-z][a-z0-9_-]*$' "
+                    f"(got {rule_id!r})"
+                )
         when = rule.get("when")
         then = rule.get("then")
         if not isinstance(when, dict):
@@ -918,6 +939,21 @@ def validate_rules(rules: list) -> list[str]:
                 f"{prefix}.then: unknown keys {sorted(extra_keys)} — "
                 "only 'note_type' and 'folder' are supported (D-46)"
             )
+
+    # Phase 56 (CFG-01, D-56.04): uniqueness pass for optional id: field.
+    # Duplicate ids would make mapping_rule_templates: lookups ambiguous.
+    seen_ids: dict[str, int] = {}
+    for idx, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            continue
+        rid = rule.get("id")
+        if isinstance(rid, str) and rid in seen_ids:
+            errors.append(
+                f"mapping_rules[{idx}].id: duplicate id {rid!r} — also defined at "
+                f"mapping_rules[{seen_ids[rid]}]"
+            )
+        elif isinstance(rid, str):
+            seen_ids[rid] = idx
 
     # Append dead-rule warnings only when no per-rule errors blocked them.
     # Shape errors above mean the pairwise heuristic could read nonsense.
