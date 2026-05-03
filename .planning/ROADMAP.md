@@ -492,7 +492,7 @@ Typed **concept↔code** edges, **template** conditionals/loops/Dataview hooks, 
 | 54. MCP, trace & Obsidian parity | v1.11 | 5/5 | Complete   | 2026-05-01 |
 | 55. Template conditionals & connection loops | v1.11 | 6/6 | Complete   | 2026-05-02 |
 | 56. Dataview templates & profile overrides | v1.11 | 0/? | Not started | — |
-| 57. Elicitation & harness increment | v1.11 | 1/3 | In Progress|  |
+| 57. Elicitation & harness increment | v1.11 | 2/3 | In Progress|  |
 | 58. Vault CLI parity & hygiene | v1.11 | 0/? | Not started | — |
 
 ### Phase 47: MCP & Trace Integration
@@ -633,12 +633,12 @@ Plans:
 3. Harness export adds a documented canonical mapping + tests for one incremental capability (additional target formatting, **or** inverse-import remains off-default with explicit guard tests if touched) (**HARN-01**).
 4. Any import entrypoint remains off by default and cannot write vault paths without explicit user-approved CLI/MCP semantics; guard tests prove this (**HARN-02**).
 
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [x] 57-01-PLAN.md — ELIC-01 sidecar collision regression tests (6 tests in tests/test_elicit.py)
 - [ ] 57-02-PLAN.md — ELIC-02 + HARN-01 docs/ELICITATION.md edit + 4 doc/constant lock tests
-- [ ] 57-03-PLAN.md — HARN-02 TDD: --allow-vault-write flag + 4 guard tests (CLI vault refusal, AST allowlist, MCP explicit-path)
+- [x] 57-03-PLAN.md — HARN-02 TDD: --allow-vault-write flag + 4 guard tests (CLI vault refusal, AST allowlist, MCP explicit-path)
 
 **UI hint:** partial — CLI/MCP guard semantics may surface user-facing flags.
 
