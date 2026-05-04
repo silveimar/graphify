@@ -142,6 +142,10 @@ def test_import_refuses_vault_rooted_output(tmp_path: Path, monkeypatch: pytest.
     assert rc.returncode != 0
     assert "vault" in rc.stderr.lower()
     assert "--allow-vault-write" in rc.stderr
+    # Phase 61: lock the two-line VAUX-02 format
+    assert "[graphify] error:" in rc.stderr
+    assert "hint:" in rc.stderr
+    assert "refusing to write harness import" not in rc.stderr
 
 
 def test_import_accepts_vault_with_explicit_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
