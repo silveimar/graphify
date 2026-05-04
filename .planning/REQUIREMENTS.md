@@ -45,13 +45,13 @@
 
 | REQ-ID | Phase | Plan / notes |
 |--------|-------|--------------|
-| VCWD-01 | TBD | `_is_obsidian_vault(path)` detection helper |
-| VCWD-02 | TBD | Auto-adopt path through `_resolve_output_target()` |
-| VCWD-03 | TBD | Refusal path via `_emit_vault_error()` with actionable hint |
-| VCWD-04 | TBD | `--write-into-vault` opt-in flag |
-| VCWD-05 | TBD | Doctor predicts new behavior (parity with VAUX-01) |
-| E2E-01 | TBD | Subprocess test for Phase 55+56 composition |
-| E2E-02 | TBD | Subprocess test for Phase 57+56 pipeline |
-| HARN-FMT-01 | TBD | Migrate `__main__.py:2567` to `_emit_vault_error()` |
+| VCWD-01 | Phase 59 | `_is_obsidian_vault(path)` detection helper |
+| VCWD-02 | Phase 59 | Auto-adopt path through `_resolve_output_target()` |
+| VCWD-03 | Phase 59 | Refusal path via `_emit_vault_error()` with actionable hint |
+| VCWD-04 | Phase 59 | `--write-into-vault` opt-in flag |
+| VCWD-05 | Phase 59 | Doctor predicts new behavior (parity with VAUX-01) |
+| E2E-01 | Phase 60 | Subprocess test for Phase 55+56 composition |
+| E2E-02 | Phase 60 | Subprocess test for Phase 57+56 pipeline |
+| HARN-FMT-01 | Phase 61 | Migrate `__main__.py:2567` to `_emit_vault_error()` |
 
 *Phase mapping populated by gsd-roadmapper during `/gsd-new-milestone` step 10.*

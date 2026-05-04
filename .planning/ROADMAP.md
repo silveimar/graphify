@@ -14,6 +14,7 @@
 - ✅ **v1.9 Onboarding, Harness Portability & Vault CLI** — Phases 39–44 (shipped 2026-04-30)
 - ✅ **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–52 (shipped 2026-05-01)
 - ✅ **v1.11 Templates, Graph Semantics & Vault Depth** — Phases 53–58 (shipped 2026-05-03)
+- 🔷 **v1.12 Vault Awareness, Pipeline Integration & Error Hygiene** — Phases 59–61 (active)
 
 ## Phases
 
@@ -414,6 +415,59 @@ Typed **concept↔code** edges promoted to first-class graph members with determ
 
 ---
 
+## Phase Details (v1.12)
+
+### Phase 59: Vault-CWD-aware CLI default
+
+**Goal:** `graphify` safely detects when the current working directory is an Obsidian vault and automatically routes output without surprising the user — auto-adopting the vault profile when present, or refusing with an actionable hint when absent.
+**Depends on:** Phase 41 (`_resolve_output_target()` vault CLI) and Phase 58 (`_emit_vault_error()`, `resolve_vault_for_parity`).
+**Requirements:** **VCWD-01**, **VCWD-02**, **VCWD-03**, **VCWD-04**, **VCWD-05**.
+
+**Success Criteria** (what must be TRUE):
+
+1. Running `graphify run` (or `update-vault`) from a directory containing `.obsidian/` triggers vault-CWD detection before pipeline dispatch; `graphify doctor` also reports the predicted behavior for the same CWD (**VCWD-01**, **VCWD-05**).
+2. When CWD is a vault with `.graphify/profile.yaml` and no explicit `--vault`/`--output` flag is passed, output routes through `_resolve_output_target()` identically to passing `--vault $CWD` — no extra flags required (**VCWD-02**).
+3. When CWD is a vault without `.graphify/profile.yaml` and no explicit routing flag is passed, the CLI exits 2 with a two-line `[graphify] error:` + `  hint:` message on stderr (via `_emit_vault_error()`) that suggests `--output <path>` or `--write-into-vault` (**VCWD-03**).
+4. Passing `--write-into-vault` suppresses the VCWD-03 refusal and proceeds with pre-v1.12 behavior; the flag is documented as a deliberate opt-in (**VCWD-04**).
+
+**Plans:** TBD during `/gsd-plan-phase 59`
+**UI hint:** partial — CLI error messages and `doctor` reporting surface new stderr behavior.
+
+---
+
+### Phase 60: Milestone-level E2E integration tests
+
+**Goal:** Two subprocess-level integration tests close the audit gaps for the two multi-phase pipelines that lacked end-to-end coverage: the profile composition + override ladder flow (Phases 55+56) and the elicitation + vault update flow (Phases 57+56).
+**Depends on:** Phase 55 (template conditionals + connection loops), Phase 56 (Dataview templates + profile overrides), Phase 57 (elicitation & harness increment).
+**Requirements:** **E2E-01**, **E2E-02**.
+
+**Success Criteria** (what must be TRUE):
+
+1. A subprocess test invokes `graphify update-vault` against a profile containing both `note_type_templates` and `mapping_rule_templates`, and asserts that output notes are correctly classified with the override ladder applied (block expansion before `${}` substitution, then template ladder resolution) (**E2E-01**).
+2. A subprocess test runs `graphify elicit` to produce a sidecar at `artifacts_dir/elicitation.json`, then `graphify update-vault`, and asserts that the merged graph renders notes containing visible elicitation contributions (**E2E-02**).
+3. Both tests run against `tmp_path`-scoped vault fixtures with no network calls and pass in the CI Python 3.10/3.12 matrix (**E2E-01**, **E2E-02**).
+
+**Plans:** TBD during `/gsd-plan-phase 60`
+**UI hint:** no — pure test infrastructure; no user-facing surface changes.
+
+---
+
+### Phase 61: Harness vault-write error format normalization
+
+**Goal:** The harness vault-write refusal in `__main__.py` emits the same two-line `[graphify] error:` + `  hint:` format as all other vault CLI errors, eliminating the one remaining one-line stderr outlier from v1.11.
+**Depends on:** Phase 58 (`_emit_vault_error()` two-line format established).
+**Requirements:** **HARN-FMT-01**.
+
+**Success Criteria** (what must be TRUE):
+
+1. The refusal at `graphify/__main__.py:2567` (harness vault-write guard) emits `[graphify] error: <msg>` on one line and `  hint: <fix>` on the next line, using `_emit_vault_error()` — matching the Phase 58 two-line contract (**HARN-FMT-01**).
+2. Existing tests that asserted the old one-line `[graphify] refusing to write harness import...` substring are updated to match the new two-line shape; the old one-line variant is removed entirely from production code (**HARN-FMT-01**).
+
+**Plans:** TBD during `/gsd-plan-phase 61`
+**UI hint:** no — internal stderr format normalization; behavior observable only via subprocess stderr capture in tests.
+
+---
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -483,6 +537,9 @@ Typed **concept↔code** edges promoted to first-class graph members with determ
 | 56. Dataview templates & profile overrides | v1.11 | 0/? | Not started | — |
 | 57. Elicitation & harness increment | v1.11 | 3/3 | Complete   | 2026-05-03 |
 | 58. Vault CLI parity & hygiene | v1.11 | 3/3 | Complete   | 2026-05-03 |
+| 59. Vault-CWD-aware CLI default | v1.12 | 0/? | Not started | — |
+| 60. Milestone-level E2E integration tests | v1.12 | 0/? | Not started | — |
+| 61. Harness vault-write error format normalization | v1.12 | 0/? | Not started | — |
 
 ### Phase 47: MCP & Trace Integration
 
@@ -511,4 +568,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-05-03 — **v1.11** shipped (Phases 53–58, 27 plans, 16/16 requirements). Detail blocks archived under `.planning/milestones/v1.11-ROADMAP.md`. Awaiting `/gsd-new-milestone` for v1.12 scope.*
+*Last updated: 2026-05-03 — **v1.12** active (Phases 59–61, 8/8 requirements mapped). v1.11 archived under `.planning/milestones/v1.11-ROADMAP.md`.*
