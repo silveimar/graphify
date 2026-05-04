@@ -192,6 +192,44 @@ def test_non_code_god_node_keeps_thing_fallback():
     assert result["per_node"]["doc_hub"]["note_type"] == "thing"
 
 
+def test_note_type_template_overrides_code_default():
+    """Phase 60.1-03 (APPLY-DET-01): vault profile listing `thing` in
+    note_type_templates overrides the CODE-note default for code-backed
+    god nodes that fall through the topology fallback (mapping.py:414-422).
+
+    RED on main HEAD before fix: n_transformer is classified as `code`
+    because the topology fallback only consults file_type, never the
+    profile's note_type_templates override surface.
+    """
+    from graphify.mapping import classify
+
+    G, communities = make_classification_fixture()
+    profile = _profile(note_type_templates=[
+        {"match": "note_type", "pattern": "thing", "template": "templates/thing.md"},
+    ])
+    result = classify(G, communities, profile)
+    # n_transformer is the unique top-degree (deg=5) god node and is
+    # code-backed (file_type="code", source_file="src/model.py"). With
+    # `thing` declared in note_type_templates, the classifier MUST emit
+    # note_type="thing", NOT "code".
+    assert result["per_node"]["n_transformer"]["note_type"] == "thing"
+    # Folder must follow the new note_type, not the previous "code"/"thing"
+    # CODE-note default routing.
+    assert result["per_node"]["n_transformer"]["folder"] == "Atlas/Sources/Graphify/Things/"
+
+
+def test_note_type_template_absent_preserves_code_default():
+    """Phase 60.1-03 negative case: when the profile declares NO
+    note_type_templates entry for `thing`, code-backed god nodes still
+    default to `code` (preserves pre-60.1-03 behavior)."""
+    from graphify.mapping import classify
+
+    G, communities = make_classification_fixture()
+    # No note_type_templates → topology fallback emits "code" as before.
+    result = classify(G, communities, _profile())
+    assert result["per_node"]["n_transformer"]["note_type"] == "code"
+
+
 def test_classify_default_statement_when_no_match():
     """VALIDATION row 3-01-05: no rule match AND not a god node → statement."""
     from graphify.mapping import classify
