@@ -241,3 +241,62 @@ def test_refusal_message_text(tmp_path):
     assert Path(cwd_in_msg).resolve() == vault.resolve(), (
         f"cwd in msg {cwd_in_msg!r} should equal {vault!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan 04 — VCWD-04: --write-into-vault flag plumbing + precedence
+# ---------------------------------------------------------------------------
+
+
+def test_write_into_vault_suppresses_refusal(tmp_path):
+    """VCWD-04: per-command --write-into-vault suppresses VCWD-03 refusal."""
+    vault = _make_partial_vault(tmp_path, with_profile=False)
+    proc = _graphify("run", "--write-into-vault", "--help", cwd=str(vault))
+    # No exit-2 refusal: the flag suppresses it. exit code 0 (help) or another
+    # non-2 value is acceptable; the assertion is that VCWD-03 stderr does NOT appear.
+    assert "refusing to write into Obsidian vault" not in proc.stderr, (
+        f"--write-into-vault should suppress refusal; got:\n{proc.stderr}"
+    )
+    assert proc.returncode != 2, f"unexpected exit 2 with --write-into-vault: stderr=\n{proc.stderr}"
+
+
+def test_global_write_into_vault_suppresses_refusal(tmp_path):
+    """VCWD-04: leading global --write-into-vault (before subcommand) suppresses refusal."""
+    vault = _make_partial_vault(tmp_path, with_profile=False)
+    proc = _graphify("--write-into-vault", "run", "--help", cwd=str(vault))
+    assert "refusing to write into Obsidian vault" not in proc.stderr, (
+        f"global --write-into-vault should suppress refusal; got:\n{proc.stderr}"
+    )
+    assert proc.returncode != 2
+
+
+def test_write_into_vault_silent_precedence(tmp_path):
+    """VCWD-04: combined with --vault / --output, explicit wins silently (no warning)."""
+    vault = _make_partial_vault(tmp_path, with_profile=False)
+    out_dir = tmp_path / "outside"
+    out_dir.mkdir()
+    proc = _graphify(
+        "--vault", str(vault), "--write-into-vault",
+        "run", "--help",
+        cwd=str(vault),
+    )
+    # Silent precedence: NO warning about flag conflict / no-op redundancy.
+    forbidden_phrases = [
+        "ignored", "ignoring", "redundant", "no-op", "warning:",
+        "--write-into-vault has no effect",
+    ]
+    for phrase in forbidden_phrases:
+        assert phrase not in proc.stderr.lower(), (
+            f"silent precedence violated: stderr contains {phrase!r}\n{proc.stderr}"
+        )
+
+
+def test_write_into_vault_yields_to_profile(tmp_path):
+    """VCWD-04: --write-into-vault does NOT suppress VCWD-02 auto-adopt (profile wins)."""
+    pytest.importorskip("yaml")
+    vault = _make_partial_vault(tmp_path, with_profile=True)
+    proc = _graphify("--write-into-vault", "run", "--help", cwd=str(vault))
+    # Profile present: auto-adopt path takes priority. Notice still appears.
+    assert "[graphify] auto-adopted vault at" in proc.stderr, (
+        f"--write-into-vault must NOT suppress auto-adopt notice; stderr:\n{proc.stderr}"
+    )
