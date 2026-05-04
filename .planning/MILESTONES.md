@@ -1,5 +1,23 @@
 # Milestones
 
+## v1.11 Templates, Graph Semantics & Vault Depth (Shipped: 2026-05-03)
+
+**Phases completed:** 6 phases (53–58), 27 plans
+**Test growth:** +127 tests (1979 → 2106 passed, 1 xfailed)
+**Audit status:** passed (16/16 requirements satisfied; see `.planning/milestones/v1.11-MILESTONE-AUDIT.md`)
+
+**Known deferred items at close:** 5 open audit items acknowledged — quick-task slug retained as registry entry only (HYG-01 behavior regression-locked in `tests/test_detect.py`); 4 dormant SEEDs carried forward to v1.12 candidate scope (see `STATE.md` — Deferred Items)
+
+**Key accomplishments:**
+
+- **CGRAPH (53/54):** Promoted concept↔code edges to first-class graph members with deterministic merge (`build.py:_merge_edge_fields`, `_normalize_concept_code_edges`); 4 new validated relations (`documents`, `tests`, `realizes`, `instantiates`) plus carried-forward `implements`; MCP `concept_code_hops` widened to 5 relations + `entity_trace.include_concept_code`; Obsidian export parity asserted with golden-path tests; `docs/RELATIONS.md` documents the schema.
+- **Templates / profile overrides (55/56):** `string.Template` block engine extended with `{{#if_note_type_<X>}}` and `{{#if_flag_<name>}}` predicates expanded **before** `${}` substitution; `predicate_flags:` profile key + `validate_template` guard; per-note-type Dataview templates with 4-class dead-rule preflight; 4-tier override ladder (`mapping_rule_templates > community > note_type > base`) + 4 collision detectors with parametric matrix tests; `docs/PROFILE-CONFIGURATION.md` (+178 lines) is now the single source of truth.
+- **Elicitation / harness (57):** 6 sidecar collision regression tests in `test_elicit.py`; `docs/ELICITATION.md` updated in-place with `## Trust Boundaries`, `## Canonical Harness Interchange (v1) Mapping`, `## Milestone Non-Goals (v1.11)`; new `--allow-vault-write` flag on `import-harness` (off by default), AST allowlist meta-test prevents transitive call-site spread, MCP empty-path refusal lock.
+- **Vault CLI / hygiene (58):** `resolve_vault_for_parity()` structured 4-dimension parity helper (path / source label / profile mode / warnings) replacing snapshot-style golden tests; `_emit_vault_error()` companion to `_refuse()` emits two-line `[graphify] error:` + `  hint:` stderr at 3 D-07 call sites without disturbing `_merge_vault_pins` precedence warnings; HYG-01 closed via dual-source equality regression-lock test on `_SELF_OUTPUT_DIRS` (`corpus_prune.py` + `detect.py`).
+- **Drift protection:** Post-audit regression test asserting `_ALLOWED_CONCEPT_CODE_RELATIONS == NEW_CONCEPT_CODE_RELATIONS | {"implements"}` to prevent silent CGRAPH set divergence in v1.12+.
+
+---
+
 ## v1.10 Stability, Baselines & Concept↔Code MVP (Shipped: 2026-05-01)
 
 **Phases completed:** 8 phase tracks (45–52), 14 plans

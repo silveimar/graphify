@@ -8,18 +8,30 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current milestone: v1.11 Templates, Graph Semantics & Vault Depth
+## Current State
 
-**Goal:** Advance declarative vault output (template/profile backlog), make concept↔code relationships first-class in the graph and MCP where justified, deepen elicitation and harness follow-ons beyond v1.9, and tighten vault CLI plus planning/registry hygiene.
+**Last shipped:** v1.11 Templates, Graph Semantics & Vault Depth (2026-05-03)
+**Next milestone:** v1.12 — TBD via `/gsd-new-milestone`
 
-**Target features:**
+**Latest test baseline:** 2106 passed / 1 xfailed (`pytest tests/ -q` at v1.11 close)
 
-- **TMPL/CFG:** Ship deferred template and profile capabilities — conditional sections, connection loops, per-note-type Dataview templates; profile composition (`extends` / `includes`) and related items per `.planning` backlog (phased in roadmap).
-- **Concept↔code graph:** Typed concept↔implementation edges in the NetworkX graph with validation, MCP/query alignment, and coherence with v1.10 concept↔code MVP (**SEED-bidirectional-concept-code-links**).
-- **Elicitation & harness:** Scoped expansion of **SEED-001** / **SEED-002** beyond the v1.9 baseline (explicit bounds in requirements — inverse-import only if guards are satisfied).
-- **Vault CLI & hygiene:** Vault-root/multi-vault ergonomics where gaps remain; close acknowledged quick-task/registry hygiene from v1.10 close notes.
+## Next Milestone Goals (v1.12 — to be defined)
 
-**Planning:** Phase numbering continues from **Phase 53** (after v1.10 Phase **52**). Repo-root `.planning/REQUIREMENTS.md` defines scoped REQ-IDs for this milestone.
+Carry-forward from v1.11 audit (`.planning/milestones/v1.11-MILESTONE-AUDIT.md`):
+
+- **Vault-write error format normalization** — bridge the divergence between Phase 57's harness one-line stderr and Phase 58's two-line `_emit_vault_error` format.
+- **Milestone-level integration tests** for two E2E flows: (a) profile with `note_type_templates` + `mapping_rule_templates` → `graphify update-vault`; (b) `graphify elicit` → sidecar → `graphify update-vault` merge.
+
+Carry-forward from dormant SEEDs (deferred at v1.11 close, see STATE.md `## Deferred Items`):
+
+- **SEED-002** — Harness Memory Export (additional target formats, multi-format round-trip)
+- **SEED-bidirectional-concept-code-links** — promotion of Phase 53/54 concept↔code work to a richer first-class feature
+- **SEED-vault-root-aware-cli** — extension of Phase 41/58 vault CLI ergonomics
+- **SEED-001** — Tacit-to-Explicit Elicitation Engine (further beyond Phase 57 increment)
+
+## Shipped: v1.11 Templates, Graph Semantics & Vault Depth (2026-05-03)
+
+Typed concept↔code edges promoted to first-class graph members with deterministic merge and MCP/Obsidian parity (**CGRAPH-01..04**); template conditional sections + connection loops without Jinja2 (**TMPL-01/02**); per-note-type Dataview templates + scoped profile overrides with collision-matrix validation (**TMPL-03**, **CFG-01/02**); elicitation sidecar collision regression suite + trust-boundary docs + off-by-default harness import guards (**ELIC-01/02**, **HARN-01/02**); vault CLI parity helper + actionable two-line errors + registry hygiene closure (**VAUX-01/02**, **HYG-01**). 6 phases, 27 plans, 16/16 requirements. Archives: `.planning/milestones/v1.11-*`.
 
 ## Shipped: v1.10 Stability, Baselines & Concept↔Code MVP (2026-05-01)
 

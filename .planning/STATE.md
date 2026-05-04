@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.11
-milestone_name: milestone
-status: completed
-stopped_at: Completed 58-03-PLAN.md
-last_updated: "2026-05-03T23:50:12.377Z"
-last_activity: 2026-05-03 -- Phase 58 marked complete
+milestone: v1.12
+milestone_name: TBD
+status: awaiting_scoping
+stopped_at: v1.11 shipped 2026-05-03; awaiting /gsd-new-milestone for v1.12 scope
+last_updated: "2026-05-04T00:30:00.000Z"
+last_activity: 2026-05-03 -- v1.11 milestone closed and archived
 progress:
-  total_phases: 8
-  completed_phases: 6
-  total_plans: 27
-  completed_plans: 27
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (**milestone v1.11** — Templates, Graph Semantics 
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Phase 58 — Vault CLI parity & hygiene
+**Current focus:** Between milestones. v1.11 shipped 2026-05-03 (16/16 requirements, 27 plans across Phases 53–58, 2106 tests passing). Run `/gsd-new-milestone` to scope v1.12.
 
 ## Current Position
 
-Phase: 58 — COMPLETE
-Plan: 3 of 3
-Status: Phase 58 complete
-Last activity: 2026-05-03 -- Phase 58 marked complete
+Phase: — (between milestones; v1.11 closed)
+Plan: —
+Status: v1.11 archived → milestones/v1.11-*
+Last activity: 2026-05-03 -- v1.11 milestone closed
 
 ## Performance Metrics
 
@@ -222,6 +222,28 @@ Open artifact audit items acknowledged at ship (`audit-open`); no runtime blocke
 | seed | SEED-002-harness-memory-export | dormant |
 | seed | SEED-bidirectional-concept-code-links | dormant |
 | seed | SEED-vault-root-aware-cli | dormant |
+
+### Milestone close acknowledgment (v1.11, 2026-05-03)
+
+Open artifact audit items acknowledged at ship (`audit-open`); no runtime blockers. Quick-task is registry-only (regression-locked by Phase 58 HYG-01 test in commit `74ce7ef`); seeds are intentionally dormant for v1.12+ scoping.
+
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 260427-rc7-fix-detect-self-ingestion | closed-in-behavior — `tests/test_detect.py::test_self_ingestion_dirs_constant_excludes_both_spellings` (Phase 58 HYG-01 regression lock); registry slug update deferred to housekeeping |
+| seed | SEED-001-tacit-knowledge-elicitation-engine | dormant — Phase 57 ELIC-01/02 shipped one increment; further scope is v1.12+ |
+| seed | SEED-002-harness-memory-export | dormant — additional target formats are v1.12+ candidate |
+| seed | SEED-bidirectional-concept-code-links | dormant — Phase 53/54 shipped MVP; full bidirectional feature is v1.12+ candidate |
+| seed | SEED-vault-root-aware-cli | dormant — Phase 41/58 shipped vault CLI baseline; further ergonomics are v1.12+ candidate |
+
+### Milestone audit findings carried forward (v1.11 → v1.12 backlog)
+
+From `.planning/milestones/v1.11-MILESTONE-AUDIT.md` — non-blocking tech debt:
+
+| Source | Item | Recommended action |
+|--------|------|-------------------|
+| Audit rec #4 | Vault-write error format divergence (Phase 57 one-line vs Phase 58 two-line) | Bundle into next vault/CLI hygiene phase |
+| Audit rec #5 | No E2E test for Flow 2 (override ladder composition) | Add milestone-level integration test in v1.12 |
+| Audit rec #5 | No E2E test for Flow 3 (elicit → update-vault pipeline) | Add subprocess pipeline test in v1.12 |
 
 ## Quick Tasks Completed
 
