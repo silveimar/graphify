@@ -363,7 +363,9 @@ def test_env_pin_disables_gate(tmp_path):
     """Cross-cutting: GRAPHIFY_VAULT env pin treated as explicit routing — gate returns n/a."""
     pytest.importorskip("yaml")
     bare = _make_partial_vault(tmp_path / "bareVault", with_profile=False)
-    pin_target = _make_partial_vault(tmp_path / "pinVault", with_profile=True)
+    # pin_target needs a fully valid profile so doctor doesn't SystemExit
+    # when _had_pin=True propagates the SystemExit on resolution failure.
+    pin_target = _make_profile_vault(tmp_path / "pinVault")
     proc = _graphify(
         "run", "--help",
         cwd=str(bare),
@@ -386,7 +388,8 @@ def test_vault_list_disables_gate(tmp_path):
     """Cross-cutting: --vault-list file treated as explicit routing — gate returns n/a."""
     pytest.importorskip("yaml")
     bare = _make_partial_vault(tmp_path / "bareVault", with_profile=False)
-    pin_target = _make_partial_vault(tmp_path / "pinVault", with_profile=True)
+    # pin_target needs a fully valid profile so --vault-list routing succeeds.
+    pin_target = _make_profile_vault(tmp_path / "pinVault")
     list_file = tmp_path / "vaults.txt"
     list_file.write_text(f"{pin_target}\n", encoding="utf-8")
     proc = _graphify(

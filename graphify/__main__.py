@@ -3274,6 +3274,9 @@ def main() -> None:
             dry_run=opts.dry_run,
             resolved_output=_dr_resolved,
         )
+        # VCWD-05: thread explicit-routing flag so _classify_vault_cwd in
+        # format_report() produces the correct doctor prediction (parity contract).
+        report.has_explicit_route = _had_pin
         print(format_report(report))
         sys.exit(1 if report.is_misconfigured() else 0)
     elif cmd == "update-vault":

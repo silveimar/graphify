@@ -318,8 +318,9 @@ def test_format_report_graphify_prefix(tmp_path):
     for line in text.splitlines():
         if not line.strip():
             continue
-        assert line.startswith("[graphify] "), (
-            f"line missing [graphify] prefix: {line!r}"
+        # [vault-cwd] lines use a different prefix by design (VCWD-05 / Decision 5).
+        assert line.startswith("[graphify] ") or line.startswith("[vault-cwd]"), (
+            f"line missing recognised prefix: {line!r}"
         )
 
 

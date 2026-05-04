@@ -156,6 +156,9 @@ class DoctorReport:
     would_self_ingest: bool = False
     recommended_fixes: list[str] = field(default_factory=list)
     preview: Optional[PreviewSection] = None
+    # VCWD-05: explicit routing flag (--vault / GRAPHIFY_VAULT / --vault-list).
+    # When True, _classify_vault_cwd reports n/a (explicit route wins, gate is bypassed).
+    has_explicit_route: bool = False
 
     def is_misconfigured(self) -> bool:
         """D-35: True iff profile errors / unresolvable dest / would_self_ingest."""
@@ -511,11 +514,39 @@ def _format_preview(preview: PreviewSection) -> list[str]:
     return out
 
 
+def _classify_vault_cwd(cwd: Path, *, has_explicit_route: bool) -> str:
+    """VCWD-05: pure read-only classifier — mirrors _check_vault_cwd_gate predicates.
+
+    Returns exactly one of "auto-adopt", "refuse", or "n/a".
+
+    Predicate ordering matches the runtime gate (VCWD-01..04) so that the
+    doctor's prediction is always consistent with gate behavior for the same
+    CWD inputs (parity contract — see T-59-12 threat register).
+
+    1. is_obsidian_vault(cwd) — if False → n/a
+    2. has_explicit_route    — if True  → n/a (explicit routing bypasses gate)
+    3. profile exists        — if True  → auto-adopt
+    4. else                  → refuse
+
+    Note: write_into_vault is intentionally omitted here; the doctor classifier
+    describes the *default* outcome (what the gate will do without overrides).
+    """
+    cwd_resolved = cwd.resolve()
+    if not is_obsidian_vault(cwd_resolved):
+        return "n/a"
+    if has_explicit_route:
+        return "n/a"
+    has_profile = (cwd_resolved / ".graphify" / "profile.yaml").is_file()
+    if has_profile:
+        return "auto-adopt"
+    return "refuse"
+
+
 def format_report(report: DoctorReport) -> str:
     """Render DoctorReport as sectioned [graphify]-prefixed text (D-34).
 
     Section order: Vault Detection / Profile Validation / Output Destination /
-    Ignore-List / Preview (when present) / Recommended Fixes.
+    Ignore-List / Preview (when present) / Recommended Fixes / Vault-CWD Default.
     """
     lines: list[str] = []
 
@@ -574,5 +605,24 @@ def format_report(report: DoctorReport) -> str:
             lines.append(fix)
     else:
         lines.append("[graphify] No issues detected.")
+
+    # --- Vault-CWD Default (VCWD-05) --------------------------------------
+    # Runs unconditionally. Outcome mirrors the runtime gate for the same CWD
+    # so that `graphify doctor` is a reliable pre-flight diagnostic.
+    lines.append("[graphify] === Vault-CWD Default ===")
+    cwd = Path.cwd().resolve()
+    outcome = _classify_vault_cwd(cwd, has_explicit_route=report.has_explicit_route)
+    if outcome == "auto-adopt":
+        profile_rel = Path(".graphify") / "profile.yaml"
+        lines.append(
+            f"[vault-cwd] auto-adopt — vault at {cwd}, profile: {profile_rel}"
+        )
+    elif outcome == "refuse":
+        lines.append(
+            f"[vault-cwd] refuse — vault at {cwd},"
+            " no .graphify/profile.yaml (override: --write-into-vault)"
+        )
+    else:
+        lines.append(f"[vault-cwd] n/a — {cwd} is not an Obsidian vault")
 
     return "\n".join(lines)
