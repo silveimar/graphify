@@ -98,6 +98,80 @@ def _cli_exit(code: int) -> None:
         print(f"[graphify] version {package_version()}", file=sys.stderr)
     raise SystemExit(code)
 
+
+def _tilde(p: Path, home: Path) -> str:
+    """Return ``~/<rel>`` if ``p`` is under ``home``; else absolute string."""
+    try:
+        rel = p.relative_to(home)
+        return "~/" + rel.as_posix()
+    except ValueError:
+        return str(p)
+
+
+def _read_stamp_or_corrupt(version_file: Path) -> str | None:
+    """Read a ``.graphify_version`` stamp file with the same hardening as
+    ``_check_skill_version`` (T-59.1.03-02 mitigation).
+
+    Returns ``None`` if the stamp file does not exist. Returns the literal
+    string ``"<corrupt>"`` if the file is oversized (>1024 bytes) or cannot
+    be decoded. Otherwise returns the stripped stamp contents.
+    """
+    try:
+        if not version_file.exists():
+            return None
+    except OSError:
+        return "<corrupt>"
+    try:
+        if version_file.stat().st_size > 1024:
+            return "<corrupt>"
+    except OSError:
+        return "<corrupt>"
+    try:
+        return version_file.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError):
+        return "<corrupt>"
+
+
+def _render_version_block(home: Path | None = None) -> str:
+    """Render the multi-line ``graphify --version`` / ``-V`` output (D-07..D-10).
+
+    Format::
+
+        graphify <pkg-version>
+          skill stamps:
+            <platform-name>: <stamp> (<install-dir-with-~>)
+            <platform-name>: — (not installed)
+          python: <python-version> (<sys.executable>)
+          install: <editable|site-packages> (<resolved-path>)
+
+    Pure: never writes, never raises. Oversized/unreadable stamps render as
+    the literal token ``<corrupt>`` per T-59.1.03-02.
+    """
+    if home is None:
+        home = Path.home()
+    lines: list[str] = [f"graphify {__version__}"]
+    lines.append("  skill stamps:")
+    for name, cfg in _PLATFORM_CONFIG.items():
+        install_dir = home / cfg["skill_dst"]
+        version_file = install_dir.parent / ".graphify_version"
+        stamp = _read_stamp_or_corrupt(version_file)
+        if stamp is None:
+            lines.append(f"    {name}: — (not installed)")
+        else:
+            lines.append(f"    {name}: {stamp} ({_tilde(install_dir.parent, home)})")
+    py_ver = sys.version.split()[0]
+    lines.append(f"  python: {py_ver} ({sys.executable})")
+    # install line: editable vs site-packages, resolved package dir
+    try:
+        import graphify as _g
+        pkg_path = Path(_g.__file__).resolve().parent
+        mode = "site-packages" if "site-packages" in str(pkg_path) else "editable"
+        lines.append(f"  install: {mode} ({pkg_path})")
+    except Exception:
+        lines.append(f"  install: unknown ({sys.executable})")
+    return "\n".join(lines)
+
+
 _SETTINGS_HOOK = {
     "matcher": "Glob|Grep",
     "hooks": [
@@ -1367,7 +1441,7 @@ def main() -> None:
 
     argv_head = sys.argv[1:]
     if len(argv_head) >= 1 and argv_head[0] in ("--version", "-V"):
-        print(f"graphify {__version__}")
+        print(_render_version_block())
         raise SystemExit(0)
 
     # Check all known skill install locations for a stale version stamp.

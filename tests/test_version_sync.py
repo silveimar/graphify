@@ -114,3 +114,113 @@ def test_oversized_stamp_treated_as_corrupt(tmp_path, capsys):
     # Corrupt is treated as silent fallback (no stderr warning emitted).
     assert err == "", f"expected silent fallback for corrupt stamp, got stderr: {err!r}"
     # Function did not raise.
+
+
+# ------------------------------------------------------------------
+# Plan 03 tests: --version block, doctor section, corrupt rendering,
+# --help regression guard. (VSYNC-02, VSYNC-03, T-59.1.03-02, D-10.)
+# ------------------------------------------------------------------
+import subprocess
+import sys as _sys
+
+import graphify.__main__ as gmain
+
+
+def _fake_two_platform_config(tmp_path: Path) -> dict:
+    """Build a 2-platform _PLATFORM_CONFIG fixture under ``tmp_path``."""
+    return {
+        "fake_claude": {
+            "skill_file": "skill.md",
+            "skill_dst": Path("fake_claude") / "SKILL.md",
+            "claude_md": False,
+            "commands_src_dir": "commands",
+            "commands_dst": None,
+            "commands_enabled": False,
+            "supports": ["code"],
+        },
+        "fake_codex": {
+            "skill_file": "skill.md",
+            "skill_dst": Path("fake_codex") / "SKILL.md",
+            "claude_md": False,
+            "commands_src_dir": "commands",
+            "commands_dst": None,
+            "commands_enabled": False,
+            "supports": ["code"],
+        },
+    }
+
+
+def test_render_version_block_multi_line(tmp_path, monkeypatch):
+    """D-19: multi-line --version block contains pkg, stamps, python, install."""
+    cfg = _fake_two_platform_config(tmp_path)
+    # fake_claude installed with stamp 0.4.7
+    (tmp_path / "fake_claude").mkdir()
+    (tmp_path / "fake_claude" / ".graphify_version").write_text("0.4.7", encoding="utf-8")
+    # fake_codex deliberately not installed
+
+    monkeypatch.setattr(gmain, "_PLATFORM_CONFIG", cfg)
+    out = gmain._render_version_block(home=tmp_path)
+
+    assert out.startswith(f"graphify {gmain.__version__}")
+    assert "skill stamps:" in out
+    assert "0.4.7" in out
+    assert "(not installed)" in out
+    assert "python:" in out
+    assert "install:" in out
+    # Path should be rendered with ~ shortening since install_dir is under home
+    assert "~/fake_claude" in out
+
+
+def test_version_flag_does_not_write_stamp(tmp_path, monkeypatch):
+    """D-10: graphify --version is side-effect-free (no .graphify_version write)."""
+    cfg = _fake_two_platform_config(tmp_path)
+    (tmp_path / "fake_claude").mkdir()
+    stamp = tmp_path / "fake_claude" / ".graphify_version"
+    stamp.write_text("0.4.7", encoding="utf-8")
+    mtime_before = stamp.stat().st_mtime_ns
+    content_before = stamp.read_bytes()
+
+    monkeypatch.setattr(gmain, "_PLATFORM_CONFIG", cfg)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(_sys, "argv", ["graphify", "--version"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        gmain.main()
+    assert exc_info.value.code == 0
+
+    # Stamp content and mtime are unchanged (no heal write occurred).
+    assert stamp.read_bytes() == content_before
+    assert stamp.stat().st_mtime_ns == mtime_before
+
+
+def test_render_version_block_handles_corrupt_stamp(tmp_path, monkeypatch):
+    """T-59.1.03-02: oversized stamp renders as ``<corrupt>``; helper does not raise."""
+    cfg = _fake_two_platform_config(tmp_path)
+    (tmp_path / "fake_claude").mkdir()
+    (tmp_path / "fake_claude" / ".graphify_version").write_bytes(b"x" * 2048)
+
+    monkeypatch.setattr(gmain, "_PLATFORM_CONFIG", cfg)
+    out = gmain._render_version_block(home=tmp_path)
+
+    assert "<corrupt>" in out
+    # The fake_claude row should carry the <corrupt> token.
+    assert "fake_claude: <corrupt>" in out
+
+
+def test_version_flag_help_regression(tmp_path):
+    """D-10: graphify --help still works post-flag-add (regression guard)."""
+    r_help = subprocess.run(
+        [_sys.executable, "-m", "graphify", "--help"],
+        capture_output=True,
+    )
+    assert r_help.returncode == 0
+    assert b"usage" in r_help.stdout.lower()
+
+    # Sanity: --version does NOT print a help-style usage banner.
+    r_ver = subprocess.run(
+        [_sys.executable, "-m", "graphify", "--version"],
+        capture_output=True,
+    )
+    assert r_ver.returncode == 0
+    assert b"usage:" not in r_ver.stdout.lower()
+    assert b"graphify " in r_ver.stdout  # package line present
