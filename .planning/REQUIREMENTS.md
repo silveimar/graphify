@@ -24,6 +24,15 @@
 
 - [ ] **HARN-FMT-01**: Harness vault-write refusal at `graphify/__main__.py:2567` migrated from one-line `[graphify] refusing to write harness import...` to Phase 58's two-line `[graphify] error: <msg>` + `  hint: <fix>` format using `_emit_vault_error()`. Existing tests asserting the old stderr substring updated to match the new shape; one-line variant removed entirely.
 
+### Version sync hygiene and --version flag (VSYNC)
+
+> Out of scope (per CONTEXT.md): D-11 (no new top-level subcommand for stamp inspection — stamp surface is folded into `--version` and `doctor` only), D-14 (release-process tooling — `bump_version.py`, CI hooks, tag automation are deferred to a future milestone).
+
+- [ ] **VSYNC-01**: Silent auto-self-heal of `.graphify_version` skill stamp when stamp < package on regular CLI invocations. `_check_skill_version()` in `graphify/__main__.py:21` rewrites the stamp to the running `__version__` and continues with no stderr output. Skips: `--version`, `-V`, `-h`, `--help`, `install`, `uninstall`, and any case where `package_version()` cannot resolve. Heal applies to all `_PLATFORM_CONFIG` platforms whose install dir contains a stamp file; platforms with no stamp remain untouched. Fallback: if write fails (OSError/PermissionError), emit the existing two-line warning shape and continue. (D-01..D-06, D-13)
+- [ ] **VSYNC-02**: `graphify --version` and `-V` produce a multi-line block: line 1 `graphify <pkg-version>`; indented `skill stamps:` block with one row per `_PLATFORM_CONFIG` platform (`<name>: <stamp> (<install-dir-with-~>)` for installed; `<name>: — (not installed)` otherwise); `python: <interpreter-version>`; `install: <editable|site-packages> (<resolved-path>)`. Side-effect-free (skips self-heal). `_cli_exit()` success-footer at `__main__.py:1370` unchanged. (D-07..D-10, D-19)
+- [ ] **VSYNC-03**: `graphify doctor` gains a `version sync` section listing each platform with stamp value, package value, and status (`✓ in sync` / `! drifted-newer` / `— not installed`). Computed on the fly; mirrors the `--version` block. No heal-history sentinel file. (D-12)
+- [ ] **VSYNC-04**: When stamp > package (mixed/downgraded install), the existing two-line stderr warning at `__main__.py:46` is preserved verbatim. Stamp is NOT rewritten downward. (D-03)
+
 ## Future (deferred past v1.12)
 
 - **Project-wide stderr format sweep** — normalize all remaining `[graphify] ...` stderr emissions to the two-line pattern (only the harness path is in v1.12 scope).
@@ -53,5 +62,9 @@
 | E2E-01 | Phase 60 | Subprocess test for Phase 55+56 composition |
 | E2E-02 | Phase 60 | Subprocess test for Phase 57+56 pipeline |
 | HARN-FMT-01 | Phase 61 | Migrate `__main__.py:2567` to `_emit_vault_error()` |
+| VSYNC-01 | Phase 59.1 | Silent self-heal in `_check_skill_version()` |
+| VSYNC-02 | Phase 59.1 | Multi-line `--version` / `-V` output block |
+| VSYNC-03 | Phase 59.1 | `doctor` `version sync` section |
+| VSYNC-04 | Phase 59.1 | Preserved warning for stamp > package |
 
 *Phase mapping populated by gsd-roadmapper during `/gsd-new-milestone` step 10.*
