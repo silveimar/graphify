@@ -300,3 +300,99 @@ def test_write_into_vault_yields_to_profile(tmp_path):
     assert "[graphify] auto-adopted vault at" in proc.stderr, (
         f"--write-into-vault must NOT suppress auto-adopt notice; stderr:\n{proc.stderr}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan 05 — VCWD-05: graphify doctor [vault-cwd] section + parity contract
+# ---------------------------------------------------------------------------
+
+
+def _doctor_section_lines(stdout: str) -> list[str]:
+    """Extract just the [vault-cwd] lines from doctor output."""
+    return [ln for ln in stdout.splitlines() if ln.startswith("[vault-cwd]")]
+
+
+def test_doctor_vault_cwd_section_always_shown(tmp_path):
+    """VCWD-05: doctor [vault-cwd] section appears for non-vault CWD too (n/a outcome)."""
+    plain = _make_no_vault(tmp_path)
+    proc = _graphify("doctor", cwd=str(plain))
+    assert proc.returncode == 0, f"doctor failed: {proc.stderr}"
+    section_lines = _doctor_section_lines(proc.stdout)
+    assert section_lines, f"missing [vault-cwd] section in doctor output:\n{proc.stdout}"
+    assert any("n/a" in ln for ln in section_lines), (
+        f"non-vault CWD should yield n/a outcome; got: {section_lines}"
+    )
+
+
+def test_doctor_three_outcomes(tmp_path):
+    """VCWD-05: all three outcomes (auto-adopt / refuse / n/a) reachable."""
+    pytest.importorskip("yaml")
+
+    # n/a
+    plain = _make_no_vault(tmp_path / "noVault")
+    p1 = _graphify("doctor", cwd=str(plain))
+    # auto-adopt
+    full = _make_partial_vault(tmp_path / "fullVault", with_profile=True)
+    p2 = _graphify("doctor", cwd=str(full))
+    # refuse
+    bare = _make_partial_vault(tmp_path / "bareVault", with_profile=False)
+    p3 = _graphify("doctor", cwd=str(bare))
+
+    s1 = " ".join(_doctor_section_lines(p1.stdout))
+    s2 = " ".join(_doctor_section_lines(p2.stdout))
+    s3 = " ".join(_doctor_section_lines(p3.stdout))
+    assert "n/a" in s1, f"plain dir → n/a expected; got: {s1!r}"
+    assert "auto-adopt" in s2, f"vault+profile → auto-adopt expected; got: {s2!r}"
+    assert "refuse" in s3, f"vault-no-profile → refuse expected; got: {s3!r}"
+
+
+def test_doctor_runtime_parity(tmp_path):
+    """VCWD-05 parity contract: doctor's prediction matches runtime gate behavior."""
+    # refuse case
+    bare = _make_partial_vault(tmp_path, with_profile=False)
+    doctor = _graphify("doctor", cwd=str(bare))
+    runtime = _graphify("run", cwd=str(bare))
+    doc_section = " ".join(_doctor_section_lines(doctor.stdout))
+    assert "refuse" in doc_section
+    assert runtime.returncode == 2 and "refusing to write" in runtime.stderr, (
+        f"doctor predicted refuse; runtime should refuse. runtime stderr:\n{runtime.stderr}"
+    )
+
+
+def test_env_pin_disables_gate(tmp_path):
+    """Cross-cutting: GRAPHIFY_VAULT env pin treated as explicit routing — gate returns n/a."""
+    pytest.importorskip("yaml")
+    bare = _make_partial_vault(tmp_path / "bareVault", with_profile=False)
+    pin_target = _make_partial_vault(tmp_path / "pinVault", with_profile=True)
+    proc = _graphify(
+        "run", "--help",
+        cwd=str(bare),
+        env={"GRAPHIFY_VAULT": str(pin_target)},
+    )
+    assert "refusing to write" not in proc.stderr, (
+        f"GRAPHIFY_VAULT pin should suppress VCWD-03; got:\n{proc.stderr}"
+    )
+    # Doctor parity: with env pin set, [vault-cwd] should report n/a (explicit route wins).
+    proc_doc = _graphify(
+        "doctor",
+        cwd=str(bare),
+        env={"GRAPHIFY_VAULT": str(pin_target)},
+    )
+    section = " ".join(_doctor_section_lines(proc_doc.stdout))
+    assert "n/a" in section, f"doctor parity broken with env pin: {section!r}"
+
+
+def test_vault_list_disables_gate(tmp_path):
+    """Cross-cutting: --vault-list file treated as explicit routing — gate returns n/a."""
+    pytest.importorskip("yaml")
+    bare = _make_partial_vault(tmp_path / "bareVault", with_profile=False)
+    pin_target = _make_partial_vault(tmp_path / "pinVault", with_profile=True)
+    list_file = tmp_path / "vaults.txt"
+    list_file.write_text(f"{pin_target}\n", encoding="utf-8")
+    proc = _graphify(
+        "--vault-list", str(list_file), "run", "--help",
+        cwd=str(bare),
+    )
+    assert "refusing to write" not in proc.stderr, (
+        f"--vault-list should suppress VCWD-03; got:\n{proc.stderr}"
+    )
