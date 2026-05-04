@@ -4,14 +4,14 @@ milestone: v1.12
 milestone_name: milestone
 status: executing
 stopped_at: Phase 60.1 context gathered
-last_updated: "2026-05-04T05:10:01.825Z"
-last_activity: 2026-05-04 -- Phase 60.1 planning complete
+last_updated: "2026-05-04T05:33:44.667Z"
+last_activity: 2026-05-04
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 7
-  completed_plans: 3
-  percent: 43
+  completed_plans: 4
+  percent: 57
 ---
 
 # Project State
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (**milestone v1.12** — Vault Awareness, Pipeline I
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** v1.12 — vault-CWD-aware CLI default + 2 milestone-level E2E integration tests + harness vault-write error format normalization. Phase numbering continues from Phase 59. Last shipped: v1.11 (2026-05-03), 2106 tests passing baseline.
+**Current focus:** Phase 60.1 — update-vault-apply-determinism-fix
 
 ## Current Position
 
-Phase: 59.1 (URGENT insert — not planned yet)
-Plan: —
+Phase: 60.1 (update-vault-apply-determinism-fix) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-05-04 -- Phase 60.1 planning complete
+Last activity: 2026-05-04
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Last activity: 2026-05-04 -- Phase 60.1 planning complete
 | Phase 58-vault-cli-parity-hygiene P03 | 3min | 1 tasks | 1 files |
 | Phase 58-vault-cli-parity-hygiene P02 | 377 | 2 tasks | 2 files |
 | Phase 59.1 P02 | 7m | 2 tasks | 2 files |
+| Phase 60.1 P01 | 12m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -169,6 +170,7 @@ Locked v1.8 choices:
 - [Phase ?]: Assert equality of both _SELF_OUTPUT_DIRS copies to catch future divergence between corpus_prune and detect
 - [Phase ?]: _emit_vault_error() two-line format: [graphify] error: + hint: for vault CLI failures
 - [Phase ?]: Phase 59.1 plan 02: silent auto-self-heal of skill stamp on drift; 1024-byte size guard; D-05 silent abort
+- [Phase ?]: Phase 60.1 Plan 01: random_seed=42 + sort tiebreaker required for cluster() determinism
 
 ### Pending Todos
 
@@ -257,6 +259,6 @@ From `.planning/milestones/v1.11-MILESTONE-AUDIT.md` — non-blocking tech debt:
 
 ## Session Continuity
 
-Last session: 2026-05-04T04:49:19.761Z
+Last session: 2026-05-04T05:33:37.183Z
 Stopped at: Phase 60.1 context gathered
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process

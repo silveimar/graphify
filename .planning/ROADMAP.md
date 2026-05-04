@@ -491,10 +491,10 @@ Plans:
 3. Phase 60's RED test `tests/test_e2e_integration.py::test_e2e_compose_override_ladder` (commit `333d2da`) turns green without modification (**APPLY-DET-01**).
 4. Full test suite `pytest tests/ -q` passes on Python 3.10/3.12, no regressions (**APPLY-DET-01**).
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 60.1-01-PLAN.md — RED/GREEN: failing determinism unit test in `tests/test_cluster.py`, then seed `graspologic.partition.leiden` with `random_seed=42` at `graphify/cluster.py:38`.
+- [x] 60.1-01-PLAN.md — RED/GREEN: failing determinism unit test in `tests/test_cluster.py`, then seed `graspologic.partition.leiden` with `random_seed=42` at `graphify/cluster.py:38`.
 - [ ] 60.1-02-PLAN.md — Verify Phase 60 E2E test (`test_e2e_compose_override_ladder`) flips RED→GREEN unmodified and full `pytest tests/ -q` is green; record APPLY-DET-01 closure.
 
 **UI hint:** no — internal pipeline determinism fix; no user-facing surface changes.
