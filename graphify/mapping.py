@@ -338,6 +338,20 @@ def classify(
     raw_rules = profile.get("mapping_rules") or []
     compiled_rules = compile_rules(raw_rules)
 
+    # Phase 60.1-03 (APPLY-DET-01): collect the set of note_type slugs the
+    # active profile declares via `note_type_templates[].pattern`. Their
+    # presence is treated as the author's classification intent and beats
+    # the CODE-note default in the topology fallback below for code-backed
+    # god nodes. Profile schema is already validated upstream
+    # (profile.py:_validate_note_type_templates) so values here are
+    # whitelist-bounded against _KNOWN_NOTE_TYPES.
+    override_note_types: set[str] = set()
+    for _tpl in profile.get("note_type_templates") or []:
+        if isinstance(_tpl, dict):
+            _pat = _tpl.get("pattern")
+            if isinstance(_pat, str):
+                override_note_types.add(_pat)
+
     if cohesion is None:
         cohesion = score_all(G, communities)
 
@@ -415,7 +429,15 @@ def classify(
             #     other god node → thing, else statement.
             if node_id in god_ids:
                 if _is_code_note_candidate(G, node_id, god_ids):
-                    note_type = "code"
+                    # Phase 60.1-03 (APPLY-DET-01): vault profile's
+                    # note_type_templates declares the author's
+                    # classification intent — when "thing" is declared,
+                    # it overrides the CODE-note default for code-backed
+                    # god nodes that fall through to this branch.
+                    if "thing" in override_note_types:
+                        note_type = "thing"
+                    else:
+                        note_type = "code"
                 else:
                     note_type = "thing"
             else:
