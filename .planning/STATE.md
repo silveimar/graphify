@@ -4,14 +4,14 @@ milestone: v1.12
 milestone_name: milestone
 status: executing
 stopped_at: Phase 59 planning complete (5 plans, plan-checker passed with concerns)
-last_updated: "2026-05-04T17:37:52.490Z"
+last_updated: "2026-05-04T17:57:23.009Z"
 last_activity: 2026-05-04
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 14
-  completed_plans: 12
-  percent: 86
+  completed_plans: 13
+  percent: 93
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: `.planning/PROJECT.md` (**milestone v1.12** — Vault Awareness, Pipeline I
 ## Current Position
 
 Phase: 59 (vault-cwd-aware-cli-default) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-05-04
 
@@ -82,6 +82,7 @@ Last activity: 2026-05-04
 | Phase 61 P01 | 4 minutes | 2 tasks | 2 files |
 | Phase 59-vault-cwd-aware-cli-default P01 | 13m | 3 tasks | 2 files |
 | Phase 59-vault-cwd-aware-cli-default P03 | 456 | 2 tasks | 2 files |
+| Phase 59 P04 | 648 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -177,6 +178,7 @@ Locked v1.8 choices:
 - [Phase ?]: VCWD-01 gate wired across 14 CLI dispatch branches
 - [Phase ?]: VCWD-03: Plan 01 wording already matched CONTEXT D-04 verbatim; RED tests locked as regression guards
 - [Phase ?]: sanitize_label (security.py:190) applied to CWD before stderr interpolation, mitigating T-59-06 control-char injection
+- [Phase ?]: VCWD-04: --write-into-vault boolean flag strips via token-strip helpers (not argparse); global pop + per-command strip; sys.argv[2:] mutated in-place for branches without pre-gate vault-strip setup
 
 ### Pending Todos
 
@@ -265,6 +267,6 @@ From `.planning/milestones/v1.11-MILESTONE-AUDIT.md` — non-blocking tech debt:
 
 ## Session Continuity
 
-Last session: 2026-05-04T17:37:45.299Z
+Last session: 2026-05-04T17:57:20.244Z
 Stopped at: Phase 59 planning complete (5 plans, plan-checker passed with concerns)
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
