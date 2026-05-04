@@ -482,7 +482,7 @@ Plans:
 
 **Goal:** Make `graphify update-vault --apply --plan-id <id>` succeed on first run by ensuring preview and apply produce identical plan_ids on identical input. Root-cause and patch the non-determinism in community-id assignment between consecutive previews (likely Leiden ordering in `cluster.py` or slug derivation in `naming.py`). Unblocks Phase 60 E2E-01 and E2E-02 GREEN gates (RED commit `333d2da` locked as regression test).
 **Depends on:** Phase 60 (RED test in place at `tests/test_e2e_integration.py::test_e2e_compose_override_ladder`).
-**Requirements:** **APPLY-DET-01** (TBD — minted during /gsd-plan-phase 60.1).
+**Requirements:** **APPLY-DET-01**.
 
 **Success Criteria** (what must be TRUE):
 
@@ -491,7 +491,12 @@ Plans:
 3. Phase 60's RED test `tests/test_e2e_integration.py::test_e2e_compose_override_ladder` (commit `333d2da`) turns green without modification (**APPLY-DET-01**).
 4. Full test suite `pytest tests/ -q` passes on Python 3.10/3.12, no regressions (**APPLY-DET-01**).
 
-**Plans:** TBD during `/gsd-plan-phase 60.1`
+**Plans:** 2 plans
+
+Plans:
+- [ ] 60.1-01-PLAN.md — RED/GREEN: failing determinism unit test in `tests/test_cluster.py`, then seed `graspologic.partition.leiden` with `random_seed=42` at `graphify/cluster.py:38`.
+- [ ] 60.1-02-PLAN.md — Verify Phase 60 E2E test (`test_e2e_compose_override_ladder`) flips RED→GREEN unmodified and full `pytest tests/ -q` is green; record APPLY-DET-01 closure.
+
 **UI hint:** no — internal pipeline determinism fix; no user-facing surface changes.
 
 ---

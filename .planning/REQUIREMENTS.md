@@ -24,6 +24,10 @@
 
 - [ ] **HARN-FMT-01**: Harness vault-write refusal at `graphify/__main__.py:2567` migrated from one-line `[graphify] refusing to write harness import...` to Phase 58's two-line `[graphify] error: <msg>` + `  hint: <fix>` format using `_emit_vault_error()`. Existing tests asserting the old stderr substring updated to match the new shape; one-line variant removed entirely.
 
+### update-vault apply determinism (APPLY-DET)
+
+- [ ] **APPLY-DET-01**: `graphify update-vault` preview pipeline is deterministic across separate Python processes for the same input corpus + vault profile. Specifically: (1) two consecutive preview runs produce identical `plan_id` values; (2) `graphify update-vault --apply --plan-id <id>` succeeds on the first attempt against a fresh corpus when `<id>` matches the immediately preceding preview run, with no warm-up runs; (3) Phase 60's RED test `tests/test_e2e_integration.py::test_e2e_compose_override_ladder` (commit `333d2da`) turns green without modification; (4) full test suite `pytest tests/ -q` passes on Python 3.10/3.12. Realised by passing `random_seed=42` to `graspologic.partition.leiden()` in `graphify/cluster.py:_partition`, matching the existing Louvain fallback `seed=42`.
+
 ### Version sync hygiene and --version flag (VSYNC)
 
 > Out of scope (per CONTEXT.md): D-11 (no new top-level subcommand for stamp inspection — stamp surface is folded into `--version` and `doctor` only), D-14 (release-process tooling — `bump_version.py`, CI hooks, tag automation are deferred to a future milestone).
@@ -66,5 +70,6 @@
 | VSYNC-02 | Phase 59.1 | Multi-line `--version` / `-V` output block |
 | VSYNC-03 | Phase 59.1 | `doctor` `version sync` section |
 | VSYNC-04 | Phase 59.1 | Preserved warning for stamp > package |
+| APPLY-DET-01 | Phase 60.1 | Seed Leiden in `cluster.py:_partition` (`random_seed=42`) + same-process determinism unit test |
 
 *Phase mapping populated by gsd-roadmapper during `/gsd-new-milestone` step 10.*
