@@ -1417,6 +1417,18 @@ def _strip_leading_vault_global_argv(
     return out, g_exp, g_list
 
 
+def _pop_global_write_into_vault(argv: list[str]) -> tuple[list[str], bool]:
+    """Pop a leading ``--write-into-vault`` boolean flag from argv (before subcommand).
+    Mirrors ``_strip_leading_vault_global_argv`` for symmetry.
+    Multiple consecutive occurrences collapse to True."""
+    out = list(argv)
+    flag = False
+    while len(out) > 1 and out[1] == "--write-into-vault":
+        flag = True
+        out = [out[0]] + out[2:]
+    return out, flag
+
+
 def _strip_vault_flags_from_tokens(
     tokens: list[str],
 ) -> tuple[Path | None, Path | None, list[str]]:
@@ -1443,6 +1455,20 @@ def _strip_vault_flags_from_tokens(
             out.append(t)
             i += 1
     return explicit, vlist, out
+
+
+def _strip_write_into_vault_from_tokens(tokens: list[str]) -> tuple[bool, list[str]]:
+    """Strip per-command ``--write-into-vault`` boolean flag from a token list.
+    Boolean flag (no value); multiple occurrences collapse to True.
+    Mirrors ``_strip_vault_flags_from_tokens`` shape."""
+    flag = False
+    out: list[str] = []
+    for t in tokens:
+        if t == "--write-into-vault":
+            flag = True
+        else:
+            out.append(t)
+    return flag, out
 
 
 def _merge_vault_pins(
@@ -1538,6 +1564,7 @@ def _check_vault_cwd_gate(
 def main() -> None:
     # Phase 41: ``graphify [--vault P] [--vault-list F] <command>`` — strip globals before dispatch.
     sys.argv, g_vault_exp, g_vault_list = _strip_leading_vault_global_argv(sys.argv)
+    sys.argv, g_write_into_vault = _pop_global_write_into_vault(sys.argv)  # VCWD-04
 
     argv_head = sys.argv[1:]
     if len(argv_head) >= 1 and argv_head[0] in ("--version", "-V"):
@@ -1787,13 +1814,14 @@ def main() -> None:
         cli_output: str | None = None
         args = sys.argv[2:]
         lv_vault, lv_vlist, args = _strip_vault_flags_from_tokens(args)
+        lv_write_into_vault, args = _strip_write_into_vault_from_tokens(args)
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list or lv_vault or lv_vlist
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         if gate == "auto-adopt":
             lv_vault = lv_vault or Path.cwd()
@@ -1928,13 +1956,14 @@ def main() -> None:
     # manifest-last). Optional --vault routes tag write-back through
     # graphify.merge.compute_merge_plan (tags: 'union' policy, D-08).
     if cmd == "--diagram-seeds":
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         graph_path = "graphify-out/graph.json"
         vault_path: Path | None = None
@@ -1988,13 +2017,14 @@ def main() -> None:
     # overwrites. Stubs hard-code `compress: false` (one-way door, D-TMPL-01).
     # All target paths routed through validate_vault_path for path confinement.
     if cmd == "--init-diagram-templates":
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         vault_arg: str | None = None
         force_flag = False
@@ -2043,13 +2073,14 @@ def main() -> None:
     # writes dedup_report.{json,md}, updates extraction.json.
     # Flags override .graphify/dedup.yaml if present (D-17).
     if cmd == "--dedup":
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         # gate == "auto-adopt": no vault routing in --dedup; CWD is the corpus root
         from graphify.dedup import dedup as _dedup, write_dedup_reports
@@ -2182,13 +2213,14 @@ def main() -> None:
         _cli_exit(0)
 
     if cmd == "snapshot":
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         # gate == "auto-adopt": no vault routing in snapshot; writes to graphify-out/ by default
         graph_path = "graphify-out/graph.json"
@@ -2310,13 +2342,14 @@ def main() -> None:
         return
 
     if cmd == "approve":
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         # gate == "auto-adopt": no vault routing in approve; operates on graphify-out/ by default
         args = sys.argv[2:]
@@ -2593,13 +2626,14 @@ def main() -> None:
         print(_subgraph_to_text(G, nodes, edges, token_budget=budget))
     elif cmd == "save-result":
         # graphify save-result --question Q --answer A --type T [--nodes N1 N2 ...]
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         # gate == "auto-adopt": no vault routing in save-result; writes to --memory-dir
         import argparse as _ap
@@ -2637,13 +2671,14 @@ def main() -> None:
     elif cmd == "elicit":
         # graphify elicit [--output PATH] [--dry-run] [--demo] [--force]
         # Phase 39 — onboarding / empty-corpus path (library: graphify.elicit).
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         import argparse as _ap
 
@@ -2734,13 +2769,14 @@ def main() -> None:
         # graphify harness export [--target claude] [--out PATH]
         #   [--include-annotations] [--secrets-mode {redact,error}]
         # (Phase 13 / SEED-002; HARNESS-07/08 flags added in Plan 04.)
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         # gate == "auto-adopt": no vault routing in harness export; writes to --out or cwd
         rest = list(sys.argv[2:])
@@ -2804,13 +2840,14 @@ def main() -> None:
         _cli_exit(0)
     elif cmd == "import-harness":
         # graphify import-harness PATH [--format auto|json|claude] [--strict] [--output PATH]
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         import argparse as _ap
         import json as _json
@@ -2905,13 +2942,14 @@ def main() -> None:
 
         rest = list(sys.argv[2:])
         lv_vault, lv_vlist, rest = _strip_vault_flags_from_tokens(rest)
+        lv_write_into_vault, rest = _strip_write_into_vault_from_tokens(rest)
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list or lv_vault or lv_vlist
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         if gate == "auto-adopt":
             lv_vault = lv_vault or Path.cwd()
@@ -3009,13 +3047,14 @@ def main() -> None:
     elif cmd == "enrich":
         # graphify enrich [--graph PATH] [--budget N] [--pass NAME] [--dry-run] [--snapshot-id ID]
         # Inline argparse equivalent of: sub.add_parser("enrich", ...) — follows __main__.py convention
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         # gate == "auto-adopt": no vault routing in enrich; operates on graphify-out/ by default
         import argparse as _ap
@@ -3239,13 +3278,14 @@ def main() -> None:
         sys.exit(1 if report.is_misconfigured() else 0)
     elif cmd == "update-vault":
         # graphify update-vault --input work-vault/raw --vault ls-vault
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         import argparse as _ap
 
@@ -3296,13 +3336,14 @@ def main() -> None:
         _cli_exit(0)
     elif cmd == "vault-promote":
         # graphify vault-promote --vault PATH [--threshold N] [--graph PATH]
+        lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])
         gate = _check_vault_cwd_gate(
             cmd,
             has_explicit_route=bool(
                 g_vault_exp or g_vault_list
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
-            write_into_vault=False,
+            write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
         )
         import argparse as _ap
 
