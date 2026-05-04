@@ -17,8 +17,8 @@
 
 ### End-to-end pipeline integration tests (E2E)
 
-- [ ] **E2E-01**: Subprocess-level integration test asserts a profile with both `note_type_templates` and `mapping_rule_templates` → `graphify update-vault` produces correctly-classified notes with the override ladder applied. Exercises Phase 55+56 composition end-to-end (block expansion before `${}` substitution, then template ladder resolution). Closes audit Flow 2 gap.
-- [ ] **E2E-02**: Subprocess-level integration test asserts `graphify elicit` → sidecar at `artifacts_dir/elicitation.json` → `graphify update-vault` produces a merged graph with elicitation contributions visible in rendered notes. Exercises Phase 57+56 pipeline end-to-end. Closes audit Flow 3 gap.
+- [x] **E2E-01**: Subprocess-level integration test asserts a profile with both `note_type_templates` and `mapping_rule_templates` → `graphify update-vault` produces correctly-classified notes with the override ladder applied. Exercises Phase 55+56 composition end-to-end (block expansion before `${}` substitution, then template ladder resolution). Closes audit Flow 2 gap.
+- [x] **E2E-02**: Subprocess-level integration test asserts `graphify elicit` → sidecar at `artifacts_dir/elicitation.json` → `graphify update-vault` produces a merged graph with elicitation contributions visible in rendered notes. Exercises Phase 57+56 pipeline end-to-end. Closes audit Flow 3 gap.
 
 ### Harness error format normalization (HARN-FMT)
 
