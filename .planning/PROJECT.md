@@ -8,25 +8,34 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current State
+## Current Milestone: v1.12 Vault Awareness, Pipeline Integration & Error Hygiene
 
-**Last shipped:** v1.11 Templates, Graph Semantics & Vault Depth (2026-05-03)
-**Next milestone:** v1.12 — TBD via `/gsd-new-milestone`
+**Goal:** Close the v1.11 audit follow-ups and ship the v1.7-deferred vault-CWD seed — make `graphify` safe to run from inside a vault without surprising the user, lock down the two end-to-end pipelines that span multiple phases, and normalize the one stderr-format outlier from v1.11.
 
-**Latest test baseline:** 2106 passed / 1 xfailed (`pytest tests/ -q` at v1.11 close)
+**Target features:**
 
-## Next Milestone Goals (v1.12 — to be defined)
+- **Vault-CWD-aware CLI default** (SEED-vault-root-aware-cli) — Detect `.obsidian/` at CWD; auto-adopt as vault if `.graphify/profile.yaml` present (Option C); refuse with two-line actionable hint if no profile (Option A). Adds `--write-into-vault` opt-in flag. Reuses Phase 41's `_resolve_output_target()` and Phase 58's `_emit_vault_error()`.
+- **Milestone-level E2E integration tests** (audit rec #5) — Two new subprocess-level tests: (a) profile with `note_type_templates` + `mapping_rule_templates` → `graphify update-vault` exercises Phase 55+56 composition end-to-end; (b) `graphify elicit` → sidecar → `graphify update-vault` exercises Phase 57+56 pipeline end-to-end.
+- **Harness vault-write error format normalization** (audit rec #4) — Migrate `__main__.py:2567` from one-line `[graphify] refusing to write...` to Phase 58's two-line `[graphify] error:` + `  hint:` format via `_emit_vault_error()`. Surgical fix.
 
-Carry-forward from v1.11 audit (`.planning/milestones/v1.11-MILESTONE-AUDIT.md`):
+**Non-goals:**
 
-- **Vault-write error format normalization** — bridge the divergence between Phase 57's harness one-line stderr and Phase 58's two-line `_emit_vault_error` format.
-- **Milestone-level integration tests** for two E2E flows: (a) profile with `note_type_templates` + `mapping_rule_templates` → `graphify update-vault`; (b) `graphify elicit` → sidecar → `graphify update-vault` merge.
+- No new resolver — reuse `_resolve_output_target()` (Phase 41)
+- No new error helper — reuse `_emit_vault_error()` (Phase 58)
+- No precedence change — `--vault` / GRAPHIFY_VAULT / `--vault-list` order preserved
+- No project-wide stderr sweep — saved for v1.13+ if more outliers surface
+- No magic auto-route to hidden `.graphify-out/` (Option B explicitly rejected)
 
-Carry-forward from dormant SEEDs (deferred at v1.11 close, see STATE.md `## Deferred Items`):
+**Planning:** Phase numbering continues from **Phase 59** (after v1.11 Phase 58). Repo-root `.planning/REQUIREMENTS.md` defines scoped REQ-IDs.
+
+**Last shipped:** v1.11 Templates, Graph Semantics & Vault Depth (2026-05-03) — 2106 tests passing baseline.
+
+## Future Carry-Forward (deferred past v1.12)
+
+Dormant SEEDs to revisit in v1.13+ scoping:
 
 - **SEED-002** — Harness Memory Export (additional target formats, multi-format round-trip)
 - **SEED-bidirectional-concept-code-links** — promotion of Phase 53/54 concept↔code work to a richer first-class feature
-- **SEED-vault-root-aware-cli** — extension of Phase 41/58 vault CLI ergonomics
 - **SEED-001** — Tacit-to-Explicit Elicitation Engine (further beyond Phase 57 increment)
 
 ## Shipped: v1.11 Templates, Graph Semantics & Vault Depth (2026-05-03)

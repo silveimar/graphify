@@ -1,11 +1,10 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.12
-milestone_name: TBD
-status: awaiting_scoping
-stopped_at: v1.11 shipped 2026-05-03; awaiting /gsd-new-milestone for v1.12 scope
-last_updated: "2026-05-04T00:30:00.000Z"
-last_activity: 2026-05-03 -- v1.11 milestone closed and archived
+milestone_name: Vault Awareness, Pipeline Integration & Error Hygiene
+status: planning
+last_updated: "2026-05-04T01:16:48.332Z"
+last_activity: 2026-05-04
 progress:
   total_phases: 0
   completed_phases: 0
@@ -18,18 +17,18 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (**milestone v1.11** — Templates, Graph Semantics & Vault Depth).
+See: `.planning/PROJECT.md` (**milestone v1.12** — Vault Awareness, Pipeline Integration & Error Hygiene).
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Between milestones. v1.11 shipped 2026-05-03 (16/16 requirements, 27 plans across Phases 53–58, 2106 tests passing). Run `/gsd-new-milestone` to scope v1.12.
+**Current focus:** v1.12 — vault-CWD-aware CLI default + 2 milestone-level E2E integration tests + harness vault-write error format normalization. Phase numbering continues from Phase 59. Last shipped: v1.11 (2026-05-03), 2106 tests passing baseline.
 
 ## Current Position
 
-Phase: — (between milestones; v1.11 closed)
+Phase: Not started (defining requirements)
 Plan: —
-Status: v1.11 archived → milestones/v1.11-*
-Last activity: 2026-05-03 -- v1.11 milestone closed
+Status: Defining requirements
+Last activity: 2026-05-04 — Milestone v1.12 started
 
 ## Performance Metrics
 
