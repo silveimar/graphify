@@ -478,6 +478,24 @@ Plans:
 
 ---
 
+### Phase 60.1: update-vault apply determinism fix (INSERTED)
+
+**Goal:** Make `graphify update-vault --apply --plan-id <id>` succeed on first run by ensuring preview and apply produce identical plan_ids on identical input. Root-cause and patch the non-determinism in community-id assignment between consecutive previews (likely Leiden ordering in `cluster.py` or slug derivation in `naming.py`). Unblocks Phase 60 E2E-01 and E2E-02 GREEN gates (RED commit `333d2da` locked as regression test).
+**Depends on:** Phase 60 (RED test in place at `tests/test_e2e_integration.py::test_e2e_compose_override_ladder`).
+**Requirements:** **APPLY-DET-01** (TBD — minted during /gsd-plan-phase 60.1).
+
+**Success Criteria** (what must be TRUE):
+
+1. Two consecutive `graphify update-vault` preview runs against the same input corpus and same vault profile produce identical `plan_id` values (**APPLY-DET-01**).
+2. `graphify update-vault --apply --plan-id <id>` succeeds on the first attempt against a fresh corpus when `<id>` matches the immediately preceding preview run, with no warm-up runs required (**APPLY-DET-01**).
+3. Phase 60's RED test `tests/test_e2e_integration.py::test_e2e_compose_override_ladder` (commit `333d2da`) turns green without modification (**APPLY-DET-01**).
+4. Full test suite `pytest tests/ -q` passes on Python 3.10/3.12, no regressions (**APPLY-DET-01**).
+
+**Plans:** TBD during `/gsd-plan-phase 60.1`
+**UI hint:** no — internal pipeline determinism fix; no user-facing surface changes.
+
+---
+
 ### Phase 61: Harness vault-write error format normalization
 
 **Goal:** The harness vault-write refusal in `__main__.py` emits the same two-line `[graphify] error:` + `  hint:` format as all other vault CLI errors, eliminating the one remaining one-line stderr outlier from v1.11.

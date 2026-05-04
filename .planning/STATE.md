@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.12
 milestone_name: milestone
-status: Phase 59.1 inserted — ready for `/gsd-plan-phase 59.1`
+status: executing
 stopped_at: Phase 60 context gathered
-last_updated: "2026-05-04T03:51:09.071Z"
-last_activity: 2026-05-03 — v1.12 roadmap written (Phases 59, 60, 61)
+last_updated: "2026-05-04T04:34:24.785Z"
+last_activity: 2026-05-04 -- Phase 60 planning complete
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 1
-  total_plans: 3
+  total_plans: 5
   completed_plans: 3
-  percent: 100
+  percent: 60
 ---
 
 # Project State
@@ -28,8 +28,8 @@ See: `.planning/PROJECT.md` (**milestone v1.12** — Vault Awareness, Pipeline I
 
 Phase: 59.1 (URGENT insert — not planned yet)
 Plan: —
-Status: Phase 59.1 inserted — ready for `/gsd-plan-phase 59.1`
-Last activity: 2026-05-03 — v1.12 roadmap written (Phases 59, 60, 61)
+Status: Ready to execute
+Last activity: 2026-05-04 -- Phase 60 planning complete
 
 ## Performance Metrics
 
@@ -176,11 +176,12 @@ None.
 
 ### Blockers/Concerns
 
-None. Research flags for planning:
+Research flags for planning:
 
 - Phase 35 should research existing merge manifest/orphan mechanics before designing migration reporting.
 - Phase 36 should audit platform skill variants for Obsidian export behavior drift.
 - Any LLM naming plan must preserve offline behavior, budget gates, cache stability, and sanitization.
+- Phase 60 RED gate surfaced determinism bug in update-vault apply: re-runs pipeline, gets new plan_id, validate_plan_matches_request raises 'stale or mismatched migration plan'. RED commit 333d2da. Affects E2E-01 and E2E-02. Likely fix locus: cluster.py Leiden ordering or naming.py slug derivation. New hotfix phase needed before Phase 60 resumes.
 
 ## Deferred Items
 
@@ -256,6 +257,6 @@ From `.planning/milestones/v1.11-MILESTONE-AUDIT.md` — non-blocking tech debt:
 
 ## Session Continuity
 
-Last session: 2026-05-04T03:51:09.066Z
+Last session: 2026-05-04T04:28:25.696Z
 Stopped at: Phase 60 context gathered
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
