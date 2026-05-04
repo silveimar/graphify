@@ -195,3 +195,49 @@ def test_explicit_vault_no_auto_adopt_notice(tmp_path):
     assert "auto-adopted vault" not in proc.stderr, (
         f"explicit --vault must not trigger auto-adopt notice\nstderr:\n{proc.stderr}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan 03 — VCWD-03: verbatim refusal text + exit code 2
+# ---------------------------------------------------------------------------
+
+REFUSAL_MSG_PREFIX = "[graphify] error: refusing to write into Obsidian vault at "
+REFUSAL_MSG_SUFFIX = " — no .graphify/profile.yaml found"
+REFUSAL_HINT_LINE = "  hint: create .graphify/profile.yaml to opt in, pass --output <path> to write outside the vault, or --write-into-vault to override"
+
+
+def test_refusal_exit_code_and_format(tmp_path):
+    """VCWD-03: profile-less vault CWD → exit 2 + two-line stderr."""
+    vault = _make_partial_vault(tmp_path, with_profile=False)
+    proc = _graphify("run", cwd=str(vault))
+    assert proc.returncode == 2, f"expected exit 2, got {proc.returncode}\nstderr:\n{proc.stderr}"
+    # Two-line shape: error line + hint line. Allow trailing newline; reject extra non-empty lines.
+    err_lines = [ln for ln in proc.stderr.splitlines() if ln.strip()]
+    # The two VCWD-03 lines must appear consecutively.
+    error_idx = next((i for i, ln in enumerate(err_lines) if ln.startswith(REFUSAL_MSG_PREFIX)), None)
+    assert error_idx is not None, f"missing error line:\n{proc.stderr}"
+    assert err_lines[error_idx + 1] == REFUSAL_HINT_LINE, (
+        f"hint line mismatch.\n"
+        f"  expected: {REFUSAL_HINT_LINE!r}\n"
+        f"  actual:   {err_lines[error_idx + 1]!r}\n"
+        f"full stderr:\n{proc.stderr}"
+    )
+
+
+def test_refusal_message_text(tmp_path):
+    """VCWD-03: error line MUST match CONTEXT D-04 verbatim (prefix + suffix shape)."""
+    vault = _make_partial_vault(tmp_path, with_profile=False)
+    proc = _graphify("run", cwd=str(vault))
+    error_line = next(
+        (ln for ln in proc.stderr.splitlines() if ln.startswith(REFUSAL_MSG_PREFIX)),
+        None,
+    )
+    assert error_line is not None
+    assert error_line.endswith(REFUSAL_MSG_SUFFIX), f"suffix mismatch: {error_line!r}"
+    # Path between prefix and suffix is the resolved cwd. It MUST be absolute.
+    cwd_in_msg = error_line[len(REFUSAL_MSG_PREFIX):-len(REFUSAL_MSG_SUFFIX)]
+    assert Path(cwd_in_msg).is_absolute(), f"cwd in msg must be absolute: {cwd_in_msg!r}"
+    # Sanity check: the cwd in the message resolves to our test vault.
+    assert Path(cwd_in_msg).resolve() == vault.resolve(), (
+        f"cwd in msg {cwd_in_msg!r} should equal {vault!r}"
+    )
