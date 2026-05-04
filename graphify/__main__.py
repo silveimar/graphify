@@ -20,12 +20,40 @@ def _numeric_version_prefix_tuple(s: str) -> tuple[int, ...]:
 
 
 def _check_skill_version(skill_dst: Path) -> None:
-    """Warn when the installed skill stamp does not match the running package."""
+    """Silently auto-heal the installed skill stamp on drift.
+
+    Behavior (Phase 59.1 plan 02, decisions D-01..D-06, D-13):
+      * Missing stamp file -> no-op (D-02).
+      * Oversized stamp file (>1024 bytes) -> silent fallback, treat as corrupt
+        (T-59.1.02-02 mitigation).
+      * Unresolvable running package version (falsy ``__version__``) -> silent
+        abort, no stamp write (D-05).
+      * Stamp == package -> no-op.
+      * Stamp older than package (numeric prefix) -> silently rewrite the
+        stamp file to ``__version__`` (D-01). On write failure (PermissionError
+        / OSError), fall back to the legacy two-line stderr warning so the
+        user's command still runs (D-04).
+      * Stamp newer than package -> emit the legacy two-line warning; stamp
+        file is NOT rewritten (D-03).
+      * Equal numeric prefix but unequal strings -> emit the legacy "differs
+        from" warning.
+    """
     version_file = skill_dst.parent / ".graphify_version"
     if not version_file.exists():
         return
+    # Size guard (T-59.1.02-02): treat oversized stamps as corrupt and
+    # silently fall back. Bounds the read at the entry point.
+    try:
+        if version_file.stat().st_size > 1024:
+            return
+    except OSError:
+        return
     installed = version_file.read_text(encoding="utf-8").strip()
     pkg = __version__
+    # D-05: if the running package version cannot be resolved, abort silently
+    # without touching the stamp file.
+    if not pkg:
+        return
     if installed == pkg:
         return
     it = _numeric_version_prefix_tuple(installed)
@@ -34,7 +62,13 @@ def _check_skill_version(skill_dst: Path) -> None:
     it_pad = it + (0,) * (n - len(it))
     pt_pad = pt + (0,) * (n - len(pt))
     if it_pad < pt_pad:
-        hint = "older than the installed package; run 'graphify install' to update the skill."
+        # D-01: heal path - silently rewrite the stamp to the running version.
+        try:
+            version_file.write_text(pkg, encoding="utf-8")
+            return
+        except (OSError, PermissionError):
+            # D-04: fall through to the legacy two-line warning fallback.
+            hint = "older than the installed package; run 'graphify install' to update the skill."
     elif it_pad > pt_pad:
         hint = (
             "newer than the installed package (unusual for an editable or mixed install); "
