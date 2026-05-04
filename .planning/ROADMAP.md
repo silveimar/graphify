@@ -596,7 +596,7 @@ Plans:
 | 56. Dataview templates & profile overrides | v1.11 | 0/? | Not started | — |
 | 57. Elicitation & harness increment | v1.11 | 3/3 | Complete   | 2026-05-03 |
 | 58. Vault CLI parity & hygiene | v1.11 | 3/3 | Complete   | 2026-05-03 |
-| 59. Vault-CWD-aware CLI default | v1.12 | 5/5 | Complete   | 2026-05-04 |
+| 59. Vault-CWD-aware CLI default | v1.12 | 5/5 | Complete    | 2026-05-04 |
 | 60. Milestone-level E2E integration tests | v1.12 | 0/? | Not started | — |
 | 61. Harness vault-write error format normalization | v1.12 | 1/1 | Complete   | 2026-05-04 |
 
