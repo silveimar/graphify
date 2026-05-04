@@ -1541,6 +1541,7 @@ def _load_override_template(
     default_template,
     *,
     list_name: str = "community_templates",
+    required_note_type: str = "moc",
 ):
     """Load an override template from <vault_dir>/.graphify/<rel_path>.
 
@@ -1582,7 +1583,12 @@ def _load_override_template(
             file=sys.stderr,
         )
         return default_template
-    errors = validate_template(text, _REQUIRED_PER_TYPE["moc"])
+    # Phase 60.1-03 (APPLY-DET-01): validate against the required slot set
+    # for the *target* note_type — non-MOC overrides (e.g. thing/statement
+    # via note_type_templates) must not be rejected for missing
+    # `members_section` / `dataview_block`, which are MOC-only contracts.
+    _required_key = required_note_type if required_note_type in _REQUIRED_PER_TYPE else "moc"
+    errors = validate_template(text, _REQUIRED_PER_TYPE[_required_key])
     if errors:
         for err in errors:
             print(
@@ -1676,6 +1682,11 @@ def _resolve_note_template(
                         vault_dir,
                         default_template,
                         list_name="mapping_rule_templates",
+                        # Phase 60.1-03 (APPLY-DET-01): validate against the
+                        # *resolved* note_type's required-slot set so non-MOC
+                        # rule-keyed overrides aren't rejected for missing
+                        # MOC-only slots.
+                        required_note_type=note_type,
                     )
 
     # --- Tier 2: community_templates (delegate to existing helper) ------
@@ -1704,6 +1715,10 @@ def _resolve_note_template(
                     vault_dir,
                     default_template,
                     list_name="note_type_templates",
+                    # Phase 60.1-03 (APPLY-DET-01): validate against the
+                    # *target* note_type's required-slot set (e.g. thing
+                    # → {frontmatter, label}), not the MOC defaults.
+                    required_note_type=note_type,
                 )
 
     # --- Tier 4: base ---------------------------------------------------

@@ -536,6 +536,7 @@ def render_note(
     G: nx.Graph,
     merged_profile: dict,
     run_meta: dict,
+    vault_dir: "Path | None" = None,
 ) -> tuple[str, str]:
     """Render a single promoted note to (filename_stem, markdown_string).
 
@@ -578,6 +579,22 @@ def render_note(
     # Load and render template
     template_name = _FOLDER_TO_TEMPLATE.get(folder_type, "thing")
     tmpl = _load_builtin_template(template_name)
+    # Phase 60.1-03 (APPLY-DET-01): consult the render-time override ladder
+    # (mapping_rule_templates, community_templates, note_type_templates) so
+    # vault profiles that ship per-note_type template overrides are honored
+    # by the update-vault apply path. Falls back to the builtin default
+    # silently when no override matches or the override fails to load.
+    if vault_dir is not None:
+        from graphify.templates import _resolve_note_template
+        tmpl = _resolve_note_template(
+            rule_id=record.get("rule_id") if isinstance(record, dict) else None,
+            community_id=None,
+            community_name=None,
+            note_type=template_name,
+            profile=merged_profile,
+            vault_dir=vault_dir,
+            default_template=tmpl,
+        )
     rendered = tmpl.safe_substitute(subs)
 
     # Filename stem
@@ -941,7 +958,7 @@ def promote(
         prefix = _FOLDER_PATH_PREFIX[bucket_key]
 
         for record in records:
-            filename_stem, content = render_note(record, folder_type, G, merged_profile, run_meta)
+            filename_stem, content = render_note(record, folder_type, G, merged_profile, run_meta, vault_dir=vault_dir)
             rel_path = f"{prefix}/{filename_stem}.md"
             outcome = write_note(vault_dir, rel_path, content, manifest)
 

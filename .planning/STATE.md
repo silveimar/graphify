@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.12
 milestone_name: milestone
 status: executing
-stopped_at: Phase 60.1 gap-closure plan 03 created (--gaps)
-last_updated: "2026-05-04T06:00:00.000Z"
-last_activity: 2026-05-04
+stopped_at: Phase 60.1-03 complete (APPLY-DET-01 closed)
+last_updated: "2026-05-04T11:30:00.000Z"
+last_activity: 2026-05-04 -- Phase 60.1-03 gap-closure plan executed; locked E2E green, suite 2122 passed / 1 xfailed
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 8
-  completed_plans: 5
-  percent: 63
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -26,10 +26,10 @@ See: `.planning/PROJECT.md` (**milestone v1.12** — Vault Awareness, Pipeline I
 
 ## Current Position
 
-Phase: 60.1 (update-vault-apply-determinism-fix) — EXECUTING (gap closure)
-Plan: 3 of 3 (Plan 03 added via /gsd-plan-phase --gaps to close VERIFICATION FAIL items #3 and #4)
-Status: Ready to execute Plan 03
-Last activity: 2026-05-04
+Phase: 60.1 (update-vault-apply-determinism-fix) — COMPLETE
+Plan: 3 of 3 (60.1-03 gap-closure complete)
+Status: APPLY-DET-01 closed; locked Phase 60 E2E green unmodified; full suite 2122 passed / 1 xfailed
+Last activity: 2026-05-04 -- Phase 60.1-03 gap-closure plan executed (RED/GREEN/REFACTOR + render-ladder fix)
 
 ## Performance Metrics
 

@@ -219,6 +219,10 @@ def run_update_vault(
         repo_identity=resolved_repo.identity,
         dry_run=True,
         return_render_context=True,
+        # Phase 60.1-03 (APPLY-DET-01): pass the actual vault root so the
+        # render-time override ladder resolves <vault>/.graphify/templates/
+        # entries (note_type_templates / mapping_rule_templates).
+        vault_root=vault,
     )
     plan, rendered_notes, render_profile, manifest_path, manifest = render_context
     preview = build_migration_preview(

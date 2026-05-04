@@ -558,6 +558,7 @@ def to_obsidian(
     force: bool = False,
     obsidian_dedup: bool = False,
     return_render_context: bool = False,
+    vault_root: "Path | None" = None,
 ) -> "MergeResult | MergePlan | tuple":
     """Export graph as an Obsidian vault using the profile-driven pipeline.
 
@@ -607,6 +608,12 @@ def to_obsidian(
     # vault-manifest.json is a graphify sidecar alongside graph.json.
     # _load_manifest gracefully returns {} when the file is absent (first run).
     _vault_dir = out.resolve()
+    # Phase 60.1-03 (APPLY-DET-01): when an explicit vault_root is supplied
+    # (e.g. by `update-vault`), use it as the override-template lookup root
+    # so `.graphify/templates/` is resolved against the actual vault, not
+    # the notes_dir. Falls back to `out` for legacy callers that pass the
+    # vault root as `output_dir`.
+    _override_root = Path(vault_root).resolve() if vault_root is not None else _vault_dir
     manifest_path = _vault_dir.parent / "vault-manifest.json"
     manifest = _load_manifest(manifest_path)
 
@@ -755,7 +762,7 @@ def to_obsidian(
             continue
         try:
             filename, rendered_text = render_note(
-                node_id, G, profile, note_type, ctx, vault_dir=out,
+                node_id, G, profile, note_type, ctx, vault_dir=_override_root,
             )
         except (ValueError, FileNotFoundError) as exc:
             # render_note raises ValueError on unknown note_type or missing
@@ -800,7 +807,7 @@ def to_obsidian(
             continue
         try:
             filename, rendered_text = render_moc(
-                cid, G, communities, profile, ctx, vault_dir=out,
+                cid, G, communities, profile, ctx, vault_dir=_override_root,
             )
         except (ValueError, FileNotFoundError) as exc:
             # Same diagnostic discipline as the per-node loop above: surface
