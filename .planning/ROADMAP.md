@@ -625,6 +625,19 @@ Plans:
 Plans:
 - [x] `49-01-PLAN.md` — `graphify.version`, CLI flags, `_cli_exit` footer, skill stamp copy, tests (`test_main_cli` / `test_main_flags`)
 
+### Phase 62: v1.12 audit cleanup: REQUIREMENTS sync + exit-code constant + E2E auto-adopt coverage
+
+**Goal:** Close v1.12 audit findings: sync REQUIREMENTS.md E2E checkboxes, name exit-code constants in `graphify/output.py`, add E2E test for `update-vault` auto-adopt from a vault CWD, and append a closure section to `.planning/v1.12-MILESTONE-AUDIT.md`.
+**Requirements**: REQUIREMENTS-SYNC-01, EXIT-CODE-CONST-01, E2E-AUTO-ADOPT-01 (audit-derived, not new REQUIREMENTS.md IDs per CONTEXT D-16)
+**Depends on:** Phase 61
+**Plans:** 4 plans
+
+Plans:
+- [ ] 62-01 REQUIREMENTS sync (E2E-01/E2E-02 checkbox flip)
+- [ ] 62-02 exit-code constants (`EXIT_VAULT_REFUSAL`/`EXIT_VAULT_GATE`)
+- [ ] 62-03 E2E auto-adopt coverage
+- [ ] 62-04 audit-trail closure (append-only)
+
 ---
 
 *Last updated: 2026-05-03 — **v1.12** active (Phases 59–61, 8/8 requirements mapped). v1.11 archived under `.planning/milestones/v1.11-ROADMAP.md`.*
