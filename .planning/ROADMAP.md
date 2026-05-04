@@ -513,7 +513,10 @@ Plans:
 1. The refusal at `graphify/__main__.py:2567` (harness vault-write guard) emits `[graphify] error: <msg>` on one line and `  hint: <fix>` on the next line, using `_emit_vault_error()` — matching the Phase 58 two-line contract (**HARN-FMT-01**).
 2. Existing tests that asserted the old one-line `[graphify] refusing to write harness import...` substring are updated to match the new two-line shape; the old one-line variant is removed entirely from production code (**HARN-FMT-01**).
 
-**Plans:** TBD during `/gsd-plan-phase 61`
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] 61-01-harness-fmt-migration-PLAN.md — TDD migration of import-harness vault-write refusal to two-line _emit_vault_error format
 **UI hint:** no — internal stderr format normalization; behavior observable only via subprocess stderr capture in tests.
 
 ---
@@ -589,7 +592,7 @@ Plans:
 | 58. Vault CLI parity & hygiene | v1.11 | 3/3 | Complete   | 2026-05-03 |
 | 59. Vault-CWD-aware CLI default | v1.12 | 0/? | Not started | — |
 | 60. Milestone-level E2E integration tests | v1.12 | 0/? | Not started | — |
-| 61. Harness vault-write error format normalization | v1.12 | 0/? | Not started | — |
+| 61. Harness vault-write error format normalization | v1.12 | 1/1 | Complete   | 2026-05-04 |
 
 ### Phase 47: MCP & Trace Integration
 

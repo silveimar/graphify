@@ -22,7 +22,7 @@
 
 ### Harness error format normalization (HARN-FMT)
 
-- [ ] **HARN-FMT-01**: Harness vault-write refusal at `graphify/__main__.py:2567` migrated from one-line `[graphify] refusing to write harness import...` to Phase 58's two-line `[graphify] error: <msg>` + `  hint: <fix>` format using `_emit_vault_error()`. Existing tests asserting the old stderr substring updated to match the new shape; one-line variant removed entirely.
+- [x] **HARN-FMT-01**: Harness vault-write refusal at `graphify/__main__.py:2567` migrated from one-line `[graphify] refusing to write harness import...` to Phase 58's two-line `[graphify] error: <msg>` + `  hint: <fix>` format using `_emit_vault_error()`. Existing tests asserting the old stderr substring updated to match the new shape; one-line variant removed entirely.
 
 ### update-vault apply determinism (APPLY-DET)
 
