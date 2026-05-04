@@ -35,7 +35,7 @@ def _partition(G: nx.Graph) -> dict[str, int]:
         try:
             sys.stderr = io.StringIO()
             with _suppress_output():
-                result = leiden(G)
+                result = leiden(G, random_seed=42)
         finally:
             sys.stderr = old_stderr
         return result
@@ -100,7 +100,7 @@ def cluster(G: nx.Graph) -> dict[int, list[str]]:
             final_communities.append(nodes)
 
     # Re-index by size descending for deterministic ordering
-    final_communities.sort(key=len, reverse=True)
+    final_communities.sort(key=lambda c: (-len(c), sorted(c)))
     return {i: sorted(nodes) for i, nodes in enumerate(final_communities)}
 
 
