@@ -469,7 +469,11 @@ Plans:
 2. A subprocess test runs `graphify elicit` to produce a sidecar at `artifacts_dir/elicitation.json`, then `graphify update-vault`, and asserts that the merged graph renders notes containing visible elicitation contributions (**E2E-02**).
 3. Both tests run against `tmp_path`-scoped vault fixtures with no network calls and pass in the CI Python 3.10/3.12 matrix (**E2E-01**, **E2E-02**).
 
-**Plans:** TBD during `/gsd-plan-phase 60`
+**Plans:** 2 plans
+
+Plans:
+- [ ] 60-01-PLAN.md — E2E-01 subprocess test: profile composition + override ladder via update-vault preview→apply
+- [ ] 60-02-PLAN.md — E2E-02 subprocess test: elicit sidecar handoff → update-vault merge → rendered note visibility
 **UI hint:** no — pure test infrastructure; no user-facing surface changes.
 
 ---
