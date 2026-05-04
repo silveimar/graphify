@@ -437,13 +437,25 @@ Typed **concept↔code** edges promoted to first-class graph members with determ
 
 ### Phase 59.1: Version sync hygiene and --version flag (fix skill-stamp drift warning, expose graphify --version) (INSERTED)
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
+**Goal:** Silence the per-command `skill stamp ('X.Y.Z') is older than the installed package` warning by silently auto-self-healing the stamp when stamp < package, preserve the warning only for the unusual stamp > package case, and expand `graphify --version` / `-V` and `graphify doctor` to surface package vs per-platform skill-stamp state without grepping `.graphify_version` files.
 **Depends on:** Phase 59
-**Plans:** 0 plans
+**Requirements:** **VSYNC-01**, **VSYNC-02**, **VSYNC-03**, **VSYNC-04**.
+
+**Success Criteria** (what must be TRUE):
+
+1. Running any non-skip `graphify` command (e.g. `graphify run`, `graphify query`) when an existing skill stamp is older than the installed package emits ZERO stderr lines and rewrites `.graphify_version` to the current `__version__` for every installed platform (**VSYNC-01**).
+2. `graphify --version` and `graphify -V` exit 0 with a multi-line block: package line, indented `skill stamps:` block (one row per `_PLATFORM_CONFIG` platform with `~`-shortened install dirs), `python:` line, and `install:` line; `--version` triggers no stamp writes (**VSYNC-02**).
+3. `graphify doctor` output includes a `version sync` section enumerating each platform with stamp / package / status (`✓ in sync` / `! drifted-newer` / `— not installed`) (**VSYNC-03**).
+4. When stamp > package, the original two-line stderr warning is emitted verbatim and the stamp file is NOT rewritten (**VSYNC-04**).
+5. CI tests on Python 3.10 and 3.12 cover: heal happy path, write-failure fallback to existing warning, stamp-newer warning preservation, and `--version` multi-line snapshot.
+
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 59.1 to break down)
+- [ ] 59.1-01-PLAN.md — Mint VSYNC-01..04 in REQUIREMENTS.md and back-fill the ROADMAP.md Phase 59.1 row
+- [ ] 59.1-02-PLAN.md — Rewrite `_check_skill_version()` for silent auto-self-heal (VSYNC-01, VSYNC-04)
+- [ ] 59.1-03-PLAN.md — Multi-line `--version` block + `doctor` `version sync` section (VSYNC-02, VSYNC-03)
+**UI hint:** partial — CLI `--version` and `doctor` output expand; previously-noisy stderr warning becomes silent.
 
 ### Phase 60: Milestone-level E2E integration tests
 
