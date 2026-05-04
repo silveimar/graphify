@@ -299,8 +299,13 @@ def test_e2e_elicit_then_update_vault(tmp_path: Path) -> None:
     Asserts:
       - Sidecar lands at <vault>.parent/graphify-out/elicitation.json (Pitfall 3: must pass --vault)
       - Sidecar contains elicitation_hub + at least 3/5 dimension nodes
-      - Hub label "Elicitation session" appears in rendered note bodies (rationale node merged)
-      - At least 3/5 demo answer literals appear in rendered note bodies
+      - "Elicitation Session" (title-cased hub label) appears in rendered community MOC
+      - community/elicitation-session tag appears (proves hub node influenced community formation)
+
+    Note: rationale-typed nodes (file_type="rationale") are NOT rendered as individual notes
+    and NOT listed in members sections (_MEMBER_GROUP_ORDER excludes "rationale"). Their
+    contribution is proven by the community MOC whose name/tag derives from the hub label.
+    _DEMO_ANSWER_LITERALS is retained as a module-level contract reference.
     """
     vault = _write_vault(tmp_path, _BASE_PROFILE_YAML)
     corpus = _write_corpus(tmp_path)
