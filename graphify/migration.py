@@ -294,12 +294,12 @@ def format_migration_preview(
     representative_limit: int = 5,
 ) -> str:
     """Render migration preview rows for terminal or Markdown review."""
-    lines = [f"Migration Preview - repo: {preview.get('repo_identity', '')}"]
-    lines.append("=" * 48)
-    lines.append(f"Plan ID: {preview.get('plan_id', '')}")
+    lines = [f"\nMigration Preview - repo: {preview.get('repo_identity', '')}"]
+    lines.append("=" * 80)
     lines.append(f"Input: {preview.get('input', '')}")
     lines.append(f"Vault: {preview.get('vault', '')}")
-    lines.append("")
+    lines.append(f"Plan ID: {preview.get('plan_id', '')}")
+    lines.append("-" * 80)
 
     summary = preview.get("summary") or {}
     for action in ACTION_ORDER:
@@ -314,14 +314,15 @@ def format_migration_preview(
         show_all = verbose or action in RISKY_ACTIONS
         shown = rows if show_all else rows[:representative_limit]
         lines.append(f"{action} ({len(rows)})")
-        for row in shown:
-            suffix = " [review-only]" if row.get("review_only") else ""
-            reason = row.get("reason") or ""
-            lines.append(f"  {action}  {row.get('path', '')}{suffix} — {reason}")
-        hidden = len(rows) - len(shown)
-        if hidden > 0:
-            lines.append(f"  ... {hidden} more {action} rows (use verbose for all)")
-        lines.append("")
+        if verbose:
+            for row in shown:
+                suffix = " [review-only]" if row.get("review_only") else ""
+                reason = row.get("reason") or ""
+                lines.append(f"  {action}  {row.get('path', '')}{suffix} — {reason}")
+            hidden = len(rows) - len(shown)
+            if hidden > 0:
+                lines.append(f"  ... {hidden} more {action} rows (use verbose for all)")
+            lines.append("")
 
     mappings = preview.get("legacy_mappings") or []
     if mappings:
