@@ -11,7 +11,7 @@
 
 - [x] **VCWD-01**: `graphify` CLI detects whether CWD contains `.obsidian/` (Obsidian vault marker) before pipeline dispatch in `run`, `update-vault`, and any other output-producing command. Detection helper exposed for reuse by `doctor`.
 - [x] **VCWD-02**: When CWD is a vault AND `.graphify/profile.yaml` is present AND no explicit `--vault` / `--output` flag was passed, output is auto-routed via Phase 41's `_resolve_output_target()` (Option C — auto-adopt). Behavior identical to passing `--vault $CWD`.
-- [ ] **VCWD-03**: When CWD is a vault but no `.graphify/profile.yaml` is present AND no explicit `--vault` / `--output` / `--write-into-vault` flag was passed, the CLI exits non-zero (exit 2) with two-line `[graphify] error: <msg>` + `  hint: <fix>` stderr (using Phase 58's `_emit_vault_error()`). Hint suggests `--output <path>` outside the vault or `--write-into-vault` to opt in.
+- [x] **VCWD-03**: When CWD is a vault but no `.graphify/profile.yaml` is present AND no explicit `--vault` / `--output` / `--write-into-vault` flag was passed, the CLI exits non-zero (exit 2) with two-line `[graphify] error: <msg>` + `  hint: <fix>` stderr (using Phase 58's `_emit_vault_error()`). Hint suggests `--output <path>` outside the vault or `--write-into-vault` to opt in.
 - [ ] **VCWD-04**: New `--write-into-vault` opt-in flag added to commands affected by VCWD-03. When present, suppresses the refusal and proceeds with original (pre-v1.12) behavior; documented as deliberate opt-in for users who actually want output inside their vault.
 - [ ] **VCWD-05**: `graphify doctor` reports the predicted vault-CWD behavior for the same inputs (auto-adopt vs refuse vs opt-in), maintaining the VAUX-01 parity contract from Phase 58.
 

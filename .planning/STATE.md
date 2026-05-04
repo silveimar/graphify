@@ -4,14 +4,14 @@ milestone: v1.12
 milestone_name: milestone
 status: executing
 stopped_at: Phase 59 planning complete (5 plans, plan-checker passed with concerns)
-last_updated: "2026-05-04T17:28:17.722Z"
+last_updated: "2026-05-04T17:37:52.490Z"
 last_activity: 2026-05-04
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 14
-  completed_plans: 11
-  percent: 79
+  completed_plans: 12
+  percent: 86
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: `.planning/PROJECT.md` (**milestone v1.12** — Vault Awareness, Pipeline I
 ## Current Position
 
 Phase: 59 (vault-cwd-aware-cli-default) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-05-04
 
@@ -81,6 +81,7 @@ Last activity: 2026-05-04
 | Phase 60.1 P01 | 12m | 2 tasks | 2 files |
 | Phase 61 P01 | 4 minutes | 2 tasks | 2 files |
 | Phase 59-vault-cwd-aware-cli-default P01 | 13m | 3 tasks | 2 files |
+| Phase 59-vault-cwd-aware-cli-default P03 | 456 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -174,6 +175,8 @@ Locked v1.8 choices:
 - [Phase ?]: Phase 59.1 plan 02: silent auto-self-heal of skill stamp on drift; 1024-byte size guard; D-05 silent abort
 - [Phase ?]: Phase 60.1 Plan 01: random_seed=42 + sort tiebreaker required for cluster() determinism
 - [Phase ?]: VCWD-01 gate wired across 14 CLI dispatch branches
+- [Phase ?]: VCWD-03: Plan 01 wording already matched CONTEXT D-04 verbatim; RED tests locked as regression guards
+- [Phase ?]: sanitize_label (security.py:190) applied to CWD before stderr interpolation, mitigating T-59-06 control-char injection
 
 ### Pending Todos
 
@@ -262,6 +265,6 @@ From `.planning/milestones/v1.11-MILESTONE-AUDIT.md` — non-blocking tech debt:
 
 ## Session Continuity
 
-Last session: 2026-05-04T17:28:17.717Z
+Last session: 2026-05-04T17:37:45.299Z
 Stopped at: Phase 59 planning complete (5 plans, plan-checker passed with concerns)
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
