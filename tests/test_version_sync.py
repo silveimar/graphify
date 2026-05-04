@@ -224,3 +224,75 @@ def test_version_flag_help_regression(tmp_path):
     assert r_ver.returncode == 0
     assert b"usage:" not in r_ver.stdout.lower()
     assert b"graphify " in r_ver.stdout  # package line present
+
+
+def test_doctor_version_sync_section(tmp_path, monkeypatch):
+    """D-12: doctor version-sync section emits per-platform status with all states."""
+    cfg = {
+        "in_sync_plat": {
+            "skill_file": "skill.md",
+            "skill_dst": Path("in_sync_plat") / "SKILL.md",
+            "claude_md": False,
+            "commands_src_dir": "commands",
+            "commands_dst": None,
+            "commands_enabled": False,
+            "supports": ["code"],
+        },
+        "newer_plat": {
+            "skill_file": "skill.md",
+            "skill_dst": Path("newer_plat") / "SKILL.md",
+            "claude_md": False,
+            "commands_src_dir": "commands",
+            "commands_dst": None,
+            "commands_enabled": False,
+            "supports": ["code"],
+        },
+        "absent_plat": {
+            "skill_file": "skill.md",
+            "skill_dst": Path("absent_plat") / "SKILL.md",
+            "claude_md": False,
+            "commands_src_dir": "commands",
+            "commands_dst": None,
+            "commands_enabled": False,
+            "supports": ["code"],
+        },
+    }
+    (tmp_path / "in_sync_plat").mkdir()
+    (tmp_path / "in_sync_plat" / ".graphify_version").write_text(
+        gmain.__version__, encoding="utf-8"
+    )
+    (tmp_path / "newer_plat").mkdir()
+    (tmp_path / "newer_plat" / ".graphify_version").write_text("99.99.99", encoding="utf-8")
+    # absent_plat: no dir, no stamp
+
+    monkeypatch.setattr(gmain, "_PLATFORM_CONFIG", cfg)
+    out = gmain._render_doctor_version_sync(home=tmp_path)
+
+    assert "version sync" in out
+    assert "✓ in sync" in out
+    assert "! drifted-newer" in out
+    assert "— not installed" in out
+    assert f"package={gmain.__version__}" in out
+
+
+def test_doctor_version_sync_renders_corrupt_stamp(tmp_path, monkeypatch):
+    """T-59.1.03-02: doctor renders oversized stamp as <corrupt> with drifted-newer status."""
+    cfg = {
+        "corrupt_plat": {
+            "skill_file": "skill.md",
+            "skill_dst": Path("corrupt_plat") / "SKILL.md",
+            "claude_md": False,
+            "commands_src_dir": "commands",
+            "commands_dst": None,
+            "commands_enabled": False,
+            "supports": ["code"],
+        },
+    }
+    (tmp_path / "corrupt_plat").mkdir()
+    (tmp_path / "corrupt_plat" / ".graphify_version").write_bytes(b"x" * 2048)
+
+    monkeypatch.setattr(gmain, "_PLATFORM_CONFIG", cfg)
+    out = gmain._render_doctor_version_sync(home=tmp_path)
+
+    assert "<corrupt>" in out
+    assert "! drifted-newer" in out

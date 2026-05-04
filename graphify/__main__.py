@@ -172,6 +172,58 @@ def _render_version_block(home: Path | None = None) -> str:
     return "\n".join(lines)
 
 
+def _render_doctor_version_sync(home: Path | None = None) -> str:
+    """Render the ``version sync`` section for ``graphify doctor`` (D-12).
+
+    Format::
+
+        version sync:
+          <platform-name>: stamp=<value> package=<pkg> status=<...>
+          ...
+
+    Statuses:
+      * ``— not installed`` — stamp file missing
+      * ``✓ in sync`` — stamp == package
+      * ``! drifted-newer`` — stamp > package, OR stamp is ``<corrupt>``
+      * ``! drifted-older`` — stamp < package (heal would normally fix this)
+
+    Pure: never writes, never raises. Reuses ``_read_stamp_or_corrupt`` so
+    oversized/unreadable stamps render as ``<corrupt>`` (T-59.1.03-02).
+    """
+    if home is None:
+        home = Path.home()
+    pkg = __version__
+    lines: list[str] = ["version sync:"]
+    for name, cfg in _PLATFORM_CONFIG.items():
+        install_dir = home / cfg["skill_dst"]
+        version_file = install_dir.parent / ".graphify_version"
+        stamp = _read_stamp_or_corrupt(version_file)
+        if stamp is None:
+            status = "— not installed"
+            stamp_disp = "—"
+        elif stamp == "<corrupt>":
+            status = "! drifted-newer"
+            stamp_disp = "<corrupt>"
+        elif stamp == pkg:
+            status = "✓ in sync"
+            stamp_disp = stamp
+        else:
+            it = _numeric_version_prefix_tuple(stamp)
+            pt = _numeric_version_prefix_tuple(pkg)
+            n = max(len(it), len(pt))
+            it_pad = it + (0,) * (n - len(it))
+            pt_pad = pt + (0,) * (n - len(pt))
+            if it_pad > pt_pad:
+                status = "! drifted-newer"
+            else:
+                status = "! drifted-older"
+            stamp_disp = stamp
+        lines.append(
+            f"  {name}: stamp={stamp_disp} package={pkg} status={status}"
+        )
+    return "\n".join(lines)
+
+
 _SETTINGS_HOOK = {
     "matcher": "Glob|Grep",
     "hooks": [
@@ -2913,6 +2965,8 @@ def main() -> None:
         result = run_benchmark(graph_path, corpus_words=corpus_words)
         print_benchmark(result)
     elif cmd == "doctor":
+        print(_render_doctor_version_sync())
+        print()
         # graphify doctor [--dry-run]
         # D-30: top-level subcommand. D-31: --dry-run lives ONLY here.
         # D-35: exit 1 on invalid profile / unresolvable dest / would_self_ingest.
