@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.12
 milestone_name: milestone
-status: executing
-stopped_at: Phase 60.1-03 complete (APPLY-DET-01 closed)
-last_updated: "2026-05-04T11:30:00.000Z"
-last_activity: 2026-05-04 -- Phase 60.1-03 gap-closure plan executed; locked E2E green, suite 2122 passed / 1 xfailed
+status: completed
+stopped_at: Phase 60.1 context gathered
+last_updated: "2026-05-04T15:25:52.711Z"
+last_activity: 2026-05-04 -- Phase 60 marked complete
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
   completed_plans: 8
   percent: 100
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (**milestone v1.12** — Vault Awareness, Pipeline I
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Phase 60.1 — update-vault-apply-determinism-fix
+**Current focus:** Phase 60 — milestone-level-e2e-integration-tests
 
 ## Current Position
 
-Phase: 60.1 (update-vault-apply-determinism-fix) — COMPLETE
-Plan: 3 of 3 (60.1-03 gap-closure complete)
-Status: APPLY-DET-01 closed; locked Phase 60 E2E green unmodified; full suite 2122 passed / 1 xfailed
-Last activity: 2026-05-04 -- Phase 60.1-03 gap-closure plan executed (RED/GREEN/REFACTOR + render-ladder fix)
+Phase: 60 — COMPLETE
+Plan: 2 of 2
+Status: Phase 60 complete
+Last activity: 2026-05-04 -- Phase 60 marked complete
 
 ## Performance Metrics
 

@@ -472,8 +472,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 60-01-PLAN.md — E2E-01 subprocess test: profile composition + override ladder via update-vault preview→apply
-- [ ] 60-02-PLAN.md — E2E-02 subprocess test: elicit sidecar handoff → update-vault merge → rendered note visibility
+- [x] 60-01-PLAN.md — E2E-01 subprocess test: profile composition + override ladder via update-vault preview→apply
+- [x] 60-02-PLAN.md — E2E-02 subprocess test: elicit sidecar handoff → update-vault merge → rendered note visibility
 **UI hint:** no — pure test infrastructure; no user-facing surface changes.
 
 ---
