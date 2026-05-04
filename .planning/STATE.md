@@ -4,14 +4,14 @@ milestone: v1.12
 milestone_name: milestone
 status: Phase 59.1 inserted — ready for `/gsd-plan-phase 59.1`
 stopped_at: Phase 59.1 context gathered
-last_updated: "2026-05-04T03:20:49.336Z"
+last_updated: "2026-05-04T03:23:03.284Z"
 last_activity: 2026-05-03 — v1.12 roadmap written (Phases 59, 60, 61)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -77,6 +77,7 @@ Last activity: 2026-05-03 — v1.12 roadmap written (Phases 59, 60, 61)
 | Phase 58-vault-cli-parity-hygiene P01 | 329 | 2 tasks | 2 files |
 | Phase 58-vault-cli-parity-hygiene P03 | 3min | 1 tasks | 1 files |
 | Phase 58-vault-cli-parity-hygiene P02 | 377 | 2 tasks | 2 files |
+| Phase 59.1 P02 | 7m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -167,6 +168,7 @@ Locked v1.8 choices:
 - [Phase ?]: Use local imports inside regression-lock test body to match existing late-import pattern in test_detect.py
 - [Phase ?]: Assert equality of both _SELF_OUTPUT_DIRS copies to catch future divergence between corpus_prune and detect
 - [Phase ?]: _emit_vault_error() two-line format: [graphify] error: + hint: for vault CLI failures
+- [Phase ?]: Phase 59.1 plan 02: silent auto-self-heal of skill stamp on drift; 1024-byte size guard; D-05 silent abort
 
 ### Pending Todos
 
@@ -254,6 +256,6 @@ From `.planning/milestones/v1.11-MILESTONE-AUDIT.md` — non-blocking tech debt:
 
 ## Session Continuity
 
-Last session: 2026-05-04T03:20:49.332Z
+Last session: 2026-05-04T03:22:59.680Z
 Stopped at: Phase 59.1 context gathered
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
