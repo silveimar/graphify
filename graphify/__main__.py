@@ -1522,17 +1522,17 @@ def _check_vault_cwd_gate(
     """VCWD-01..04 dispatch gate.
 
     Classifies CWD into one of: "auto-adopt" (returns str), "n/a" (returns str),
-    or "refuse" (never returned — raises SystemExit(2) via _emit_vault_error).
+    or "refuse" (never returned — raises SystemExit(EXIT_VAULT_GATE) via _emit_vault_error).
 
     Side effects:
       - Emits the auto-adopt stderr notice exactly once when it returns "auto-adopt".
-      - Raises SystemExit(2) via _emit_vault_error() when the CWD is a vault
+      - Raises SystemExit(EXIT_VAULT_GATE) via _emit_vault_error() when the CWD is a vault
         without a profile and no explicit routing and no write_into_vault override.
 
     Per CONTEXT D-01, this helper is invoked from EXACTLY the 14 gated branches
     listed in CONTEXT.md. Read-only commands do not call it.
     """
-    from graphify.output import is_obsidian_vault, _emit_vault_error
+    from graphify.output import is_obsidian_vault, _emit_vault_error, EXIT_VAULT_GATE
     from graphify.security import sanitize_label
 
     cwd = Path.cwd().resolve()
@@ -1557,7 +1557,7 @@ def _check_vault_cwd_gate(
     raise _emit_vault_error(
         f"refusing to write into Obsidian vault at {safe_cwd} — no .graphify/profile.yaml found",
         "create .graphify/profile.yaml to opt in, pass --output <path> to write outside the vault, or --write-into-vault to override",
-        code=2,
+        code=EXIT_VAULT_GATE,
     )
 
 
@@ -2901,11 +2901,12 @@ def main() -> None:
             local_list=_lv_ih2,
         )
         artifacts = resolved.artifacts_dir
-        from graphify.output import is_obsidian_vault, _emit_vault_error
+        from graphify.output import is_obsidian_vault, _emit_vault_error, EXIT_VAULT_REFUSAL
         if not opts.allow_vault_write and is_obsidian_vault(artifacts):
             raise _emit_vault_error(
                 f"Refusing to write harness import under vault root {artifacts}",
                 "Pass --allow-vault-write to override.",
+                code=EXIT_VAULT_REFUSAL,
             )
         artifacts.mkdir(parents=True, exist_ok=True)
 

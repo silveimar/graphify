@@ -77,11 +77,22 @@ def _refuse(msg: str) -> SystemExit:
     return SystemExit(1)
 
 
-def _emit_vault_error(msg: str, hint: str, *, code: int = 1) -> SystemExit:
+EXIT_VAULT_REFUSAL = 1
+EXIT_VAULT_GATE = 2
+
+
+def _emit_vault_error(msg: str, hint: str, *, code: int = EXIT_VAULT_REFUSAL) -> SystemExit:
     """Emit [graphify] error: + hint: lines to stderr and return SystemExit(code).
 
     VAUX-02: two-line format mirrors doctor.py _FIX_HINTS pattern (D-05).
     Callers: raise _emit_vault_error(msg, hint, code=...)
+
+    Exit-code policy (EXIT-CODE-CONST-01, Phase 62-02):
+      - ``EXIT_VAULT_REFUSAL`` (=1, default) — vault-policy refusals (no profile,
+        write-into-vault guard, missing/invalid vault root).
+      - ``EXIT_VAULT_GATE`` (=2) — VCWD-03 CWD-gate refusal: CWD is a vault, no
+        profile present, and no override. Distinct exit code surfaces the gate
+        diagnostic to downstream parsers.
     """
     print(f"[graphify] error: {msg}", file=sys.stderr)
     print(f"  hint: {hint}", file=sys.stderr)
@@ -95,11 +106,13 @@ def _ensure_vault_root(path: Path) -> Path:
         raise _emit_vault_error(
             f"Vault path is not a directory: {p}",
             "Check the path exists and is a directory, not a file.",
+            code=EXIT_VAULT_REFUSAL,
         )
     if not is_obsidian_vault(p):
         raise _emit_vault_error(
             f"Not an Obsidian vault (missing .obsidian/ directory): {p}",
             "Pass the root of an Obsidian vault (must contain .obsidian/).",
+            code=EXIT_VAULT_REFUSAL,
         )
     return p
 
