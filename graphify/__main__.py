@@ -2721,14 +2721,12 @@ def main() -> None:
             local_list=_lv_ih2,
         )
         artifacts = resolved.artifacts_dir
-        from graphify.output import is_obsidian_vault
+        from graphify.output import is_obsidian_vault, _emit_vault_error
         if not opts.allow_vault_write and is_obsidian_vault(artifacts):
-            print(
-                f"[graphify] refusing to write harness import under vault root {artifacts}; "
-                "pass --allow-vault-write to override",
-                file=sys.stderr,
+            raise _emit_vault_error(
+                f"Refusing to write harness import under vault root {artifacts}",
+                "Pass --allow-vault-write to override.",
             )
-            sys.exit(2)
         artifacts.mkdir(parents=True, exist_ok=True)
 
         src = Path(opts.path)
