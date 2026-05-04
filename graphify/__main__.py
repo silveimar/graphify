@@ -1507,6 +1507,7 @@ def _check_vault_cwd_gate(
     listed in CONTEXT.md. Read-only commands do not call it.
     """
     from graphify.output import is_obsidian_vault, _emit_vault_error
+    from graphify.security import sanitize_label
 
     cwd = Path.cwd().resolve()
     if not is_obsidian_vault(cwd):
@@ -1525,8 +1526,10 @@ def _check_vault_cwd_gate(
         return "auto-adopt"
     if write_into_vault:
         return "n/a"  # VCWD-04 silent opt-in suppresses refusal
+    # Sanitize the cwd path before interpolation (T-59-06: control-char injection).
+    safe_cwd = sanitize_label(str(cwd))
     raise _emit_vault_error(
-        f"refusing to write into Obsidian vault at {cwd} — no .graphify/profile.yaml found",
+        f"refusing to write into Obsidian vault at {safe_cwd} — no .graphify/profile.yaml found",
         "create .graphify/profile.yaml to opt in, pass --output <path> to write outside the vault, or --write-into-vault to override",
         code=2,
     )
