@@ -74,3 +74,15 @@ def test_cluster_does_not_write_to_stderr(capsys):
     # Allow logging output (starts with [graphify]) but no raw ANSI codes
     for line in captured.err.splitlines():
         assert "\x1b" not in line, f"cluster() wrote ANSI to stderr: {line!r}"
+
+
+def test_cluster_is_deterministic_across_runs():
+    """Two cluster() calls on independently built graphs must produce identical partitions.
+
+    Guards against Leiden non-determinism (root cause of update-vault apply
+    plan_id flicker — see Phase 60.1 / APPLY-DET-01). Both Leiden (graspologic)
+    and Louvain (networkx) paths must be seeded with random_seed=42 / seed=42.
+    """
+    G1 = make_graph()
+    G2 = make_graph()
+    assert cluster(G1) == cluster(G2)
