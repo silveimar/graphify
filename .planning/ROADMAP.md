@@ -491,11 +491,12 @@ Plans:
 3. Phase 60's RED test `tests/test_e2e_integration.py::test_e2e_compose_override_ladder` (commit `333d2da`) turns green without modification (**APPLY-DET-01**).
 4. Full test suite `pytest tests/ -q` passes on Python 3.10/3.12, no regressions (**APPLY-DET-01**).
 
-**Plans:** 2/2 plans complete
+**Plans:** 2/3 plans complete (Plan 03 added via `/gsd-plan-phase 60.1 --gaps` after VERIFICATION.md scored 2/4)
 
 Plans:
 - [x] 60.1-01-PLAN.md — RED/GREEN: failing determinism unit test in `tests/test_cluster.py`, then seed `graspologic.partition.leiden` with `random_seed=42` at `graphify/cluster.py:38`.
 - [x] 60.1-02-PLAN.md — Verify Phase 60 E2E test (`test_e2e_compose_override_ladder`) flips RED→GREEN unmodified and full `pytest tests/ -q` is green; record APPLY-DET-01 closure.
+- [ ] 60.1-03-PLAN.md — **Gap closure** (Wave 3, depends on 01+02): RED unit test in `tests/test_mapping.py` for note-type precedence, then patch CODE-note default in `graphify/mapping.py` (lines 414-422) so vault profile `note_type_templates.thing` overrides `_is_code_note_candidate()`; final gate re-runs locked E2E + full suite + truths `REQUIREMENTS.md:29` checkbox.
 
 **UI hint:** no — internal pipeline determinism fix; no user-facing surface changes.
 
