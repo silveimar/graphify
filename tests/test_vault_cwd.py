@@ -89,3 +89,109 @@ def test_gate_skipped_for_readonly_cmds(tmp_path):
         assert "refusing to write into Obsidian vault" not in proc.stderr, (
             f"Gate fired for read-only cmd {cmd!r}: {proc.stderr[:200]}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Plan 02 — VCWD-02: auto-adopt routing parity + single-line notice
+# ---------------------------------------------------------------------------
+
+
+def _make_profile_vault(parent: Path) -> Path:
+    """Create a fully valid Obsidian vault with .graphify/profile.yaml that
+    passes v1.8 schema validation (has taxonomy + mapping.min_community_size)
+    and includes a vault-relative output block so resolve_output() succeeds.
+    Used by VCWD-02 tests only."""
+    vault = parent / "pv"
+    (vault / ".obsidian").mkdir(parents=True, exist_ok=True)
+    gdir = vault / ".graphify"
+    gdir.mkdir(parents=True, exist_ok=True)
+    (gdir / "profile.yaml").write_text(
+        "taxonomy:\n"
+        "  root: TestAtlas\n"
+        "  folders:\n"
+        "    moc: MOCs\n"
+        "    thing: Things\n"
+        "    default: Things\n"
+        "mapping:\n"
+        "  min_community_size: 3\n"
+        "output:\n"
+        "  mode: vault-relative\n"
+        "  path: notes\n",
+        encoding="utf-8",
+    )
+    # Create the notes dir so validate_vault_path can resolve it inside the vault.
+    (vault / "notes").mkdir(parents=True, exist_ok=True)
+    return vault
+
+
+def test_auto_adopt_notice_emitted_once(tmp_path):
+    """VCWD-02: auto-adopt path emits the notice EXACTLY once per process.
+
+    Uses `run --help`: gate fires BEFORE manual arg-parsing in the run branch,
+    so the auto-adopt notice lands in stderr before the branch tries to handle
+    --help (which it treats as an unknown flag and exits 2). Exit code is
+    irrelevant; we only inspect stderr for the notice text.
+    """
+    pytest.importorskip("yaml")
+    vault = _make_profile_vault(tmp_path)
+    proc = _graphify("run", "--help", cwd=str(vault))
+    notice = "[graphify] auto-adopted vault at"
+    occurrences = proc.stderr.count(notice)
+    assert occurrences == 1, (
+        f"expected exactly 1 auto-adopt notice, got {occurrences}\nstderr:\n{proc.stderr}"
+    )
+    assert "(profile: .graphify/profile.yaml)" in proc.stderr, (
+        f"notice missing profile suffix\nstderr:\n{proc.stderr}"
+    )
+
+
+def test_auto_adopt_matches_explicit_vault(tmp_path):
+    """VCWD-02: auto-adopt (no flags) routes artifacts_dir identically to --vault $CWD.
+
+    Uses `elicit --dry-run --demo` which prints JSON with artifacts_dir to stdout
+    and exits 0 without real work, exercising _resolve_cli_paths in the elicit branch.
+    """
+    pytest.importorskip("yaml")
+    vault = _make_profile_vault(tmp_path)
+
+    # Run 1: auto-adopt path (no routing flags)
+    proc_auto = _graphify("elicit", "--dry-run", "--demo", cwd=str(vault))
+    # Run 2: explicit --vault $CWD (should produce identical resolution)
+    proc_explicit = _graphify(
+        "--vault", str(vault), "elicit", "--dry-run", "--demo", cwd=str(vault)
+    )
+
+    import json as _json
+
+    def _artifacts(proc: subprocess.CompletedProcess) -> str | None:
+        try:
+            data = _json.loads(proc.stdout)
+            return data.get("artifacts_dir")
+        except Exception:
+            return None
+
+    auto_path = _artifacts(proc_auto)
+    explicit_path = _artifacts(proc_explicit)
+    assert auto_path is not None, (
+        f"auto-adopt elicit --dry-run produced no artifacts_dir\n"
+        f"stdout: {proc_auto.stdout}\nstderr: {proc_auto.stderr}"
+    )
+    assert explicit_path is not None, (
+        f"explicit --vault elicit --dry-run produced no artifacts_dir\n"
+        f"stdout: {proc_explicit.stdout}\nstderr: {proc_explicit.stderr}"
+    )
+    assert auto_path == explicit_path, (
+        f"auto-adopt {auto_path!r} != explicit-vault {explicit_path!r}"
+    )
+
+
+def test_explicit_vault_no_auto_adopt_notice(tmp_path):
+    """VCWD-02: passing --vault $CWD explicitly must NOT trigger the auto-adopt notice."""
+    pytest.importorskip("yaml")
+    vault = _make_profile_vault(tmp_path)
+    proc = _graphify(
+        "--vault", str(vault), "elicit", "--dry-run", "--demo", cwd=str(vault)
+    )
+    assert "auto-adopted vault" not in proc.stderr, (
+        f"explicit --vault must not trigger auto-adopt notice\nstderr:\n{proc.stderr}"
+    )
