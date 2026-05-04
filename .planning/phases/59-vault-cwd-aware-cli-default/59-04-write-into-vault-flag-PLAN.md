@@ -3,7 +3,7 @@ phase: 59-vault-cwd-aware-cli-default
 plan: 04
 type: tdd
 wave: 2
-depends_on: [59-01]
+depends_on: [59-01, 59-02, 59-03]
 files_modified:
   - tests/test_vault_cwd.py
   - graphify/__main__.py

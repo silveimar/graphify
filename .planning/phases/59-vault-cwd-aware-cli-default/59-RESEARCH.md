@@ -393,7 +393,7 @@ def _classify_vault_cwd(cwd: Path) -> tuple[str, Path | None]:
 
 **All claims tagged `[VERIFIED]` were confirmed by reading `graphify/__main__.py`, `graphify/output.py`, `graphify/doctor.py` at HEAD this session. All `[CITED]` claims reference CONTEXT.md, ROADMAP.md, REQUIREMENTS.md, PROJECT.md as canonical.**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `--write-into-vault` accept a value, or is it a pure boolean flag?**
    - What we know: CONTEXT Decision 3 says "opt-in flag" — implies boolean.

@@ -92,7 +92,9 @@ resolved = _resolve_cli_paths(
 Append to `tests/test_vault_cwd.py`:
 
 ```python
-yaml_required = pytest.importorskip("yaml")  # noqa: F841 — only the with-profile tests need YAML
+# NOTE: Do NOT add module-level `pytest.importorskip("yaml")` — it would skip the entire
+# file when PyYAML is absent, including non-profile tests. Per-function importorskip is
+# already used inside the with-profile tests below (the correct pattern).
 
 
 def _resolved_output_dir(stdout_or_stderr_combined: str) -> str | None:
