@@ -141,9 +141,13 @@ def _run_update_vault_preview_then_apply(corpus: Path, vault: Path) -> Path:
     return vault / "Atlas" / "Sources" / "Graphify"
 
 
-# -- E2E-01 ---------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Shared profile base (used by both E2E-01 and E2E-02).
+# Tests that need extra blocks (mapping_rule_templates, note_type_templates)
+# concatenate their own YAML fragment onto this base string.
+# ---------------------------------------------------------------------------
 
-_PROFILE_YAML_E2E_01 = textwrap.dedent(
+_BASE_PROFILE_YAML = textwrap.dedent(
     f"""\
     output:
       mode: vault-relative
@@ -163,6 +167,23 @@ _PROFILE_YAML_E2E_01 = textwrap.dedent(
       min_community_size: 1
     naming:
       convention: kebab-case
+    """
+)
+
+# Demo answer literals — verbatim from graphify/__main__.py _demo_answers().
+_DEMO_ANSWER_LITERALS = (
+    "Daily standup, weekly retro",
+    "Prefer small PRs",
+    "Platform team for deploys",
+    "Internal runbooks are outdated",
+    "Context switching",
+)
+
+
+# -- E2E-01 ---------------------------------------------------------------
+
+_PROFILE_YAML_E2E_01 = _BASE_PROFILE_YAML + textwrap.dedent(
+    """\
     mapping_rule_templates:
       - match: rule_id
         pattern: e2e-test-rule
@@ -261,4 +282,74 @@ def test_e2e_compose_override_ladder(tmp_path: Path) -> None:
     )
     assert "cohesion" not in fm, (
         f"cohesion must be absent for type=thing notes; got {fm!r}"
+    )
+
+
+# -- E2E-02 ---------------------------------------------------------------
+
+
+def test_e2e_elicit_then_update_vault(tmp_path: Path) -> None:
+    """E2E-02: elicit sidecar → update-vault merge → rendered notes contain elicitation contributions.
+
+    Flow:
+      1. graphify --vault <vault> elicit --demo  →  writes <artifacts_dir>/elicitation.json
+      2. graphify update-vault … (preview)       →  migration plan written
+      3. graphify update-vault … --apply         →  notes materialised in vault
+
+    Asserts:
+      - Sidecar lands at <vault>.parent/graphify-out/elicitation.json (Pitfall 3: must pass --vault)
+      - Sidecar contains elicitation_hub + at least 3/5 dimension nodes
+      - Hub label "Elicitation session" appears in rendered note bodies (rationale node merged)
+      - At least 3/5 demo answer literals appear in rendered note bodies
+    """
+    vault = _write_vault(tmp_path, _BASE_PROFILE_YAML)
+    corpus = _write_corpus(tmp_path)
+
+    artifacts_dir = vault.parent / "graphify-out"
+    sidecar = artifacts_dir / "elicitation.json"
+
+    # --- Call 1: elicit with --vault to align artifacts_dir (RESEARCH Pitfall 3) ---
+    r1 = _graphify(["--vault", str(vault), "elicit", "--demo"], cwd=vault.parent)
+    assert r1.returncode == 0, f"elicit failed: stderr={r1.stderr!r}"
+
+    # Assert sidecar landed at the SAME artifacts_dir update-vault will read.
+    assert sidecar.exists(), (
+        f"sidecar missing at {sidecar}; "
+        f"artifacts_dir contents={list(artifacts_dir.glob('*')) if artifacts_dir.exists() else 'NO_DIR'}; "
+        f"stderr={r1.stderr!r}"
+    )
+    sidecar_data = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert sidecar_data.get("version") == 1
+    node_ids = {n["id"] for n in sidecar_data["extraction"]["nodes"]}
+    assert "elicitation_hub" in node_ids, f"hub node missing from sidecar: {node_ids}"
+    expected_dims = {
+        "elicitation_rhythms",
+        "elicitation_decisions",
+        "elicitation_dependencies",
+        "elicitation_knowledge",
+        "elicitation_friction",
+    }
+    assert len(expected_dims & node_ids) >= 3, (
+        f"too few dimension nodes in sidecar: {node_ids}"
+    )
+
+    # --- Calls 2 & 3: update-vault preview then apply (helper handles both) ---
+    output_root = _run_update_vault_preview_then_apply(corpus, vault)
+    assert output_root.exists(), f"output root not materialised: {output_root}"
+
+    # --- Assertions on rendered notes ---
+    all_md = list(output_root.rglob("*.md"))
+    assert all_md, f"no rendered notes under {output_root}"
+    bodies = "\n\n".join(p.read_text(encoding="utf-8") for p in all_md)
+
+    # Hub label visibility (proves rationale node merged into graph and rendered).
+    assert "Elicitation session" in bodies, (
+        f"hub label missing from rendered output. Files: {[p.name for p in all_md]}"
+    )
+
+    # At least 3 of 5 demo answer literals appear (RESEARCH "Elicitation visibility assertion targets").
+    hits = [a for a in _DEMO_ANSWER_LITERALS if a in bodies]
+    assert len(hits) >= 3, (
+        f"only {len(hits)} demo literals visible: {hits}. "
+        f"Files: {[p.name for p in all_md]}"
     )
