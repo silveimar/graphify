@@ -1,10 +1,11 @@
 ---
 phase: 58
 slug: vault-cli-parity-hygiene
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-03
+post_execution_audit: 2026-05-03 (v1.11-MILESTONE-AUDIT) — full suite green at 2105 passed, 1 xfailed
 ---
 
 # Phase 58 — Validation Strategy

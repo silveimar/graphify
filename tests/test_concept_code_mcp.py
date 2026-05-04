@@ -195,3 +195,32 @@ def test_concept_code_hops_backward_compat_implements_steps_key():
     assert "implements_traversal_steps" in meta, meta
     assert meta["implements_traversal_steps"] == meta["traversal_steps"], meta
     assert meta["steps_by_relation"] == {"implements": meta["traversal_steps"]}, meta
+
+
+# ---------------------------------------------------------------------------
+# Drift-protection (v1.11 milestone audit recommendation #3)
+# ---------------------------------------------------------------------------
+
+
+def test_allowed_concept_code_relations_matches_validate_vocabulary():
+    """Catch silent drift between Phase 53 schema vocabulary and Phase 54 MCP filter.
+
+    `NEW_CONCEPT_CODE_RELATIONS` (graphify/validate.py) and
+    `_ALLOWED_CONCEPT_CODE_RELATIONS` (graphify/serve.py) must stay in sync:
+    the MCP set is the schema set plus the pre-existing `implements` relation
+    (which lives in `KNOWN_EDGE_RELATIONS`, not in the v1.11 additions).
+
+    Adding a new concept↔code relation to `validate.py` without also adding it
+    to `serve.py` would silently exclude it from MCP `concept_code_hops` /
+    `entity_trace` results — caught here before that drift can ship.
+    """
+    from graphify.serve import _ALLOWED_CONCEPT_CODE_RELATIONS
+    from graphify.validate import NEW_CONCEPT_CODE_RELATIONS
+
+    expected = NEW_CONCEPT_CODE_RELATIONS | {"implements"}
+    assert _ALLOWED_CONCEPT_CODE_RELATIONS == expected, (
+        f"MCP filter and schema vocabulary diverged.\n"
+        f"  serve._ALLOWED_CONCEPT_CODE_RELATIONS = {sorted(_ALLOWED_CONCEPT_CODE_RELATIONS)}\n"
+        f"  validate.NEW_CONCEPT_CODE_RELATIONS | {{'implements'}} = {sorted(expected)}\n"
+        f"Add the new relation to BOTH constants, or document the asymmetry."
+    )
