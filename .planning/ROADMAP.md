@@ -435,6 +435,16 @@ Typed **concept↔code** edges promoted to first-class graph members with determ
 
 ---
 
+### Phase 59.1: Version sync hygiene and --version flag (fix skill-stamp drift warning, expose graphify --version) (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 59
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 59.1 to break down)
+
 ### Phase 60: Milestone-level E2E integration tests
 
 **Goal:** Two subprocess-level integration tests close the audit gaps for the two multi-phase pipelines that lacked end-to-end coverage: the profile composition + override ladder flow (Phases 55+56) and the elicitation + vault update flow (Phases 57+56).

@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.12
-milestone_name: Vault Awareness, Pipeline Integration & Error Hygiene
-status: planning
-last_updated: "2026-05-04T01:16:48.332Z"
-last_activity: 2026-05-04
+milestone_name: milestone
+status: Phase 59.1 inserted (URGENT) — ready for `/gsd-plan-phase 59.1`
+stopped_at: Completed 58-03-PLAN.md
+last_updated: "2026-05-04T01:35:35.370Z"
+last_activity: 2026-05-03 — v1.12 roadmap written (Phases 59, 60, 61)
 progress:
-  total_phases: 3
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 0
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: `.planning/PROJECT.md` (**milestone v1.12** — Vault Awareness, Pipeline I
 
 ## Current Position
 
-Phase: 59 (not started — roadmap created)
+Phase: 59.1 (URGENT insert — not planned yet)
 Plan: —
-Status: Roadmap created — ready for `/gsd-plan-phase 59`
+Status: Phase 59.1 inserted — ready for `/gsd-plan-phase 59.1`
 Last activity: 2026-05-03 — v1.12 roadmap written (Phases 59, 60, 61)
 
 ## Performance Metrics
@@ -85,6 +85,7 @@ Last activity: 2026-05-03 — v1.12 roadmap written (Phases 59, 60, 61)
 - Phase 38 scope ratified as docs-only reconciliation (dormant seeds + quick-task lifecycle) with runtime modules unchanged.
 - Phase 48 added: `.graphifyignore` loading / matching fixes for nested `graphify-out` (stop false prompts); consolidate outputs under canonical `graphify-out` instead of nested trees under input (`gsd-add-phase`; numbered **48** after resolving duplicate Phase 46 collision with Concept↔Code roadmap slot).
 - Phase 49 added: `--version` flag on graphify CLI; print package version on command results; fix skill vs installed package version mismatch warnings (e.g. update-vault reporting stale embedded skill version vs PyPI/package version).
+- Phase 59.1 inserted after 59 (URGENT, 2026-05-03): version sync hygiene + `--version` flag — fix skill stamp drift warning ("skill stamp ('0.4.7') is older than the installed package ... (package is '1.0.0')") and expose `graphify --version`. Re-activates dormant Phase 49 scope as v1.12 work.
 
 ### Decisions
 
