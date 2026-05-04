@@ -1,6 +1,7 @@
 """Unit tests for graphify/output.py — Phase 27 vault detection + resolution."""
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 import pytest
@@ -469,3 +470,24 @@ def test_default_graphify_artifacts_dir_legacy_target_relative_without_resolved(
     sub = tmp_path / "pkg" / "src"
     sub.mkdir(parents=True)
     assert default_graphify_artifacts_dir(sub, resolved=None) == (sub / "graphify-out").resolve()
+
+
+# ---------------------------------------------------------------------------
+# EXIT-CODE-CONST-01 (Phase 62-02): named exit-code constants for vault errors
+# ---------------------------------------------------------------------------
+
+def test_emit_vault_error_exit_code_constants():
+    """EXIT_VAULT_REFUSAL/EXIT_VAULT_GATE exist, equal 1/2, and drive _emit_vault_error default."""
+    from graphify.output import (
+        EXIT_VAULT_REFUSAL,
+        EXIT_VAULT_GATE,
+        _emit_vault_error,
+    )
+
+    assert EXIT_VAULT_REFUSAL == 1
+    assert EXIT_VAULT_GATE == 2
+    assert isinstance(EXIT_VAULT_REFUSAL, int) and not isinstance(EXIT_VAULT_REFUSAL, bool)
+    assert isinstance(EXIT_VAULT_GATE, int) and not isinstance(EXIT_VAULT_GATE, bool)
+
+    sig = inspect.signature(_emit_vault_error)
+    assert sig.parameters["code"].default == EXIT_VAULT_REFUSAL
