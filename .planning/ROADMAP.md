@@ -430,7 +430,13 @@ Typed **concept↔code** edges promoted to first-class graph members with determ
 3. When CWD is a vault without `.graphify/profile.yaml` and no explicit routing flag is passed, the CLI exits 2 with a two-line `[graphify] error:` + `  hint:` message on stderr (via `_emit_vault_error()`) that suggests `--output <path>` or `--write-into-vault` (**VCWD-03**).
 4. Passing `--write-into-vault` suppresses the VCWD-03 refusal and proceeds with pre-v1.12 behavior; the flag is documented as a deliberate opt-in (**VCWD-04**).
 
-**Plans:** TBD during `/gsd-plan-phase 59`
+**Plans:** 5 plans
+Plans:
+- [ ] 59-01-detection-gate-PLAN.md — Wave 0 fixture + `_check_vault_cwd_gate` helper wired into 14 dispatch branches (VCWD-01)
+- [ ] 59-02-auto-adopt-PLAN.md — Auto-adopt routing via `_resolve_cli_paths(explicit_vault=cwd)` + single-line stderr notice (VCWD-02)
+- [ ] 59-03-refusal-PLAN.md — Sanitized `<cwd>` interpolation, exit 2, verbatim two-line refusal text (VCWD-03)
+- [ ] 59-04-write-into-vault-flag-PLAN.md — `--write-into-vault` global+per-command boolean, silent precedence (VCWD-04)
+- [ ] 59-05-doctor-section-PLAN.md — `[graphify] === Vault-CWD Default ===` doctor section + parity contract + cross-cutting env/vault-list (VCWD-05)
 **UI hint:** partial — CLI error messages and `doctor` reporting surface new stderr behavior.
 
 ---
