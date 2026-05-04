@@ -1487,6 +1487,51 @@ def _resolve_cli_paths(
     )
 
 
+def _check_vault_cwd_gate(
+    cmd: str,
+    *,
+    has_explicit_route: bool,
+    write_into_vault: bool,
+) -> str:
+    """VCWD-01..04 dispatch gate.
+
+    Classifies CWD into one of: "auto-adopt" (returns str), "n/a" (returns str),
+    or "refuse" (never returned — raises SystemExit(2) via _emit_vault_error).
+
+    Side effects:
+      - Emits the auto-adopt stderr notice exactly once when it returns "auto-adopt".
+      - Raises SystemExit(2) via _emit_vault_error() when the CWD is a vault
+        without a profile and no explicit routing and no write_into_vault override.
+
+    Per CONTEXT D-01, this helper is invoked from EXACTLY the 14 gated branches
+    listed in CONTEXT.md. Read-only commands do not call it.
+    """
+    from graphify.output import is_obsidian_vault, _emit_vault_error
+
+    cwd = Path.cwd().resolve()
+    if not is_obsidian_vault(cwd):
+        return "n/a"
+    # Explicit routing flag wins — silent precedence, no notice emitted.
+    if has_explicit_route:
+        return "n/a"
+    has_profile = (cwd / ".graphify" / "profile.yaml").is_file()
+    if has_profile:
+        # VCWD-02 auto-adopt notice — exactly one line, exactly once per process.
+        # Plan 02 wires the routing side; this stub only emits the notice.
+        print(
+            f"[graphify] auto-adopted vault at {cwd} (profile: .graphify/profile.yaml)",
+            file=sys.stderr,
+        )
+        return "auto-adopt"
+    if write_into_vault:
+        return "n/a"  # VCWD-04 silent opt-in suppresses refusal
+    raise _emit_vault_error(
+        f"refusing to write into Obsidian vault at {cwd} — no .graphify/profile.yaml found",
+        "create .graphify/profile.yaml to opt in, pass --output <path> to write outside the vault, or --write-into-vault to override",
+        code=2,
+    )
+
+
 def main() -> None:
     # Phase 41: ``graphify [--vault P] [--vault-list F] <command>`` — strip globals before dispatch.
     sys.argv, g_vault_exp, g_vault_list = _strip_leading_vault_global_argv(sys.argv)
@@ -1739,6 +1784,14 @@ def main() -> None:
         cli_output: str | None = None
         args = sys.argv[2:]
         lv_vault, lv_vlist, args = _strip_vault_flags_from_tokens(args)
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list or lv_vault or lv_vlist
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         cli_repo_identity, args = _extract_repo_identity_arg(args)
         i = 0
         while i < len(args):
@@ -1870,6 +1923,14 @@ def main() -> None:
     # manifest-last). Optional --vault routes tag write-back through
     # graphify.merge.compute_merge_plan (tags: 'union' policy, D-08).
     if cmd == "--diagram-seeds":
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         graph_path = "graphify-out/graph.json"
         vault_path: Path | None = None
         args = sys.argv[2:]
@@ -1920,6 +1981,14 @@ def main() -> None:
     # overwrites. Stubs hard-code `compress: false` (one-way door, D-TMPL-01).
     # All target paths routed through validate_vault_path for path confinement.
     if cmd == "--init-diagram-templates":
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         vault_arg: str | None = None
         force_flag = False
         args = sys.argv[2:]
@@ -1965,6 +2034,14 @@ def main() -> None:
     # writes dedup_report.{json,md}, updates extraction.json.
     # Flags override .graphify/dedup.yaml if present (D-17).
     if cmd == "--dedup":
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         from graphify.dedup import dedup as _dedup, write_dedup_reports
 
         graph_path_arg = None
@@ -2095,6 +2172,14 @@ def main() -> None:
         _cli_exit(0)
 
     if cmd == "snapshot":
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         graph_path = "graphify-out/graph.json"
         name = None
         cap = 10
@@ -2214,6 +2299,14 @@ def main() -> None:
         return
 
     if cmd == "approve":
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         args = sys.argv[2:]
         vault_path = None
         reject = False
@@ -2488,6 +2581,14 @@ def main() -> None:
         print(_subgraph_to_text(G, nodes, edges, token_budget=budget))
     elif cmd == "save-result":
         # graphify save-result --question Q --answer A --type T [--nodes N1 N2 ...]
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         import argparse as _ap
         p = _ap.ArgumentParser(prog="graphify save-result")
         p.add_argument("--question", required=True)
@@ -2523,6 +2624,14 @@ def main() -> None:
     elif cmd == "elicit":
         # graphify elicit [--output PATH] [--dry-run] [--demo] [--force]
         # Phase 39 — onboarding / empty-corpus path (library: graphify.elicit).
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         import argparse as _ap
 
         parser = _ap.ArgumentParser(
@@ -2610,6 +2719,14 @@ def main() -> None:
         # graphify harness export [--target claude] [--out PATH]
         #   [--include-annotations] [--secrets-mode {redact,error}]
         # (Phase 13 / SEED-002; HARNESS-07/08 flags added in Plan 04.)
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         rest = list(sys.argv[2:])
         if not rest or rest[0] != "export":
             print(
@@ -2671,6 +2788,14 @@ def main() -> None:
         _cli_exit(0)
     elif cmd == "import-harness":
         # graphify import-harness PATH [--format auto|json|claude] [--strict] [--output PATH]
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         import argparse as _ap
         import json as _json
 
@@ -2762,6 +2887,14 @@ def main() -> None:
 
         rest = list(sys.argv[2:])
         lv_vault, lv_vlist, rest = _strip_vault_flags_from_tokens(rest)
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list or lv_vault or lv_vlist
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         cli_repo_identity, rest = _extract_repo_identity_arg(rest)
         use_router = "--router" in rest
         rest = [a for a in rest if a != "--router"]
@@ -2856,6 +2989,14 @@ def main() -> None:
     elif cmd == "enrich":
         # graphify enrich [--graph PATH] [--budget N] [--pass NAME] [--dry-run] [--snapshot-id ID]
         # Inline argparse equivalent of: sub.add_parser("enrich", ...) — follows __main__.py convention
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         import argparse as _ap
 
         p_enrich = _ap.ArgumentParser(
@@ -3077,6 +3218,14 @@ def main() -> None:
         sys.exit(1 if report.is_misconfigured() else 0)
     elif cmd == "update-vault":
         # graphify update-vault --input work-vault/raw --vault ls-vault
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         import argparse as _ap
 
         _p_uv = _ap.ArgumentParser(
@@ -3123,6 +3272,14 @@ def main() -> None:
         _cli_exit(0)
     elif cmd == "vault-promote":
         # graphify vault-promote --vault PATH [--threshold N] [--graph PATH]
+        _check_vault_cwd_gate(
+            cmd,
+            has_explicit_route=bool(
+                g_vault_exp or g_vault_list
+                or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
+            ),
+            write_into_vault=False,
+        )
         import argparse as _ap
 
         _p_vp = _ap.ArgumentParser(
