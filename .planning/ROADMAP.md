@@ -449,10 +449,10 @@ Typed **concept↔code** edges promoted to first-class graph members with determ
 4. When stamp > package, the original two-line stderr warning is emitted verbatim and the stamp file is NOT rewritten (**VSYNC-04**).
 5. CI tests on Python 3.10 and 3.12 cover: heal happy path, write-failure fallback to existing warning, stamp-newer warning preservation, and `--version` multi-line snapshot.
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 59.1-01-PLAN.md — Mint VSYNC-01..04 in REQUIREMENTS.md and back-fill the ROADMAP.md Phase 59.1 row
+- [x] 59.1-01-PLAN.md — Mint VSYNC-01..04 in REQUIREMENTS.md and back-fill the ROADMAP.md Phase 59.1 row
 - [ ] 59.1-02-PLAN.md — Rewrite `_check_skill_version()` for silent auto-self-heal (VSYNC-01, VSYNC-04)
 - [ ] 59.1-03-PLAN.md — Multi-line `--version` block + `doctor` `version sync` section (VSYNC-02, VSYNC-03)
 **UI hint:** partial — CLI `--version` and `doctor` output expand; previously-noisy stderr warning becomes silent.
