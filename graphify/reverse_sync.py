@@ -12,9 +12,11 @@ Reverse-sync compares raw file bytes so frontmatter-only edits are detected.
 
 import difflib
 import hashlib
+import json
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -171,6 +173,40 @@ def _diff_summary(a: bytes, b: bytes) -> str:
     return f"+{plus_lines} -{minus_lines} lines, +{plus_bytes} -{minus_bytes} bytes"
 
 
+def _append_jsonl(path: Path, record: dict) -> None:
+    """Append a single record as a JSON line to *path* (D-15 append-only).
+
+    Mirrors graphify.serve._append_annotation pattern verbatim.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _make_log_record(
+    change: ChangeRecord,
+    action: str,
+    *,
+    vault_text: bytes | None,
+    input_text: bytes | None,
+) -> dict:
+    """Build a 7-key JSONL record for a single reverse-sync event (D-14)."""
+    ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    if vault_text is None and input_text is None:
+        diff = ""
+    else:
+        diff = _diff_summary(input_text or b"", vault_text or b"")
+    return {
+        "ts": ts,
+        "vault_path": str(change.vault_path),
+        "input_path": str(change.input_path),
+        "action": action,
+        "diff_summary": diff,
+        "hash_before": change.hash_before,
+        "hash_after": change.hash_after,
+    }
+
+
 def prompt_per_file(rel: str, vault_text: str, input_text: str | None) -> str:
     """Interactive Y/n/d/A/Q prompt (D-01, D-02). TTY-gated (D-13).
 
@@ -307,6 +343,17 @@ def run_reverse_sync(
     input_dir = Path(profile["input_path"])
     changes = compute_change_set(profile)
 
+    # Plan 04: resolve JSONL log path (D-15 default + memory_path override).
+    memory_rel = rs_cfg.get("memory_path") or ".graphify/reverse-sync-log.jsonl"
+    log_path = (vault_dir / memory_rel).resolve()
+    # Path-confine log inside vault_dir (security).
+    if not _is_within(log_path, vault_dir):
+        print(
+            f"[graphify] reverse-sync: refusing log path outside vault: {memory_rel}",
+            file=sys.stderr,
+        )
+        log_path = (vault_dir / ".graphify" / "reverse-sync-log.jsonl").resolve()
+
     counters = {
         "copied": 0,
         "skipped_user": 0,
@@ -322,15 +369,47 @@ def run_reverse_sync(
             rec, mode=mode, all_yes=all_yes, input_dir=input_dir
         )
         if outcome == "skip":
+            # D-14: kind=="skip" (unchanged file) is NOT a sync event; do not log.
             continue
         if outcome == "quit":
             break
+
+        # Plan 04: log every detected change-set decision.
+        try:
+            vault_bytes = (
+                rec.vault_path.read_bytes()
+                if rec.vault_path.exists() and rec.vault_path.is_file()
+                else None
+            )
+        except OSError:
+            vault_bytes = None
+        try:
+            input_bytes = (
+                rec.input_path.read_bytes()
+                if rec.input_path.exists() and rec.input_path.is_file()
+                else None
+            )
+        except OSError:
+            input_bytes = None
+        # For "copied" action, input_bytes was just (over)written with vault_bytes;
+        # diff_summary should reflect the pre-copy delta. For "copied" via apply_change,
+        # the input file equals vault now — pass None for input_text when hash_before
+        # is None (new file) so diff is "+N -0".
+        log_input = input_bytes
+        if outcome == "copied" and rec.hash_before is None:
+            log_input = None
+        _append_jsonl(
+            log_path,
+            _make_log_record(rec, outcome, vault_text=vault_bytes, input_text=log_input),
+        )
+
         if outcome in counters:
             counters[outcome] += 1
 
     result = dict(counters)
     result["conflicts_skipped"] = counters["skipped_conflict"]
     result["failed"] = False
+    result["log_path"] = str(log_path)
     return result
 
 
@@ -343,4 +422,6 @@ __all__ = [
     "apply_change",
     "_validate_input_path",
     "_diff_summary",
+    "_append_jsonl",
+    "_make_log_record",
 ]
