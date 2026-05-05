@@ -3315,10 +3315,54 @@ def main() -> None:
         _p_uv.add_argument("--verbose", action="store_true", help="Print all migration rows")
         _p_uv.add_argument("--apply", action="store_true", help="Apply a reviewed migration plan")
         _p_uv.add_argument("--plan-id", default=None, help="Plan id from a preview artifact")
+        _p_uv.add_argument(
+            "--migrate-legacy",
+            action="store_true",
+            help="Detect legacy graphify artifacts and print a dry-run move plan; performs no file changes.",
+        )
+        _p_uv.add_argument(
+            "--migrate-legacy-apply",
+            action="store_true",
+            help="Apply the migrate-legacy move plan (moves files + updates manifest atomically).",
+        )
         opts = _p_uv.parse_args(sys.argv[2:])
         if opts.apply and not opts.plan_id:
             print("error: --apply requires --plan-id from a preview artifact", file=sys.stderr)
             sys.exit(2)
+
+        # --- migrate-legacy dispatch (Plan 04 / D-13) — runs BEFORE normal update-vault ---
+        if getattr(opts, "migrate_legacy", False) or getattr(opts, "migrate_legacy_apply", False):
+            _ml_vault = opts.vault
+            if gate == "auto-adopt" and not _ml_vault:
+                _ml_vault = str(Path.cwd())
+            elif not _ml_vault:
+                from graphify.output import EXIT_VAULT_REFUSAL
+                print("error: --vault is required for --migrate-legacy", file=sys.stderr)
+                sys.exit(EXIT_VAULT_REFUSAL)
+            _ml_vault_path = Path(_ml_vault)
+            from graphify.profile import load_profile as _lp, _deep_merge as _dm, _DEFAULT_PROFILE as _DP
+            _ml_user_prof = _lp(_ml_vault_path)
+            _ml_merged = _dm(_DP, _ml_user_prof)
+            _ml_manifest_path = _ml_vault_path / ".graphify" / "manifest.json"
+            if not _ml_manifest_path.exists():
+                _ml_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+                _ml_manifest_path.write_text("{}", encoding="utf-8")
+            from graphify.vault_promote import migrate_legacy as _migrate_legacy
+            _ml_result = _migrate_legacy(
+                _ml_vault_path,
+                _ml_merged,
+                _ml_manifest_path,
+                apply=bool(getattr(opts, "migrate_legacy_apply", False)),
+            )
+            _ml_planned = len(_ml_result["planned"])
+            _ml_moved = _ml_result["moved"]
+            _ml_failed = len(_ml_result["failed"])
+            print(
+                f"[graphify] migrate-legacy: planned {_ml_planned}, "
+                f"moved {_ml_moved}, failed {_ml_failed}"
+            )
+            _cli_exit(1 if _ml_result["failed"] else 0)
+
         # NOTE: post-parse auto-adopt guard duplicated in vault-promote (~30 lines below). Two-call duplication does not justify a helper yet.
         _uv_vault = opts.vault
         if gate == "auto-adopt" and not _uv_vault:

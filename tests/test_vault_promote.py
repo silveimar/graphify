@@ -954,8 +954,15 @@ def test_no_hardcoded_atlas_literals(tmp_path):
     assert "_FOLDER_PATH_PREFIX" not in code, (
         "_FOLDER_PATH_PREFIX must be removed from vault_promote.py"
     )
-    assert '"Atlas/Maps"' not in code, (
-        'Hardcoded "Atlas/Maps" string literal must be removed from vault_promote.py'
+    # Strip legacy-glob block (Plan 04 D-12 intentionally records "Atlas/Maps" as a
+    # *detection* pattern for the old pre-profile-mapping layout — not a production output path).
+    code_no_legacy_block = "\n".join(
+        line for line in code.splitlines()
+        if "_LEGACY_GLOB_PATTERNS" not in line and "Community*.md" not in line
+    )
+    assert '"Atlas/Maps"' not in code_no_legacy_block, (
+        'Hardcoded "Atlas/Maps" string literal must be removed from vault_promote.py '
+        '(except inside _LEGACY_GLOB_PATTERNS)'
     )
     assert '"Atlas/Dots/' not in code, (
         'Hardcoded "Atlas/Dots/..." string literal must be removed from vault_promote.py'

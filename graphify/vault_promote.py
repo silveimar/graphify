@@ -1131,3 +1131,221 @@ def promote(
         "skipped": skipped,
         "writeback": writeback_result,
     }
+
+
+# ---------------------------------------------------------------------------
+# Legacy artifact detection + migration — D-12..D-15 (Plan 04)
+# ---------------------------------------------------------------------------
+
+import shutil as _shutil
+
+_LEGACY_GLOB_PATTERNS: list[tuple[str, str]] = [
+    ("", "_COMM*.md"),           # vault root: old community dump files
+    ("Atlas/Maps", "Community*.md"),  # old MOC location before pinned-subtree move
+]
+_OWNERSHIP_MARKER_KEY: str = "graphifyProject"
+
+
+def _parse_frontmatter_keys(text: str) -> dict:
+    """Parse YAML frontmatter from a markdown string; return dict of keys → values.
+
+    Uses a minimal regex approach (no PyYAML required): reads the --- block and
+    parses simple `key: value` lines. Sufficient for ownership marker detection.
+    """
+    import re as _re
+    fm_match = _re.match(r"^---\r?\n(.*?)\r?\n---", text, _re.DOTALL)
+    if not fm_match:
+        return {}
+    result: dict = {}
+    for line in fm_match.group(1).splitlines():
+        kv_match = _re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)", line)
+        if kv_match:
+            key, val = kv_match.group(1), kv_match.group(2).strip()
+            # Coerce "true"/"false" to bool
+            if val.lower() == "true":
+                result[key] = True
+            elif val.lower() == "false":
+                result[key] = False
+            else:
+                result[key] = val
+    return result
+
+
+def _pinned_prefixes(merged_profile: dict) -> list[str]:
+    """Return vault-relative prefix strings that graphify owns (the pinned subtree)."""
+    mapping = (merged_profile.get("graphify_folder_mapping") or {})
+    if not mapping:
+        mapping = _DEFAULT_PROFILE.get("graphify_folder_mapping", {})
+    prefixes = []
+    for v in mapping.values():
+        prefix = v.rstrip("/")
+        if prefix:
+            prefixes.append(prefix)
+    return prefixes
+
+
+def detect_legacy_artifacts(vault_dir: Path, merged_profile: dict) -> list[str]:
+    """Return vault-relative posix paths of legacy graphify notes outside the pinned subtree.
+
+    Detection uses two strategies per D-12 + RESEARCH Open Q1:
+    1. Hardcoded glob patterns (_LEGACY_GLOB_PATTERNS): _COMM*.md at vault root,
+       Community*.md under Atlas/Maps/.
+    2. Ownership-marker scan: any *.md file outside the pinned subtree that has
+       `graphifyProject: true` (or truthy) in its YAML frontmatter.
+
+    Returns deduplicated, sorted vault-relative posix paths.
+    """
+    found: set[str] = set()
+    pinned = _pinned_prefixes(merged_profile)
+
+    # Strategy 1: hardcoded globs
+    for subdir, pattern in _LEGACY_GLOB_PATTERNS:
+        search_dir = vault_dir / subdir if subdir else vault_dir
+        if search_dir.is_dir():
+            for match in search_dir.glob(pattern):
+                rel = match.relative_to(vault_dir).as_posix()
+                found.add(rel)
+
+    # Strategy 2: ownership-marker scan — walk all *.md outside pinned subtree
+    skip_dirs = {".graphify"}
+    # Also skip pinned subtree top-level dirs to avoid finding our own output
+    pinned_top = set()
+    for prefix in pinned:
+        top = prefix.split("/")[0]
+        pinned_top.add(top)
+
+    for md_file in vault_dir.rglob("*.md"):
+        rel = md_file.relative_to(vault_dir).as_posix()
+        # Skip if it's inside any pinned subtree
+        is_pinned = any(rel.startswith(p + "/") or rel == p for p in pinned)
+        # Skip if it's inside a special skip dir
+        is_skip = any(part in skip_dirs for part in Path(rel).parts)
+        if is_pinned or is_skip:
+            continue
+        try:
+            text = md_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        fm = _parse_frontmatter_keys(text)
+        if fm.get(_OWNERSHIP_MARKER_KEY):
+            found.add(rel)
+
+    return sorted(found)
+
+
+def migrate_legacy(
+    vault_dir: Path,
+    merged_profile: dict,
+    manifest_path: Path,
+    apply: bool,
+) -> dict:
+    """Detect and optionally move legacy artifacts to their canonical pinned-subtree locations.
+
+    apply=False (dry-run): prints `old → new` lines to stdout; performs zero file moves.
+    apply=True: atomically moves each file and updates the manifest. On OSError during
+    manifest write, rolls back the file move and records the path in 'failed'.
+
+    Returns: {"planned": [{"old": str, "new": str}, ...], "moved": N, "failed": [...]}
+    """
+    legacy_paths = detect_legacy_artifacts(vault_dir, merged_profile)
+
+    # Determine destination for each legacy path
+    # _COMM*.md and Community*.md → maps bucket → _resolve_folder_prefix("maps", ...)
+    maps_prefix = _resolve_folder_prefix("maps", merged_profile)
+    misc_fallback = "Atlas/Sources/Graphify/Misc"
+
+    planned: list[dict] = []
+    for rel in legacy_paths:
+        filename = Path(rel).name
+        # Determine bucket from filename pattern
+        if filename.startswith("_COMM") or filename.startswith("Community"):
+            new_rel = f"{maps_prefix}/{filename}"
+        else:
+            # Ownership-marker-only file: check frontmatter type
+            try:
+                text = (vault_dir / rel).read_text(encoding="utf-8", errors="replace")
+                fm = _parse_frontmatter_keys(text)
+                ftype = (fm.get("type") or "").lower()
+            except OSError:
+                ftype = ""
+            bucket_map = {
+                "source": "sources",
+                "thing": "things",
+                "map": "maps",
+                "moc": "maps",
+                "question": "questions",
+                "person": "people",
+                "quote": "quotes",
+                "statement": "statements",
+            }
+            bucket = bucket_map.get(ftype)
+            if bucket:
+                dest_prefix = _resolve_folder_prefix(bucket, merged_profile)
+            else:
+                dest_prefix = misc_fallback
+            new_rel = f"{dest_prefix}/{filename}"
+        planned.append({"old": rel, "new": new_rel})
+
+    if not apply:
+        for entry in planned:
+            print(f"{entry['old']} → {entry['new']}")
+        return {"planned": planned, "moved": 0, "failed": []}
+
+    # Apply mode: load manifest, move files atomically
+    import json as _json
+
+    try:
+        manifest: dict = _json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError):
+        manifest = {}
+
+    failed: list[str] = []
+    moved = 0
+
+    for entry in planned:
+        old_rel, new_rel = entry["old"], entry["new"]
+        old_abs = vault_dir / old_rel
+        new_abs = vault_dir / new_rel
+
+        # Snapshot manifest before this operation
+        manifest_snapshot = dict(manifest)
+
+        # Move the file
+        try:
+            new_abs.parent.mkdir(parents=True, exist_ok=True)
+            _shutil.move(str(old_abs), str(new_abs))
+        except OSError as exc:
+            print(f"[graphify] migrate-legacy: failed to move {old_rel}: {exc}", file=sys.stderr)
+            failed.append(old_rel)
+            continue
+
+        # Update manifest: replace old_rel reference with new_rel
+        if old_rel in manifest:
+            manifest[new_rel] = manifest.pop(old_rel)
+        else:
+            # Also check values (some manifests store path as value)
+            for k, v in list(manifest.items()):
+                if v == old_rel:
+                    manifest[k] = new_rel
+
+        # Atomic manifest write
+        try:
+            _write_atomic(manifest_path, _json.dumps(manifest, indent=2))
+            moved += 1
+        except OSError as exc:
+            print(
+                f"[graphify] migrate-legacy: manifest write failed for {old_rel}: {exc}",
+                file=sys.stderr,
+            )
+            # Rollback: move file back
+            try:
+                _shutil.move(str(new_abs), str(old_abs))
+            except OSError as rb_exc:
+                print(
+                    f"[graphify] migrate-legacy: rollback also failed for {old_rel}: {rb_exc}",
+                    file=sys.stderr,
+                )
+            manifest = manifest_snapshot
+            failed.append(old_rel)
+
+    return {"planned": planned, "moved": moved, "failed": failed}

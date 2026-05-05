@@ -159,6 +159,8 @@ class DoctorReport:
     # VCWD-05: explicit routing flag (--vault / GRAPHIFY_VAULT / --vault-list).
     # When True, _classify_vault_cwd reports n/a (explicit route wins, gate is bypassed).
     has_explicit_route: bool = False
+    # Plan 04 (D-15): legacy graphify artifacts outside pinned subtree (non-blocking)
+    legacy_artifact_paths: list[str] = field(default_factory=list)
 
     def is_misconfigured(self) -> bool:
         """D-35: True iff profile errors / unresolvable dest / would_self_ingest."""
@@ -470,6 +472,17 @@ def run_doctor(
         )
         report.preview = _build_preview_section(scan, report.resolved_output)
 
+    # Plan 04 (D-15): detect legacy artifacts — non-blocking, always runs when vault known
+    if report.vault_path is not None and report.vault_path.is_dir():
+        try:
+            from graphify.vault_promote import detect_legacy_artifacts
+            from graphify.profile import load_profile as _load_profile, _deep_merge, _DEFAULT_PROFILE
+            _user_prof = _load_profile(report.vault_path)
+            _merged = _deep_merge(_DEFAULT_PROFILE, _user_prof)
+            report.legacy_artifact_paths = detect_legacy_artifacts(report.vault_path, _merged)
+        except Exception:
+            pass  # Non-blocking: silently skip on import/IO error
+
     return report
 
 
@@ -597,6 +610,22 @@ def format_report(report: DoctorReport) -> str:
     # --- Preview (only when populated; D-38) ------------------------------
     if report.preview is not None:
         lines.extend(_format_preview(report.preview))
+
+    # --- Legacy Artifacts (Plan 04 / D-15) — non-blocking warning section ----
+    lines.append("[graphify] === Legacy Artifacts ===")
+    if report.legacy_artifact_paths:
+        _max_shown = 5
+        for path in report.legacy_artifact_paths[:_max_shown]:
+            lines.append(f"[graphify] legacy: {path}")
+        overflow = len(report.legacy_artifact_paths) - _max_shown
+        if overflow > 0:
+            lines.append(f"[graphify] ... and {overflow} more legacy artifact(s)")
+        lines.append(
+            "[graphify]   hint: run `graphify update-vault --migrate-legacy-apply` "
+            "to move these files into the pinned subtree"
+        )
+    else:
+        lines.append("[graphify] no legacy artifacts detected")
 
     # --- Recommended Fixes ------------------------------------------------
     lines.append("[graphify] === Recommended Fixes ===")
