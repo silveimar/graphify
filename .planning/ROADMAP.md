@@ -650,4 +650,4 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 62.1-01-PLAN.md — TDD fix: flip --vault to required=False on update-vault + vault-promote, tighten post-parse guard with friendly-error branch, unskip 2 RED tests, add 2 friendly-error tests
+- [x] 62.1-01-PLAN.md — TDD fix: flip --vault to required=False on update-vault + vault-promote, tighten post-parse guard with friendly-error branch, unskip 2 RED tests, add 2 friendly-error tests ✓ verified 2026-05-04
