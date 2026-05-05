@@ -2291,3 +2291,76 @@ def test_unknown_top_level_key_no_longer_rejects_mapping_rule_templates():
 def test_unknown_top_level_key_no_longer_rejects_note_type_templates():
     """Regression guard: 'note_type_templates' is in _VALID_TOP_LEVEL_KEYS."""
     assert "note_type_templates" in _VALID_TOP_LEVEL_KEYS
+
+
+# ---------------------------------------------------------------------------
+# Phase 69 — v1→v2 migrator tests (D-05, D-06)
+# ---------------------------------------------------------------------------
+
+from graphify.profile import migrate_profile_v1_to_v2  # noqa: E402
+
+
+def _write_profile(dot_graphify_dir: Path, content: str) -> Path:
+    """Write a profile.yaml under dot_graphify_dir and return its path."""
+    dot_graphify_dir.mkdir(parents=True, exist_ok=True)
+    p = dot_graphify_dir / "profile.yaml"
+    p.write_text(content, encoding="utf-8")
+    return p
+
+
+def test_migrator_renames_key(tmp_path):
+    """migrate_profile_v1_to_v2 renames folder_mapping → graphify_folder_mapping in-place."""
+    pytest.importorskip("yaml")
+    import yaml
+
+    dot_g = tmp_path / ".graphify"
+    profile_path = _write_profile(
+        dot_g,
+        "folder_mapping:\n  thing: Atlas/Sources/Graphify/Things/\n  moc: Atlas/Sources/Graphify/MOCs/\n",
+    )
+
+    result = migrate_profile_v1_to_v2(profile_path, tmp_path)
+
+    assert result == "migrated"
+    reloaded = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+    assert "graphify_folder_mapping" in reloaded, "key must be renamed"
+    assert "folder_mapping" not in reloaded, "legacy key must be absent"
+    assert reloaded["graphify_folder_mapping"]["thing"] == "Atlas/Sources/Graphify/Things/"
+
+
+def test_migrator_idempotent(tmp_path):
+    """Second call on a v2 profile returns 'already_v2'; .bak mtime is unchanged."""
+    pytest.importorskip("yaml")
+
+    dot_g = tmp_path / ".graphify"
+    profile_path = _write_profile(
+        dot_g,
+        "folder_mapping:\n  thing: Atlas/Sources/Graphify/Things/\n",
+    )
+
+    first = migrate_profile_v1_to_v2(profile_path, tmp_path)
+    assert first == "migrated"
+
+    bak_path = dot_g / "profile.yaml.bak"
+    assert bak_path.exists()
+    bak_mtime_after_first = bak_path.stat().st_mtime
+
+    second = migrate_profile_v1_to_v2(profile_path, tmp_path)
+    assert second == "already_v2"
+    assert bak_path.stat().st_mtime == bak_mtime_after_first, ".bak must not be touched on second call"
+
+
+def test_migrator_writes_bak(tmp_path):
+    """After migration, .graphify/profile.yaml.bak contains the original pre-migration bytes."""
+    pytest.importorskip("yaml")
+
+    dot_g = tmp_path / ".graphify"
+    original_content = "folder_mapping:\n  thing: Atlas/Sources/Graphify/Things/\n"
+    profile_path = _write_profile(dot_g, original_content)
+    original_bytes = profile_path.read_bytes()
+
+    migrate_profile_v1_to_v2(profile_path, tmp_path)
+
+    bak_path = dot_g / "profile.yaml.bak"
+    assert bak_path.exists(), ".bak file must be written"
+    assert bak_path.read_bytes() == original_bytes, ".bak must contain pre-migration bytes"
