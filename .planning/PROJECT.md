@@ -8,33 +8,49 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
+## Current Milestone: v1.13 Concept Intelligence & Audit Closure
+
+**Goal:** Promote concept↔code edges from a structural feature to a knowledge-reasoning tool (cross-repo identity, semantic confidence, drift detection, parameterized queries), close the remaining vault-CWD seed bullet, and resolve all v1.12 audit-deferred items.
+
+**Target features:**
+
+*Concept Intelligence (SEED-bidirectional-concept-code-links — remaining 35%):*
+- Cross-repo concept identity federation — dedupe MOCs across `repo_identity` boundaries; unify `implements` edges
+- Per-edge LLM confidence scoring — replace uniform `confidence_score=1.0` with semantic scoring (schema already supports it)
+- Edge-level concept drift detection — surface when community renames orphan `implements` edges
+- Parameterized `concept_code_hops` — filter by relation type / confidence threshold; enables "concept coverage" lens
+
+*Vault Hygiene (SEED-vault-root-aware-cli — remaining 20%):*
+- Silent reroute Option B — when CWD is a vault but no `.graphify/profile.yaml`, optionally route output to hidden `.graphify-out/`
+
+*Audit Closure (v1.12 deferred items):*
+- Nyquist VALIDATION.md gap-fill across phases 59 / 59.1 / 60 / 60.1 / 61
+- Project-wide `[graphify]` stderr two-line format sweep (`__main__.py:~2745` and other outliers)
+- Retroactive seed traceability — annotate REQUIREMENTS.md / PROJECT.md with which milestone consumed each seed
+
+**Out of scope:**
+- Concept-edge schema breaking changes (already shipped in prior milestones)
+- New language extractors
+- Multi-vault federation beyond concept identity
+
 ## Current State
 
 **Last shipped:** v1.12 Vault Awareness, Pipeline Integration & Error Hygiene (2026-05-04) — 2139+ tests passing on Python 3.10/3.12. 7 phases (59, 59.1, 60, 60.1, 61, 62, 62.1), 18 plans, 13/13 requirements satisfied. Archives: `.planning/milestones/v1.12-*`.
 
-**No active milestone.** Run `/gsd-new-milestone` to start the next cycle.
-
-**Next milestone goals (sourcing pool):**
-
-- Nyquist VALIDATION.md gap-fill for v1.12 phases (59 / 59.1 / 60 / 60.1 / 61) — deferred from v1.12 audit closure.
-- Project-wide `[graphify]` stderr format sweep — only the harness path was migrated to two-line in v1.12; remaining one-line outliers (e.g. adjacent `print(f"[graphify] {exc}", ...)` at `__main__.py:~2745`) still pending.
-- Second E2E flow for HARN-FMT-01.
-- SEED-001 (Tacit-to-Explicit Elicitation Engine — beyond Phase 57 increment).
-- SEED-002 (Harness Memory Export — additional target formats, multi-format round-trip).
-- SEED-bidirectional-concept-code-links — promotion of Phase 53/54 concept↔code work to a richer first-class feature.
-- SEED-001 / SEED-002 traceability rows in REQUIREMENTS.md (pre-existing audit gap).
+**Active milestone:** v1.13 — phase numbering continues from **63**.
 
 ## Shipped: v1.12 Vault Awareness, Pipeline Integration & Error Hygiene (2026-05-04)
 
 Vault-CWD-aware CLI default with auto-adopt when `.graphify/profile.yaml` is present and two-line `[graphify] error:` + `  hint:` refusal otherwise (**VCWD-01..05**); silent skill-stamp self-heal + multi-line `--version` / `doctor` `version sync` block (**VSYNC-01..04**); milestone-level E2E subprocess tests for composition+override-ladder and elicit→update-vault flows (**E2E-01/02**); `update-vault --apply` first-run determinism via seeded Leiden (**APPLY-DET-01**); harness vault-write refusal migrated to two-line format (**HARN-FMT-01**); audit-cleanup phase closing REQUIREMENTS-SYNC / EXIT-CODE-CONST / E2E-AUTO-ADOPT findings; insertion phase 62.1 fixing `--vault required=True` argparse defect that bypassed auto-adopt for `update-vault` and `vault-promote`. **13/13** requirements. Archives: `.planning/milestones/v1.12-*`.
 
-## Future Carry-Forward (deferred past v1.12)
+## Seed Status (audit at v1.13 start)
 
-Dormant SEEDs to revisit in v1.13+ scoping:
+A v1.13-pre audit confirmed prior milestones silently consumed three of four seeds. Status corrected here for traceability:
 
-- **SEED-002** — Harness Memory Export (additional target formats, multi-format round-trip)
-- **SEED-bidirectional-concept-code-links** — promotion of Phase 53/54 concept↔code work to a richer first-class feature
-- **SEED-001** — Tacit-to-Explicit Elicitation Engine (further beyond Phase 57 increment)
+- **SEED-001 Tacit-to-Explicit Elicitation Engine** — CONSUMED by **v1.9** (`graphify/elicit.py`, `__main__.py:2671`, ELIC-01..04 phases 39–44).
+- **SEED-002 Harness Memory Export** — CONSUMED by **v1.4** (`harness_export.py` Phase 13; `harness_import.py` Phase 40); v1.11 Phase 57 added `--allow-vault-write` gate; v1.12 Phase 61 finalized error UX.
+- **SEED-vault-root-aware-cli** — 80% CONSUMED by **v1.12** (VCWD-01..05 Phase 59; argparse fix Phase 62.1). Remaining: silent reroute Option B → scoped into v1.13.
+- **SEED-bidirectional-concept-code-links** — 65% CONSUMED by **v1.10/v1.11** (Phase 46 CCODE schema; Phase 53/54 CGRAPH typed edges + `/trace` integration). Remaining 35% (cross-repo identity, per-edge confidence, drift, parameterized queries) → scoped into v1.13.
 
 ## Shipped: v1.11 Templates, Graph Semantics & Vault Depth (2026-05-03)
 
@@ -302,7 +318,7 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-*v1.11 is active — goals are listed under **Current milestone** above.*
+*v1.13 is active — goals are listed under **Current Milestone: v1.13** at the top of this file.*
 
 ---
-*Last updated: 2026-04-30 — Started milestone **v1.11** (Templates, Graph Semantics & Vault Depth); phase numbering from **53**.*
+*Last updated: 2026-05-05 — Started milestone **v1.13** (Concept Intelligence & Audit Closure); phase numbering from **63**.*

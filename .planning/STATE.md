@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: "between milestones — v1.12 shipped 2026-05-04"
-status: idle
-stopped_at: v1.12 archived — awaiting /gsd-new-milestone
-last_updated: "2026-05-05T11:20:00.000Z"
-last_activity: 2026-05-05 -- v1.12 milestone archived (ROADMAP/REQUIREMENTS/AUDIT moved to .planning/milestones/v1.12-*); REQUIREMENTS.md deleted for fresh next-milestone seed
+milestone: v1.13
+milestone_name: Concept Intelligence & Audit Closure
+status: planning
+last_updated: "2026-05-05T16:12:06.239Z"
+last_activity: 2026-05-05
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 18
-  completed_plans: 18
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -26,10 +25,10 @@ See: `.planning/PROJECT.md` — **v1.12 shipped 2026-05-04**, awaiting next mile
 
 ## Current Position
 
-Phase: none — v1.12 archived to `.planning/milestones/v1.12-ROADMAP.md`
-Plan: n/a (last completed: 62 + 62.1, all plans verified passing)
-Status: Executing Phase 62
-Last activity: 2026-05-04 -- Plan 62-04 complete (v1.12 milestone audit closure section appended; cites ea2c1ae/87e7f6b/522e290; commit 02499aa). Phase 62 done.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-05 — Milestone v1.13 started
 
 ## Performance Metrics
 
