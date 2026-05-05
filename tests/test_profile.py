@@ -2364,3 +2364,61 @@ def test_migrator_writes_bak(tmp_path):
     bak_path = dot_g / "profile.yaml.bak"
     assert bak_path.exists(), ".bak file must be written"
     assert bak_path.read_bytes() == original_bytes, ".bak must contain pre-migration bytes"
+
+
+# ---------------------------------------------------------------------------
+# Phase 70 (VPROF-03 / VRSYNC-01): reverse_sync + augment schema additions
+# ---------------------------------------------------------------------------
+
+def test_default_profile_has_reverse_sync_section(tmp_path):
+    result = load_profile(tmp_path)
+    assert result["reverse_sync"] == {
+        "mode": "always_ask",
+        "memory_path": ".graphify/reverse-sync-log.jsonl",
+        "auto_on_run": False,
+    }
+
+
+def test_default_profile_augment_allow_community_false(tmp_path):
+    result = load_profile(tmp_path)
+    assert result["augment"] == {"allow_community": False}
+
+
+def test_user_profile_overrides_merged():
+    # Direct _deep_merge test (avoids v1.8 required-fields gate in load_profile)
+    user = {"reverse_sync": {"mode": "always_copy"}}
+    merged = _deep_merge(_DEFAULT_PROFILE, user)
+    assert merged["reverse_sync"]["mode"] == "always_copy"
+    # other defaults preserved
+    assert merged["reverse_sync"]["memory_path"] == ".graphify/reverse-sync-log.jsonl"
+    assert merged["reverse_sync"]["auto_on_run"] is False
+
+
+def test_validate_rejects_invalid_mode():
+    errors = validate_profile({"reverse_sync": {"mode": "alway_ask"}})
+    assert any("mode" in e for e in errors), errors
+
+
+def test_validate_rejects_non_bool_auto_on_run():
+    errors = validate_profile({"reverse_sync": {"auto_on_run": "true"}})
+    assert any("auto_on_run" in e for e in errors), errors
+
+
+def test_validate_rejects_non_bool_allow_community():
+    errors = validate_profile({"augment": {"allow_community": 1}})
+    assert any("allow_community" in e for e in errors), errors
+
+
+def test_validate_rejects_non_string_memory_path():
+    errors = validate_profile({"reverse_sync": {"memory_path": 42}})
+    assert any("memory_path" in e for e in errors), errors
+
+
+def test_missing_reverse_sync_key_uses_defaults(tmp_path):
+    dot_g = tmp_path / ".graphify"
+    dot_g.mkdir()
+    (dot_g / "profile.yaml").write_text("naming: {}\n", encoding="utf-8")
+    result = load_profile(tmp_path)
+    # Pure _deep_merge supplies missing keys — no migrator needed
+    assert result["reverse_sync"]["mode"] == "always_ask"
+    assert result["augment"]["allow_community"] is False

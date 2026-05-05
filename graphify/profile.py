@@ -178,8 +178,13 @@ _DEFAULT_PROFILE: dict = {
         "source":    "Atlas/Sources/Graphify/Sources/",
     },
     "user_only_folders": [],
+    # Phase 70: reverse_sync + augment are additive; missing keys merge from defaults — no migrator needed.
     "augment": {"allow_community": False},
-    "reverse_sync": {},  # Phase 70 placeholder — not consumed in Phase 69
+    "reverse_sync": {
+        "mode": "always_ask",
+        "memory_path": ".graphify/reverse-sync-log.jsonl",
+        "auto_on_run": False,
+    },
 }
 
 _VALID_TOP_LEVEL_KEYS = {
@@ -1447,6 +1452,42 @@ def validate_profile(profile: dict) -> list[str]:
     errors.extend(_detect_mapping_rule_template_collisions(profile))
     errors.extend(_detect_pattern_duplicate_collisions(profile))
     errors.extend(_detect_note_type_template_collisions(profile))
+
+    # Phase 70 (VPROF-03 / VRSYNC-01, Pitfall 4): validate reverse_sync + augment keys.
+    rs = profile.get("reverse_sync")
+    if rs is not None:
+        if not isinstance(rs, dict):
+            errors.append("'reverse_sync' must be a mapping (dict)")
+        else:
+            mode = rs.get("mode")
+            if mode is not None and mode not in {"always_ask", "always_copy", "never_copy"}:
+                errors.append(
+                    f"reverse_sync.mode must be one of "
+                    f"'always_ask', 'always_copy', 'never_copy' (got {mode!r})"
+                )
+            mem = rs.get("memory_path")
+            if mem is not None and not isinstance(mem, str):
+                errors.append(
+                    f"reverse_sync.memory_path must be a string "
+                    f"(got {type(mem).__name__})"
+                )
+            aor = rs.get("auto_on_run")
+            if aor is not None and not isinstance(aor, bool):
+                errors.append(
+                    f"reverse_sync.auto_on_run must be a bool "
+                    f"(got {type(aor).__name__})"
+                )
+    aug = profile.get("augment")
+    if aug is not None:
+        if not isinstance(aug, dict):
+            errors.append("'augment' must be a mapping (dict)")
+        else:
+            allow_comm = aug.get("allow_community")
+            if allow_comm is not None and not isinstance(allow_comm, bool):
+                errors.append(
+                    f"augment.allow_community must be a bool "
+                    f"(got {type(allow_comm).__name__})"
+                )
 
     return errors
 
