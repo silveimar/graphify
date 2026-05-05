@@ -400,3 +400,245 @@ def test_cli_subcommand_dispatch(tmp_path, monkeypatch, capsys):
         gm.main()
     assert exc.value.code == 0
     assert (inp / "Atlas" / "f.md").read_text() == "hello\n"
+
+
+# ---------------------------------------------------------------------------
+# Plan 04 tests: JSONL audit log (D-14, D-15, Success Criterion 2).
+# ---------------------------------------------------------------------------
+
+import json
+import re
+
+
+def _write_profile_yaml_with_log(vault: Path, input_dir: Path, mode: str = "always_copy",
+                                  folders=("Atlas",), memory_path: str | None = None) -> None:
+    """Write a v1.8 profile, optionally with reverse_sync.memory_path."""
+    pdir = vault / ".graphify"
+    pdir.mkdir(parents=True, exist_ok=True)
+    folders_yaml = "\n".join(f"  - {f}" for f in folders)
+    mem_line = f"\n  memory_path: {memory_path}" if memory_path else ""
+    (pdir / "profile.yaml").write_text(
+        "taxonomy: {}\n"
+        "mapping:\n"
+        "  min_community_size: 1\n"
+        "user_only_folders:\n" + folders_yaml + "\n"
+        "reverse_sync:\n"
+        "  mode: " + mode + mem_line + "\n",
+        encoding="utf-8",
+    )
+
+
+def _read_log_lines(path: Path) -> list[dict]:
+    return [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+
+
+def test_jsonl_log_schema_keys(tmp_path):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    (vault / "Atlas" / "a.md").write_text("alpha\n")
+    _write_profile_yaml_with_log(vault, inp, mode="always_copy")
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    log = vault / ".graphify" / "reverse-sync-log.jsonl"
+    assert log.exists()
+    recs = _read_log_lines(log)
+    assert len(recs) == 1
+    assert set(recs[0].keys()) == {
+        "ts", "vault_path", "input_path", "action",
+        "diff_summary", "hash_before", "hash_after",
+    }
+
+
+def test_jsonl_action_copied(tmp_path):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    (vault / "Atlas" / "a.md").write_text("alpha\n")
+    _write_profile_yaml_with_log(vault, inp, mode="always_copy")
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    rec = _read_log_lines(vault / ".graphify" / "reverse-sync-log.jsonl")[0]
+    assert rec["action"] == "copied"
+    assert rec["hash_before"] is None
+    assert isinstance(rec["hash_after"], str)
+    assert re.match(r"^[0-9a-f]{64}$", rec["hash_after"])
+
+
+def test_jsonl_action_skipped_user(tmp_path, monkeypatch):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    (vault / "Atlas" / "a.md").write_text("alpha\n")
+    _write_profile_yaml_with_log(vault, inp, mode="always_ask")
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", _scripted_input(["n"]))
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    rec = _read_log_lines(vault / ".graphify" / "reverse-sync-log.jsonl")[0]
+    assert rec["action"] == "skipped_user"
+
+
+def test_jsonl_action_skipped_conflict(tmp_path, monkeypatch):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    (vault / "Atlas" / "a.md").write_text("alpha\n")
+    _write_profile_yaml_with_log(vault, inp, mode="always_ask")
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    rec = _read_log_lines(vault / ".graphify" / "reverse-sync-log.jsonl")[0]
+    assert rec["action"] == "skipped_conflict"
+
+
+def test_jsonl_action_skipped_never_copy(tmp_path):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    (vault / "Atlas" / "a.md").write_text("alpha\n")
+    _write_profile_yaml_with_log(vault, inp, mode="never_copy")
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    rec = _read_log_lines(vault / ".graphify" / "reverse-sync-log.jsonl")[0]
+    assert rec["action"] == "skipped_never_copy"
+
+
+def test_jsonl_action_vault_deleted(tmp_path):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    (inp / "Atlas" / "old.md").write_text("orphaned\n")
+    _write_profile_yaml_with_log(vault, inp, mode="always_copy")
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    rec = _read_log_lines(vault / ".graphify" / "reverse-sync-log.jsonl")[0]
+    assert rec["action"] == "vault_deleted"
+    assert rec["hash_after"] is None
+    # input file untouched
+    assert (inp / "Atlas" / "old.md").read_text() == "orphaned\n"
+
+
+def test_jsonl_action_enum_exhaustive(tmp_path, monkeypatch):
+    """Aggregate actions across modes; every emitted action is in the allowed enum."""
+    from graphify.reverse_sync import run_reverse_sync
+    allowed = {"copied", "skipped_user", "skipped_conflict",
+               "skipped_never_copy", "vault_deleted"}
+    seen: set[str] = set()
+
+    # always_copy: copied + vault_deleted
+    v1, i1 = tmp_path / "v1" / "vault", tmp_path / "v1" / "input"
+    (v1 / "Atlas").mkdir(parents=True); (i1 / "Atlas").mkdir(parents=True)
+    (v1 / "Atlas" / "x.md").write_text("x\n")
+    (i1 / "Atlas" / "orphan.md").write_text("o\n")
+    _write_profile_yaml_with_log(v1, i1, mode="always_copy")
+    run_reverse_sync(vault_dir=v1, input_dir_override=i1)
+    for r in _read_log_lines(v1 / ".graphify" / "reverse-sync-log.jsonl"):
+        seen.add(r["action"])
+
+    # never_copy
+    v2, i2 = tmp_path / "v2" / "vault", tmp_path / "v2" / "input"
+    (v2 / "Atlas").mkdir(parents=True); (i2 / "Atlas").mkdir(parents=True)
+    (v2 / "Atlas" / "y.md").write_text("y\n")
+    _write_profile_yaml_with_log(v2, i2, mode="never_copy")
+    run_reverse_sync(vault_dir=v2, input_dir_override=i2)
+    for r in _read_log_lines(v2 / ".graphify" / "reverse-sync-log.jsonl"):
+        seen.add(r["action"])
+
+    # always_ask + n → skipped_user
+    v3, i3 = tmp_path / "v3" / "vault", tmp_path / "v3" / "input"
+    (v3 / "Atlas").mkdir(parents=True); (i3 / "Atlas").mkdir(parents=True)
+    (v3 / "Atlas" / "z.md").write_text("z\n")
+    _write_profile_yaml_with_log(v3, i3, mode="always_ask")
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", _scripted_input(["n"]))
+    run_reverse_sync(vault_dir=v3, input_dir_override=i3)
+    for r in _read_log_lines(v3 / ".graphify" / "reverse-sync-log.jsonl"):
+        seen.add(r["action"])
+
+    # always_ask non-TTY → skipped_conflict
+    v4, i4 = tmp_path / "v4" / "vault", tmp_path / "v4" / "input"
+    (v4 / "Atlas").mkdir(parents=True); (i4 / "Atlas").mkdir(parents=True)
+    (v4 / "Atlas" / "w.md").write_text("w\n")
+    _write_profile_yaml_with_log(v4, i4, mode="always_ask")
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    run_reverse_sync(vault_dir=v4, input_dir_override=i4)
+    for r in _read_log_lines(v4 / ".graphify" / "reverse-sync-log.jsonl"):
+        seen.add(r["action"])
+
+    assert seen <= allowed
+    assert seen == allowed
+
+
+def test_jsonl_default_path(tmp_path):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    (vault / "Atlas" / "a.md").write_text("alpha\n")
+    _write_profile_yaml_with_log(vault, inp, mode="always_copy")  # no memory_path
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    assert (vault / ".graphify" / "reverse-sync-log.jsonl").exists()
+
+
+def test_jsonl_custom_path(tmp_path):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    (vault / "Atlas" / "a.md").write_text("alpha\n")
+    _write_profile_yaml_with_log(vault, inp, mode="always_copy",
+                                 memory_path="custom/log.jsonl")
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    assert (vault / "custom" / "log.jsonl").exists()
+    assert not (vault / ".graphify" / "reverse-sync-log.jsonl").exists()
+
+
+def test_jsonl_append_only(tmp_path):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    log = vault / ".graphify" / "reverse-sync-log.jsonl"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    pre_lines = [json.dumps({"ts": "old", "vault_path": "x", "input_path": "y",
+                             "action": "copied", "diff_summary": "",
+                             "hash_before": None, "hash_after": "h"}) for _ in range(5)]
+    log.write_text("\n".join(pre_lines) + "\n", encoding="utf-8")
+    (vault / "Atlas" / "a.md").write_text("alpha\n")
+    (vault / "Atlas" / "b.md").write_text("beta\n")
+    (vault / "Atlas" / "c.md").write_text("gamma\n")
+    _write_profile_yaml_with_log(vault, inp, mode="always_copy")
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    lines = log.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 8
+    # Original 5 untouched
+    for i in range(5):
+        assert json.loads(lines[i])["ts"] == "old"
+
+
+def test_jsonl_diff_summary_format(tmp_path):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    (vault / "Atlas" / "a.md").write_text("line1\nline2\nline3\n")
+    _write_profile_yaml_with_log(vault, inp, mode="always_copy")
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    rec = _read_log_lines(vault / ".graphify" / "reverse-sync-log.jsonl")[0]
+    # New file (no input pre-existing): expect "+N -0 lines, +B -0 bytes"
+    m = re.match(r"^\+(\d+) -0 lines, \+(\d+) -0 bytes$", rec["diff_summary"])
+    assert m, f"diff_summary did not match expected format: {rec['diff_summary']!r}"
+
+
+def test_jsonl_skip_unchanged_not_logged(tmp_path):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    body = "identical\n"
+    (vault / "Atlas" / "same.md").write_text(body)
+    (inp / "Atlas" / "same.md").write_text(body)
+    _write_profile_yaml_with_log(vault, inp, mode="always_copy")
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    log = vault / ".graphify" / "reverse-sync-log.jsonl"
+    # No event should be logged for kind="skip"
+    if log.exists():
+        recs = _read_log_lines(log)
+        assert all(r["action"] != "skip" for r in recs)
+        # No skip action emitted means file may not exist or is empty
+        assert len(recs) == 0
+
+
+def test_jsonl_ts_iso8601_utc(tmp_path):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_dirs(tmp_path)
+    (vault / "Atlas" / "a.md").write_text("alpha\n")
+    _write_profile_yaml_with_log(vault, inp, mode="always_copy")
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp)
+    rec = _read_log_lines(vault / ".graphify" / "reverse-sync-log.jsonl")[0]
+    ts = rec["ts"]
+    assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", ts)
+    assert ts.endswith("Z") or "+00:00" in ts
