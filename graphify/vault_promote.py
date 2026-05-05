@@ -203,7 +203,7 @@ def classify_nodes(
         result["things"].append({
             "node_id": nid,
             "label": gn["label"],
-            "folder": "Atlas/Dots/Things/",
+            "folder": _resolve_folder_prefix("things", profile),
             "score": degree,
         })
 
@@ -216,7 +216,7 @@ def classify_nodes(
         result["questions"].append({
             "node_id": nid,
             "label": gap["label"],
-            "folder": "Atlas/",
+            "folder": _resolve_folder_prefix("questions", profile),
             "score": G.degree(nid),
             "reason": gap.get("reason", ""),
         })
@@ -228,7 +228,7 @@ def classify_nodes(
         result["maps"].append({
             "community_id": cid,
             "label": f"Community {cid}",
-            "folder": "Atlas/Maps/",
+            "folder": _resolve_folder_prefix("maps", profile),
             "score": 0,
             "members": list(member_ids),
         })
@@ -246,7 +246,7 @@ def classify_nodes(
             result["people"].append({
                 "node_id": node_id,
                 "label": label,
-                "folder": "Atlas/Dots/People/",
+                "folder": _resolve_folder_prefix("people", profile),
                 "score": degree,
             })
 
@@ -264,7 +264,7 @@ def classify_nodes(
             result["quotes"].append({
                 "node_id": node_id,
                 "label": label,
-                "folder": "Atlas/Quotes/",
+                "folder": _resolve_folder_prefix("quotes", profile),
                 "score": degree,
             })
 
@@ -280,7 +280,7 @@ def classify_nodes(
             result["statements"].append({
                 "node_id": node_id,
                 "label": data.get("label", node_id),
-                "folder": "Atlas/Dots/Statements/",
+                "folder": _resolve_folder_prefix("statements", profile),
                 "score": degree,
             })
 
@@ -296,7 +296,7 @@ def classify_nodes(
                 result["sources"].append({
                     "source_path": src_path,
                     "label": stem,
-                    "folder": "Atlas/Sources/",
+                    "folder": _resolve_folder_prefix("sources", profile),
                     "score": 0,
                 })
 
@@ -868,16 +868,45 @@ def _writeback_profile(vault_dir: Path, detected_tags: dict[str, list[str]]) -> 
 # Main orchestrator (VAULT-01, VAULT-05, VAULT-06) — Plan 03
 # ---------------------------------------------------------------------------
 
-# Folder type → vault relative path prefix (D-11)
-_FOLDER_PATH_PREFIX: dict[str, str] = {
-    "things": "Atlas/Dots/Things",
-    "questions": "Atlas/Dots/Questions",
-    "statements": "Atlas/Dots/Statements",
-    "people": "Atlas/Dots/People",
-    "quotes": "Atlas/Dots/Quotes",
-    "maps": "Atlas/Maps",
-    "sources": "Atlas/Sources/Clippings",
+# Plural bucket key → singular profile key (graphify_folder_mapping uses singular nouns per D-01)
+_BUCKET_TO_PROFILE_KEY: dict[str, str] = {
+    "things": "thing",
+    "questions": "question",
+    "maps": "map",
+    "people": "person",
+    "quotes": "quote",
+    "statements": "statement",
+    "sources": "source",
 }
+
+
+def _resolve_folder_prefix(bucket_key: str, merged_profile: dict) -> str:
+    """Resolve the vault-relative folder prefix for a bucket key using the merged profile.
+
+    Lookup order:
+    1. User-supplied graphify_folder_mapping[profile_key] (merged_profile)
+    2. _DEFAULT_PROFILE["graphify_folder_mapping"][profile_key] (built-in default)
+    3. D-04 fallback: Atlas/Sources/Graphify/<BucketKey.capitalize()>/ with stderr INFO
+    """
+    profile_key = _BUCKET_TO_PROFILE_KEY.get(bucket_key)
+    mapping = (merged_profile.get("graphify_folder_mapping") or {}) if merged_profile else {}
+
+    if profile_key and profile_key in mapping:
+        return mapping[profile_key].rstrip("/")
+
+    default_mapping = _DEFAULT_PROFILE.get("graphify_folder_mapping", {})
+    if profile_key and profile_key in default_mapping:
+        return default_mapping[profile_key].rstrip("/")
+
+    # D-04: unknown record type — emit INFO breadcrumb and use generic fallback
+    fallback = f"Atlas/Sources/Graphify/{bucket_key.capitalize()}"
+    print(
+        f"[graphify] profile: unknown record type {bucket_key!r}; "
+        f"using fallback {fallback}/",
+        file=sys.stderr,
+    )
+    return fallback
+
 
 _BUCKET_TO_FOLDER_TYPE: dict[str, str] = {
     "things": "Things",
@@ -946,7 +975,7 @@ def promote(
         "vault": str(vault_dir),
     }
 
-    promoted_counts: dict[str, int] = {k: 0 for k in _FOLDER_PATH_PREFIX}
+    promoted_counts: dict[str, int] = {k: 0 for k in _BUCKET_TO_PROFILE_KEY}
     skipped: dict[str, list[str]] = {}
     skipped_entries: list[tuple[str, str]] = []  # for import-log
 
@@ -955,7 +984,7 @@ def promote(
     for bucket_key in bucket_order:
         records = classified.get(bucket_key, [])
         folder_type = _BUCKET_TO_FOLDER_TYPE[bucket_key]
-        prefix = _FOLDER_PATH_PREFIX[bucket_key]
+        prefix = _resolve_folder_prefix(bucket_key, merged_profile)
 
         for record in records:
             filename_stem, content = render_note(record, folder_type, G, merged_profile, run_meta, vault_dir=vault_dir)

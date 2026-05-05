@@ -531,7 +531,7 @@ def test_vault01_cli_does_not_overwrite_foreign(tmp_path):
     # Pre-place a foreign file in a path graphify would use.
     # Maps are rendered with safe_filename(label) where label = "Community 0", "Community 1" etc.
     # Use "Community 0.md" which matches the first community in the synthetic graph.
-    foreign_dir = vault / "Atlas" / "Maps"
+    foreign_dir = vault / "Atlas" / "Sources" / "Graphify" / "Maps"
     foreign_dir.mkdir(parents=True, exist_ok=True)
     foreign_file = foreign_dir / "Community 0.md"
     foreign_file.write_text("## User's own map note", encoding="utf-8")
@@ -721,7 +721,7 @@ def test_multi_run_preserves_foreign_file(tmp_path):
     # Do NOT run first promote() — create a foreign file at a path promote() WILL try to write.
     # promote() treats a file as foreign when it exists on disk but is NOT in the manifest.
     # Use "Atlas/Maps/Community 0.md" — promote() always generates Map MOCs for community 0.
-    foreign_dir = vault / "Atlas" / "Maps"
+    foreign_dir = vault / "Atlas" / "Sources" / "Graphify" / "Maps"
     foreign_dir.mkdir(parents=True, exist_ok=True)
     handmade = foreign_dir / "Community 0.md"
     handmade.write_text("# Hand-written map\nUser created this manually.", encoding="utf-8")
@@ -752,7 +752,7 @@ def test_multi_run_preserves_user_edit(tmp_path):
     promote(graph_path=graph_path, vault_path=vault, threshold=1)
 
     # Locate one promoted file in Things and mutate it
-    things_dir = vault / "Atlas" / "Dots" / "Things"
+    things_dir = vault / "Atlas" / "Sources" / "Graphify" / "Things"
     assert things_dir.exists(), "Things folder must exist after first promote()"
     promoted_files = list(things_dir.glob("*.md"))
     assert promoted_files, "There must be at least one promoted file in Things"
@@ -869,12 +869,12 @@ def test_profile_folder_routing(tmp_path):
     from graphify.vault_promote import classify_nodes
 
     # Build a graph with one high-degree Thing node (degree >= 1, file_type != code)
-    nodes = [{"id": "my_concept", "label": "My Concept", "file_type": "document"}]
+    nodes = [{"id": "my_concept", "label": "My Concept", "file_type": "document", "source_file": "ideas.md"}]
     edges = [
         {"source": "my_concept", "target": f"peer_{i}", "relation": "references", "confidence": "EXTRACTED", "source_file": "doc.md"}
         for i in range(5)
     ]
-    peers = [{"id": f"peer_{i}", "label": f"Peer {i}", "file_type": "document"} for i in range(5)]
+    peers = [{"id": f"peer_{i}", "label": f"Peer {i}", "file_type": "document", "source_file": "ideas.md"} for i in range(5)]
     G = _make_graph_with_nodes(nodes + peers, edges)
     communities = _make_communities(G, {0: ["my_concept"] + [f"peer_{i}" for i in range(5)]})
 
