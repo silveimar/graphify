@@ -1144,3 +1144,156 @@ def test_user_only_symlink_resolved(tmp_path):
         _write_record(vault, "Atlas/Sources/Graphify/SymMaps/x.md", "content", {}, profile)
 
     assert not (calendar_dir / "x.md").exists(), "Symlink bypass: file must not be written into Calendar/"
+
+
+# ---------------------------------------------------------------------------
+# Plan 04: Legacy artifact detection + migration (69-04-01..06)
+# ---------------------------------------------------------------------------
+
+def _make_default_profile_for_legacy():
+    """Return a merged_profile dict with default pinned subtree (Atlas/Sources/Graphify/)."""
+    from graphify.profile import _DEFAULT_PROFILE
+    import copy
+    p = copy.deepcopy(_DEFAULT_PROFILE)
+    return p
+
+
+def test_detect_legacy_comm_at_root(tmp_path):
+    """detect_legacy_artifacts surfaces _COMM*.md files at vault root (D-12)."""
+    from graphify.vault_promote import detect_legacy_artifacts
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "_COMM_alpha.md").write_text("# alpha\n")
+    (vault / "_COMM_beta.md").write_text("# beta\n")
+
+    profile = _make_default_profile_for_legacy()
+    result = detect_legacy_artifacts(vault, profile)
+    result_set = set(result)
+    assert "_COMM_alpha.md" in result_set, f"Expected _COMM_alpha.md in {result_set}"
+    assert "_COMM_beta.md" in result_set, f"Expected _COMM_beta.md in {result_set}"
+
+
+def test_detect_legacy_community_maps(tmp_path):
+    """detect_legacy_artifacts surfaces Community*.md under Atlas/Maps/ (D-12)."""
+    from graphify.vault_promote import detect_legacy_artifacts
+
+    vault = tmp_path / "vault"
+    maps_dir = vault / "Atlas" / "Maps"
+    maps_dir.mkdir(parents=True)
+    (maps_dir / "Community_X.md").write_text("# community x\n")
+
+    profile = _make_default_profile_for_legacy()
+    result = detect_legacy_artifacts(vault, profile)
+    result_set = set(result)
+    assert "Atlas/Maps/Community_X.md" in result_set, f"Expected Atlas/Maps/Community_X.md in {result_set}"
+
+
+def test_detect_manifest_outside_pinned(tmp_path):
+    """detect_legacy_artifacts surfaces files with graphifyProject frontmatter outside pinned subtree."""
+    from graphify.vault_promote import detect_legacy_artifacts
+
+    vault = tmp_path / "vault"
+    notes_dir = vault / "Notes"
+    notes_dir.mkdir(parents=True)
+    (notes_dir / "Random.md").write_text("---\ngraphifyProject: true\n---\n# Random\n")
+
+    profile = _make_default_profile_for_legacy()
+    result = detect_legacy_artifacts(vault, profile)
+    result_set = set(result)
+    assert "Notes/Random.md" in result_set, f"Expected Notes/Random.md in {result_set}"
+
+
+def test_migrate_legacy_dry_run(tmp_path, capsys):
+    """migrate_legacy with apply=False prints plan, performs zero moves."""
+    from graphify.vault_promote import detect_legacy_artifacts, migrate_legacy
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "_COMM_alpha.md").write_text("# alpha\n")
+    maps_dir = vault / "Atlas" / "Maps"
+    maps_dir.mkdir(parents=True)
+    (maps_dir / "Community_X.md").write_text("# community x\n")
+    notes_dir = vault / "Notes"
+    notes_dir.mkdir()
+    (notes_dir / "Random.md").write_text("---\ngraphifyProject: true\n---\n# Random\n")
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text("{}")
+    profile = _make_default_profile_for_legacy()
+
+    result = migrate_legacy(vault, profile, manifest_path, apply=False)
+
+    assert result["moved"] == 0, f"dry-run must move 0 files; got {result['moved']}"
+    assert len(result["planned"]) > 0, "planned list must be non-empty"
+
+    # Original files still present
+    assert (vault / "_COMM_alpha.md").exists(), "_COMM_alpha.md must still exist after dry-run"
+    assert (maps_dir / "Community_X.md").exists(), "Community_X.md must still exist after dry-run"
+
+    captured = capsys.readouterr()
+    assert "→" in captured.out, f"Expected 'old → new' lines in stdout; got: {captured.out!r}"
+
+
+def test_migrate_legacy_apply(tmp_path):
+    """migrate_legacy with apply=True moves legacy files to mapped locations and updates manifest."""
+    from graphify.vault_promote import migrate_legacy
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "_COMM_alpha.md").write_text("# alpha\n")
+    maps_dir = vault / "Atlas" / "Maps"
+    maps_dir.mkdir(parents=True)
+    (maps_dir / "Community_X.md").write_text("# cx\n")
+    notes_dir = vault / "Notes"
+    notes_dir.mkdir()
+    (notes_dir / "Random.md").write_text("---\ngraphifyProject: true\n---\n# Random\n")
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        '{"_COMM_alpha.md": "aaa", "Atlas/Maps/Community_X.md": "bbb", "Notes/Random.md": "ccc"}'
+    )
+    profile = _make_default_profile_for_legacy()
+
+    result = migrate_legacy(vault, profile, manifest_path, apply=True)
+
+    assert result["moved"] >= 3, f"Expected at least 3 moves; got {result['moved']}"
+    # Original files should no longer be at their old locations
+    assert not (vault / "_COMM_alpha.md").exists(), "_COMM_alpha.md should have been moved"
+    # Manifest must be updated
+    import json
+    new_manifest = json.loads(manifest_path.read_text())
+    assert "_COMM_alpha.md" not in new_manifest, "Old manifest entry should be replaced"
+
+
+def test_migrate_legacy_rollback(tmp_path, monkeypatch):
+    """migrate_legacy rolls back a file move when manifest write fails (D-14)."""
+    from graphify.vault_promote import migrate_legacy
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "_COMM_alpha.md").write_text("# alpha rollback test\n")
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text('{"_COMM_alpha.md": "hash123"}')
+    profile = _make_default_profile_for_legacy()
+
+    # Monkeypatch _write_atomic in vault_promote to raise OSError
+    import graphify.vault_promote as vp_mod
+    original_write_atomic = vp_mod._write_atomic
+
+    call_count = {"n": 0}
+
+    def failing_write_atomic(target, content):
+        call_count["n"] += 1
+        raise OSError("simulated manifest write failure")
+
+    monkeypatch.setattr(vp_mod, "_write_atomic", failing_write_atomic)
+
+    result = migrate_legacy(vault, profile, manifest_path, apply=True)
+
+    # The file should have been rolled back to its original location
+    assert (vault / "_COMM_alpha.md").exists(), (
+        "_COMM_alpha.md must be rolled back after manifest write failure"
+    )
+    assert len(result["failed"]) > 0, f"failed list must be non-empty; got {result}"
