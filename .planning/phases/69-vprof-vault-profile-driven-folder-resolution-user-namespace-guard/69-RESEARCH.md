@@ -602,22 +602,13 @@ def write_note(vault_dir: Path, rel_path: str, content: str, manifest: dict[str,
 
 **A3 is LOW confidence** — planner should evaluate whether a separate `--migrate-legacy-apply` flag avoids ambiguity.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **`graphify_manifest_hash` frontmatter key vs `graphifyProject`**
-   - What we know: D-12 specifies `graphify_manifest_hash`; codebase uses `graphifyProject`/`graphifyRun`
-   - What's unclear: Should Phase 69 introduce `graphify_manifest_hash` to all note frontmatter going forward, or use `graphifyProject` as the detection marker?
-   - Recommendation: Use `graphifyProject` for Phase 69 (zero test churn). If `graphify_manifest_hash` is needed for Phase 70 reverse-sync, introduce it then.
+1. **`graphify_manifest_hash` frontmatter key vs `graphifyProject`** — **RESOLVED:** use `graphifyProject` as the Phase 69 ownership marker for legacy detection. Zero test churn. `graphify_manifest_hash` is deferred to Phase 70 if reverse-sync needs it.
 
-2. **`user_only_folders` default list**
-   - What we know: REQUIREMENTS.md mentions `Atlas/`, `Calendar/`, `Efforts/`, `+/`, `x/`, and vault root as defaults
-   - What's unclear: Exact default list is not in CONTEXT.md decisions — only mentioned in REQUIREMENTS.md
-   - Recommendation: Use the REQUIREMENTS.md list as `_DEFAULT_USER_ONLY_FOLDERS` in `_DEFAULT_PROFILE`.
+2. **`user_only_folders` default list** — **RESOLVED:** default to `[]` (empty list — opt-in). Users must declare `user_only_folders` explicitly in `profile.yaml`. Rationale: graphify cannot know which folders a given vault treats as user-owned without the user's input; an empty default avoids false-refusals on non-Ideaverse vaults. The Ideaverse-specific list (`Atlas/`, `Calendar/`, `Efforts/`, `+/`, `x/`, vault root) belongs in the user's profile, not as a global default. (Captured as D-16 in CONTEXT.md.)
 
-3. **`--migrate-legacy` CLI flag shape**
-   - What we know: D-13 says `--migrate-legacy` is dry-run, `--migrate-legacy --apply` applies moves
-   - What's unclear: `--apply` already has a meaning on `update-vault` (apply a plan with `--plan-id`)
-   - Recommendation: Consider `--migrate-legacy-apply` as a single flag to avoid ambiguity. Planner's discretion.
+3. **`--migrate-legacy` CLI flag shape** — **RESOLVED:** use two separate flags. `--migrate-legacy` is dry-run; `--migrate-legacy-apply` is a single combined flag that performs the moves. This avoids collision with `--apply` semantics elsewhere on `update-vault`.
 
 ## Security Domain
 

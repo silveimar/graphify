@@ -2,8 +2,9 @@
 phase: 69
 slug: vprof-vault-profile-driven-folder-resolution-user-namespace-guard
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
+wave_0_rationale: "TDD RED tasks in Plans 01–04 satisfy the Wave 0 stub contract — each plan's first task writes failing tests for the requirement before any implementation. No separate Wave 0 plan is required."
 created: 2026-05-05
 ---
 

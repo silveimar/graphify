@@ -46,6 +46,7 @@ Replace hardcoded `Atlas/...` write paths in `graphify/vault_promote.py` with pr
 - **D-05:** **Silent in-place rewrite** of `profile.yaml` on first read of a v1 profile. The migrator renames `folder_mapping` → `graphify_folder_mapping` and writes the result back to the same path. Idempotent: if `graphify_folder_mapping` is already present, no rewrite occurs.
 - **D-06:** A single `profile.yaml.bak` is written alongside before each rewrite. The `.bak` always reflects the *previous* state immediately before the latest migration. Subsequent migrations overwrite the same `.bak` (no `.bak.bak` accumulation, no timestamped variants).
 - **D-07:** The migrator is the only graphify code path that writes to the user's `.graphify/` directory in this phase. All other writes still target `Atlas/Sources/Graphify/<type>/` per D-01.
+- **D-16 (added 2026-05-05 post-research):** `user_only_folders` defaults to `[]` (empty list — opt-in). graphify cannot know which folders a given vault treats as user-owned without the user's input; an empty default avoids false-refusals on non-Ideaverse vaults. Users declare `user_only_folders` in their `profile.yaml`. The Ideaverse-specific list (`Atlas/`, `Calendar/`, `Efforts/`, `+/`, `x/`, vault root) is documented as the recommended user-side configuration but ships nowhere as a hardcoded default.
 
 ### Refusal pre-flight scope
 - **D-08:** **Defense in depth — pre-flight pass + chokepoint guard.**
@@ -89,7 +90,7 @@ Replace hardcoded `Atlas/...` write paths in `graphify/vault_promote.py` with pr
 ### Bug epicenter (read these — they define the literals to remove)
 - `graphify/vault_promote.py:195-300` — the hardcoded `folder = "Atlas/..."` literals across the 7 record-type classifiers (things/questions/maps/people/quotes/statements/sources).
 - `graphify/vault_promote.py:702-732` — manifest-hash overwrite guard (PRESERVE; cover with regression test).
-- `graphify/vault_promote.py:873-879` — `_DEFAULT_LAYERS` dict (REMOVE; replaced by profile-derived mapping).
+- `graphify/vault_promote.py:873-879` — `_FOLDER_PATH_PREFIX` dict (the actual symbol name in code; CONTEXT originally used the alias `_DEFAULT_LAYERS`). REMOVE; replaced by profile-derived mapping via `_resolve_folder_prefix()`.
 
 ### Convention contracts
 - `CLAUDE.md` §Security and §"All external input passes through graphify/security.py" — path confinement convention; the new pre-flight reuses this discipline.
