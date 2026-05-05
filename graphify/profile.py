@@ -167,6 +167,19 @@ _DEFAULT_PROFILE: dict = {
             "tracked_paths": [],
         },
     },
+    # Phase 69 (VPROF-01) — schema v2 keys
+    "graphify_folder_mapping": {
+        "thing":     "Atlas/Sources/Graphify/Things/",
+        "question":  "Atlas/Sources/Graphify/Questions/",
+        "map":       "Atlas/Sources/Graphify/Maps/",
+        "person":    "Atlas/Sources/Graphify/People/",
+        "quote":     "Atlas/Sources/Graphify/Quotes/",
+        "statement": "Atlas/Sources/Graphify/Statements/",
+        "source":    "Atlas/Sources/Graphify/Sources/",
+    },
+    "user_only_folders": [],
+    "augment": {"allow_community": False},
+    "reverse_sync": {},  # Phase 70 placeholder — not consumed in Phase 69
 }
 
 _VALID_TOP_LEVEL_KEYS = {
@@ -177,6 +190,10 @@ _VALID_TOP_LEVEL_KEYS = {
     "dataview_queries",  # Phase 31 (TMPL-03, D-11)
     "predicate_flags",  # Phase 55 (TMPL-01, D-55.08)
     "mapping_rule_templates", "note_type_templates",  # Phase 56 (CFG-01, D-56.03)
+    "graphify_folder_mapping",  # Phase 69 (VPROF-01)
+    "user_only_folders",         # Phase 69 (VPROF-02)
+    "augment",                   # Phase 69 (VPROF-03)
+    "reverse_sync",              # Phase 70 placeholder
 }
 
 # Phase 31 (TMPL-03, D-12): per-note-type keys allowed under `dataview_queries:`.
@@ -551,6 +568,62 @@ def _resolve_profile_chain(entry_path: Path, vault_dir: Path) -> "ResolvedProfil
 # Profile loading (PROF-01, PROF-02, D-04)
 # ---------------------------------------------------------------------------
 
+def migrate_profile_v1_to_v2(profile_path: Path, vault_dir: Path) -> str:
+    """Migrate a v1 profile.yaml to v2 in-place, writing .bak first.
+
+    Returns:
+      "migrated"        — folder_mapping → graphify_folder_mapping rename performed.
+      "already_v2"      — graphify_folder_mapping already present (no-op); OR neither
+                          legacy nor v2 key found (nothing to migrate).
+      "skipped_no_yaml" — profile_path does not exist.
+
+    Idempotent: if graphify_folder_mapping already present, returns "already_v2"
+    and does NOT rewrite profile.yaml or .bak.  The .bak write happens ONLY when
+    an actual migration occurs (D-05 / D-06).
+    """
+    if not profile_path.exists():
+        return "skipped_no_yaml"
+
+    try:
+        import yaml  # type: ignore[import-untyped]
+    except ImportError:
+        return "skipped_no_yaml"
+
+    raw_bytes = profile_path.read_bytes()
+    data: dict = yaml.safe_load(raw_bytes) or {}
+
+    if "graphify_folder_mapping" in data:
+        # Already v2 — idempotent no-op; do NOT touch .bak.
+        return "already_v2"
+
+    if "folder_mapping" not in data:
+        # Neither legacy nor v2 key present — nothing to migrate.
+        return "already_v2"
+
+    # Write .bak BEFORE rewriting — overwrite any prior .bak (D-06: single overwriting .bak).
+    bak_path = profile_path.parent / (profile_path.name + ".bak")
+    bak_path.write_bytes(raw_bytes)
+
+    # Rename key, preserving values and dict order.
+    updated: dict = {}
+    for k, v in data.items():
+        if k == "folder_mapping":
+            updated["graphify_folder_mapping"] = v
+        else:
+            updated[k] = v
+
+    tmp = profile_path.with_suffix(".yaml.tmp")
+    tmp.write_text(yaml.dump(updated, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    os.replace(tmp, profile_path)
+
+    print(
+        "[graphify] profile: migrated folder_mapping → graphify_folder_mapping"
+        f" (backup at {bak_path.relative_to(vault_dir)})",
+        file=sys.stderr,
+    )
+    return "migrated"
+
+
 def load_profile(vault_dir: str | Path | None) -> dict:
     """Discover and load a vault profile, merging over built-in defaults.
 
@@ -572,6 +645,11 @@ def load_profile(vault_dir: str | Path | None) -> dict:
             file=sys.stderr,
         )
         return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, {}))
+
+    # Phase 69 (VPROF-01): silently upgrade v1 profile to v2 in-place before chain resolution.
+    _quick = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
+    if "folder_mapping" in _quick and "graphify_folder_mapping" not in _quick:
+        migrate_profile_v1_to_v2(profile_path, Path(vault_dir))
 
     # Phase 30 (CFG-02): walk the extends/includes chain BEFORE schema validation
     # so partial fragments are tolerated (D-08) and only the composed profile
