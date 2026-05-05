@@ -97,7 +97,7 @@
   6. `graphify doctor` reports legacy artifacts (`_COMM*.md` at vault root, `Community*.md` under `Atlas/Maps/`, etc.) when present; `graphify update-vault --migrate-legacy` relocates them into the profile-pinned subtree and re-points the manifest.
 **Plans**: 4 plans
 - [x] 69-01-PLAN.md — Profile schema v2 + silent v1→v2 migrator (VPROF-01)
-- [ ] 69-02-PLAN.md — Profile-driven folder resolution; remove hardcoded Atlas literals (VPROF-02)
+- [x] 69-02-PLAN.md — Profile-driven folder resolution; remove hardcoded Atlas literals (VPROF-02)
 - [ ] 69-03-PLAN.md — Pre-flight refusal + chokepoint guard; preserve manifest-hash guard (VPROF-03 refusal half)
 - [ ] 69-04-PLAN.md — Legacy artifact detection in doctor + update-vault --migrate-legacy[-apply] (VPROF-04)
 
@@ -124,7 +124,7 @@
 | 66. CFED | 0/0 | Not started | - |
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
 | 68. AUDIT-B | 0/0 | Not started | - |
-| 69. VPROF | 1/4 | In Progress|  |
+| 69. VPROF | 2/4 | In Progress|  |
 | 70. VRSYNC | 0/0 | Not started | - |
 
 ## Coverage
