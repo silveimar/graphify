@@ -1650,6 +1650,9 @@ def main() -> None:
         print("    --apply --plan-id <id>  apply a reviewed migration plan artifact")
         print("                            Back up the target vault before apply")
         print("                            apply output includes Archived legacy notes under graphify-out/migrations/archive/")
+        print("  reverse-sync --vault PATH [--input PATH] [--mode MODE] [--yes]")
+        print("                            sync user-edited vault files back into input/ (Phase 70 / VRSYNC-01)")
+        print("                            --mode {always_ask,always_copy,never_copy}; --yes overrides always_ask only")
         print("  enrich                 run background derivation passes over an existing graph (overlay only)")
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
         print("    --budget N              token budget cap (description → patterns → community; staleness compute-only)")
@@ -3387,6 +3390,35 @@ def main() -> None:
             sys.exit(1)
         print(format_migration_preview(result["preview"], verbose=opts.verbose))
         _cli_exit(0)
+    elif cmd == "reverse-sync":
+        # graphify reverse-sync --vault PATH [--input PATH] [--mode MODE] [--yes]
+        # Phase 70 / VRSYNC-01 — Plan 03.
+        import argparse as _ap
+        _p_rs = _ap.ArgumentParser(
+            prog="graphify reverse-sync",
+            description="Sync user-edited vault files back into input/ (VRSYNC-01).",
+        )
+        _p_rs.add_argument("--vault", default=None)
+        _p_rs.add_argument("--input", default=None)
+        _p_rs.add_argument(
+            "--yes",
+            action="store_true",
+            help="Override always_ask mode (does NOT override never_copy per D-12)",
+        )
+        _p_rs.add_argument(
+            "--mode",
+            choices=["always_ask", "always_copy", "never_copy"],
+            default=None,
+        )
+        opts = _p_rs.parse_args(sys.argv[2:])
+        from graphify.reverse_sync import run_reverse_sync
+        result = run_reverse_sync(
+            vault_dir=Path(opts.vault) if opts.vault else Path.cwd(),
+            input_dir_override=Path(opts.input) if opts.input else None,
+            mode_override=opts.mode,
+            yes=opts.yes,
+        )
+        sys.exit(0 if not result["failed"] else 1)
     elif cmd == "vault-promote":
         # graphify vault-promote --vault PATH [--threshold N] [--graph PATH]
         lv_write_into_vault, sys.argv[2:] = _strip_write_into_vault_from_tokens(sys.argv[2:])

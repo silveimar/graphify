@@ -154,13 +154,19 @@ def test_empty_vault(tmp_path):
 
 def _write_profile_yaml(vault: Path, input_dir: Path, mode: str = "always_ask",
                         folders=("Atlas",)) -> None:
-    """Write a minimal .graphify/profile.yaml so load_profile() returns mode + folders."""
+    """Write a minimal valid v1.8 .graphify/profile.yaml.
+
+    `taxonomy` and `mapping.min_community_size` are required by
+    _validate_required_v18_user_profile; vault_path/input_path are NOT valid
+    profile keys — run_reverse_sync injects them from its arguments.
+    """
     pdir = vault / ".graphify"
     pdir.mkdir(parents=True, exist_ok=True)
     folders_yaml = "\n".join(f"  - {f}" for f in folders)
     (pdir / "profile.yaml").write_text(
-        "vault_path: " + str(vault) + "\n"
-        "input_path: " + str(input_dir) + "\n"
+        "taxonomy: {}\n"
+        "mapping:\n"
+        "  min_community_size: 1\n"
         "user_only_folders:\n" + folders_yaml + "\n"
         "reverse_sync:\n"
         "  mode: " + mode + "\n",
@@ -189,7 +195,7 @@ def test_mode_always_copy_writes_without_prompt(tmp_path, monkeypatch):
         raise AssertionError("input() must not be called in always_copy mode")
     monkeypatch.setattr("builtins.input", _no_input)
 
-    result = run_reverse_sync(vault_dir=vault)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp)
     assert result["copied"] == 2
     assert (inp / "Atlas" / "a.md").read_text() == "alpha\n"
     assert (inp / "Atlas" / "b.md").read_text() == "beta\n"
@@ -203,7 +209,7 @@ def test_mode_never_copy_logs_only(tmp_path):
     _write_profile_yaml(vault, inp, mode="never_copy")
 
     # D-12: --yes does NOT override never_copy.
-    result = run_reverse_sync(vault_dir=vault, yes=True)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp, yes=True)
     assert result["skipped_never_copy"] == 2
     assert result["copied"] == 0
     assert not (inp / "Atlas" / "x.md").exists()
@@ -220,7 +226,7 @@ def test_mode_always_ask_yes_response(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
     monkeypatch.setattr("builtins.input", _scripted_input(["y"]))
 
-    result = run_reverse_sync(vault_dir=vault)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp)
     assert result["copied"] == 1
     assert (inp / "Atlas" / "f.md").read_text() == "data\n"
 
@@ -235,7 +241,7 @@ def test_mode_always_ask_no_response(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
     monkeypatch.setattr("builtins.input", _scripted_input(["n"]))
 
-    result = run_reverse_sync(vault_dir=vault)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp)
     assert result["skipped_user"] == 1
     assert result["copied"] == 0
     assert not (inp / "Atlas" / "f.md").exists()
@@ -252,7 +258,7 @@ def test_prompt_diff_then_yes(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
     monkeypatch.setattr("builtins.input", _scripted_input(["d", "y"]))
 
-    result = run_reverse_sync(vault_dir=vault)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp)
     out = capsys.readouterr().out
     # diff body printed (D-02)
     assert "new content" in out or "old content" in out
@@ -273,7 +279,7 @@ def test_prompt_all_response(tmp_path, monkeypatch):
     # Exactly one input() call ("A") — subsequent files must auto-accept.
     monkeypatch.setattr("builtins.input", _scripted_input(["A"]))
 
-    result = run_reverse_sync(vault_dir=vault)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp)
     assert result["copied"] == 3
 
 
@@ -290,7 +296,7 @@ def test_prompt_quit_response(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
     monkeypatch.setattr("builtins.input", _scripted_input(["y", "Q"]))
 
-    result = run_reverse_sync(vault_dir=vault)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp)
     assert result["failed"] is False  # clean abort
     assert result["copied"] == 1
     # Files after the quit must not be touched.
@@ -308,7 +314,7 @@ def test_yes_flag_overrides_always_ask(tmp_path, monkeypatch):
         raise AssertionError("input() must not be called when --yes is set")
     monkeypatch.setattr("builtins.input", _no_input)
 
-    result = run_reverse_sync(vault_dir=vault, yes=True)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp, yes=True)
     assert result["copied"] == 1
     assert (inp / "Atlas" / "f.md").read_text() == "data\n"
 
@@ -319,7 +325,7 @@ def test_yes_does_NOT_override_never_copy(tmp_path):
     (vault / "Atlas" / "f.md").write_text("data\n")
     _write_profile_yaml(vault, inp, mode="never_copy")
 
-    result = run_reverse_sync(vault_dir=vault, yes=True)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp, yes=True)
     assert result["skipped_never_copy"] == 1
     assert result["copied"] == 0
     assert not (inp / "Atlas" / "f.md").exists()
@@ -338,7 +344,7 @@ def test_non_tty_skips_conflicts(tmp_path, monkeypatch):
         raise AssertionError("input() must not be called in non-TTY mode")
     monkeypatch.setattr("builtins.input", _no_input)
 
-    result = run_reverse_sync(vault_dir=vault)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp)
     assert result["skipped_conflict"] == 2
     assert result["copied"] == 0
     assert not (inp / "Atlas" / "a.md").exists()
@@ -361,7 +367,7 @@ def test_atomic_copy(tmp_path, monkeypatch):
         return real_replace(src, dst)
     monkeypatch.setattr("os.replace", _spy_replace)
 
-    result = run_reverse_sync(vault_dir=vault)
+    result = run_reverse_sync(vault_dir=vault, input_dir_override=inp)
     assert result["copied"] == 1
     assert seen["replace_called"] is True
 
@@ -386,7 +392,8 @@ def test_cli_subcommand_dispatch(tmp_path, monkeypatch, capsys):
 
     monkeypatch.setattr(
         "sys.argv",
-        ["graphify", "reverse-sync", "--vault", str(vault), "--mode", "always_copy"],
+        ["graphify", "reverse-sync", "--vault", str(vault),
+         "--input", str(inp), "--mode", "always_copy"],
     )
 
     with pytest.raises(SystemExit) as exc:

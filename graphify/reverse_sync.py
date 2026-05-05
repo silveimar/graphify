@@ -10,7 +10,9 @@ NOTE: Do NOT use graphify.cache.file_hash() here — it strips frontmatter for
 Reverse-sync compares raw file bytes so frontmatter-only edits are detected.
 """
 
+import difflib
 import hashlib
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -148,4 +150,197 @@ def compute_change_set(profile: dict) -> list[ChangeRecord]:
     return records
 
 
-__all__ = ["ChangeRecord", "ChangeKind", "compute_change_set"]
+# ---------------------------------------------------------------------------
+# Plan 03: mode dispatch + prompt UX + apply step.
+# ---------------------------------------------------------------------------
+
+
+def _diff_summary(a: bytes, b: bytes) -> str:
+    """Compact stats string for JSONL log (D-03). +N -M lines, +A -B bytes.
+
+    a = old (input-side), b = new (vault-side). Wired by Plan 04; defined here
+    so the module surface is complete.
+    """
+    a_lines = a.decode("utf-8", errors="replace").splitlines()
+    b_lines = b.decode("utf-8", errors="replace").splitlines()
+    diff = list(difflib.ndiff(a_lines, b_lines))
+    plus_lines = sum(1 for d in diff if d.startswith("+ "))
+    minus_lines = sum(1 for d in diff if d.startswith("- "))
+    plus_bytes = max(0, len(b) - len(a))
+    minus_bytes = max(0, len(a) - len(b))
+    return f"+{plus_lines} -{minus_lines} lines, +{plus_bytes} -{minus_bytes} bytes"
+
+
+def prompt_per_file(rel: str, vault_text: str, input_text: str | None) -> str:
+    """Interactive Y/n/d/A/Q prompt (D-01, D-02). TTY-gated (D-13).
+
+    Returns one of: "yes", "no", "all", "quit", "skip".
+    "skip" is returned in non-TTY environments (D-13) — caller must treat as
+    skipped_conflict (NOT an auto-accept).
+    """
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return "skip"
+    while True:
+        try:
+            ans = input(f"[graphify] reverse-sync {rel} [Y/n/d/A/Q]: ").strip()
+        except EOFError:
+            return "skip"
+        low = ans.lower()
+        if low in ("", "y", "yes"):
+            return "yes"
+        if low in ("n", "no"):
+            return "no"
+        if low in ("a", "all"):
+            return "all"
+        if low in ("q", "quit"):
+            return "quit"
+        if low in ("d", "diff"):
+            old = (input_text or "").splitlines(keepends=True)
+            new = vault_text.splitlines(keepends=True)
+            sys.stdout.writelines(
+                difflib.unified_diff(old, new, fromfile=f"input/{rel}", tofile=f"vault/{rel}")
+            )
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            continue
+        # unknown → re-prompt
+
+
+def _atomic_copy(src: Path, dst: Path) -> None:
+    """Atomic copy via temp + os.replace. Mirrors merge.py / vault_promote pattern."""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dst.with_suffix(dst.suffix + ".tmp")
+    tmp.write_bytes(src.read_bytes())
+    os.replace(tmp, dst)
+
+
+def _validate_input_path(input_dir: Path, target: Path) -> bool:
+    """Confine *target* to inside *input_dir* (security V4)."""
+    return _is_within(target, input_dir)
+
+
+def apply_change(
+    rec: ChangeRecord,
+    *,
+    mode: str,
+    all_yes: bool,
+    input_dir: Path,
+) -> tuple[str, bool]:
+    """Apply one ChangeRecord according to *mode* and *all_yes*.
+
+    Returns (outcome, new_all_yes) where outcome is one of:
+      "copied", "skipped_user", "skipped_conflict", "skipped_never_copy",
+      "vault_deleted", "quit", "skip" (kind == "skip" — no-op).
+    """
+    if rec.kind == "skip":
+        return ("skip", all_yes)
+    if rec.kind == "vault_deleted":
+        # D-10: log only, never silently delete in this layer.
+        return ("vault_deleted", all_yes)
+
+    # Path-confinement (security V4) before any write.
+    if not _validate_input_path(input_dir, rec.input_path):
+        print(
+            f"[graphify] reverse-sync: refusing target outside input_path: {rec.rel_path}",
+            file=sys.stderr,
+        )
+        return ("skipped_conflict", all_yes)
+
+    if mode == "never_copy":
+        return ("skipped_never_copy", all_yes)
+    if mode == "always_copy":
+        _atomic_copy(rec.vault_path, rec.input_path)
+        return ("copied", all_yes)
+    # always_ask
+    if all_yes:
+        _atomic_copy(rec.vault_path, rec.input_path)
+        return ("copied", all_yes)
+    vault_text = rec.vault_path.read_text(encoding="utf-8", errors="replace")
+    input_text = (
+        rec.input_path.read_text(encoding="utf-8", errors="replace")
+        if rec.input_path.exists() else None
+    )
+    resp = prompt_per_file(rec.rel_path, vault_text, input_text)
+    if resp == "yes":
+        _atomic_copy(rec.vault_path, rec.input_path)
+        return ("copied", all_yes)
+    if resp == "no":
+        return ("skipped_user", all_yes)
+    if resp == "all":
+        _atomic_copy(rec.vault_path, rec.input_path)
+        return ("copied", True)
+    if resp == "quit":
+        return ("quit", all_yes)
+    # "skip" (non-TTY, D-13)
+    return ("skipped_conflict", all_yes)
+
+
+def run_reverse_sync(
+    vault_dir: Path,
+    *,
+    input_dir_override: Path | None = None,
+    mode_override: str | None = None,
+    yes: bool = False,
+    auto_on_run: bool = False,
+) -> dict:
+    """Top-level reverse-sync entry point. Plan 03 implementation.
+
+    JSONL audit log layered in Plan 04; auto-on-run hook layered in Plan 05.
+    """
+    from graphify.profile import load_profile
+
+    profile = load_profile(vault_dir)
+    # Ensure the resolved profile points at *this* vault and the desired input.
+    profile = dict(profile)
+    profile["vault_path"] = str(vault_dir)
+    if input_dir_override is not None:
+        profile["input_path"] = str(input_dir_override)
+    rs_cfg = profile.get("reverse_sync") or {}
+    mode = mode_override or rs_cfg.get("mode") or "always_ask"
+    if mode not in ("always_ask", "always_copy", "never_copy"):
+        print(
+            f"[graphify] reverse-sync: unknown mode '{mode}', defaulting to always_ask",
+            file=sys.stderr,
+        )
+        mode = "always_ask"
+
+    input_dir = Path(profile["input_path"])
+    changes = compute_change_set(profile)
+
+    counters = {
+        "copied": 0,
+        "skipped_user": 0,
+        "skipped_conflict": 0,
+        "skipped_never_copy": 0,
+        "vault_deleted": 0,
+    }
+    # D-12: --yes flips always_ask only.
+    all_yes = bool(yes) and mode == "always_ask"
+
+    for rec in changes:
+        outcome, all_yes = apply_change(
+            rec, mode=mode, all_yes=all_yes, input_dir=input_dir
+        )
+        if outcome == "skip":
+            continue
+        if outcome == "quit":
+            break
+        if outcome in counters:
+            counters[outcome] += 1
+
+    result = dict(counters)
+    result["conflicts_skipped"] = counters["skipped_conflict"]
+    result["failed"] = False
+    return result
+
+
+__all__ = [
+    "ChangeRecord",
+    "ChangeKind",
+    "compute_change_set",
+    "run_reverse_sync",
+    "prompt_per_file",
+    "apply_change",
+    "_validate_input_path",
+    "_diff_summary",
+]
