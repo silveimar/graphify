@@ -84,6 +84,32 @@
   4. The audit closure leaves no v1.12-deferred audit item open in MILESTONES.md.
 **Plans**: TBD
 
+### Phase 69: VPROF — Vault Profile-Driven Folder Resolution & User-Namespace Guard
+**Goal**: `graphify update-vault` and `graphify vault-promote --write-into-vault` resolve every write target via `profile.graphify_folder_mapping` (default `Atlas/Sources/Graphify/<type>/`), refuse to write under `profile.user_only_folders`, and surface legacy graphify-shaped artifacts outside the pinned subtree via `graphify doctor` + `--migrate-legacy`.
+**Depends on**: none (regression fix; independently shippable)
+**Requirements**: VPROF-01, VPROF-02, VPROF-03 (refusal half), VPROF-04
+**Success Criteria** (what must be TRUE):
+  1. With a profile mapping `moc → Atlas/Sources/Graphify/Maps/`, no community MOC notes land in `Atlas/Maps/`; all writes go under the profile-pinned subtree.
+  2. The hardcoded `folder = "Atlas/..."` literals at `graphify/vault_promote.py:206-299` and the `_DEFAULT_LAYERS` dict at `vault_promote.py:873-879` are removed; folder is computed from `profile.graphify_folder_mapping`.
+  3. A write attempt targeting any path under `profile.user_only_folders` is refused pre-flight with an actionable `[graphify] error:` + `  hint:` two-line stderr message; no partial writes occur.
+  4. The manifest-hash overwrite guard at `vault_promote.py:702-732` is preserved and covered by a regression test that simulates a name collision.
+  5. Existing vault profiles using the old `folder_mapping` key upgrade silently to `graphify_folder_mapping` via the one-shot migrator (idempotent; second invocation is a no-op).
+  6. `graphify doctor` reports legacy artifacts (`_COMM*.md` at vault root, `Community*.md` under `Atlas/Maps/`, etc.) when present; `graphify update-vault --migrate-legacy` relocates them into the profile-pinned subtree and re-points the manifest.
+**Plans**: TBD
+
+### Phase 70: VRSYNC — Vault → Input Reverse-Sync & User-File Augmentation
+**Goal**: A new `graphify reverse-sync` command brings vault-side edits back into the raw corpus, and graphify-side writes that touch user files are limited to a frontmatter-augmentation contract.
+**Depends on**: Phase 69 (profile schema v2 must exist; user-namespace contract must be settled)
+**Requirements**: VPROF-03 (augmentation half), VRSYNC-01
+**Success Criteria** (what must be TRUE):
+  1. `graphify reverse-sync` detects new/changed files in `profile.vault_path` user folders via SHA256 (reusing `cache.py` hashing) and copies them into `profile.input_path` according to `profile.reverse_sync.mode` (`always_ask` default).
+  2. Each sync event appends one JSON line to `profile.reverse_sync.memory_path` (default `.graphify/reverse-sync-log.jsonl`) with `{ts, vault_path, input_path, action, diff_summary, hash_before, hash_after}`.
+  3. `--yes` flag overrides `always_ask` for scripted runs; `never_copy` mode logs but never writes; `always_copy` mirrors without prompting.
+  4. `profile.reverse_sync.auto_on_run: true` makes `graphify run` and `graphify update-vault` invoke reverse-sync at start; `false` (default) leaves them untouched.
+  5. User-file augmentation merges only the allowlist frontmatter keys (`related_to`, `up`, `tags`, `comments`, `analysis`, `references`, `type`); body content is byte-identical before vs after augmentation in a property test.
+  6. The `community` frontmatter key is added to user files only when `profile.augment.allow_community: true`; default-config runs leave it absent.
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -94,6 +120,8 @@
 | 66. CFED | 0/0 | Not started | - |
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
 | 68. AUDIT-B | 0/0 | Not started | - |
+| 69. VPROF | 0/0 | Not started | - |
+| 70. VRSYNC | 0/0 | Not started | - |
 
 ## Coverage
 
@@ -109,8 +137,11 @@ All 22 v1.13 requirements mapped to exactly one phase:
 | AUDIT-01 | 68 |
 | AUDIT-02 | 64 |
 | AUDIT-03 | 68 |
+| VPROF-01..02, VPROF-04 | 69 |
+| VPROF-03 | 69, 70 (refusal + augmentation halves) |
+| VRSYNC-01 | 70 |
 
-Total: 22/22 — no orphans, no duplicates.
+Total: 27/27 — no orphans, no duplicates.
 
 ---
 *Created: 2026-05-05 — graphify v1.13 roadmap.*
