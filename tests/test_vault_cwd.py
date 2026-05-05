@@ -399,3 +399,57 @@ def test_vault_list_disables_gate(tmp_path):
     assert "refusing to write" not in proc.stderr, (
         f"--vault-list should suppress VCWD-03; got:\n{proc.stderr}"
     )
+
+
+# Plan 62.1-01 — VCWD-argparse-required defect: update-vault + vault-promote
+# RED tests (TDD gate). These must FAIL before the fix and PASS after.
+# Root cause: _check_vault_cwd_gate auto-adopts BEFORE argparse runs, but
+# --vault is declared required=True so argparse exits 2 regardless.
+# ---------------------------------------------------------------------------
+
+
+def test_update_vault_auto_adopt_no_vault_flag(tmp_path):
+    """VCWD-argparse-required: update-vault from a profile vault CWD without --vault
+    must NOT exit with argparse error 2 ('required: --vault').
+
+    Currently FAILS (RED) because argparse required=True fires before the
+    post-parse auto-adopt fallback can fill in opts.vault.
+    """
+    pytest.importorskip("yaml")
+    vault = _make_profile_vault(tmp_path)
+    # Pass a non-existent --input so the command fails for a *business* reason
+    # (not argparse), proving argparse accepted the call.
+    proc = _graphify(
+        "update-vault", "--input", str(tmp_path / "nonexistent"),
+        cwd=str(vault),
+    )
+    assert "required: --vault" not in proc.stderr, (
+        "argparse 'required: --vault' error fired — auto-adopt argv injection missing.\n"
+        f"stderr: {proc.stderr}"
+    )
+    assert proc.returncode != 2 or "required: --vault" not in proc.stderr, (
+        f"exit 2 with argparse required error\nstderr: {proc.stderr}"
+    )
+
+
+def test_vault_promote_auto_adopt_no_vault_flag(tmp_path):
+    """VCWD-argparse-required: vault-promote from a profile vault CWD without --vault
+    must NOT exit with argparse error 2 ('required: --vault').
+
+    Currently FAILS (RED) because argparse required=True fires before the
+    post-parse auto-adopt fallback can fill in opts.vault.
+    """
+    pytest.importorskip("yaml")
+    vault = _make_profile_vault(tmp_path)
+    # Pass a non-existent --graph so the command fails for a *business* reason.
+    proc = _graphify(
+        "vault-promote", "--graph", str(tmp_path / "nonexistent.json"),
+        cwd=str(vault),
+    )
+    assert "required: --vault" not in proc.stderr, (
+        "argparse 'required: --vault' error fired — auto-adopt argv injection missing.\n"
+        f"stderr: {proc.stderr}"
+    )
+    assert proc.returncode != 2 or "required: --vault" not in proc.stderr, (
+        f"exit 2 with argparse required error\nstderr: {proc.stderr}"
+    )
