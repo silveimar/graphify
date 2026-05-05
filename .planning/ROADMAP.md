@@ -95,7 +95,11 @@
   4. The manifest-hash overwrite guard at `vault_promote.py:702-732` is preserved and covered by a regression test that simulates a name collision.
   5. Existing vault profiles using the old `folder_mapping` key upgrade silently to `graphify_folder_mapping` via the one-shot migrator (idempotent; second invocation is a no-op).
   6. `graphify doctor` reports legacy artifacts (`_COMM*.md` at vault root, `Community*.md` under `Atlas/Maps/`, etc.) when present; `graphify update-vault --migrate-legacy` relocates them into the profile-pinned subtree and re-points the manifest.
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 69-01-PLAN.md — Profile schema v2 + silent v1→v2 migrator (VPROF-01)
+- [ ] 69-02-PLAN.md — Profile-driven folder resolution; remove hardcoded Atlas literals (VPROF-02)
+- [ ] 69-03-PLAN.md — Pre-flight refusal + chokepoint guard; preserve manifest-hash guard (VPROF-03 refusal half)
+- [ ] 69-04-PLAN.md — Legacy artifact detection in doctor + update-vault --migrate-legacy[-apply] (VPROF-04)
 
 ### Phase 70: VRSYNC — Vault → Input Reverse-Sync & User-File Augmentation
 **Goal**: A new `graphify reverse-sync` command brings vault-side edits back into the raw corpus, and graphify-side writes that touch user files are limited to a frontmatter-augmentation contract.
