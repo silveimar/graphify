@@ -72,28 +72,28 @@
 
 | REQ-ID | Phase | Notes |
 |--------|-------|-------|
-| CCONF-01 | TBD | |
-| CCONF-02 | TBD | |
-| CCONF-03 | TBD | |
-| CCONF-04 | TBD | |
-| CCONF-05 | TBD | |
-| CFED-01 | TBD | |
-| CFED-02 | TBD | |
-| CFED-03 | TBD | |
-| CFED-04 | TBD | |
-| CFED-05 | TBD | |
-| CDRIFT-01 | TBD | |
-| CDRIFT-02 | TBD | |
-| CDRIFT-03 | TBD | |
-| CDRIFT-04 | TBD | |
-| CQUERY-01 | TBD | |
-| CQUERY-02 | TBD | |
-| VOPT-01 | TBD | |
-| VOPT-02 | TBD | |
-| VOPT-03 | TBD | |
-| AUDIT-01 | TBD | |
-| AUDIT-02 | TBD | |
-| AUDIT-03 | TBD | |
+| CCONF-01 | Phase 65 | |
+| CCONF-02 | Phase 65 | |
+| CCONF-03 | Phase 65 | |
+| CCONF-04 | Phase 65 | |
+| CCONF-05 | Phase 65 | |
+| CFED-01 | Phase 66 | |
+| CFED-02 | Phase 66 | |
+| CFED-03 | Phase 66 | |
+| CFED-04 | Phase 66 | |
+| CFED-05 | Phase 66 | |
+| CDRIFT-01 | Phase 67 | |
+| CDRIFT-02 | Phase 67 | |
+| CDRIFT-03 | Phase 67 | |
+| CDRIFT-04 | Phase 67 | |
+| CQUERY-01 | Phase 67 | |
+| CQUERY-02 | Phase 67 | |
+| VOPT-01 | Phase 63 | |
+| VOPT-02 | Phase 63 | |
+| VOPT-03 | Phase 63 | |
+| AUDIT-01 | Phase 68 | |
+| AUDIT-02 | Phase 64 | |
+| AUDIT-03 | Phase 68 | |
 
 ---
 

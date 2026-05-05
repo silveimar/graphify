@@ -6,9 +6,9 @@ status: planning
 last_updated: "2026-05-05T16:12:06.239Z"
 last_activity: 2026-05-05
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
-  total_plans: 0
+  total_plans: 0  # TBD per phase
   completed_plans: 0
   percent: 0
 ---
@@ -17,18 +17,18 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` — **v1.12 shipped 2026-05-04**, awaiting next milestone.
+See: `.planning/PROJECT.md` — **v1.13 milestone planning** (v1.12 shipped 2026-05-04).
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Between milestones. Run `/gsd-new-milestone` to start the next cycle.
+**Current focus:** v1.13 — Concept Intelligence & Audit Closure. Roadmap defined (Phases 63–68); awaiting plan-phase.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 63 (VOPT) — not yet planned
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-05 — Milestone v1.13 started
+Status: Roadmap complete; awaiting plan-phase 63
+Last activity: 2026-05-05 — v1.13 ROADMAP.md created (6 phases, 22/22 reqs mapped)
 
 ## Performance Metrics
 
