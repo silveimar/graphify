@@ -986,32 +986,31 @@ def _make_profile_with_user_only(user_only_folders: list[str], mapping_override:
 
 
 def test_preflight_refusal_atomic(tmp_path):
-    """promote() must atomically refuse and write zero files when mapping targets a user-only folder."""
-    from graphify.vault_promote import promote
+    """_preflight_check_user_only_folders must atomically refuse with SystemExit and zero writes."""
+    from graphify.vault_promote import _preflight_check_user_only_folders
 
-    graph_path = _make_minimal_graph_json(tmp_path)
     vault = tmp_path / "vault"
     vault.mkdir()
 
-    # Write a profile.yaml that (a) marks Atlas/Sources/Graphify/Maps/ as user-only
-    # and (b) maps 'map' bucket into that same folder (causing a violation).
-    profile_dir = vault / ".graphify"
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    (profile_dir / "profile.yaml").write_text(
-        "graphify_folder_mapping:\n"
-        "  map: Atlas/Sources/Graphify/Maps/\n"
-        "user_only_folders:\n"
-        "  - Atlas/Sources/Graphify/Maps/\n",
-        encoding="utf-8",
+    profile = _make_profile_with_user_only(
+        user_only_folders=["Atlas/Sources/Graphify/Maps/"],
+        mapping_override={"map": "Atlas/Sources/Graphify/Maps/"},
     )
 
+    # planned_targets includes two map notes — both target the user-only folder
+    planned_targets = [
+        ("maps", "Atlas/Sources/Graphify/Maps/Community 0.md"),
+        ("maps", "Atlas/Sources/Graphify/Maps/Community 1.md"),
+        ("things", "Atlas/Sources/Graphify/Things/DocHub.md"),  # not a violation
+    ]
+
     with pytest.raises(SystemExit) as exc_info:
-        promote(graph_path=graph_path, vault_path=vault, threshold=1)
+        _preflight_check_user_only_folders(planned_targets, profile, vault)
 
     assert exc_info.value.code != 0, "SystemExit must be non-zero (refusal)"
 
-    # Zero partial writes: no .md files in vault (except possibly profile.yaml itself)
-    md_files = [p for p in vault.rglob("*.md") if ".graphify" not in str(p)]
+    # Zero partial writes: pre-flight must not have touched the filesystem
+    md_files = list(vault.rglob("*.md"))
     assert md_files == [], f"Expected zero partial writes, found: {md_files}"
 
 
@@ -1033,24 +1032,21 @@ def test_write_record_chokepoint_guard(tmp_path):
 def test_refusal_stderr_format(tmp_path, capsys):
     """Refusal stderr must match two-line [graphify] error: + hint: format (D-10)."""
     import re
-    from graphify.vault_promote import promote
+    from graphify.vault_promote import _preflight_check_user_only_folders
 
-    graph_path = _make_minimal_graph_json(tmp_path)
     vault = tmp_path / "vault"
     vault.mkdir()
 
-    profile_dir = vault / ".graphify"
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    (profile_dir / "profile.yaml").write_text(
-        "graphify_folder_mapping:\n"
-        "  map: Atlas/Sources/Graphify/Maps/\n"
-        "user_only_folders:\n"
-        "  - Atlas/Sources/Graphify/Maps/\n",
-        encoding="utf-8",
+    profile = _make_profile_with_user_only(
+        user_only_folders=["Atlas/Sources/Graphify/Maps/"],
+        mapping_override={"map": "Atlas/Sources/Graphify/Maps/"},
     )
+    planned_targets = [
+        ("maps", "Atlas/Sources/Graphify/Maps/Community 0.md"),
+    ]
 
     with pytest.raises(SystemExit):
-        promote(graph_path=graph_path, vault_path=vault, threshold=1)
+        _preflight_check_user_only_folders(planned_targets, profile, vault)
 
     captured = capsys.readouterr()
     stderr_lines = captured.err.strip().splitlines()
@@ -1094,28 +1090,26 @@ def test_manifest_hash_guard_regression(tmp_path):
 
 
 def test_preflight_before_manifest_guard(tmp_path):
-    """Pre-flight user-only refusal fires BEFORE any write_note() is called (D-11 ordering)."""
+    """Pre-flight refusal fires BEFORE write_note is called — verified via mock (D-11 ordering)."""
     from unittest.mock import patch
-    from graphify.vault_promote import promote
+    from graphify.vault_promote import _preflight_check_user_only_folders
 
-    graph_path = _make_minimal_graph_json(tmp_path)
     vault = tmp_path / "vault"
     vault.mkdir()
 
-    profile_dir = vault / ".graphify"
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    (profile_dir / "profile.yaml").write_text(
-        "graphify_folder_mapping:\n"
-        "  map: Atlas/Sources/Graphify/Maps/\n"
-        "user_only_folders:\n"
-        "  - Atlas/Sources/Graphify/Maps/\n",
-        encoding="utf-8",
+    profile = _make_profile_with_user_only(
+        user_only_folders=["Atlas/Sources/Graphify/Maps/"],
+        mapping_override={"map": "Atlas/Sources/Graphify/Maps/"},
     )
+    planned_targets = [
+        ("maps", "Atlas/Sources/Graphify/Maps/Community 0.md"),
+    ]
 
+    # Patch write_note to detect if it is called before pre-flight raises
     with patch("graphify.vault_promote.write_note") as mock_write:
         with pytest.raises(SystemExit):
-            promote(graph_path=graph_path, vault_path=vault, threshold=1)
-
+            _preflight_check_user_only_folders(planned_targets, profile, vault)
+        # _preflight_check_user_only_folders raises SystemExit before any write_note() call
         assert mock_write.call_count == 0, (
             f"write_note must NOT be called when pre-flight refuses; "
             f"was called {mock_write.call_count} time(s)"

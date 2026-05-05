@@ -919,6 +919,100 @@ _BUCKET_TO_FOLDER_TYPE: dict[str, str] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# User-namespace refusal — D-08..D-11 (Plan 03)
+# ---------------------------------------------------------------------------
+
+def _assert_under_pinned_subtree(rel_path: str, merged_profile: dict, vault_dir: Path) -> None:
+    """Raise ValueError if rel_path resolves to a user-only folder or outside the pinned subtree.
+
+    Defense-in-depth chokepoint called by _write_record() before every write_note() call.
+    Uses Path.resolve() to defeat symlink bypass attacks (T-69-V4).
+    """
+    resolved = (vault_dir / rel_path).resolve()
+
+    # Check 1: target must be under at least one graphify-owned folder
+    mapping = merged_profile.get("graphify_folder_mapping") or {}
+    pinned_prefixes = tuple(
+        (vault_dir / v.rstrip("/")).resolve() for v in mapping.values() if v
+    )
+    if pinned_prefixes and not any(
+        resolved == p or p in resolved.parents for p in pinned_prefixes
+    ):
+        raise ValueError(
+            f"Target path {rel_path!r} is not under any graphify-owned folder. "
+            "Check graphify_folder_mapping in .graphify/profile.yaml."
+        )
+
+    # Check 2: target must not fall inside a user-only folder (after symlink resolution)
+    for uof in merged_profile.get("user_only_folders") or []:
+        uof_resolved = (vault_dir / uof.rstrip("/")).resolve()
+        if resolved == uof_resolved or uof_resolved in resolved.parents:
+            raise ValueError(
+                f"Target path {rel_path!r} resolves into user-owned folder {uof!r}. "
+                "Graphify will not write into user-owned folders. "
+                "Edit graphify_folder_mapping in .graphify/profile.yaml to retarget "
+                "under a graphify-owned folder."
+            )
+
+
+def _preflight_check_user_only_folders(
+    planned_targets: list[tuple[str, str]],
+    merged_profile: dict,
+    vault_dir: Path,
+) -> None:
+    """Collect ALL user-only folder violations in planned_targets; refuse atomically (D-09).
+
+    planned_targets: list of (bucket_key, rel_path) pairs for every write that promote() plans.
+    Prints two-line [graphify] error: + hint: to stderr (D-10) and raises SystemExit(1).
+    If no violations, returns silently.
+    """
+    violations: list[str] = []
+    user_only = merged_profile.get("user_only_folders") or []
+
+    for bucket_key, rel_path in planned_targets:
+        resolved = (vault_dir / rel_path).resolve()
+        for uof in user_only:
+            uof_resolved = (vault_dir / uof.rstrip("/")).resolve()
+            if resolved == uof_resolved or uof_resolved in resolved.parents:
+                violations.append(
+                    f"{rel_path} (record_type={bucket_key}, violates user_only_folders={uof!r})"
+                )
+                break  # one violation per target is enough
+
+    if violations:
+        n = len(violations)
+        hint_list = "; ".join(violations)
+        print(
+            f"[graphify] error: refused {n} write(s) targeting user-owned folders",
+            file=sys.stderr,
+        )
+        print(
+            f"  hint: violations: {hint_list}; "
+            "edit graphify_folder_mapping in .graphify/profile.yaml to retarget "
+            "under Atlas/Sources/Graphify/.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+
+def _write_record(
+    vault_dir: Path,
+    rel_path: str,
+    content: str,
+    manifest: dict[str, str],
+    merged_profile: dict,
+) -> str:
+    """Single chokepoint for all vault writes in promote().
+
+    Enforces _assert_under_pinned_subtree() before delegating to write_note().
+    The manifest-hash overwrite guard inside write_note() (lines 702-732) fires
+    independently for within-pinned-subtree name collisions (D-11).
+    """
+    _assert_under_pinned_subtree(rel_path, merged_profile, vault_dir)
+    return write_note(vault_dir, rel_path, content, manifest)
+
+
 def promote(
     graph_path: Path,
     vault_path: Path,
@@ -981,6 +1075,22 @@ def promote(
 
     bucket_order = ["things", "questions", "maps", "sources", "people", "quotes", "statements"]
 
+    # Build planned_targets for pre-flight check (D-08/D-09): collect every (bucket_key, rel_path)
+    # that promote() intends to write BEFORE any writes occur.
+    planned_targets: list[tuple[str, str]] = []
+    for bucket_key in bucket_order:
+        records = classified.get(bucket_key, [])
+        folder_type = _BUCKET_TO_FOLDER_TYPE[bucket_key]
+        prefix = _resolve_folder_prefix(bucket_key, merged_profile)
+        for record in records:
+            filename_stem, _content = render_note(
+                record, folder_type, G, merged_profile, run_meta, vault_dir=vault_dir
+            )
+            planned_targets.append((bucket_key, f"{prefix}/{filename_stem}.md"))
+
+    # Pre-flight: refuse atomically if any target violates user_only_folders (D-09, D-11)
+    _preflight_check_user_only_folders(planned_targets, merged_profile, vault_dir)
+
     for bucket_key in bucket_order:
         records = classified.get(bucket_key, [])
         folder_type = _BUCKET_TO_FOLDER_TYPE[bucket_key]
@@ -989,7 +1099,7 @@ def promote(
         for record in records:
             filename_stem, content = render_note(record, folder_type, G, merged_profile, run_meta, vault_dir=vault_dir)
             rel_path = f"{prefix}/{filename_stem}.md"
-            outcome = write_note(vault_dir, rel_path, content, manifest)
+            outcome = _write_record(vault_dir, rel_path, content, manifest, merged_profile)
 
             if outcome in ("written", "overwritten"):
                 promoted_counts[bucket_key] = promoted_counts.get(bucket_key, 0) + 1
