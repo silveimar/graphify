@@ -2999,6 +2999,32 @@ def main() -> None:
             print(f"error: path not found: {target}", file=sys.stderr)
             sys.exit(2)
 
+        # Phase 70 Plan 05: auto_on_run hook (D-11 warn-and-continue).
+        if (
+            resolved.vault_path is not None
+            and isinstance(profile.get("reverse_sync"), dict)
+            and profile["reverse_sync"].get("auto_on_run", False)
+        ):
+            try:
+                from graphify.reverse_sync import run_reverse_sync as _run_reverse_sync
+                _rs_result = _run_reverse_sync(
+                    resolved.vault_path,
+                    input_dir_override=target,
+                    auto_on_run=True,
+                )
+                _rs_skipped = _rs_result.get("conflicts_skipped", 0)
+                if _rs_skipped:
+                    print(
+                        f"[graphify] reverse-sync: {_rs_skipped} conflicts skipped — "
+                        f"run 'graphify reverse-sync' to resolve",
+                        file=sys.stderr,
+                    )
+            except Exception as _rs_exc:  # D-11: warn-and-continue
+                print(
+                    f"[graphify] reverse-sync: skipped due to error: {_rs_exc}",
+                    file=sys.stderr,
+                )
+
         # Determine artifacts out_dir per ResolvedOutput contract (D-11, D-12, HYG-05)
         from graphify.output import default_graphify_artifacts_dir
 
@@ -3375,6 +3401,37 @@ def main() -> None:
             print("error: --vault is required (omit only when running from a vault CWD with auto-adopt)", file=sys.stderr)
             sys.exit(EXIT_VAULT_REFUSAL)
         from graphify.migration import format_migration_preview, run_update_vault
+
+        # Phase 70 Plan 05: auto_on_run hook (D-11 warn-and-continue).
+        try:
+            from graphify.profile import load_profile as _uv_load_profile
+            _uv_profile = _uv_load_profile(Path(_uv_vault))
+        except Exception:
+            _uv_profile = {}
+        if (
+            isinstance(_uv_profile.get("reverse_sync"), dict)
+            and _uv_profile["reverse_sync"].get("auto_on_run", False)
+        ):
+            try:
+                from graphify.reverse_sync import run_reverse_sync as _run_reverse_sync
+                _rs_result = _run_reverse_sync(
+                    Path(_uv_vault),
+                    input_dir_override=Path(opts.input),
+                    auto_on_run=True,
+                )
+                _rs_skipped = _rs_result.get("conflicts_skipped", 0)
+                if _rs_skipped:
+                    print(
+                        f"[graphify] reverse-sync: {_rs_skipped} conflicts skipped — "
+                        f"run 'graphify reverse-sync' to resolve",
+                        file=sys.stderr,
+                    )
+            except Exception as _rs_exc:  # D-11: warn-and-continue
+                print(
+                    f"[graphify] reverse-sync: skipped due to error: {_rs_exc}",
+                    file=sys.stderr,
+                )
+
         try:
             result = run_update_vault(
                 input_dir=Path(opts.input),

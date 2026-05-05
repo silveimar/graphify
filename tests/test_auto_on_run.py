@@ -23,6 +23,7 @@ def _write_profile_yaml(
     auto_on_run: bool,
     mode: str = "always_copy",
     folders=("Atlas",),
+    input_path: Path | None = None,
 ) -> None:
     """Write a minimal valid v1.8 profile with reverse_sync.auto_on_run set.
 
@@ -97,7 +98,7 @@ def test_run_with_auto_on_run_true_fires_hook(
     _write_profile_yaml(vault, auto_on_run=True, mode="always_copy")
 
     _stub_run_corpus(monkeypatch)
-    monkeypatch.chdir(vault)
+    monkeypatch.chdir(inp)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -126,7 +127,7 @@ def test_run_with_auto_on_run_false_skips_hook(
     _write_profile_yaml(vault, auto_on_run=False, mode="always_copy")
 
     _stub_run_corpus(monkeypatch)
-    monkeypatch.chdir(vault)
+    monkeypatch.chdir(inp)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -192,7 +193,7 @@ def test_auto_on_run_failure_warn_continue(
         raise RuntimeError("simulated reverse-sync failure")
 
     monkeypatch.setattr("graphify.reverse_sync.run_reverse_sync", _boom)
-    monkeypatch.chdir(vault)
+    monkeypatch.chdir(inp)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -235,7 +236,7 @@ def test_auto_on_run_conflicts_skipped_summary(
         }
 
     monkeypatch.setattr("graphify.reverse_sync.run_reverse_sync", _fake_rs)
-    monkeypatch.chdir(vault)
+    monkeypatch.chdir(inp)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -262,7 +263,7 @@ def test_no_recursion(
     _write_profile_yaml(vault, auto_on_run=True, mode="always_copy")
 
     _stub_run_corpus(monkeypatch)
-    monkeypatch.chdir(vault)
+    monkeypatch.chdir(inp)
     monkeypatch.setattr(
         sys,
         "argv",
