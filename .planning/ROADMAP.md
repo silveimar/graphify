@@ -641,3 +641,13 @@ Plans:
 ---
 
 *Last updated: 2026-05-03 — **v1.12** active (Phases 59–61, 8/8 requirements mapped). v1.11 archived under `.planning/milestones/v1.11-ROADMAP.md`.*
+
+### Phase 62.1: fix auto-adopt argparse defect: --vault required=True bypasses _check_vault_cwd_gate auto-adopt for update-vault and vault-promote (see .planning/debug/vault-cwd-gate-argparse-required.md) (INSERTED)
+
+**Goal:** Restore VCWD-02 auto-adopt UX for update-vault and vault-promote: running either command from a profile vault CWD without --vault must succeed (auto-adopt fills opts.vault from Path.cwd()) instead of exiting with argparse error 2.
+**Requirements**: none (insertion phase; goal-backward verification via must_haves in PLAN)
+**Depends on:** Phase 62
+**Plans:** 1 plan
+
+Plans:
+- [ ] 62.1-01-PLAN.md — TDD fix: flip --vault to required=False on update-vault + vault-promote, tighten post-parse guard with friendly-error branch, unskip 2 RED tests, add 2 friendly-error tests
