@@ -98,8 +98,8 @@
 **Plans**: 4 plans
 - [x] 69-01-PLAN.md — Profile schema v2 + silent v1→v2 migrator (VPROF-01)
 - [x] 69-02-PLAN.md — Profile-driven folder resolution; remove hardcoded Atlas literals (VPROF-02)
-- [ ] 69-03-PLAN.md — Pre-flight refusal + chokepoint guard; preserve manifest-hash guard (VPROF-03 refusal half)
-- [ ] 69-04-PLAN.md — Legacy artifact detection in doctor + update-vault --migrate-legacy[-apply] (VPROF-04)
+- [x] 69-03-PLAN.md — Pre-flight refusal + chokepoint guard; preserve manifest-hash guard (VPROF-03 refusal half)
+- [x] 69-04-PLAN.md — Legacy artifact detection in doctor + update-vault --migrate-legacy[-apply] (VPROF-04)
 
 ### Phase 70: VRSYNC — Vault → Input Reverse-Sync & User-File Augmentation
 **Goal**: A new `graphify reverse-sync` command brings vault-side edits back into the raw corpus, and graphify-side writes that touch user files are limited to a frontmatter-augmentation contract.
@@ -124,7 +124,7 @@
 | 66. CFED | 0/0 | Not started | - |
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
 | 68. AUDIT-B | 0/0 | Not started | - |
-| 69. VPROF | 2/4 | In Progress|  |
+| 69. VPROF | 4/4 | Complete   | 2026-05-05 |
 | 70. VRSYNC | 0/0 | Not started | - |
 
 ## Coverage
