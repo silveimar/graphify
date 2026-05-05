@@ -858,3 +858,105 @@ def test_subpath_isolation_vault_manifest(tmp_path):
     final = _load_manifest(graphify_out)
     assert "Atlas/Dots/sub_a/NoteA.md" in final, "sub_a row must survive sub_b write"
     assert "Atlas/Dots/sub_b/NoteB.md" in final, "sub_b row must be present"
+
+
+# ---------------------------------------------------------------------------
+# Phase 69-02: profile-driven folder resolution tests (RED gate)
+# ---------------------------------------------------------------------------
+
+def test_profile_folder_routing(tmp_path):
+    """classify_nodes() must use profile graphify_folder_mapping for folder assignment."""
+    from graphify.vault_promote import classify_nodes
+
+    # Build a graph with one high-degree Thing node (degree >= 1, file_type != code)
+    nodes = [{"id": "my_concept", "label": "My Concept", "file_type": "document"}]
+    edges = [
+        {"source": "my_concept", "target": f"peer_{i}", "relation": "references", "confidence": "EXTRACTED", "source_file": "doc.md"}
+        for i in range(5)
+    ]
+    peers = [{"id": f"peer_{i}", "label": f"Peer {i}", "file_type": "document"} for i in range(5)]
+    G = _make_graph_with_nodes(nodes + peers, edges)
+    communities = _make_communities(G, {0: ["my_concept"] + [f"peer_{i}" for i in range(5)]})
+
+    custom_folder = "MyVault/Custom/Things/"
+    profile = {"graphify_folder_mapping": {"thing": custom_folder}}
+
+    result = classify_nodes(G, communities, profile, threshold=1)
+    things = result.get("things", [])
+    assert len(things) >= 1, "Expected at least one Thing record"
+    for rec in things:
+        assert rec["folder"].startswith("MyVault/Custom/Things"), (
+            f"Expected folder to start with 'MyVault/Custom/Things', got {rec['folder']!r}"
+        )
+
+
+def test_unknown_type_fallback(tmp_path, capsys):
+    """Unknown bucket key falls back to Atlas/Sources/Graphify/<Type>/ with stderr INFO."""
+    from graphify.vault_promote import _resolve_folder_prefix
+
+    # Call with a bucket key not in _BUCKET_TO_PROFILE_KEY
+    folder = _resolve_folder_prefix("widgets", {})
+
+    # Must use the D-04 fallback path
+    assert folder.startswith("Atlas/Sources/Graphify/"), (
+        f"Unknown type fallback must start with Atlas/Sources/Graphify/, got {folder!r}"
+    )
+    # Must capitalize first letter of bucket key
+    assert "Widgets" in folder, f"Expected 'Widgets' in fallback path, got {folder!r}"
+
+    # Must emit one stderr INFO line
+    captured = capsys.readouterr()
+    assert "[graphify] profile: unknown record type" in captured.err, (
+        f"Expected stderr breadcrumb, got: {captured.err!r}"
+    )
+
+
+def test_end_to_end_all_seven_folders(tmp_path):
+    """Full promote() run on synthetic fixture: every produced note under Atlas/Sources/Graphify/<Type>/."""
+    from graphify.vault_promote import promote
+
+    graph_path = _make_graph_json_from_fixture(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    # threshold=1 so degree-1 People/Quotes/Statements nodes qualify
+    promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+    all_md = list(vault.rglob("*.md"))
+    assert len(all_md) >= 1, "promote() must write at least one note"
+
+    expected_prefixes = [
+        "Atlas/Sources/Graphify/Things",
+        "Atlas/Sources/Graphify/Questions",
+        "Atlas/Sources/Graphify/Maps",
+        "Atlas/Sources/Graphify/Sources",
+        "Atlas/Sources/Graphify/People",
+        "Atlas/Sources/Graphify/Quotes",
+        "Atlas/Sources/Graphify/Statements",
+    ]
+
+    for md_path in all_md:
+        rel = md_path.relative_to(vault).as_posix()
+        # Skip import-log.md and profile files
+        if not rel.startswith("Atlas/"):
+            continue
+        assert any(rel.startswith(prefix) for prefix in expected_prefixes), (
+            f"Note {rel!r} does not start with any expected Atlas/Sources/Graphify/<Type>/ prefix. "
+            f"Ensure profile-driven routing is applied."
+        )
+
+
+def test_no_hardcoded_atlas_literals(tmp_path):
+    """vault_promote.py must not contain _FOLDER_PATH_PREFIX or hardcoded 'Atlas/Maps'/'Atlas/Dots/' literals."""
+    src = Path("graphify/vault_promote.py").read_text(encoding="utf-8")
+    # Strip comment lines to avoid false negatives from commented-out code
+    code = "\n".join(line for line in src.splitlines() if not line.lstrip().startswith("#"))
+    assert "_FOLDER_PATH_PREFIX" not in code, (
+        "_FOLDER_PATH_PREFIX must be removed from vault_promote.py"
+    )
+    assert '"Atlas/Maps"' not in code, (
+        'Hardcoded "Atlas/Maps" string literal must be removed from vault_promote.py'
+    )
+    assert '"Atlas/Dots/' not in code, (
+        'Hardcoded "Atlas/Dots/..." string literal must be removed from vault_promote.py'
+    )
