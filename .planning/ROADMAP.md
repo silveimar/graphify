@@ -14,7 +14,7 @@
 - ✅ **v1.9 Onboarding, Harness Portability & Vault CLI** — Phases 39–44 (shipped 2026-04-30)
 - ✅ **v1.10 Stability, Baselines & Concept↔Code MVP** — Phases 45–52 (shipped 2026-05-01)
 - ✅ **v1.11 Templates, Graph Semantics & Vault Depth** — Phases 53–58 (shipped 2026-05-03)
-- 🔷 **v1.12 Vault Awareness, Pipeline Integration & Error Hygiene** — Phases 59–61 (active)
+- ✅ **v1.12 Vault Awareness, Pipeline Integration & Error Hygiene** — Phases 59–62.1 (shipped 2026-05-04)
 
 ## Phases
 
@@ -413,118 +413,17 @@ Typed **concept↔code** edges promoted to first-class graph members with determ
 
 </details>
 
----
 
-## Phase Details (v1.12)
+<details>
+<summary>✅ v1.12 Vault Awareness, Pipeline Integration & Error Hygiene (Phases 59–62.1) — SHIPPED 2026-05-04</summary>
 
-### Phase 59: Vault-CWD-aware CLI default
+Vault-CWD-aware CLI default: auto-adopt when `.graphify/profile.yaml` is present, refuse with two-line `[graphify] error:` + `  hint:` otherwise (**VCWD-01..05**); silent skill-stamp self-heal + multi-line `--version` / `doctor` `version sync` block (**VSYNC-01..04**); two milestone-level E2E subprocess tests for the composition+override-ladder and elicit→update-vault flows (**E2E-01/02**); `update-vault --apply` first-run determinism via seeded Leiden (**APPLY-DET-01**); harness vault-write refusal migrated to two-line format (**HARN-FMT-01**); audit-cleanup phase closing REQUIREMENTS-SYNC / EXIT-CODE-CONST / E2E-AUTO-ADOPT findings (commits ea2c1ae / 87e7f6b / 522e290 / 02499aa); insertion phase 62.1 fixing `--vault required=True` argparse defect that bypassed auto-adopt for `update-vault` and `vault-promote`.
 
-**Goal:** `graphify` safely detects when the current working directory is an Obsidian vault and automatically routes output without surprising the user — auto-adopting the vault profile when present, or refusing with an actionable hint when absent.
-**Depends on:** Phase 41 (`_resolve_output_target()` vault CLI) and Phase 58 (`_emit_vault_error()`, `resolve_vault_for_parity`).
-**Requirements:** **VCWD-01**, **VCWD-02**, **VCWD-03**, **VCWD-04**, **VCWD-05**.
+**Totals:** 7 phases (59, 59.1, 60, 60.1, 61, 62, 62.1), 18 plans, **13/13** requirements satisfied. Test growth: **+33** (2106 → 2139+).
 
-**Success Criteria** (what must be TRUE):
+**Archives:** `.planning/milestones/v1.12-ROADMAP.md`, `.planning/milestones/v1.12-REQUIREMENTS.md`, `.planning/milestones/v1.12-MILESTONE-AUDIT.md`
 
-1. Running `graphify run` (or `update-vault`) from a directory containing `.obsidian/` triggers vault-CWD detection before pipeline dispatch; `graphify doctor` also reports the predicted behavior for the same CWD (**VCWD-01**, **VCWD-05**).
-2. When CWD is a vault with `.graphify/profile.yaml` and no explicit `--vault`/`--output` flag is passed, output routes through `_resolve_output_target()` identically to passing `--vault $CWD` — no extra flags required (**VCWD-02**).
-3. When CWD is a vault without `.graphify/profile.yaml` and no explicit routing flag is passed, the CLI exits 2 with a two-line `[graphify] error:` + `  hint:` message on stderr (via `_emit_vault_error()`) that suggests `--output <path>` or `--write-into-vault` (**VCWD-03**).
-4. Passing `--write-into-vault` suppresses the VCWD-03 refusal and proceeds with pre-v1.12 behavior; the flag is documented as a deliberate opt-in (**VCWD-04**).
-
-**Plans:** 5/5 plans complete
-Plans:
-- [x] 59-01-detection-gate-PLAN.md — Wave 0 fixture + `_check_vault_cwd_gate` helper wired into 14 dispatch branches (VCWD-01)
-- [x] 59-02-auto-adopt-PLAN.md — Auto-adopt routing via `_resolve_cli_paths(explicit_vault=cwd)` + single-line stderr notice (VCWD-02)
-- [x] 59-03-refusal-PLAN.md — Sanitized `<cwd>` interpolation, exit 2, verbatim two-line refusal text (VCWD-03)
-- [x] 59-04-write-into-vault-flag-PLAN.md — `--write-into-vault` global+per-command boolean, silent precedence (VCWD-04)
-- [x] 59-05-doctor-section-PLAN.md — `[graphify] === Vault-CWD Default ===` doctor section + parity contract + cross-cutting env/vault-list (VCWD-05)
-**UI hint:** partial — CLI error messages and `doctor` reporting surface new stderr behavior.
-
----
-
-### Phase 59.1: Version sync hygiene and --version flag (fix skill-stamp drift warning, expose graphify --version) (INSERTED)
-
-**Goal:** Silence the per-command `skill stamp ('X.Y.Z') is older than the installed package` warning by silently auto-self-healing the stamp when stamp < package, preserve the warning only for the unusual stamp > package case, and expand `graphify --version` / `-V` and `graphify doctor` to surface package vs per-platform skill-stamp state without grepping `.graphify_version` files.
-**Depends on:** Phase 59
-**Requirements:** **VSYNC-01**, **VSYNC-02**, **VSYNC-03**, **VSYNC-04**.
-
-**Success Criteria** (what must be TRUE):
-
-1. Running any non-skip `graphify` command (e.g. `graphify run`, `graphify query`) when an existing skill stamp is older than the installed package emits ZERO stderr lines and rewrites `.graphify_version` to the current `__version__` for every installed platform (**VSYNC-01**).
-2. `graphify --version` and `graphify -V` exit 0 with a multi-line block: package line, indented `skill stamps:` block (one row per `_PLATFORM_CONFIG` platform with `~`-shortened install dirs), `python:` line, and `install:` line; `--version` triggers no stamp writes (**VSYNC-02**).
-3. `graphify doctor` output includes a `version sync` section enumerating each platform with stamp / package / status (`✓ in sync` / `! drifted-newer` / `— not installed`) (**VSYNC-03**).
-4. When stamp > package, the original two-line stderr warning is emitted verbatim and the stamp file is NOT rewritten (**VSYNC-04**).
-5. CI tests on Python 3.10 and 3.12 cover: heal happy path, write-failure fallback to existing warning, stamp-newer warning preservation, and `--version` multi-line snapshot.
-
-**Plans:** 3/3 plans complete
-
-Plans:
-- [x] 59.1-01-PLAN.md — Mint VSYNC-01..04 in REQUIREMENTS.md and back-fill the ROADMAP.md Phase 59.1 row
-- [x] 59.1-02-PLAN.md — Rewrite `_check_skill_version()` for silent auto-self-heal (VSYNC-01, VSYNC-04)
-- [x] 59.1-03-PLAN.md — Multi-line `--version` block + `doctor` `version sync` section (VSYNC-02, VSYNC-03)
-**UI hint:** partial — CLI `--version` and `doctor` output expand; previously-noisy stderr warning becomes silent.
-
-### Phase 60: Milestone-level E2E integration tests
-
-**Goal:** Two subprocess-level integration tests close the audit gaps for the two multi-phase pipelines that lacked end-to-end coverage: the profile composition + override ladder flow (Phases 55+56) and the elicitation + vault update flow (Phases 57+56).
-**Depends on:** Phase 55 (template conditionals + connection loops), Phase 56 (Dataview templates + profile overrides), Phase 57 (elicitation & harness increment).
-**Requirements:** **E2E-01**, **E2E-02**.
-
-**Success Criteria** (what must be TRUE):
-
-1. A subprocess test invokes `graphify update-vault` against a profile containing both `note_type_templates` and `mapping_rule_templates`, and asserts that output notes are correctly classified with the override ladder applied (block expansion before `${}` substitution, then template ladder resolution) (**E2E-01**).
-2. A subprocess test runs `graphify elicit` to produce a sidecar at `artifacts_dir/elicitation.json`, then `graphify update-vault`, and asserts that the merged graph renders notes containing visible elicitation contributions (**E2E-02**).
-3. Both tests run against `tmp_path`-scoped vault fixtures with no network calls and pass in the CI Python 3.10/3.12 matrix (**E2E-01**, **E2E-02**).
-
-**Plans:** 2 plans
-
-Plans:
-- [x] 60-01-PLAN.md — E2E-01 subprocess test: profile composition + override ladder via update-vault preview→apply
-- [x] 60-02-PLAN.md — E2E-02 subprocess test: elicit sidecar handoff → update-vault merge → rendered note visibility
-**UI hint:** no — pure test infrastructure; no user-facing surface changes.
-
----
-
-### Phase 60.1: update-vault apply determinism fix (INSERTED)
-
-**Goal:** Make `graphify update-vault --apply --plan-id <id>` succeed on first run by ensuring preview and apply produce identical plan_ids on identical input. Root-cause and patch the non-determinism in community-id assignment between consecutive previews (likely Leiden ordering in `cluster.py` or slug derivation in `naming.py`). Unblocks Phase 60 E2E-01 and E2E-02 GREEN gates (RED commit `333d2da` locked as regression test).
-**Depends on:** Phase 60 (RED test in place at `tests/test_e2e_integration.py::test_e2e_compose_override_ladder`).
-**Requirements:** **APPLY-DET-01**.
-
-**Success Criteria** (what must be TRUE):
-
-1. Two consecutive `graphify update-vault` preview runs against the same input corpus and same vault profile produce identical `plan_id` values (**APPLY-DET-01**).
-2. `graphify update-vault --apply --plan-id <id>` succeeds on the first attempt against a fresh corpus when `<id>` matches the immediately preceding preview run, with no warm-up runs required (**APPLY-DET-01**).
-3. Phase 60's RED test `tests/test_e2e_integration.py::test_e2e_compose_override_ladder` (commit `333d2da`) turns green without modification (**APPLY-DET-01**).
-4. Full test suite `pytest tests/ -q` passes on Python 3.10/3.12, no regressions (**APPLY-DET-01**).
-
-**Plans:** 3/3 plans complete (Plan 03 added via `/gsd-plan-phase 60.1 --gaps` after VERIFICATION.md scored 2/4; APPLY-DET-01 fully closed)
-
-Plans:
-- [x] 60.1-01-PLAN.md — RED/GREEN: failing determinism unit test in `tests/test_cluster.py`, then seed `graspologic.partition.leiden` with `random_seed=42` at `graphify/cluster.py:38`.
-- [x] 60.1-02-PLAN.md — Verify Phase 60 E2E test (`test_e2e_compose_override_ladder`) flips RED→GREEN unmodified and full `pytest tests/ -q` is green; record APPLY-DET-01 closure.
-- [x] 60.1-03-PLAN.md — **Gap closure** (Wave 3, depends on 01+02): RED unit test in `tests/test_mapping.py` for note-type precedence; patched topology fallback in `graphify/mapping.py` to honor `note_type_templates`; fixed render-time override-template loader (`templates.py`) to validate against target note_type's required-slot set; threaded actual vault root through `export.to_obsidian` → `render_note`/`render_moc` so `<vault>/.graphify/templates/` overrides resolve. Locked E2E green unmodified, full suite at 2122 passed / 1 xfailed (baseline preserved).
-
-**UI hint:** no — internal pipeline determinism fix; no user-facing surface changes.
-
----
-
-### Phase 61: Harness vault-write error format normalization
-
-**Goal:** The harness vault-write refusal in `__main__.py` emits the same two-line `[graphify] error:` + `  hint:` format as all other vault CLI errors, eliminating the one remaining one-line stderr outlier from v1.11.
-**Depends on:** Phase 58 (`_emit_vault_error()` two-line format established).
-**Requirements:** **HARN-FMT-01**.
-
-**Success Criteria** (what must be TRUE):
-
-1. The refusal at `graphify/__main__.py:2567` (harness vault-write guard) emits `[graphify] error: <msg>` on one line and `  hint: <fix>` on the next line, using `_emit_vault_error()` — matching the Phase 58 two-line contract (**HARN-FMT-01**).
-2. Existing tests that asserted the old one-line `[graphify] refusing to write harness import...` substring are updated to match the new two-line shape; the old one-line variant is removed entirely from production code (**HARN-FMT-01**).
-
-**Plans:** 1/1 plans complete
-
-Plans:
-- [x] 61-01-harness-fmt-migration-PLAN.md — TDD migration of import-harness vault-write refusal to two-line _emit_vault_error format
-**UI hint:** no — internal stderr format normalization; behavior observable only via subprocess stderr capture in tests.
-
+</details>
 ---
 
 ## Progress
@@ -597,57 +496,11 @@ Plans:
 | 57. Elicitation & harness increment | v1.11 | 3/3 | Complete   | 2026-05-03 |
 | 58. Vault CLI parity & hygiene | v1.11 | 3/3 | Complete   | 2026-05-03 |
 | 59. Vault-CWD-aware CLI default | v1.12 | 5/5 | Complete    | 2026-05-04 |
-| 60. Milestone-level E2E integration tests | v1.12 | 0/? | Not started | — |
-| 61. Harness vault-write error format normalization | v1.12 | 1/1 | Complete   | 2026-05-04 |
+| 59.1 Version sync hygiene & --version flag (INSERTED) | v1.12 | 3/3 | Complete | 2026-05-04 |
+| 60. Milestone-level E2E integration tests | v1.12 | 2/2 | Complete | 2026-05-04 |
+| 60.1 update-vault apply determinism fix (INSERTED) | v1.12 | 3/3 | Complete | 2026-05-04 |
+| 61. Harness vault-write error format normalization | v1.12 | 1/1 | Complete | 2026-05-04 |
+| 62. v1.12 audit cleanup (REQUIREMENTS sync, exit-code consts, E2E auto-adopt) | v1.12 | 4/4 | Complete | 2026-05-04 |
+| 62.1 Auto-adopt argparse defect fix (INSERTED) | v1.12 | 1/1 | Complete | 2026-05-04 |
 
-### Phase 47: MCP & Trace Integration
-
-**Goal:** Agents and narrative commands can **find and walk** typed concept↔implementation links through **MCP** and **`/trace` or `entity_trace`**, with documentation updated when capability surfaces change.
-**Depends on:** Phase 46 (typed edges live in validated graph artifacts).
-**Requirements:** **CCODE-03**, **CCODE-04**.
-
-**Success Criteria** (what must be TRUE):
-
-1. At least one MCP tool or structured graph-query path exposes or traverses concept↔implementation edges; **manifest/capability** and skill docs reflect any new tools or parameters (**CCODE-03**).
-2. **`/trace`** (slash workflow) **or** **`entity_trace`** MCP follows concept↔code hops in **at least one golden-path scenario** backed by automated tests (**CCODE-04**).
-
-**Plans:** `.planning/phases/47-mcp-trace-integration/` — `47-01-PLAN.md` (wave 1: MCP `concept_code_hops` + tests), `47-02-PLAN.md` (wave 2: docs, `server.json`, skills).
-
-**UI hint**: yes — slash **`/trace`** command surface ties to conversational UX workflows.
-
-### Phase 49: add --version flag to graphify command, and also print current version on each command result, Fix skill vs package version validations (graphify update-vault warning: skill is from graphify 0.4.7, package is 1.0.0)
-
-**Goal:** CLI `--version` / `-V`, stderr `[graphify] version` on successful non-install commands, directional skill-stamp warnings, `graphify.version.package_version()` as single metadata reader.
-**Requirements:** **CLI-VER-01**, **CLI-VER-02**
-**Depends on:** Phase 48
-**Plans:** 1 plan (wave 1)
-
-Plans:
-- [x] `49-01-PLAN.md` — `graphify.version`, CLI flags, `_cli_exit` footer, skill stamp copy, tests (`test_main_cli` / `test_main_flags`)
-
-### Phase 62: v1.12 audit cleanup: REQUIREMENTS sync + exit-code constant + E2E auto-adopt coverage
-
-**Goal:** Close v1.12 audit findings: sync REQUIREMENTS.md E2E checkboxes, name exit-code constants in `graphify/output.py`, add E2E test for `update-vault` auto-adopt from a vault CWD, and append a closure section to `.planning/v1.12-MILESTONE-AUDIT.md`.
-**Requirements**: REQUIREMENTS-SYNC-01, EXIT-CODE-CONST-01, E2E-AUTO-ADOPT-01 (audit-derived, not new REQUIREMENTS.md IDs per CONTEXT D-16)
-**Depends on:** Phase 61
-**Plans:** 4 plans
-
-Plans:
-- [ ] 62-01 REQUIREMENTS sync (E2E-01/E2E-02 checkbox flip)
-- [ ] 62-02 exit-code constants (`EXIT_VAULT_REFUSAL`/`EXIT_VAULT_GATE`)
-- [ ] 62-03 E2E auto-adopt coverage
-- [ ] 62-04 audit-trail closure (append-only)
-
----
-
-*Last updated: 2026-05-03 — **v1.12** active (Phases 59–61, 8/8 requirements mapped). v1.11 archived under `.planning/milestones/v1.11-ROADMAP.md`.*
-
-### Phase 62.1: fix auto-adopt argparse defect: --vault required=True bypasses _check_vault_cwd_gate auto-adopt for update-vault and vault-promote (see .planning/debug/vault-cwd-gate-argparse-required.md) (INSERTED)
-
-**Goal:** Restore VCWD-02 auto-adopt UX for update-vault and vault-promote: running either command from a profile vault CWD without --vault must succeed (auto-adopt fills opts.vault from Path.cwd()) instead of exiting with argparse error 2.
-**Requirements**: none (insertion phase; goal-backward verification via must_haves in PLAN)
-**Depends on:** Phase 62
-**Plans:** 1 plan
-
-Plans:
-- [x] 62.1-01-PLAN.md — TDD fix: flip --vault to required=False on update-vault + vault-promote, tighten post-parse guard with friendly-error branch, unskip 2 RED tests, add 2 friendly-error tests ✓ verified 2026-05-04
+*Last updated: 2026-05-05 — **v1.12** archived to `.planning/milestones/v1.12-ROADMAP.md` (shipped 2026-05-04). Awaiting next milestone via `/gsd-new-milestone`.*

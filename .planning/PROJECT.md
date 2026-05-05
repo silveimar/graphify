@@ -8,27 +8,25 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: v1.12 Vault Awareness, Pipeline Integration & Error Hygiene
+## Current State
 
-**Goal:** Close the v1.11 audit follow-ups and ship the v1.7-deferred vault-CWD seed — make `graphify` safe to run from inside a vault without surprising the user, lock down the two end-to-end pipelines that span multiple phases, and normalize the one stderr-format outlier from v1.11.
+**Last shipped:** v1.12 Vault Awareness, Pipeline Integration & Error Hygiene (2026-05-04) — 2139+ tests passing on Python 3.10/3.12. 7 phases (59, 59.1, 60, 60.1, 61, 62, 62.1), 18 plans, 13/13 requirements satisfied. Archives: `.planning/milestones/v1.12-*`.
 
-**Target features:**
+**No active milestone.** Run `/gsd-new-milestone` to start the next cycle.
 
-- **Vault-CWD-aware CLI default** (SEED-vault-root-aware-cli) — Detect `.obsidian/` at CWD; auto-adopt as vault if `.graphify/profile.yaml` present (Option C); refuse with two-line actionable hint if no profile (Option A). Adds `--write-into-vault` opt-in flag. Reuses Phase 41's `_resolve_output_target()` and Phase 58's `_emit_vault_error()`.
-- **Milestone-level E2E integration tests** (audit rec #5) — Two new subprocess-level tests: (a) profile with `note_type_templates` + `mapping_rule_templates` → `graphify update-vault` exercises Phase 55+56 composition end-to-end; (b) `graphify elicit` → sidecar → `graphify update-vault` exercises Phase 57+56 pipeline end-to-end.
-- **Harness vault-write error format normalization** (audit rec #4) — Migrate `__main__.py:2567` from one-line `[graphify] refusing to write...` to Phase 58's two-line `[graphify] error:` + `  hint:` format via `_emit_vault_error()`. Surgical fix.
+**Next milestone goals (sourcing pool):**
 
-**Non-goals:**
+- Nyquist VALIDATION.md gap-fill for v1.12 phases (59 / 59.1 / 60 / 60.1 / 61) — deferred from v1.12 audit closure.
+- Project-wide `[graphify]` stderr format sweep — only the harness path was migrated to two-line in v1.12; remaining one-line outliers (e.g. adjacent `print(f"[graphify] {exc}", ...)` at `__main__.py:~2745`) still pending.
+- Second E2E flow for HARN-FMT-01.
+- SEED-001 (Tacit-to-Explicit Elicitation Engine — beyond Phase 57 increment).
+- SEED-002 (Harness Memory Export — additional target formats, multi-format round-trip).
+- SEED-bidirectional-concept-code-links — promotion of Phase 53/54 concept↔code work to a richer first-class feature.
+- SEED-001 / SEED-002 traceability rows in REQUIREMENTS.md (pre-existing audit gap).
 
-- No new resolver — reuse `_resolve_output_target()` (Phase 41)
-- No new error helper — reuse `_emit_vault_error()` (Phase 58)
-- No precedence change — `--vault` / GRAPHIFY_VAULT / `--vault-list` order preserved
-- No project-wide stderr sweep — saved for v1.13+ if more outliers surface
-- No magic auto-route to hidden `.graphify-out/` (Option B explicitly rejected)
+## Shipped: v1.12 Vault Awareness, Pipeline Integration & Error Hygiene (2026-05-04)
 
-**Planning:** Phase numbering continues from **Phase 59** (after v1.11 Phase 58). Repo-root `.planning/REQUIREMENTS.md` defines scoped REQ-IDs.
-
-**Last shipped:** v1.11 Templates, Graph Semantics & Vault Depth (2026-05-03) — 2106 tests passing baseline.
+Vault-CWD-aware CLI default with auto-adopt when `.graphify/profile.yaml` is present and two-line `[graphify] error:` + `  hint:` refusal otherwise (**VCWD-01..05**); silent skill-stamp self-heal + multi-line `--version` / `doctor` `version sync` block (**VSYNC-01..04**); milestone-level E2E subprocess tests for composition+override-ladder and elicit→update-vault flows (**E2E-01/02**); `update-vault --apply` first-run determinism via seeded Leiden (**APPLY-DET-01**); harness vault-write refusal migrated to two-line format (**HARN-FMT-01**); audit-cleanup phase closing REQUIREMENTS-SYNC / EXIT-CODE-CONST / E2E-AUTO-ADOPT findings; insertion phase 62.1 fixing `--vault required=True` argparse defect that bypassed auto-adopt for `update-vault` and `vault-promote`. **13/13** requirements. Archives: `.planning/milestones/v1.12-*`.
 
 ## Future Carry-Forward (deferred past v1.12)
 

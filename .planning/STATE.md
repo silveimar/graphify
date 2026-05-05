@@ -1,33 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.12
-milestone_name: "audit cleanup: REQUIREMENTS sync + exit-code constant + E2E auto-adopt coverage"
-status: executing
-stopped_at: Phase 59 verified — VCWD-01..05 complete, 2139 tests
-last_updated: "2026-05-05T01:36:35.952Z"
-last_activity: 2026-05-04 -- Phase 62 execution started
+milestone: none
+milestone_name: "between milestones — v1.12 shipped 2026-05-04"
+status: idle
+stopped_at: v1.12 archived — awaiting /gsd-new-milestone
+last_updated: "2026-05-05T11:20:00.000Z"
+last_activity: 2026-05-05 -- v1.12 milestone archived (ROADMAP/REQUIREMENTS/AUDIT moved to .planning/milestones/v1.12-*); REQUIREMENTS.md deleted for fresh next-milestone seed
 progress:
-  total_phases: 9
-  completed_phases: 5
+  total_phases: 7
+  completed_phases: 7
   total_plans: 18
-  completed_plans: 17
-  percent: 94
+  completed_plans: 18
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (**milestone v1.12** — Vault Awareness, Pipeline Integration & Error Hygiene).
+See: `.planning/PROJECT.md` — **v1.12 shipped 2026-05-04**, awaiting next milestone.
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Phase 62 — v1.12 audit cleanup
+**Current focus:** Between milestones. Run `/gsd-new-milestone` to start the next cycle.
 
 ## Current Position
 
-Phase: 62 (v1.12 audit cleanup) — EXECUTING
-Plan: 4 of 4 complete (62-01, 62-02, 62.1-01, 62-03, 62-04 all complete; phase ready for /gsd-close-phase 62)
+Phase: none — v1.12 archived to `.planning/milestones/v1.12-ROADMAP.md`
+Plan: n/a (last completed: 62 + 62.1, all plans verified passing)
 Status: Executing Phase 62
 Last activity: 2026-05-04 -- Plan 62-04 complete (v1.12 milestone audit closure section appended; cites ea2c1ae/87e7f6b/522e290; commit 02499aa). Phase 62 done.
 
