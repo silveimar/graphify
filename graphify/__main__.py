@@ -3309,7 +3309,7 @@ def main() -> None:
             formatter_class=_ap.RawDescriptionHelpFormatter,
         )
         _p_uv.add_argument("--input", required=True, help="Raw corpus input path")
-        _p_uv.add_argument("--" "vault", required=True, help="Target Obsidian vault path")
+        _p_uv.add_argument("--" "vault", required=False, default=None, help="Target Obsidian vault path (omit when running from a vault CWD with auto-adopt)")
         _p_uv.add_argument("--repo-identity", default=None, help="Override repo identity")
         _p_uv.add_argument("--router", action="store_true", help="Use heterogeneous extraction routing")
         _p_uv.add_argument("--verbose", action="store_true", help="Print all migration rows")
@@ -3319,9 +3319,14 @@ def main() -> None:
         if opts.apply and not opts.plan_id:
             print("error: --apply requires --plan-id from a preview artifact", file=sys.stderr)
             sys.exit(2)
+        # NOTE: post-parse auto-adopt guard duplicated in vault-promote (~30 lines below). Two-call duplication does not justify a helper yet.
         _uv_vault = opts.vault
         if gate == "auto-adopt" and not _uv_vault:
             _uv_vault = str(Path.cwd())
+        elif not _uv_vault:
+            from graphify.output import EXIT_VAULT_REFUSAL
+            print("error: --vault is required (omit only when running from a vault CWD with auto-adopt)", file=sys.stderr)
+            sys.exit(EXIT_VAULT_REFUSAL)
         from graphify.migration import format_migration_preview, run_update_vault
         try:
             result = run_update_vault(
@@ -3355,7 +3360,7 @@ def main() -> None:
             prog="graphify vault-promote",
             description="Promote knowledge graph nodes into an Obsidian vault (VAULT-01/05/06)",
         )
-        _p_vp.add_argument("--vault", required=True, help="Path to the target Obsidian vault")
+        _p_vp.add_argument("--vault", required=False, default=None, help="Path to the target Obsidian vault (omit when running from a vault CWD with auto-adopt)")
         _p_vp.add_argument(
             "--threshold",
             type=int,
@@ -3371,6 +3376,10 @@ def main() -> None:
         _vp_vault = opts.vault
         if gate == "auto-adopt" and not _vp_vault:
             _vp_vault = str(Path.cwd())
+        elif not _vp_vault:
+            from graphify.output import EXIT_VAULT_REFUSAL
+            print("error: --vault is required (omit only when running from a vault CWD with auto-adopt)", file=sys.stderr)
+            sys.exit(EXIT_VAULT_REFUSAL)
         from graphify.vault_promote import promote
         summary = promote(
             graph_path=Path(opts.graph),
