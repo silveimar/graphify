@@ -115,7 +115,7 @@
 **Plans**: 6 plans
 - [x] 70-01-augment-PLAN.md — Allowlist frontmatter merge into user files; body byte-identical property test (D-04..D-07, D-16; VPROF-03 augmentation half)
 - [x] 70-02-reverse-sync-detect-PLAN.md — Raw-bytes SHA256 change detection over user_only_folders; new/update/skip/vault_deleted classifier (D-08..D-10; VRSYNC-01 §1)
-- [ ] 70-03-reverse-sync-cmd-PLAN.md — Mode dispatch (always_ask/always_copy/never_copy), Y/n/d/A/Q prompt, --yes flag, CLI subcommand (D-01..D-03, D-12, D-13; VRSYNC-01 §3)
+- [x] 70-03-reverse-sync-cmd-PLAN.md — Mode dispatch (always_ask/always_copy/never_copy), Y/n/d/A/Q prompt, --yes flag, CLI subcommand (D-01..D-03, D-12, D-13; VRSYNC-01 §3)
 - [ ] 70-04-jsonl-log-PLAN.md — JSONL audit log with 7-key schema, exhaustive action enum, default .graphify/reverse-sync-log.jsonl (D-14, D-15; VRSYNC-01 §2)
 - [ ] 70-05-auto-on-run-PLAN.md — auto_on_run hook in graphify run + update-vault; warn-and-continue on failure (D-11; VRSYNC-01 §4)
 - [ ] 70-06-doctor-and-schema-PLAN.md — Profile additive defaults + validation, doctor === Reverse-Sync === section, vault_promote chokepoint augmentation routing (Pitfalls 4 & 8; VPROF-03 + VRSYNC-01)
@@ -131,7 +131,7 @@
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
 | 68. AUDIT-B | 0/0 | Not started | - |
 | 69. VPROF | 4/4 | Complete   | 2026-05-05 |
-| 70. VRSYNC | 2/6 | In Progress|  |
+| 70. VRSYNC | 3/6 | In Progress|  |
 
 ## Coverage
 
