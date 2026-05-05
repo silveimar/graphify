@@ -960,3 +960,193 @@ def test_no_hardcoded_atlas_literals(tmp_path):
     assert '"Atlas/Dots/' not in code, (
         'Hardcoded "Atlas/Dots/..." string literal must be removed from vault_promote.py'
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 69 Plan 03 — User-namespace refusal + chokepoint guard (RED tests)
+# ---------------------------------------------------------------------------
+
+def _make_profile_with_user_only(user_only_folders: list[str], mapping_override: dict | None = None) -> dict:
+    """Build a merged_profile dict with user_only_folders and optional mapping override."""
+    base_mapping = {
+        "thing":     "Atlas/Sources/Graphify/Things/",
+        "question":  "Atlas/Sources/Graphify/Questions/",
+        "map":       "Atlas/Sources/Graphify/Maps/",
+        "person":    "Atlas/Sources/Graphify/People/",
+        "quote":     "Atlas/Sources/Graphify/Quotes/",
+        "statement": "Atlas/Sources/Graphify/Statements/",
+        "source":    "Atlas/Sources/Graphify/Sources/",
+    }
+    if mapping_override:
+        base_mapping.update(mapping_override)
+    return {
+        "graphify_folder_mapping": base_mapping,
+        "user_only_folders": user_only_folders,
+    }
+
+
+def test_preflight_refusal_atomic(tmp_path):
+    """promote() must atomically refuse and write zero files when mapping targets a user-only folder."""
+    from graphify.vault_promote import promote
+
+    graph_path = _make_minimal_graph_json(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    # Write a profile.yaml that (a) marks Atlas/Sources/Graphify/Maps/ as user-only
+    # and (b) maps 'map' bucket into that same folder (causing a violation).
+    profile_dir = vault / ".graphify"
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    (profile_dir / "profile.yaml").write_text(
+        "graphify_folder_mapping:\n"
+        "  map: Atlas/Sources/Graphify/Maps/\n"
+        "user_only_folders:\n"
+        "  - Atlas/Sources/Graphify/Maps/\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+    assert exc_info.value.code != 0, "SystemExit must be non-zero (refusal)"
+
+    # Zero partial writes: no .md files in vault (except possibly profile.yaml itself)
+    md_files = [p for p in vault.rglob("*.md") if ".graphify" not in str(p)]
+    assert md_files == [], f"Expected zero partial writes, found: {md_files}"
+
+
+def test_write_record_chokepoint_guard(tmp_path):
+    """_write_record() must raise ValueError when rel_path targets a user-only folder."""
+    from graphify.vault_promote import _write_record
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    profile = _make_profile_with_user_only(["Calendar/"])
+
+    with pytest.raises((ValueError, SystemExit)):
+        _write_record(vault, "Calendar/evil.md", "content", {}, profile)
+
+    # Verify nothing was written
+    assert not (vault / "Calendar" / "evil.md").exists()
+
+
+def test_refusal_stderr_format(tmp_path, capsys):
+    """Refusal stderr must match two-line [graphify] error: + hint: format (D-10)."""
+    import re
+    from graphify.vault_promote import promote
+
+    graph_path = _make_minimal_graph_json(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    profile_dir = vault / ".graphify"
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    (profile_dir / "profile.yaml").write_text(
+        "graphify_folder_mapping:\n"
+        "  map: Atlas/Sources/Graphify/Maps/\n"
+        "user_only_folders:\n"
+        "  - Atlas/Sources/Graphify/Maps/\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit):
+        promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+    captured = capsys.readouterr()
+    stderr_lines = captured.err.strip().splitlines()
+    # First line must match the error pattern
+    assert any(
+        re.match(r"^\[graphify\] error: refused \d+ write\(s\) targeting user-owned folders", line)
+        for line in stderr_lines
+    ), f"Expected error line not found in stderr: {captured.err!r}"
+    # Second line (hint) must follow
+    assert any(line.startswith("  hint:") for line in stderr_lines), (
+        f"Expected '  hint:' line not found in stderr: {captured.err!r}"
+    )
+
+
+def test_manifest_hash_guard_regression(tmp_path):
+    """write_note() manifest-hash overwrite guard (lines 702-732) still fires for within-pinned collisions."""
+    import hashlib
+    from graphify.vault_promote import write_note
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    rel = "Atlas/Sources/Graphify/Maps/Foo.md"
+    content_a = "# Foo version A\n"
+    content_b = "# Foo version B\n"
+
+    manifest: dict[str, str] = {}
+
+    # First write: fresh write
+    outcome1 = write_note(vault, rel, content_a, manifest)
+    assert outcome1 == "written"
+
+    # Simulate user editing: change disk hash so it differs from manifest
+    target = vault / rel
+    target.write_text("# User edit\n", encoding="utf-8")
+    # manifest[rel] still holds hash of content_a — disk differs → "skipped_user_modified"
+    outcome2 = write_note(vault, rel, content_b, manifest)
+    assert outcome2 == "skipped_user_modified", (
+        f"Manifest-hash guard must fire and skip user-modified file; got {outcome2!r}"
+    )
+
+
+def test_preflight_before_manifest_guard(tmp_path):
+    """Pre-flight user-only refusal fires BEFORE any write_note() is called (D-11 ordering)."""
+    from unittest.mock import patch
+    from graphify.vault_promote import promote
+
+    graph_path = _make_minimal_graph_json(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    profile_dir = vault / ".graphify"
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    (profile_dir / "profile.yaml").write_text(
+        "graphify_folder_mapping:\n"
+        "  map: Atlas/Sources/Graphify/Maps/\n"
+        "user_only_folders:\n"
+        "  - Atlas/Sources/Graphify/Maps/\n",
+        encoding="utf-8",
+    )
+
+    with patch("graphify.vault_promote.write_note") as mock_write:
+        with pytest.raises(SystemExit):
+            promote(graph_path=graph_path, vault_path=vault, threshold=1)
+
+        assert mock_write.call_count == 0, (
+            f"write_note must NOT be called when pre-flight refuses; "
+            f"was called {mock_write.call_count} time(s)"
+        )
+
+
+def test_user_only_symlink_resolved(tmp_path):
+    """Symlink pointing into a user-only folder must be refused after Path.resolve() (T-69-V4)."""
+    from graphify.vault_promote import _write_record
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    # Create Calendar/ (user-only) and the graphify mapping target
+    calendar_dir = vault / "Calendar"
+    calendar_dir.mkdir()
+
+    graphify_maps = vault / "Atlas" / "Sources" / "Graphify" / "Maps"
+    graphify_maps.mkdir(parents=True)
+
+    # Create symlink: Maps/ → ../../../../Calendar/ (points into user-only area)
+    symlink_target = vault / "Atlas" / "Sources" / "Graphify" / "SymMaps"
+    symlink_target.symlink_to(calendar_dir)
+
+    profile = _make_profile_with_user_only(
+        user_only_folders=["Calendar/"],
+        mapping_override={"map": "Atlas/Sources/Graphify/SymMaps/"},
+    )
+
+    # Writing into SymMaps/ should be refused because it resolves to Calendar/
+    with pytest.raises((ValueError, SystemExit)):
+        _write_record(vault, "Atlas/Sources/Graphify/SymMaps/x.md", "content", {}, profile)
+
+    assert not (calendar_dir / "x.md").exists(), "Symlink bypass: file must not be written into Calendar/"
