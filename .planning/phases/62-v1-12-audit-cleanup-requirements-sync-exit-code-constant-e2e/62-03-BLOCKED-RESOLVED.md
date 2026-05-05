@@ -45,3 +45,22 @@ Every gated command whose argparse declares `--vault required=True` is affected.
 ## Plans 62-04 status
 
 Not started. Cannot run while 62-03 is unresolved — the audit closure section would falsely claim WARNING 2 is closed.
+
+---
+
+## RESOLUTION (2026-05-04)
+
+The `--vault required=True` argparse defect was fixed in Phase 62.1 (commit
+`56636ce`: "fix(62.1-01): GREEN — flip --vault to required=False with
+friendly-error guard for update-vault + vault-promote"), and locked by
+Phase 62.1 regression tests (commit `cfe3884`).
+
+Plan 62-03 was re-run on shipped main and its single new test
+`test_e2e_update_vault_auto_adopts_vault_cwd` passes:
+
+```
+pytest tests/test_e2e_integration.py::test_e2e_update_vault_auto_adopts_vault_cwd -x -q
+1 passed in 22.17s
+```
+
+Audit WARNING 2 (E2E-AUTO-ADOPT-01) is now closed.

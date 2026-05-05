@@ -362,3 +362,97 @@ def test_e2e_elicit_then_update_vault(tmp_path: Path) -> None:
         f"elicitation community tag missing from rendered output. "
         f"Files: {[p.name for p in all_md]}"
     )
+
+
+# -- E2E-AUTO-ADOPT-01 ----------------------------------------------------
+
+
+def test_e2e_update_vault_auto_adopts_vault_cwd(tmp_path: Path) -> None:
+    """E2E-AUTO-ADOPT-01: `update-vault` from cwd=<vault> with NO --vault flag
+    triggers the Phase 59 vault-CWD auto-adopt gate, runs preview→apply, and
+    preserves APPLY-DET-01 determinism.
+
+    This locks the Phase 62.1 fix (argparse `--vault required=False` + friendly
+    guard) and closes audit WARNING 2 (E2E-AUTO-ADOPT-01).
+
+    Flow:
+      1. Preview 1 from cwd=<vault> with NO --vault → exit 0, single auto-adopt notice,
+         migration plan JSON written, plan_id captured.
+      2. Delete migration JSON; Preview 2 from cwd=<vault> → exit 0, regenerated
+         plan_id matches Preview 1's (APPLY-DET-01 determinism under auto-adopt).
+      3. Apply with the captured plan_id from cwd=<vault> with NO --vault → exit 0.
+      4. Notes are materialized under <vault>.parent/graphify-out/ (vault artifacts_dir).
+      5. No `[graphify] error:` lines anywhere in stderr (proves we are NOT on the
+         VCWD-03 refusal branch).
+    """
+    vault = _write_vault(tmp_path, _BASE_PROFILE_YAML)
+    corpus = _write_corpus(tmp_path)
+
+    migrations_dir = vault.parent / "graphify-out" / "migrations"
+
+    # --- Preview 1 (auto-adopt path) ---
+    preview1 = _graphify(
+        ["update-vault", "--input", str(corpus)],
+        cwd=vault,
+    )
+    assert preview1.returncode == 0, (
+        f"preview1 (auto-adopt) failed: stderr={preview1.stderr!r} stdout={preview1.stdout!r}"
+    )
+    assert preview1.stderr.count("auto-adopted vault at") == 1, (
+        f"expected exactly one auto-adopt notice in stderr; got "
+        f"{preview1.stderr.count('auto-adopted vault at')}; stderr={preview1.stderr!r}"
+    )
+    assert "[graphify] error:" not in preview1.stderr, (
+        f"preview1 stderr contains [graphify] error: line; stderr={preview1.stderr!r}"
+    )
+
+    plan_files_1 = sorted(migrations_dir.glob("migration-plan-*.json"))
+    assert len(plan_files_1) == 1, (
+        f"expected exactly one migration plan json after preview1, found "
+        f"{len(plan_files_1)}: {plan_files_1}"
+    )
+    plan_id_1 = json.loads(plan_files_1[0].read_text(encoding="utf-8"))["plan_id"]
+
+    # --- Preview 2 (determinism check, APPLY-DET-01) ---
+    for pf in plan_files_1:
+        pf.unlink()
+
+    preview2 = _graphify(
+        ["update-vault", "--input", str(corpus)],
+        cwd=vault,
+    )
+    assert preview2.returncode == 0, (
+        f"preview2 (auto-adopt) failed: stderr={preview2.stderr!r} stdout={preview2.stdout!r}"
+    )
+    assert "[graphify] error:" not in preview2.stderr, (
+        f"preview2 stderr contains [graphify] error: line; stderr={preview2.stderr!r}"
+    )
+
+    plan_files_2 = sorted(migrations_dir.glob("migration-plan-*.json"))
+    assert len(plan_files_2) == 1, (
+        f"expected exactly one migration plan json after preview2, found "
+        f"{len(plan_files_2)}: {plan_files_2}"
+    )
+    plan_id_2 = json.loads(plan_files_2[0].read_text(encoding="utf-8"))["plan_id"]
+    assert plan_id_1 == plan_id_2, (
+        f"APPLY-DET-01 determinism violated under auto-adopt: "
+        f"preview1.plan_id={plan_id_1!r} preview2.plan_id={plan_id_2!r}"
+    )
+
+    # --- Apply (auto-adopt path) ---
+    apply_result = _graphify(
+        ["update-vault", "--input", str(corpus), "--apply", "--plan-id", plan_id_1],
+        cwd=vault,
+    )
+    assert apply_result.returncode == 0, (
+        f"apply (auto-adopt) failed: stderr={apply_result.stderr!r} stdout={apply_result.stdout!r}"
+    )
+    assert "[graphify] error:" not in apply_result.stderr, (
+        f"apply stderr contains [graphify] error: line; stderr={apply_result.stderr!r}"
+    )
+
+    # --- Materialization: notes produced under the vault's resolved artifacts root ---
+    materialized = list((vault.parent / "graphify-out").rglob("*.md"))
+    assert materialized, (
+        f"no markdown files materialized under {vault.parent / 'graphify-out'}"
+    )
