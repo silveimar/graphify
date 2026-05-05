@@ -4,14 +4,14 @@ milestone: v1.13
 milestone_name: milestone
 status: executing
 stopped_at: Phase 70 context gathered
-last_updated: "2026-05-05T21:35:00.887Z"
+last_updated: "2026-05-05T21:44:54.408Z"
 last_activity: 2026-05-05
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 10
-  completed_plans: 5
-  percent: 50
+  completed_plans: 6
+  percent: 60
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: `.planning/PROJECT.md` — **v1.13 milestone planning** (v1.12 shipped 2026
 ## Current Position
 
 Phase: 70 (vrsync-vault-input-reverse-sync-user-file-augmentation) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-05-05
 
@@ -85,6 +85,7 @@ Last activity: 2026-05-05
 | Phase 59 P04 | 648 | 2 tasks | 2 files |
 | Phase 59-vault-cwd-aware-cli-default P05 | 622 | 3 tasks | 4 files |
 | Phase 69 P04 | 15m | 2 tasks | 4 files |
+| Phase 70 P02 | 600 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -184,6 +185,7 @@ Locked v1.8 choices:
 - [Phase ?]: sanitize_label (security.py:190) applied to CWD before stderr interpolation, mitigating T-59-06 control-char injection
 - [Phase ?]: VCWD-04: --write-into-vault boolean flag strips via token-strip helpers (not argparse); global pop + per-command strip; sys.argv[2:] mutated in-place for branches without pre-gate vault-strip setup
 - [Phase ?]: detect_legacy_artifacts uses hardcoded globs + graphifyProject ownership marker (D-12, RESEARCH Q1)
+- [Phase ?]: Reverse-sync detection uses raw-bytes SHA256, not cache.file_hash
 
 ### Pending Todos
 
@@ -272,6 +274,6 @@ From `.planning/milestones/v1.11-MILESTONE-AUDIT.md` — non-blocking tech debt:
 
 ## Session Continuity
 
-Last session: 2026-05-05T21:35:00.883Z
+Last session: 2026-05-05T21:44:49.497Z
 Stopped at: Phase 70 context gathered
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
