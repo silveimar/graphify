@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.12
-milestone_name: milestone
-status: verifying
+milestone_name: "audit cleanup: REQUIREMENTS sync + exit-code constant + E2E auto-adopt coverage"
+status: executing
 stopped_at: Phase 59 verified — VCWD-01..05 complete, 2139 tests
-last_updated: "2026-05-04T18:20:18.144Z"
-last_activity: 2026-05-04
+last_updated: "2026-05-05T01:36:35.952Z"
+last_activity: 2026-05-04 -- Phase 62 execution started
 progress:
-  total_phases: 7
+  total_phases: 9
   completed_phases: 5
-  total_plans: 14
-  completed_plans: 14
-  percent: 100
+  total_plans: 18
+  completed_plans: 17
+  percent: 94
 ---
 
 # Project State
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (**milestone v1.12** — Vault Awareness, Pipeline I
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Phase 59 — vault-cwd-aware-cli-default
+**Current focus:** Phase 62 — v1.12 audit cleanup
 
 ## Current Position
 
-Phase: 59.1
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-05-04
+Phase: 62 (v1.12 audit cleanup) — EXECUTING
+Plan: 4 of 4 (62-01, 62-02, 62.1-01, 62-03 complete; 62-04 next)
+Status: Executing Phase 62
+Last activity: 2026-05-04 -- Plan 62-03 complete (test_e2e_update_vault_auto_adopts_vault_cwd locks Phase 62.1 fix; commit 522e290)
 
 ## Performance Metrics
 
@@ -94,6 +94,8 @@ Last activity: 2026-05-04
 - Phase 48 added: `.graphifyignore` loading / matching fixes for nested `graphify-out` (stop false prompts); consolidate outputs under canonical `graphify-out` instead of nested trees under input (`gsd-add-phase`; numbered **48** after resolving duplicate Phase 46 collision with Concept↔Code roadmap slot).
 - Phase 49 added: `--version` flag on graphify CLI; print package version on command results; fix skill vs installed package version mismatch warnings (e.g. update-vault reporting stale embedded skill version vs PyPI/package version).
 - Phase 59.1 inserted after 59 (URGENT, 2026-05-03): version sync hygiene + `--version` flag — fix skill stamp drift warning ("skill stamp ('0.4.7') is older than the installed package ... (package is '1.0.0')") and expose `graphify --version`. Re-activates dormant Phase 49 scope as v1.12 work.
+- Phase 62 added (2026-05-04): v1.12 audit cleanup — REQUIREMENTS sync (E2E-01/E2E-02 checkbox drift), exit-code constant unification (`_emit_vault_error` code=1 vs code=2 divergence between VCWD-03 and HARN-FMT-01), and E2E auto-adopt coverage gap surfaced by `gsd-audit-milestone` (status: tech_debt; see `.planning/v1.12-MILESTONE-AUDIT.md`).
+- Phase 62.1 inserted after 62 (URGENT, 2026-05-04): fix auto-adopt argparse defect — `_check_vault_cwd_gate` auto-adopts and prints notice but argparse `--vault required=True` exits 2 first. Affects `update-vault` (`__main__.py:3312`) and `vault-promote` (`__main__.py:3358`). Diagnosis: `.planning/debug/vault-cwd-gate-argparse-required.md`. Recommended fix: `required=False` + post-parse None-guard. Unskips RED tests in `tests/test_vault_cwd.py` as TDD GREEN gate. Surfaced by Phase 62-03 D-17 stop.
 
 ### Decisions
 
