@@ -453,3 +453,40 @@ def test_vault_promote_auto_adopt_no_vault_flag(tmp_path):
     assert proc.returncode != 2 or "required: --vault" not in proc.stderr, (
         f"exit 2 with argparse required error\nstderr: {proc.stderr}"
     )
+
+
+def test_update_vault_no_vault_flag_outside_vault_friendly_error(tmp_path):
+    """VCWD-argparse-required friendly-error branch: outside a vault CWD,
+    omitting --vault must NOT raise argparse exit-2 — instead emit a
+    user-facing 'error: --vault is required' and exit EXIT_VAULT_REFUSAL (=1).
+    """
+    proc = _graphify(
+        "update-vault", "--input", str(tmp_path / "nonexistent"),
+        cwd=str(tmp_path),
+    )
+    assert "required: --vault" not in proc.stderr, (
+        f"argparse 'required: --vault' must not fire; got stderr: {proc.stderr}"
+    )
+    assert "--vault is required" in proc.stderr, (
+        f"expected friendly error 'error: --vault is required'; got stderr: {proc.stderr}"
+    )
+    assert proc.returncode == 1, (
+        f"expected EXIT_VAULT_REFUSAL=1, got {proc.returncode}; stderr: {proc.stderr}"
+    )
+
+
+def test_vault_promote_no_vault_flag_outside_vault_friendly_error(tmp_path):
+    """VCWD-argparse-required friendly-error branch for vault-promote."""
+    proc = _graphify(
+        "vault-promote", "--graph", str(tmp_path / "nonexistent.json"),
+        cwd=str(tmp_path),
+    )
+    assert "required: --vault" not in proc.stderr, (
+        f"argparse 'required: --vault' must not fire; got stderr: {proc.stderr}"
+    )
+    assert "--vault is required" in proc.stderr, (
+        f"expected friendly error 'error: --vault is required'; got stderr: {proc.stderr}"
+    )
+    assert proc.returncode == 1, (
+        f"expected EXIT_VAULT_REFUSAL=1, got {proc.returncode}; stderr: {proc.stderr}"
+    )
