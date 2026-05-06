@@ -1304,3 +1304,122 @@ def test_migrate_legacy_rollback(tmp_path, monkeypatch):
         "_COMM_alpha.md must be rolled back after manifest write failure"
     )
     assert len(result["failed"]) > 0, f"failed list must be non-empty; got {result}"
+
+
+# ---------------------------------------------------------------------------
+# Phase 70 / VPROF-03: user-folder augmentation routing helper
+# ---------------------------------------------------------------------------
+
+def _make_user_file(path: Path, frontmatter: str = "", body: str = "Body line\n") -> bytes:
+    """Write a user file with optional frontmatter; return original bytes."""
+    if frontmatter:
+        text = f"---\n{frontmatter}---\n{body}"
+    else:
+        text = body
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path.read_bytes()
+
+
+def test_user_folder_write_routed_to_augmentation(tmp_path):
+    from graphify.vault_promote import route_user_folder_to_augmentation
+    user_dir = tmp_path / "Calendar"
+    f = user_dir / "note.md"
+    original_body_bytes = b"Body line\n"
+    _make_user_file(f, frontmatter="title: Existing\n", body="Body line\n")
+    profile = _make_profile_with_user_only(["Calendar/"])
+    outcome, changed = route_user_folder_to_augmentation(
+        tmp_path, "Calendar/note.md",
+        {"tags": ["graphify-tag"], "related_to": ["[[Other]]"]},
+        profile,
+    )
+    assert outcome == "augmented"
+    assert "tags" in changed and "related_to" in changed
+    # Body bytes preserved (D-07)
+    final = f.read_bytes()
+    assert final.endswith(original_body_bytes), "body must be byte-identical post-augmentation"
+
+
+def test_augmentation_passes_only_allowlist_keys(tmp_path):
+    from graphify.vault_promote import route_user_folder_to_augmentation
+    f = tmp_path / "Calendar" / "note.md"
+    _make_user_file(f, frontmatter="title: Existing\n", body="Body\n")
+    profile = _make_profile_with_user_only(["Calendar/"])
+    outcome, changed = route_user_folder_to_augmentation(
+        tmp_path, "Calendar/note.md",
+        {"random_internal_key": "x", "tags": ["t"]},
+        profile,
+    )
+    assert outcome == "augmented"
+    # Only allowlist keys propagate; random_internal_key dropped by augment
+    assert "tags" in changed
+    text = f.read_text(encoding="utf-8")
+    assert "random_internal_key" not in text
+
+
+def test_augmentation_skips_when_user_file_missing(tmp_path, capsys):
+    from graphify.vault_promote import route_user_folder_to_augmentation
+    profile = _make_profile_with_user_only(["Calendar/"])
+    outcome, changed = route_user_folder_to_augmentation(
+        tmp_path, "Calendar/missing.md", {"tags": ["x"]}, profile,
+    )
+    assert outcome == "skipped_missing"
+    assert changed == []
+    err = capsys.readouterr().err
+    assert "[graphify]" in err
+    assert "user file does not exist" in err
+
+
+def test_augmentation_idempotent_in_pipeline(tmp_path):
+    from graphify.vault_promote import route_user_folder_to_augmentation
+    f = tmp_path / "Calendar" / "note.md"
+    _make_user_file(f, frontmatter="title: X\n", body="Body\n")
+    profile = _make_profile_with_user_only(["Calendar/"])
+    augs = {"tags": ["graphify-tag"], "related_to": ["[[Other]]"]}
+    out1, _ = route_user_folder_to_augmentation(tmp_path, "Calendar/note.md", augs, profile)
+    bytes_after_first = f.read_bytes()
+    out2, changed2 = route_user_folder_to_augmentation(tmp_path, "Calendar/note.md", augs, profile)
+    assert out1 == "augmented"
+    assert out2 == "noop"  # Pitfall 8 idempotence
+    assert changed2 == []
+    assert f.read_bytes() == bytes_after_first
+
+
+def test_community_added_when_allow_community_true(tmp_path):
+    from graphify.vault_promote import route_user_folder_to_augmentation
+    f = tmp_path / "Calendar" / "note.md"
+    _make_user_file(f, frontmatter="title: X\n", body="Body\n")
+    profile = _make_profile_with_user_only(["Calendar/"])
+    profile["augment"] = {"allow_community": True}
+    outcome, changed = route_user_folder_to_augmentation(
+        tmp_path, "Calendar/note.md", {"community": "C-1"}, profile,
+    )
+    assert outcome == "augmented"
+    assert "community" in changed
+    assert "community: C-1" in f.read_text(encoding="utf-8")
+
+
+def test_community_omitted_when_allow_community_false(tmp_path):
+    from graphify.vault_promote import route_user_folder_to_augmentation
+    f = tmp_path / "Calendar" / "note.md"
+    _make_user_file(f, frontmatter="title: X\n", body="Body\n")
+    profile = _make_profile_with_user_only(["Calendar/"])
+    # Explicit default
+    profile["augment"] = {"allow_community": False}
+    outcome, changed = route_user_folder_to_augmentation(
+        tmp_path, "Calendor/note.md".replace("Calendor", "Calendar"),
+        {"community": "C-1"}, profile,
+    )
+    # community gated off → no change at all
+    assert outcome == "noop"
+    assert "community" not in changed
+    assert "community" not in f.read_text(encoding="utf-8")
+
+
+def test_phase69_refusal_preserved_for_full_file_writes(tmp_path):
+    """Existing Phase 69 _preflight_check_user_only_folders refusal must NOT regress."""
+    from graphify.vault_promote import _preflight_check_user_only_folders
+    profile = _make_profile_with_user_only(["Calendar/"])
+    planned_targets = [("map", "Calendar/foo.md")]
+    with pytest.raises(SystemExit):
+        _preflight_check_user_only_folders(planned_targets, profile, tmp_path)

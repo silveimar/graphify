@@ -1349,3 +1349,62 @@ def migrate_legacy(
             failed.append(old_rel)
 
     return {"planned": planned, "moved": moved, "failed": failed}
+
+
+# ---------------------------------------------------------------------------
+# Phase 70 / VPROF-03: route user-folder writes to allowlist augmentation
+# (D-04..D-07, D-16). This narrows the Phase 69 atomic refusal: when a planned
+# write targets a user-only folder AND the file already exists AND the
+# augmentation payload is purely allowlist frontmatter (body unchanged), we
+# route through augment_user_file_frontmatter instead of refusing. All other
+# cases (non-existing user file, non-allowlist keys, body-byte mutations,
+# full-file rewrites) still hit the Phase 69 refusal at the preflight gate —
+# VPROF-03's user-namespace ownership invariant is preserved.
+# ---------------------------------------------------------------------------
+
+def _is_user_only_target(rel_path: str, merged_profile: dict, vault_dir: Path) -> bool:
+    """True if rel_path resolves under any user_only_folders entry."""
+    user_only = merged_profile.get("user_only_folders") or []
+    resolved = (vault_dir / rel_path).resolve()
+    for uof in user_only:
+        uof_resolved = (vault_dir / uof.rstrip("/")).resolve()
+        if resolved == uof_resolved or uof_resolved in resolved.parents:
+            return True
+    return False
+
+
+def route_user_folder_to_augmentation(
+    vault_dir: Path,
+    rel_path: str,
+    augmentations: dict,
+    merged_profile: dict,
+) -> tuple[str, list[str]]:
+    """Augment an existing user-folder file via allowlist frontmatter merge.
+
+    Phase 70 chokepoint helper (A4). Returns (outcome, changed_keys):
+      - ("augmented", [keys...])  — frontmatter merged, body byte-identical (D-07)
+      - ("noop", [])              — already up-to-date (Pitfall 8 idempotence)
+      - ("skipped_missing", [])   — user file does not exist; do NOT create it
+        (augmentation is for existing user files only — preserve ownership).
+
+    Caller is responsible for having already filtered `augmentations` down to
+    intentional allowlist keys; non-allowlist keys are silently dropped by
+    augment_user_file_frontmatter, which is the desired behavior at this layer.
+    Manifest is intentionally NOT updated — graphify must not "own" user files
+    (Pitfall 8). Idempotence on subsequent runs is provided by D-04/D-05.
+    """
+    from graphify.augment import augment_user_file_frontmatter  # lazy: avoid cycle
+
+    target = (vault_dir / rel_path).resolve()
+    if not target.exists():
+        import sys
+        print(
+            f"[graphify] vault_promote: user file does not exist, "
+            f"skipping augmentation: {rel_path}",
+            file=sys.stderr,
+        )
+        return ("skipped_missing", [])
+    _, changed = augment_user_file_frontmatter(target, augmentations, merged_profile)
+    if changed:
+        return ("augmented", changed)
+    return ("noop", [])
