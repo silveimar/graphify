@@ -127,6 +127,7 @@ def generate(
     suggested_questions: list[dict] | None = None,
     usage_data: dict | None = None,
     dedup_report: dict | None = None,  # Phase 10, D-04
+    federation_manifest: list[dict] | None = None,  # Phase 66 (CFED-05)
 ) -> str:
     today = date.today().isoformat()
 
@@ -264,6 +265,28 @@ def generate(
             f"Cohesion: {score}",
             f"Nodes ({len(real_nodes)}): {', '.join(display)}{suffix}",
         ]
+
+    # --- Phase 66 (CFED-05) Federation section ---
+    # Placement per D-66.6: immediately AFTER the Communities block.
+    # Omit-on-zero policy: when manifest is empty/None, no `## Federation`
+    # heading is emitted (mirrors Phase 67 CDRIFT "absent ⇒ omit" convention).
+    # Driven directly off federation-manifest.json schema (D-66.5).
+    if federation_manifest:
+        lines += ["", "## Federation"]
+        lines.append("| Merged Concept | Repos | Jaccard | Shared Basenames | Tiebreaker |")
+        lines.append("|---|---|---|---|---|")
+        for entry in federation_manifest:
+            repos = ", ".join(c.get("repo", "") for c in entry.get("contributing", []))
+            sigs = entry.get("signals", {}) or {}
+            jacc = f"{float(sigs.get('neighborhood_jaccard', 0.0)):.2f}"
+            basenames = ", ".join(sigs.get("shared_basenames", []) or [])
+            tb = (
+                f"{float(entry['tiebreaker_score']):.2f}"
+                if "tiebreaker_score" in entry else ""
+            )
+            lines.append(
+                f"| {entry.get('merged_id', '')} | {repos} | {jacc} | {basenames} | {tb} |"
+            )
 
     ambiguous = [(u, v, d) for u, v, d in G.edges(data=True) if d.get("confidence") == "AMBIGUOUS"]
     if ambiguous:

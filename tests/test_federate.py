@@ -451,7 +451,9 @@ def _report_aux():
     """Minimal aux args required by report.generate() — calibration-only test analog."""
     detection = {"total_files": 4, "total_words": 1000, "needs_graph": True, "warning": None}
     tokens = {"input": 0, "output": 0}
-    return {0: ["a", "b"]}, {0: 0.8}, {0: "ClusterA"}, [], [], detection, tokens
+    # Use node ids that exist in _build_graph_with_inferred_scores_local() so
+    # the Communities loop's G.nodes[n] lookup succeeds.
+    return {0: ["code_0", "concept_0"]}, {0: 0.8}, {0: "ClusterA"}, [], [], detection, tokens
 
 
 def _build_graph_with_inferred_scores_local(scores: list[float]) -> _nx.Graph:
