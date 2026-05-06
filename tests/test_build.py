@@ -39,3 +39,11 @@ def test_build_merges_multiple_extractions():
     G = build([ext1, ext2])
     assert G.number_of_nodes() == 2
     assert G.number_of_edges() == 1
+
+
+def test_build_from_json_default_off():
+    """CFED-01: build_from_json without peers kwarg behaves identically to pre-Phase-66."""
+    G = build_from_json(load_extraction())
+    # Snapshot baseline values captured BEFORE Phase 66 changes:
+    assert G.number_of_nodes() == 4
+    assert G.number_of_edges() == 4

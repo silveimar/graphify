@@ -244,3 +244,111 @@ def test_no_new_deps():
     }
     bad = imports - allowed
     assert not bad, f"federate.py imports unexpected modules: {bad}"
+
+
+# --------------------------------------------------------------------------- #
+# Plan 02: Pipeline integration + atomic vault-aware manifest writer          #
+# --------------------------------------------------------------------------- #
+
+
+def test_manifest_vault_aware(tmp_path, monkeypatch):
+    """write_manifest writes under default_graphify_artifacts_dir(target), not a hardcoded path."""
+    from graphify.federate import write_manifest
+    from graphify.output import default_graphify_artifacts_dir
+
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path
+    expected_dir = default_graphify_artifacts_dir(target)
+    entries = [{"merged_id": "x::a", "contributing": [], "signals": {}}]
+    out_path = write_manifest(entries, target)
+
+    assert out_path == expected_dir / "federation-manifest.json"
+    assert out_path.exists()
+    data = json.loads(out_path.read_text())
+    assert data == entries
+
+
+def test_manifest_atomic(tmp_path, monkeypatch):
+    """When os.replace fails, no leftover .tmp file remains and no partial manifest is written."""
+    import os as _os
+    from graphify.federate import write_manifest
+    from graphify.output import default_graphify_artifacts_dir
+
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path
+    expected_dir = default_graphify_artifacts_dir(target)
+    expected_dir.mkdir(parents=True, exist_ok=True)
+
+    real_replace = _os.replace
+
+    def boom(src, dst):
+        raise OSError("simulated atomic failure")
+
+    monkeypatch.setattr("graphify.federate.os.replace", boom)
+
+    with pytest.raises(OSError):
+        write_manifest([{"merged_id": "x::a", "contributing": [], "signals": {}}], target)
+
+    assert not (expected_dir / "federation-manifest.json").exists()
+    leftover = list(expected_dir.glob("federation-manifest.json*"))
+    assert leftover == [], f"leftover tmp files: {leftover}"
+
+
+def test_pipeline_invokes_federate(tmp_path, monkeypatch):
+    """build_from_json invokes federate() exactly once when peers is non-empty."""
+    from graphify import build as build_mod
+    from graphify import federate as federate_mod
+
+    extraction = {
+        "nodes": [
+            {"id": "n_a", "label": "A", "file_type": "code", "source_file": "a.py"},
+            {"id": "n_b", "label": "B", "file_type": "document", "source_file": "b.md"},
+        ],
+        "edges": [
+            {"source": "n_a", "target": "n_b", "relation": "documents",
+             "confidence": "INFERRED", "source_file": "b.md", "weight": 1.0,
+             "confidence_score": 0.7},
+        ],
+    }
+
+    peer_dir = tmp_path / "peer" / "graphify-out"
+    peer_dir.mkdir(parents=True)
+    peer_path = peer_dir / "graph.json"
+    peer_path.write_text(json.dumps({"nodes": [], "edges": []}))
+
+    calls = {"n": 0, "args": None}
+
+    def spy(extr, peers, local_repo=""):
+        calls["n"] += 1
+        calls["args"] = (extr, peers, local_repo)
+        return extr, []
+
+    monkeypatch.setattr(federate_mod, "federate", spy)
+    monkeypatch.setattr(build_mod, "_skip_manifest_for_test", True, raising=False)
+    # Avoid manifest write side effects in this spy test by stubbing write_manifest too.
+    monkeypatch.setattr(federate_mod, "write_manifest", lambda *a, **kw: tmp_path / "noop.json")
+
+    monkeypatch.chdir(tmp_path)
+    build_mod.build_from_json(extraction, peers=[peer_path])
+    assert calls["n"] == 1
+
+
+def test_pipeline_preserves_concept_code_normalization():
+    """With peers=[], build_from_json behaves identically (default-off invariant)."""
+    from graphify.build import build_from_json
+
+    extraction = {
+        "nodes": [
+            {"id": "n_a", "label": "A", "file_type": "code", "source_file": "a.py"},
+            {"id": "n_b", "label": "B", "file_type": "document", "source_file": "b.md"},
+        ],
+        "edges": [
+            {"source": "n_a", "target": "n_b", "relation": "implements",
+             "confidence": "INFERRED", "source_file": "a.py", "weight": 1.0},
+            {"source": "n_a", "target": "n_b", "relation": "implements",
+             "confidence": "INFERRED", "source_file": "a.py", "weight": 1.0},
+        ],
+    }
+    G_no_peers = build_from_json(extraction)
+    # Phase 53 normalization collapses duplicates → exactly one edge.
+    assert G_no_peers.number_of_edges() == 1
