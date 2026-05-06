@@ -41,9 +41,9 @@
   3. Running `pytest tests/ -q` produces zero unexpected stderr-format diffs across the full suite.
   4. The 7 platform skill files' regex parsers are enumerated in a test fixture so future format changes have a documented contract surface.
 **Plans**: 3 plans
-- [ ] 64-01-PLAN.md — AUDIT-02 stderr snapshot lock (TDD: golden fixture + test)
-- [ ] 64-02-PLAN.md — AUDIT-02 stderr outlier sweep (grep-and-migrate + invariant test)
-- [ ] 64-03-PLAN.md — AUDIT-02 skill regex fixture for 7 platforms (TDD)
+- [ ] 64-01-PLAN.md — AUDIT-02 stderr snapshot lock (TDD: golden fixture + test) — **wave 1**
+- [ ] 64-02-PLAN.md — AUDIT-02 stderr outlier sweep (grep-and-migrate + invariant test) — **wave 2** (depends on 64-01: sweep is gated by snapshot existing)
+- [ ] 64-03-PLAN.md — AUDIT-02 skill regex fixture for 7 platforms (TDD) — **wave 2** (depends on 64-01: regex matches assert against `tests/fixtures/stderr_contract.txt`)
 
 ### Phase 65: CCONF — Per-Edge Confidence + Cache Split + schema_version
 **Goal**: Every concept↔code INFERRED edge carries a per-edge LLM-derived `confidence_score` and `evidence`, persisted via a separate cache namespace that prompt-version bumps invalidate cleanly, with backward-compat reads of pre-v1.13 graphs.
