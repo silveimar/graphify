@@ -8,7 +8,7 @@
 
 ## Phases
 
-- [ ] **Phase 63: VOPT — Vault Option B Silent Reroute & `--explain-paths`** — Vault-CWD reroute to `.graphify-out/` with stderr breadcrumb and a path-resolver flag.
+- [x] **Phase 63: VOPT — Vault Option B Silent Reroute & `--explain-paths`** — Vault-CWD reroute to `.graphify-out/` with stderr breadcrumb and a path-resolver flag. (completed 2026-05-06)
 - [ ] **Phase 64: AUDIT-A — stderr Format Snapshot Lock & Sweep** — Freeze the `[graphify]` two-line stderr contract via snapshot test, then migrate one-line outliers.
 - [ ] **Phase 65: CCONF — Per-Edge Confidence + Cache Split + schema_version** — Load-bearing: per-edge LLM `confidence_score` + `evidence`, second cache namespace, schema-compat with legacy fixture, calibration self-check.
 - [ ] **Phase 66: CFED — Cross-Repo Concept Federation (`federate.py`)** — Opt-in deterministic id-namespacing + multi-signal merge + provenance manifest + report section.
@@ -29,7 +29,7 @@
 **Plans**: 3 plans
   - [x] 63-01-PLAN.md — Option B silent reroute resolver + VCWD-03 gate harmonization (VOPT-01, VOPT-02) — **wave 1**
   - [x] 63-02-PLAN.md — `--explain-paths` flag with 5-row resolution table (VOPT-03) — **wave 2** (depends on 63-01: tests assert `option-b` resolution label produced by 63-01's resolver branch)
-  - [ ] 63-03-PLAN.md — Legacy `graphify-out/` detection third hint line + .graphifyignore + final regression sweep (VOPT-02) — **wave 2** (depends on 63-01: extends `_emit_vault_info(extra_hint=...)`)
+  - [x] 63-03-PLAN.md — Legacy `graphify-out/` detection third hint line + .graphifyignore + final regression sweep (VOPT-02) — **wave 2** (depends on 63-01: extends `_emit_vault_info(extra_hint=...)`)
 
 ### Phase 64: AUDIT-A — stderr Format Snapshot Lock & Sweep
 **Goal**: The `[graphify] error:` + `  hint:` two-line stderr contract is locked by an automated snapshot test BEFORE any reformatting touches the codebase, so the 7 platform skills' regex parsers cannot silently break.
@@ -127,7 +127,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 63. VOPT | 2/3 | In Progress|  |
+| 63. VOPT | 3/3 | Complete   | 2026-05-06 |
 | 64. AUDIT-A | 0/0 | Not started | - |
 | 65. CCONF | 0/0 | Not started | - |
 | 66. CFED | 0/0 | Not started | - |
@@ -170,7 +170,7 @@ Total: 27/27 — no orphans, no duplicates.
 **Requirements**: TBD (likely VFIX-01 path resolution + VFIX-02 docs/examples)
 **Depends on:** Phase 70
 **Evidence:** /Users/silveimar/temp-testgph/tmp/
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 70.1-01: RED matrix locking cwd × --obsidian-dir × profile.output invariants (VFIX-01 RED) — d64e892
