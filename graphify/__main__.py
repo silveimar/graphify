@@ -1863,12 +1863,25 @@ def main() -> None:
         )
 
         # Precedence (D-08): --output > profile > --obsidian-dir > legacy default
+        _od_profile = None  # VFIX-01: optional profile sourced from a --obsidian-dir vault
         if cli_output is not None:
             obsidian_dir = str(resolved.notes_dir)
         elif resolved.vault_detected and resolved.source in _PROFILE_DRIVEN_SOURCES:
             obsidian_dir = str(resolved.notes_dir)
         elif user_passed_obsidian_dir:
-            pass  # honor explicit --obsidian-dir; leave obsidian_dir as-is
+            # VFIX-01 (Plan 70.1-02): Resolve --obsidian-dir to an absolute path
+            # up front so downstream to_obsidian does not re-join against cwd
+            # (which can produce the doubled `<vault>/<vault>/` segment when
+            # cwd is the vault's parent and the user passes a relative
+            # `--obsidian-dir <vault-name>`). If the resolved path is itself
+            # an Obsidian vault with a graphify profile, load that profile
+            # explicitly here so to_obsidian receives the correct mapping
+            # without re-discovering it relative to a stale cwd.
+            _od = Path(obsidian_dir).resolve()
+            obsidian_dir = str(_od)
+            if (_od / ".obsidian").is_dir() and (_od / ".graphify" / "profile.yaml").exists():
+                from graphify.profile import load_profile as _lp
+                _od_profile = _lp(_od)
         # else: keep legacy default "graphify-out/obsidian" (D-12 backcompat)
 
         # Load graph.json — reuse the exact query-command pattern.
@@ -1910,6 +1923,10 @@ def main() -> None:
         if resolved.vault_detected and resolved.vault_path is not None:
             from graphify.profile import load_profile
             profile = load_profile(resolved.vault_path)
+        # VFIX-01: when --obsidian-dir resolved to a profile-bearing vault and
+        # no other source set the profile, use the obsidian-dir-vault profile.
+        if profile is None and _od_profile is not None:
+            profile = _od_profile
 
         # Call the library. When a vault was detected, pass the vault profile
         # explicitly because obsidian_dir may point at a profile-selected notes
