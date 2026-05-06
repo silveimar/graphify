@@ -996,6 +996,82 @@ def _preflight_check_user_only_folders(
         raise SystemExit(1)
 
 
+def _route_user_only_writes(
+    planned_with_content: list[tuple[str, str, str]],
+    merged_profile: dict,
+    vault_dir: Path,
+    manifest: dict[str, str],
+) -> tuple[list[str], list[tuple[str, str]], list[tuple[str, str, str]]]:
+    """Plan 70-07 chokepoint wiring (VPROF-03 augmentation half).
+
+    Partition planned writes against ``user_only_folders``:
+
+    * If a planned target is inside a user_only_folders entry AND the user
+      file already exists AND every key in the planned frontmatter is in the
+      augment allowlist (graphify.augment._ALLOWLIST_LISTS / _ALLOWLIST_SCALARS,
+      plus "community" iff D-16 gate enabled) → route to
+      :func:`route_user_folder_to_augmentation`. The helper merges allowlist
+      keys into the existing user file and leaves body bytes byte-identical
+      (D-07). Manifest is intentionally NOT updated for augmented user files
+      (D-11: graphify must not "own" user files).
+    * Otherwise (non-allowlist key, missing user file, body-byte mutation
+      attempt) → return as a refusal target so the caller can hit the existing
+      atomic refusal path (D-09 preserved).
+
+    Returns (augmented_paths, refusal_targets, normal_targets):
+      - augmented_paths: rel_paths that were augmented in-place (skip writes)
+      - refusal_targets: list of (bucket_key, rel_path) → feed to
+        ``_preflight_check_user_only_folders`` for atomic SystemExit
+      - normal_targets: list of (bucket_key, rel_path, content) → feed to
+        the normal write loop (no user_only_folders match)
+    """
+    from graphify.augment import _ALLOWLIST_LISTS, _ALLOWLIST_SCALARS
+    from graphify.merge import _parse_frontmatter
+
+    allow_community = bool(
+        (merged_profile or {}).get("augment", {}).get("allow_community", False)
+    )
+    allowlist: set[str] = set(_ALLOWLIST_LISTS) | set(_ALLOWLIST_SCALARS)
+    if allow_community:
+        allowlist.add("community")
+
+    augmented_paths: list[str] = []
+    refusal_targets: list[tuple[str, str]] = []
+    normal_targets: list[tuple[str, str, str]] = []
+
+    for bucket_key, rel_path, content in planned_with_content:
+        if not _is_user_only_target(rel_path, merged_profile, vault_dir):
+            normal_targets.append((bucket_key, rel_path, content))
+            continue
+
+        # User-only target: must (a) already exist and (b) carry allowlist-only
+        # planned frontmatter to be eligible for augmentation routing.
+        target = (vault_dir / rel_path).resolve()
+        if not target.exists():
+            refusal_targets.append((bucket_key, rel_path))
+            continue
+
+        planned_fm = _parse_frontmatter(content) or {}
+        non_allowlist_keys = [k for k in planned_fm.keys() if k not in allowlist]
+        if non_allowlist_keys:
+            # Non-allowlist key → preserve D-09 atomic refusal
+            refusal_targets.append((bucket_key, rel_path))
+            continue
+
+        # Allowlist-only delta on an existing user file → route to augmentation.
+        # D-09 (atomic refusal) and D-11 (manifest scope) are preserved:
+        #   - augmentation never modifies body bytes (D-07)
+        #   - manifest is NOT updated; graphify never "owns" user files (D-11)
+        route_user_folder_to_augmentation(
+            vault_dir, rel_path, planned_fm, merged_profile
+        )
+        # Defensive: ensure manifest is not polluted with this rel_path
+        manifest.pop(rel_path, None)
+        augmented_paths.append(rel_path)
+
+    return augmented_paths, refusal_targets, normal_targets
+
+
 def _write_record(
     vault_dir: Path,
     rel_path: str,
@@ -1075,41 +1151,46 @@ def promote(
 
     bucket_order = ["things", "questions", "maps", "sources", "people", "quotes", "statements"]
 
-    # Build planned_targets for pre-flight check (D-08/D-09): collect every (bucket_key, rel_path)
-    # that promote() intends to write BEFORE any writes occur.
-    planned_targets: list[tuple[str, str]] = []
+    # Build planned_with_content for pre-flight + augmentation routing (D-08/D-09/D-11):
+    # collect every (bucket_key, rel_path, content) BEFORE any writes occur.
+    planned_with_content: list[tuple[str, str, str]] = []
     for bucket_key in bucket_order:
         records = classified.get(bucket_key, [])
         folder_type = _BUCKET_TO_FOLDER_TYPE[bucket_key]
         prefix = _resolve_folder_prefix(bucket_key, merged_profile)
         for record in records:
-            filename_stem, _content = render_note(
+            filename_stem, content = render_note(
                 record, folder_type, G, merged_profile, run_meta, vault_dir=vault_dir
             )
-            planned_targets.append((bucket_key, f"{prefix}/{filename_stem}.md"))
+            planned_with_content.append((bucket_key, f"{prefix}/{filename_stem}.md", content))
+
+    # Plan 70-07 (VPROF-03): split user_only_folders writes — allowlist-only frontmatter
+    # deltas on existing user files route through route_user_folder_to_augmentation;
+    # everything else (non-allowlist keys, missing user files) feeds the existing
+    # atomic refusal gate. D-09 atomicity and D-11 manifest scope both preserved.
+    augmented_paths, refusal_targets, normal_planned = _route_user_only_writes(
+        planned_with_content, merged_profile, vault_dir, manifest
+    )
 
     # Pre-flight: refuse atomically if any target violates user_only_folders (D-09, D-11)
-    _preflight_check_user_only_folders(planned_targets, merged_profile, vault_dir)
+    _preflight_check_user_only_folders(refusal_targets, merged_profile, vault_dir)
 
-    for bucket_key in bucket_order:
-        records = classified.get(bucket_key, [])
-        folder_type = _BUCKET_TO_FOLDER_TYPE[bucket_key]
-        prefix = _resolve_folder_prefix(bucket_key, merged_profile)
+    # Track augmented user files in promoted summary so import-log + caller see the activity
+    if augmented_paths:
+        promoted_counts.setdefault("augmented_user_files", 0)
+        promoted_counts["augmented_user_files"] += len(augmented_paths)
 
-        for record in records:
-            filename_stem, content = render_note(record, folder_type, G, merged_profile, run_meta, vault_dir=vault_dir)
-            rel_path = f"{prefix}/{filename_stem}.md"
-            outcome = _write_record(vault_dir, rel_path, content, manifest, merged_profile)
-
-            if outcome in ("written", "overwritten"):
-                promoted_counts[bucket_key] = promoted_counts.get(bucket_key, 0) + 1
-            else:
-                # outcome is "skipped_foreign" or "skipped_user_modified"
-                reason = outcome.replace("skipped_", "")
-                if reason not in skipped:
-                    skipped[reason] = []
-                skipped[reason].append(rel_path)
-                skipped_entries.append((rel_path, reason))
+    for bucket_key, rel_path, content in normal_planned:
+        outcome = _write_record(vault_dir, rel_path, content, manifest, merged_profile)
+        if outcome in ("written", "overwritten"):
+            promoted_counts[bucket_key] = promoted_counts.get(bucket_key, 0) + 1
+        else:
+            # outcome is "skipped_foreign" or "skipped_user_modified"
+            reason = outcome.replace("skipped_", "")
+            if reason not in skipped:
+                skipped[reason] = []
+            skipped[reason].append(rel_path)
+            skipped_entries.append((rel_path, reason))
 
     # Step 7: Save manifest
     _save_manifest(manifest, graphify_out)
