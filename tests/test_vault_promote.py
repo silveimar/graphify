@@ -1423,3 +1423,144 @@ def test_phase69_refusal_preserved_for_full_file_writes(tmp_path):
     planned_targets = [("map", "Calendar/foo.md")]
     with pytest.raises(SystemExit):
         _preflight_check_user_only_folders(planned_targets, profile, tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Plan 70-07 — Augmentation chokepoint wiring (VPROF-03 gap closure)
+# ---------------------------------------------------------------------------
+
+def _build_user_file(vault: Path, rel_path: str, frontmatter: str, body: str) -> Path:
+    p = vault / rel_path
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(frontmatter + body, encoding="utf-8")
+    return p
+
+
+def test_user_folder_augmentation_chokepoint_merges_allowlist_frontmatter(tmp_path):
+    """Allowlist-only planned frontmatter on a user_only_folders path → merged; body unchanged; no manifest entry."""
+    from graphify.vault_promote import _route_user_only_writes
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    profile = _make_profile_with_user_only(["10 People/"])
+
+    body = "user-authored content\nline two\n"
+    fm = "---\nrelated_to:\n  - foo\n---\n"
+    user_file = _build_user_file(vault, "10 People/Alice.md", fm, body)
+    pre_body_bytes = user_file.read_bytes().split(b"---\n", 2)[2]
+
+    # Planned content has allowlist-only frontmatter
+    planned_content = (
+        "---\n"
+        "related_to:\n  - bar\n"
+        "tags:\n  - x\n"
+        "---\n"
+        "graphify-generated body that we MUST NOT write\n"
+    )
+    planned = [("things", "10 People/Alice.md", planned_content)]
+    manifest: dict[str, str] = {}
+
+    augmented, refusal_targets, normal_targets = _route_user_only_writes(
+        planned, profile, vault, manifest
+    )
+
+    assert augmented == ["10 People/Alice.md"], f"Expected augmentation route, got {augmented}"
+    assert refusal_targets == [], "No refusals expected"
+    assert normal_targets == [], "No normal writes expected for user-only path"
+
+    # Body bytes preserved
+    post_body_bytes = user_file.read_bytes().split(b"---\n", 2)[2]
+    assert post_body_bytes == pre_body_bytes, "Body bytes must be byte-identical (D-07)"
+
+    # Frontmatter merged: related_to has both foo + bar; tags has x
+    text = user_file.read_text(encoding="utf-8")
+    assert "foo" in text and "bar" in text, f"related_to must contain foo + bar; got: {text}"
+    assert "tags:" in text and "- x" in text, f"tags merged in; got: {text}"
+
+    # No manifest entry for augmented user file
+    assert "10 People/Alice.md" not in manifest, "Manifest must not track augmented user files (D-11)"
+
+
+def test_user_folder_augmentation_chokepoint_idempotent(tmp_path):
+    """Second routing run is byte-idempotent for augmented user files."""
+    from graphify.vault_promote import _route_user_only_writes
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    profile = _make_profile_with_user_only(["10 People/"])
+
+    fm = "---\nrelated_to:\n  - foo\n---\n"
+    body = "user content\n"
+    user_file = _build_user_file(vault, "10 People/Alice.md", fm, body)
+
+    planned_content = "---\nrelated_to:\n  - bar\n---\nignored body\n"
+    planned = [("things", "10 People/Alice.md", planned_content)]
+    manifest: dict[str, str] = {}
+
+    _route_user_only_writes(planned, profile, vault, manifest)
+    after_first = user_file.read_bytes()
+    _route_user_only_writes(planned, profile, vault, manifest)
+    after_second = user_file.read_bytes()
+
+    assert after_first == after_second, "Second run must be byte-idempotent"
+
+
+def test_user_folder_augmentation_chokepoint_refuses_non_allowlist_key(tmp_path):
+    """Non-allowlist key in planned frontmatter on a user_only_folders path → atomic refusal preserved (D-09)."""
+    from graphify.vault_promote import _route_user_only_writes
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    profile = _make_profile_with_user_only(["10 People/"])
+
+    fm = "---\nrelated_to:\n  - foo\n---\n"
+    body = "user body\n"
+    user_file = _build_user_file(vault, "10 People/Alice.md", fm, body)
+    pre = user_file.read_bytes()
+
+    # Includes graphifyProject which is NOT in the augment allowlist
+    planned_content = (
+        "---\n"
+        "related_to:\n  - bar\n"
+        "graphifyProject: my-project\n"
+        "---\n"
+        "body\n"
+    )
+    planned = [("things", "10 People/Alice.md", planned_content)]
+    manifest: dict[str, str] = {}
+
+    augmented, refusal_targets, normal_targets = _route_user_only_writes(
+        planned, profile, vault, manifest
+    )
+
+    # Routed to refusal bucket — caller will atomically refuse
+    assert augmented == [], "Non-allowlist key must NOT be routed to augmentation"
+    assert refusal_targets == [("things", "10 People/Alice.md")], (
+        f"Expected refusal target, got {refusal_targets}"
+    )
+    # File untouched
+    assert user_file.read_bytes() == pre, "User file must be untouched on refusal path"
+
+
+def test_user_folder_augmentation_chokepoint_refuses_when_user_file_missing(tmp_path):
+    """Allowlist-only planned write where user file does NOT exist → refusal (graphify must not create user files)."""
+    from graphify.vault_promote import _route_user_only_writes
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    profile = _make_profile_with_user_only(["10 People/"])
+
+    planned_content = "---\nrelated_to:\n  - bar\n---\nbody\n"
+    planned = [("things", "10 People/NewPerson.md", planned_content)]
+    manifest: dict[str, str] = {}
+
+    augmented, refusal_targets, normal_targets = _route_user_only_writes(
+        planned, profile, vault, manifest
+    )
+
+    assert augmented == [], "Missing user file must NOT be augmented (would create file in user folder)"
+    assert refusal_targets == [("things", "10 People/NewPerson.md")], (
+        f"Expected refusal target, got {refusal_targets}"
+    )
+    # File still doesn't exist
+    assert not (vault / "10 People" / "NewPerson.md").exists()
