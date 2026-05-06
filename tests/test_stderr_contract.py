@@ -90,6 +90,35 @@ def test_emit_option_b_breadcrumb_matches_snapshot(capsys: pytest.CaptureFixture
     )
 
 
+def test_no_outlier_stderr_prefixes_in_source() -> None:
+    """D-04 grep invariant: every print(..., file=sys.stderr) in graphify/ must use a compliant prefix.
+
+    Allowed literal prefixes in the print argument:
+      '[graphify] error: '   (plain or f-string)
+      '[graphify] info: '    (plain or f-string)
+      '  hint: '             (plain or f-string, two leading spaces)
+
+    The single whitelisted exception is graphify/output.py whose raw
+    '[graphify] {msg}' form is wrapped by the emit_* functions tested above.
+    """
+    import subprocess
+    import re as _re
+    repo = Path(__file__).resolve().parents[1]
+    out = subprocess.check_output(
+        ["grep", "-rEn", r"print\([^)]*file=sys\.stderr", "graphify/", "--include=*.py"],
+        cwd=repo, text=True,
+    )
+    allowed = _re.compile(r'(f?"\[graphify\] (error|info): |f?"  hint: )')
+    offenders = []
+    for line in out.splitlines():
+        path = line.split(":", 1)[0]
+        if path == "graphify/output.py":
+            continue
+        if not allowed.search(line):
+            offenders.append(line)
+    assert not offenders, "Non-compliant stderr prefixes found:\n" + "\n".join(offenders)
+
+
 def test_strict_prefix_whitelist(capsys: pytest.CaptureFixture[str]) -> None:
     """D-04: every non-empty line in all fixture sections must match the strict prefix whitelist.
 
