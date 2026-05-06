@@ -37,13 +37,16 @@ Opt-in, deterministic, build-time merge of concept nodes across multiple graphif
 <decisions>
 
 ### D-66.1 — CLI invocation
-- **Flag**: repeatable `--federate-with PATH` on `graphify run`.
+- **New subcommand**: `graphify federate --federate-with PATH ...` (repeatable flag, argparse `action="append"`).
+  - Wraps `build_from_json` → `federate.py` → `cluster` → `report` in one invocation.
+  - Keeps existing `graphify run` / `run_corpus` paths untouched (default behavior unchanged ⇒ CFED-01 satisfied by construction).
 - `PATH` points at a peer repo's `graphify-out/` directory.
-- Default behavior unchanged when flag absent (CFED-01).
 - No new config file (`.graphify/federate.yaml` rejected — keeps surface minimal).
+- **Resolved post-research:** original "extend `graphify run` with the flag" idea was rejected because `run` calls `run_corpus` (extract-only) and never invokes `build_from_json` — build runs from skill orchestration. New subcommand is the cleanest plumbing path.
 
 ### D-66.2 — Peer artifact
-- Federation reads each peer's existing `graphify-out/export.json`.
+- Federation reads each peer's existing `graphify-out/graph.json` (the canonical artifact written by `graphify.export.to_json`).
+- **Resolved post-research:** original CONTEXT said `export.json`; corrected to `graph.json` after reading `graphify/export.py`. No new producer-side artifact required.
 - No new producer-side artifact, no peer re-extraction.
 - If a peer's `export.json` is missing or unreadable → fail loudly with two-line stderr (Phase 64 contract): `[graphify] error: peer export not found at {path}\n  hint: run \`graphify run\` in the peer repo first`.
 
@@ -67,6 +70,7 @@ For each candidate concept-node pair (one from local, one from a peer) to merge,
 - **Path**: `{vault_aware_artifacts_dir}/federation-manifest.json` — resolved via `default_graphify_artifacts_dir()` / Option B router (NOT hardcoded `graphify-out/`).
 - **Format**: JSON, stdlib only, no new deps.
 - **Lifecycle**: rewritten each run (single source of truth for current graph). History/append-only is deferred to Phase 67 drift work.
+- **Manifest scope:** merges only — no rejected-candidate diagnostics this phase (deferred; defer tuning to a future phase if threshold-tuning need emerges).
 - **Schema** per merged-concept entry (full provenance):
   ```json
   {
@@ -86,7 +90,7 @@ For each candidate concept-node pair (one from local, one from a peer) to merge,
   `tiebreaker_score` field present only when tiebreaker fired; omitted otherwise.
 
 ### D-66.6 — GRAPH_REPORT.md Federation section
-- **Placement**: after Communities, before Calibration (Phase 65 self-check section).
+- **Placement**: immediately AFTER the Communities block in `report.py`. (Phase 65 Calibration currently sits BEFORE Communities; Federation is appended after Communities and Calibration position is unchanged. Resolved post-research.)
 - **Rendering**: markdown table.
   - Columns: `Merged Concept | Repos | Jaccard | Shared Basenames | Tiebreaker`.
 - **Zero-merges policy**: section omitted entirely (matches the Phase 67 drift-section "absent ⇒ omit" convention noted in ROADMAP SC for CDRIFT).
