@@ -9,7 +9,7 @@
 ## Phases
 
 - [x] **Phase 63: VOPT — Vault Option B Silent Reroute & `--explain-paths`** — Vault-CWD reroute to `.graphify-out/` with stderr breadcrumb and a path-resolver flag. (completed 2026-05-06)
-- [ ] **Phase 64: AUDIT-A — stderr Format Snapshot Lock & Sweep** — Freeze the `[graphify]` two-line stderr contract via snapshot test, then migrate one-line outliers.
+- [x] **Phase 64: AUDIT-A — stderr Format Snapshot Lock & Sweep** — Freeze the `[graphify]` two-line stderr contract via snapshot test, then migrate one-line outliers. (completed 2026-05-06)
 - [ ] **Phase 65: CCONF — Per-Edge Confidence + Cache Split + schema_version** — Load-bearing: per-edge LLM `confidence_score` + `evidence`, second cache namespace, schema-compat with legacy fixture, calibration self-check.
 - [ ] **Phase 66: CFED — Cross-Repo Concept Federation (`federate.py`)** — Opt-in deterministic id-namespacing + multi-signal merge + provenance manifest + report section.
 - [ ] **Phase 67: CDRIFT + CQUERY — Edge-Level Drift (`drift.py`) & Parameterized Concept Queries** — Membership-Jaccard drift classification with snapshot retention, plus `concept_code_hops` parameter filters.
@@ -42,7 +42,7 @@
   4. The 7 platform skill files' regex parsers are enumerated in a test fixture so future format changes have a documented contract surface.
 **Plans**: 3 plans
 - [x] 64-01-PLAN.md — AUDIT-02 stderr snapshot lock (TDD: golden fixture + test) — **wave 1**
-- [ ] 64-02-PLAN.md — AUDIT-02 stderr outlier sweep (grep-and-migrate + invariant test) — **wave 2** (depends on 64-01: sweep is gated by snapshot existing)
+- [x] 64-02-PLAN.md — AUDIT-02 stderr outlier sweep (grep-and-migrate + invariant test) — **wave 2** (depends on 64-01: sweep is gated by snapshot existing)
 - [x] 64-03-PLAN.md — AUDIT-02 skill regex fixture for 7 platforms (TDD) — **wave 2** (depends on 64-01: regex matches assert against `tests/fixtures/stderr_contract.txt`)
 
 ### Phase 65: CCONF — Per-Edge Confidence + Cache Split + schema_version
@@ -131,7 +131,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 63. VOPT | 3/3 | Complete    | 2026-05-06 |
-| 64. AUDIT-A | 2/3 | In Progress|  |
+| 64. AUDIT-A | 3/3 | Complete   | 2026-05-06 |
 | 65. CCONF | 0/0 | Not started | - |
 | 66. CFED | 0/0 | Not started | - |
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
@@ -173,7 +173,7 @@ Total: 27/27 — no orphans, no duplicates.
 **Requirements**: TBD (likely VFIX-01 path resolution + VFIX-02 docs/examples)
 **Depends on:** Phase 70
 **Evidence:** /Users/silveimar/temp-testgph/tmp/
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 70.1-01: RED matrix locking cwd × --obsidian-dir × profile.output invariants (VFIX-01 RED) — d64e892
