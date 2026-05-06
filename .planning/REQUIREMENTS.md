@@ -17,10 +17,10 @@
 - [ ] **CCONF-05**: `validate.py` enforces "optional on read, required on write" with a new `schema_version` field; a frozen v1.10–v1.12 legacy fixture must pass read validation in `tests/`.
 
 ### CFED — Cross-Repo Concept Federation
-- [ ] **CFED-01**: User can opt into cross-repo federation via an explicit CLI flag; default behaviour is off (federation never runs without consent).
+- [x] **CFED-01**: User can opt into cross-repo federation via an explicit CLI flag; default behaviour is off (federation never runs without consent).
 - [ ] **CFED-02**: Federation is deterministic — namespaces all node IDs as `{repo}::{id}`; merges only when multi-signal evidence (label + shared neighborhood + source-path overlap) all agree. No embeddings, no LLM arbitration.
 - [ ] **CFED-03**: A federation manifest records per-repo provenance for every merged concept (which repos contributed, which signals matched).
-- [ ] **CFED-04**: `graphify/federate.py` runs as a build-time merge step after `_normalize_concept_code_edges` in `build.py` and before `cluster.py`.
+- [x] **CFED-04**: `graphify/federate.py` runs as a build-time merge step after `_normalize_concept_code_edges` in `build.py` and before `cluster.py`.
 - [ ] **CFED-05**: GRAPH_REPORT.md gains a Federation section listing merged concepts with their provenance entries.
 
 ### CDRIFT — Edge-Level Concept Drift
