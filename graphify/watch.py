@@ -82,11 +82,11 @@ def _maybe_trigger_enrichment(out_dir: Path, enabled: bool) -> None:
             start_new_session=False,  # keep in same session so SIGTERM propagates
         )
         print(
-            f"[graphify] watch: triggered enrichment pid={_active_enrichment_child.pid}",
+            f"[graphify] info: watch: triggered enrichment pid={_active_enrichment_child.pid}",
             file=sys.stderr,
         )
     except OSError as exc:
-        print(f"[graphify] watch: failed to spawn enrichment: {exc}", file=sys.stderr)
+        print(f"[graphify] error: watch: failed to spawn enrichment: {exc}", file=sys.stderr)
 
 
 def _rebuild_code(watch_path: Path, *, follow_symlinks: bool = False) -> bool:

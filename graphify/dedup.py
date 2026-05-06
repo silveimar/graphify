@@ -225,7 +225,7 @@ def _get_model() -> "SentenceTransformer":
             "Run: pip install 'graphifyy[dedup]'"
         )
     if _MODEL is None:
-        print(f"[graphify] Loading embedding model {_MODEL_NAME} ...", file=sys.stderr)
+        print(f"[graphify] info: Loading embedding model {_MODEL_NAME} ...", file=sys.stderr)
         _MODEL = SentenceTransformer(_MODEL_NAME)
     return _MODEL
 

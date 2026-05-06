@@ -2941,7 +2941,7 @@ def collect_files(
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python -m graphify.extract <file_or_dir> ...", file=sys.stderr)
+        print("[graphify] error: usage: python -m graphify.extract <file_or_dir> ...", file=sys.stderr)
         sys.exit(1)
 
     paths: list[Path] = []

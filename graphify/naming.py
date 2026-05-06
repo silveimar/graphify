@@ -114,12 +114,12 @@ def _accepted_explicit_identity(
     except ValueError as exc:
         warning = f"{source} repo identity rejected: {exc}"
         warnings.append(warning)
-        print(f"[graphify] repo identity warning: {warning}", file=sys.stderr)
+        print(f"[graphify] info: repo identity warning: {warning}", file=sys.stderr)
         return None
     if identity == "repo" and not value.strip():
         warning = f"{source} repo identity rejected: value must be non-empty"
         warnings.append(warning)
-        print(f"[graphify] repo identity warning: {warning}", file=sys.stderr)
+        print(f"[graphify] info: repo identity warning: {warning}", file=sys.stderr)
         return None
     return identity, value
 

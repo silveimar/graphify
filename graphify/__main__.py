@@ -77,7 +77,7 @@ def _check_skill_version(skill_dst: Path) -> None:
     else:
         hint = "differs from the installed package; run 'graphify install' to align versions."
     print(
-        f"  warning: skill stamp ({installed!r}) is {hint} (package is {pkg!r}).",
+        f"[graphify] info: skill stamp ({installed!r}) is {hint} (package is {pkg!r}).",
         file=sys.stderr,
     )
 
@@ -313,14 +313,14 @@ def _extract_repo_identity_arg(args: list[str]) -> tuple[str | None, list[str]]:
         arg = args[i]
         if arg == "--repo-identity":
             if i + 1 >= len(args) or args[i + 1].startswith("--"):
-                print("error: --repo-identity requires a value", file=sys.stderr)
+                print("[graphify] error: --repo-identity requires a value", file=sys.stderr)
                 sys.exit(2)
             repo_identity = args[i + 1]
             i += 2
         elif arg.startswith("--repo-identity="):
             repo_identity = arg.split("=", 1)[1]
             if not repo_identity:
-                print("error: --repo-identity requires a value", file=sys.stderr)
+                print("[graphify] error: --repo-identity requires a value", file=sys.stderr)
                 sys.exit(2)
             i += 1
         else:
@@ -530,7 +530,7 @@ def install(platform: str = "claude", no_commands: bool = False,
         return
     if platform not in _PLATFORM_CONFIG:
         print(
-            f"error: unknown platform '{platform}'. Choose from: {', '.join(_PLATFORM_CONFIG)}, gemini, cursor, antigravity",
+            f"[graphify] error: unknown platform '{platform}'. Choose from: {', '.join(_PLATFORM_CONFIG)}, gemini, cursor, antigravity",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -543,7 +543,7 @@ def install(platform: str = "claude", no_commands: bool = False,
         cfg = {**cfg, "supports": [s for s in cfg.get("supports", []) if s != "obsidian"]}
     skill_src = Path(__file__).parent / cfg["skill_file"]
     if not skill_src.exists():
-        print(f"error: {cfg['skill_file']} not found in package - reinstall graphify", file=sys.stderr)
+        print(f"[graphify] error: {cfg['skill_file']} not found in package - reinstall graphify", file=sys.stderr)
         sys.exit(1)
 
     skill_dst = Path.home() / cfg["skill_dst"]
@@ -582,7 +582,7 @@ def uninstall(platform: str = "claude", no_commands: bool = False) -> None:
     """Remove the skill file and command files for the given platform."""
     if platform not in _PLATFORM_CONFIG:
         print(
-            f"error: unknown platform '{platform}'. Choose from: {', '.join(_PLATFORM_CONFIG)}",
+            f"[graphify] error: unknown platform '{platform}'. Choose from: {', '.join(_PLATFORM_CONFIG)}",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -1305,7 +1305,7 @@ def _approve_and_write_proposal(proposals_dir: Path, record_id: str, vault_path:
     if skipped_user_modified:
         for action in skipped_user_modified:
             print(
-                f"[graphify] Note {action.path.name!r} was user-modified, skipping. "
+                f"[graphify] info: Note {action.path.name!r} was user-modified, skipping. "
                 f"Use --force to override.",
                 file=sys.stderr,
             )
@@ -1341,7 +1341,7 @@ def _load_dedup_yaml_config(path: Path) -> dict:
         import yaml  # PyYAML; optional via [obsidian] extra
     except ImportError:
         print(
-            "[graphify] warning: PyYAML not installed, skipping .graphify/dedup.yaml "
+            "[graphify] info: PyYAML not installed, skipping .graphify/dedup.yaml "
             "(install with: pip install 'graphifyy[obsidian]')",
             file=sys.stderr,
         )
@@ -1350,7 +1350,7 @@ def _load_dedup_yaml_config(path: Path) -> dict:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as e:
         print(
-            f"[graphify] warning: could not parse .graphify/dedup.yaml: {e}",
+            f"[graphify] info: could not parse .graphify/dedup.yaml: {e}",
             file=sys.stderr,
         )
         return {}
@@ -1539,7 +1539,7 @@ def _merge_vault_pins(
     used_global = g_exp is not None or g_list is not None
     if used_local and used_global:
         print(
-            "[graphify] command --vault / --vault-list overrides global pin",
+            "[graphify] info: command --vault / --vault-list overrides global pin",
             file=sys.stderr,
         )
     exp = l_exp if l_exp is not None else g_exp
@@ -1627,7 +1627,7 @@ def _check_vault_cwd_gate(
         # VCWD-02 auto-adopt notice — exactly one line, exactly once per process.
         # Plan 02 wires the routing side; this stub only emits the notice.
         print(
-            f"[graphify] auto-adopted vault at {cwd} (profile: .graphify/profile.yaml)",
+            f"[graphify] info: auto-adopted vault at {cwd} (profile: .graphify/profile.yaml)",
             file=sys.stderr,
         )
         return "auto-adopt"
@@ -1823,15 +1823,15 @@ def main() -> None:
     # Never writes. Never runs the extract/build/cluster pipeline.
     if cmd == "--validate-profile":
         if len(sys.argv) < 3:
-            print("Usage: graphify --validate-profile <vault-path>", file=sys.stderr)
+            print("[graphify] error: usage: graphify --validate-profile <vault-path>", file=sys.stderr)
             sys.exit(2)
         from graphify.profile import validate_profile_preflight
         vault_arg = Path(sys.argv[2])
         result = validate_profile_preflight(vault_arg)
         for err in result.errors:
-            print(f"error: {err}", file=sys.stderr)
+            print(f"[graphify] error: {err}", file=sys.stderr)
         for warn in result.warnings:
-            print(f"warning: {warn}", file=sys.stderr)
+            print(f"[graphify] info: {warn}", file=sys.stderr)
 
         # Phase 30 (D-14, D-16, D-17): always print the three new sections to
         # stdout, even on error, so users see what the resolver was able to
@@ -1962,7 +1962,7 @@ def main() -> None:
             elif args[i] == "--obsidian-dedup":
                 obsidian_dedup = True; i += 1
             else:
-                print(f"error: unknown --obsidian option: {args[i]}", file=sys.stderr)
+                print(f"[graphify] error: unknown --obsidian option: {args[i]}", file=sys.stderr)
                 sys.exit(2)
 
         # Phase 27/41: resolve vault-aware output destination (pins + CWD).
@@ -2005,11 +2005,11 @@ def main() -> None:
         # Load graph.json — reuse the exact query-command pattern.
         gp = Path(graph_path).resolve()
         if not gp.exists():
-            print(f"error: graph file not found: {gp}", file=sys.stderr)
-            print("hint: run /graphify to produce graphify-out/graph.json first", file=sys.stderr)
+            print(f"[graphify] error: graph file not found: {gp}", file=sys.stderr)
+            print("  hint: run /graphify to produce graphify-out/graph.json first", file=sys.stderr)
             sys.exit(1)
         if gp.suffix != ".json":
-            print("error: graph file must be a .json file", file=sys.stderr)
+            print("[graphify] error: graph file must be a .json file", file=sys.stderr)
             sys.exit(1)
         try:
             import json as _json
@@ -2020,7 +2020,7 @@ def main() -> None:
             except TypeError:
                 G = json_graph.node_link_graph(_raw)
         except Exception as exc:
-            print(f"error: could not load graph: {exc}", file=sys.stderr)
+            print(f"[graphify] error: could not load graph: {exc}", file=sys.stderr)
             sys.exit(1)
 
         # Reconstruct communities dict from node["community"] attribute
@@ -2063,7 +2063,7 @@ def main() -> None:
                 obsidian_dedup=obsidian_dedup,  # Phase 10 D-15
             )
         except Exception as exc:
-            print(f"error: to_obsidian failed: {exc}", file=sys.stderr)
+            print(f"[graphify] error: to_obsidian failed: {exc}", file=sys.stderr)
             sys.exit(1)
 
         if isinstance(result, MergePlan):
@@ -2118,16 +2118,16 @@ def main() -> None:
             elif args[i].startswith("--vault="):
                 vault_path = Path(args[i].split("=", 1)[1]); i += 1
             else:
-                print(f"error: unknown --diagram-seeds option: {args[i]}", file=sys.stderr)
+                print(f"[graphify] error: unknown --diagram-seeds option: {args[i]}", file=sys.stderr)
                 sys.exit(2)
 
         gp = Path(graph_path).resolve()
         if not gp.exists():
-            print(f"error: graph file not found: {gp}", file=sys.stderr)
-            print("hint: run /graphify to produce graphify-out/graph.json first", file=sys.stderr)
+            print(f"[graphify] error: graph file not found: {gp}", file=sys.stderr)
+            print("  hint: run /graphify to produce graphify-out/graph.json first", file=sys.stderr)
             sys.exit(1)
         if gp.suffix != ".json":
-            print("error: graph file must be a .json file", file=sys.stderr)
+            print("[graphify] error: graph file must be a .json file", file=sys.stderr)
             sys.exit(1)
 
         try:
@@ -2139,7 +2139,7 @@ def main() -> None:
             except TypeError:
                 G = json_graph.node_link_graph(_raw)
         except Exception as exc:
-            print(f"error: could not load graph: {exc}", file=sys.stderr)
+            print(f"[graphify] error: could not load graph: {exc}", file=sys.stderr)
             sys.exit(1)
 
         from graphify.seed import build_all_seeds
@@ -2179,14 +2179,14 @@ def main() -> None:
                 force_flag = True; i += 1
             else:
                 print(
-                    f"error: unknown --init-diagram-templates option: {args[i]}",
+                    f"[graphify] error: unknown --init-diagram-templates option: {args[i]}",
                     file=sys.stderr,
                 )
                 sys.exit(2)
         if not vault_arg and gate == "auto-adopt":
             vault_arg = str(Path.cwd())
         if not vault_arg:
-            print("error: --vault PATH required", file=sys.stderr)
+            print("[graphify] error: --vault PATH required", file=sys.stderr)
             sys.exit(2)
         from graphify.excalidraw import write_stubs
         from graphify.profile import load_profile
@@ -2200,7 +2200,7 @@ def main() -> None:
         try:
             written = write_stubs(vault_arg, diagram_types, force=force_flag)
         except ValueError as exc:
-            print(f"error: {exc}", file=sys.stderr)
+            print(f"[graphify] error: {exc}", file=sys.stderr)
             sys.exit(1)
         print(
             f"[graphify] init-diagram-templates complete: "
@@ -2258,7 +2258,7 @@ def main() -> None:
             elif args[i].startswith("--batch-token-budget="):
                 batch_token_budget = int(args[i].split("=", 1)[1]); i += 1
             else:
-                print(f"error: unknown --dedup option: {args[i]}", file=sys.stderr)
+                print(f"[graphify] error: unknown --dedup option: {args[i]}", file=sys.stderr)
                 sys.exit(2)
 
         # Layer .graphify/dedup.yaml if present (T-10-04: safe_load only)
@@ -2283,7 +2283,7 @@ def main() -> None:
                 source_path = graph_json
             else:
                 print(
-                    f"error: no extraction.json or graph.json found in {out_dir!s}",
+                    f"[graphify] error: no extraction.json or graph.json found in {out_dir!s}",
                     file=sys.stderr,
                 )
                 sys.exit(1)
@@ -2297,7 +2297,7 @@ def main() -> None:
             else:
                 extraction = json.loads(source_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as e:
-            print(f"error: could not read extraction from {source_path!s}: {e}",
+            print(f"[graphify] error: could not read extraction from {source_path!s}: {e}",
                   file=sys.stderr)
             sys.exit(1)
 
@@ -2309,13 +2309,13 @@ def main() -> None:
             extraction = {**extraction, "edges": extraction.pop("links")}
         if "nodes" not in extraction or "edges" not in extraction:
             print(
-                f"error: {source_path!s} does not contain 'nodes' and 'edges' keys",
+                f"[graphify] error: {source_path!s} does not contain 'nodes' and 'edges' keys",
                 file=sys.stderr,
             )
             sys.exit(1)
 
         print(
-            f"[graphify] Running dedup on {len(extraction['nodes'])} nodes "
+            f"[graphify] info: Running dedup on {len(extraction['nodes'])} nodes "
             f"(fuzzy>={final_fuzzy}, cos>={final_embed}, cross_type={final_cross}) ...",
             file=sys.stderr,
         )
@@ -2331,7 +2331,7 @@ def main() -> None:
             # UAT gaps 2b/3: missing [dedup] extra (RuntimeError) and
             # path-confinement violations (ValueError) must surface as a
             # single clean `error: <msg>` line — no Python traceback.
-            print(f"error: {e}", file=sys.stderr)
+            print(f"[graphify] error: {e}", file=sys.stderr)
             sys.exit(1)
 
         # Write updated extraction.json alongside the report (preserve old as backup)
@@ -2346,7 +2346,7 @@ def main() -> None:
 
         summary = report["summary"]
         print(
-            f"[graphify] dedup complete: {summary['total_nodes_before']} -> "
+            f"[graphify] info: dedup complete: {summary['total_nodes_before']} -> "
             f"{summary['total_nodes_after']} nodes, {summary['merges']} merges. "
             f"Reports: {out_dir / 'dedup_report.json'!s}, {out_dir / 'dedup_report.md'!s}",
             file=sys.stderr,
@@ -2385,12 +2385,12 @@ def main() -> None:
             elif args[i] == "--cap" and i + 1 < len(args):
                 cap = int(args[i + 1]); i += 2
                 if cap < 1:
-                    print("error: --cap must be at least 1", file=sys.stderr)
+                    print("[graphify] error: --cap must be at least 1", file=sys.stderr)
                     sys.exit(2)
             elif args[i].startswith("--cap="):
                 cap = int(args[i].split("=", 1)[1]); i += 1
                 if cap < 1:
-                    print("error: --cap must be at least 1", file=sys.stderr)
+                    print("[graphify] error: --cap must be at least 1", file=sys.stderr)
                     sys.exit(2)
             elif args[i] == "--from" and i + 1 < len(args):
                 from_path = args[i + 1]; i += 2
@@ -2403,12 +2403,12 @@ def main() -> None:
             elif args[i] == "--delta":
                 gen_delta = True; i += 1
             else:
-                print(f"error: unknown snapshot option: {args[i]}", file=sys.stderr)
+                print(f"[graphify] error: unknown snapshot option: {args[i]}", file=sys.stderr)
                 sys.exit(2)
 
         # Validate --from/--to pairing
         if bool(from_path) != bool(to_path):
-            print("error: --from and --to must be specified together", file=sys.stderr)
+            print("[graphify] error: --from and --to must be specified together", file=sys.stderr)
             sys.exit(2)
 
         # If --from and --to are specified, compare two snapshots (D-07)
@@ -2430,11 +2430,11 @@ def main() -> None:
         # Load graph.json — reuse the exact --obsidian pattern
         gp = Path(graph_path).resolve()
         if not gp.exists():
-            print(f"error: graph file not found: {gp}", file=sys.stderr)
-            print("hint: run /graphify to produce graphify-out/graph.json first", file=sys.stderr)
+            print(f"[graphify] error: graph file not found: {gp}", file=sys.stderr)
+            print("  hint: run /graphify to produce graphify-out/graph.json first", file=sys.stderr)
             sys.exit(1)
         if gp.suffix != ".json":
-            print("error: graph file must be a .json file", file=sys.stderr)
+            print("[graphify] error: graph file must be a .json file", file=sys.stderr)
             sys.exit(1)
         try:
             import json as _json
@@ -2445,7 +2445,7 @@ def main() -> None:
             except TypeError:
                 G = json_graph.node_link_graph(_raw)
         except Exception as exc:
-            print(f"error: could not load graph: {exc}", file=sys.stderr)
+            print(f"[graphify] error: could not load graph: {exc}", file=sys.stderr)
             sys.exit(1)
 
         # Reconstruct communities dict from node["community"] attribute
@@ -2524,7 +2524,7 @@ def main() -> None:
             elif not args[i].startswith("-"):
                 target_id = args[i]; i += 1
             else:
-                print(f"error: unknown approve option: {args[i]}", file=sys.stderr)
+                print(f"[graphify] error: unknown approve option: {args[i]}", file=sys.stderr)
                 sys.exit(2)
 
         proposals_dir = out_dir / "proposals"
@@ -2560,18 +2560,18 @@ def main() -> None:
                 r = _reject_proposal(proposals_dir, target_id)
                 print(f"Rejected: {r['record_id'][:8]} \u2014 {r.get('title', 'untitled')}")
             except FileNotFoundError as exc:
-                print(f"error: {exc}", file=sys.stderr)
+                print(f"[graphify] error: {exc}", file=sys.stderr)
                 sys.exit(1)
             _cli_exit(0)
 
         if reject and not target_id:
-            print("error: --reject requires a proposal ID", file=sys.stderr)
+            print("[graphify] error: --reject requires a proposal ID", file=sys.stderr)
             sys.exit(2)
 
         # --all --vault <path>: batch approve
         if approve_all:
             if not vault_path:
-                print("error: --vault is required for approve operations", file=sys.stderr)
+                print("[graphify] error: --vault is required for approve operations", file=sys.stderr)
                 sys.exit(2)
             proposals = _list_pending_proposals(out_dir)
             if not proposals:
@@ -2582,22 +2582,22 @@ def main() -> None:
                     _approve_and_write_proposal(proposals_dir, p["record_id"], vault_path, force=force)
                     print(f"Approved: {p['record_id'][:8]} \u2014 {p.get('title', 'untitled')}")
                 except Exception as exc:
-                    print(f"error approving {p['record_id'][:8]}: {exc}", file=sys.stderr)
+                    print(f"[graphify] error: approving {p['record_id'][:8]}: {exc}", file=sys.stderr)
             _cli_exit(0)
 
         # <id> --vault <path>: approve single
         if target_id:
             if not vault_path:
-                print("error: --vault is required for approve operations", file=sys.stderr)
+                print("[graphify] error: --vault is required for approve operations", file=sys.stderr)
                 sys.exit(2)
             try:
                 r = _approve_and_write_proposal(proposals_dir, target_id, vault_path, force=force)
                 print(f"Approved: {r['record_id'][:8]} \u2014 {r.get('title', 'untitled')}")
             except FileNotFoundError as exc:
-                print(f"error: {exc}", file=sys.stderr)
+                print(f"[graphify] error: {exc}", file=sys.stderr)
                 sys.exit(1)
             except Exception as exc:
-                print(f"error: {exc}", file=sys.stderr)
+                print(f"[graphify] error: {exc}", file=sys.stderr)
                 sys.exit(1)
             _cli_exit(0)
 
@@ -2633,7 +2633,7 @@ def main() -> None:
         elif subcmd == "uninstall":
             claude_uninstall()
         else:
-            print("Usage: graphify claude [install|uninstall]", file=sys.stderr)
+            print("[graphify] error: usage: graphify claude [install|uninstall]", file=sys.stderr)
             sys.exit(1)
     elif cmd == "gemini":
         subcmd = sys.argv[2] if len(sys.argv) > 2 else ""
@@ -2642,7 +2642,7 @@ def main() -> None:
         elif subcmd == "uninstall":
             gemini_uninstall()
         else:
-            print("Usage: graphify gemini [install|uninstall]", file=sys.stderr)
+            print("[graphify] error: usage: graphify gemini [install|uninstall]", file=sys.stderr)
             sys.exit(1)
     elif cmd == "cursor":
         subcmd = sys.argv[2] if len(sys.argv) > 2 else ""
@@ -2651,7 +2651,7 @@ def main() -> None:
         elif subcmd == "uninstall":
             _cursor_uninstall(Path("."))
         else:
-            print("Usage: graphify cursor [install|uninstall]", file=sys.stderr)
+            print("[graphify] error: usage: graphify cursor [install|uninstall]", file=sys.stderr)
             sys.exit(1)
     elif cmd == "copilot":
         subcmd = sys.argv[2] if len(sys.argv) > 2 else ""
@@ -2673,7 +2673,7 @@ def main() -> None:
                     break
             print("; ".join(removed) if removed else "nothing to remove")
         else:
-            print("Usage: graphify copilot [install|uninstall]", file=sys.stderr)
+            print("[graphify] error: usage: graphify copilot [install|uninstall]", file=sys.stderr)
             sys.exit(1)
     elif cmd in ("aider", "codex", "opencode", "claw", "droid", "trae", "trae-cn"):
         subcmd = sys.argv[2] if len(sys.argv) > 2 else ""
@@ -2684,7 +2684,7 @@ def main() -> None:
             if cmd == "codex":
                 _uninstall_codex_hook(Path("."))
         else:
-            print(f"Usage: graphify {cmd} [install|uninstall]", file=sys.stderr)
+            print(f"[graphify] error: usage: graphify {cmd} [install|uninstall]", file=sys.stderr)
             sys.exit(1)
     elif cmd == "antigravity":
         subcmd = sys.argv[2] if len(sys.argv) > 2 else ""
@@ -2693,7 +2693,7 @@ def main() -> None:
         elif subcmd == "uninstall":
             _antigravity_uninstall(Path("."))
         else:
-            print("Usage: graphify antigravity [install|uninstall]", file=sys.stderr)
+            print("[graphify] error: usage: graphify antigravity [install|uninstall]", file=sys.stderr)
             sys.exit(1)
     elif cmd == "hook":
         from graphify.hooks import install as hook_install, uninstall as hook_uninstall, status as hook_status
@@ -2705,11 +2705,11 @@ def main() -> None:
         elif subcmd == "status":
             print(hook_status(Path(".")))
         else:
-            print("Usage: graphify hook [install|uninstall|status]", file=sys.stderr)
+            print("[graphify] error: usage: graphify hook [install|uninstall|status]", file=sys.stderr)
             sys.exit(1)
     elif cmd == "query":
         if len(sys.argv) < 3:
-            print("Usage: graphify query \"<question>\" [--dfs] [--budget N] [--graph path]", file=sys.stderr)
+            print("[graphify] error: usage: graphify query \"<question>\" [--dfs] [--budget N] [--graph path]", file=sys.stderr)
             sys.exit(1)
         from graphify.serve import _score_nodes, _bfs, _dfs, _subgraph_to_text
         from graphify.security import sanitize_label
@@ -2725,14 +2725,14 @@ def main() -> None:
                 try:
                     budget = int(args[i + 1])
                 except ValueError:
-                    print(f"error: --budget must be an integer", file=sys.stderr)
+                    print(f"[graphify] error: --budget must be an integer", file=sys.stderr)
                     sys.exit(1)
                 i += 2
             elif args[i].startswith("--budget="):
                 try:
                     budget = int(args[i].split("=", 1)[1])
                 except ValueError:
-                    print(f"error: --budget must be an integer", file=sys.stderr)
+                    print(f"[graphify] error: --budget must be an integer", file=sys.stderr)
                     sys.exit(1)
                 i += 1
             elif args[i] == "--graph" and i + 1 < len(args):
@@ -2743,10 +2743,10 @@ def main() -> None:
         # so for custom --graph paths we resolve and load directly after existence check
         gp = Path(graph_path).resolve()
         if not gp.exists():
-            print(f"error: graph file not found: {gp}", file=sys.stderr)
+            print(f"[graphify] error: graph file not found: {gp}", file=sys.stderr)
             sys.exit(1)
         if not gp.suffix == ".json":
-            print(f"error: graph file must be a .json file", file=sys.stderr)
+            print(f"[graphify] error: graph file must be a .json file", file=sys.stderr)
             sys.exit(1)
         try:
             import json as _json
@@ -2757,7 +2757,7 @@ def main() -> None:
             except TypeError:
                 G = json_graph.node_link_graph(_raw)
         except Exception as exc:
-            print(f"error: could not load graph: {exc}", file=sys.stderr)
+            print(f"[graphify] error: could not load graph: {exc}", file=sys.stderr)
             sys.exit(1)
         terms = [t.lower() for t in question.split() if len(t) > 2]
         scored = _score_nodes(G, terms)
@@ -2808,9 +2808,9 @@ def main() -> None:
         if "--validate" in rest:
             code, err = validate_cli()
             if err:
-                print(err, file=sys.stderr, end="")
+                print(f"[graphify] error: {err}", file=sys.stderr, end="")
             sys.exit(code)
-        print("Usage: graphify capability --stdout | graphify capability --validate", file=sys.stderr)
+        print("[graphify] error: usage: graphify capability --stdout | graphify capability --validate", file=sys.stderr)
         sys.exit(2)
     elif cmd == "elicit":
         # graphify elicit [--output PATH] [--dry-run] [--demo] [--force]
@@ -2928,7 +2928,7 @@ def main() -> None:
         rest = list(sys.argv[2:])
         if not rest or rest[0] != "export":
             print(
-                "Usage: graphify harness export [--target claude] [--out PATH] "
+                "[graphify] error: usage: graphify harness export [--target claude] [--out PATH] "
                 "[--format {markdown,interchange,both}] "
                 "[--include-annotations] [--secrets-mode {redact,error}]",
                 file=sys.stderr,
@@ -2979,7 +2979,7 @@ def main() -> None:
             # ValueError listing offending annotation ids. Exit code 3
             # distinguishes secret-scan failure from generic argparse errors
             # (code 2) and unknown-target/schema errors (also ValueError).
-            print(f"[graphify] {exc}", file=sys.stderr)
+            print(f"[graphify] error: {exc}", file=sys.stderr)
             sys.exit(3)
         for p in written:
             print(str(p))
@@ -3035,7 +3035,7 @@ def main() -> None:
 
         if opts.path in {"-", "/dev/stdin"}:
             print(
-                "[graphify] import-harness: stdin and URLs are not supported in this release.",
+                "[graphify] info: import-harness: stdin and URLs are not supported in this release.",
                 file=sys.stderr,
             )
             sys.exit(2)
@@ -3068,7 +3068,7 @@ def main() -> None:
                 artifacts_root=artifacts,
             )
         except (ValueError, FileNotFoundError) as exc:
-            print(f"[graphify] {exc}", file=sys.stderr)
+            print(f"[graphify] error: {exc}", file=sys.stderr)
             sys.exit(2)
 
         out_json = artifacts / "harness_import.json"
@@ -3141,7 +3141,7 @@ def main() -> None:
             target = Path(raw_target).resolve()
 
         if not target.exists():
-            print(f"error: path not found: {target}", file=sys.stderr)
+            print(f"[graphify] error: path not found: {target}", file=sys.stderr)
             sys.exit(2)
 
         # Phase 70 Plan 05: auto_on_run hook (D-11 warn-and-continue).
@@ -3160,13 +3160,13 @@ def main() -> None:
                 _rs_skipped = _rs_result.get("conflicts_skipped", 0)
                 if _rs_skipped:
                     print(
-                        f"[graphify] reverse-sync: {_rs_skipped} conflicts skipped — "
+                        f"[graphify] info: reverse-sync: {_rs_skipped} conflicts skipped — "
                         f"run 'graphify reverse-sync' to resolve",
                         file=sys.stderr,
                     )
             except Exception as _rs_exc:  # D-11: warn-and-continue
                 print(
-                    f"[graphify] reverse-sync: skipped due to error: {_rs_exc}",
+                    f"[graphify] info: reverse-sync: skipped due to error: {_rs_exc}",
                     file=sys.stderr,
                 )
 
@@ -3204,7 +3204,7 @@ def main() -> None:
                     )
                     if added_paths:
                         print(
-                            "[graphify] auto-appended "
+                            "[graphify] info: auto-appended "
                             f"{len(added_paths)} path(s) to corpus.dot_graphify.tracked_paths",
                             file=sys.stderr,
                         )
@@ -3284,7 +3284,7 @@ def main() -> None:
             )
         except BlockingIOError:
             print(
-                "[graphify] enrichment: another enrichment is already running "
+                "[graphify] error: enrichment: another enrichment is already running "
                 "(see .enrichment.pid); exiting",
                 file=sys.stderr,
             )
@@ -3293,7 +3293,7 @@ def main() -> None:
             # Read-only filesystem, permission denied, invalid path, etc.
             # SystemExit(2) from run_enrichment's own guards propagates untouched.
             print(
-                f"[graphify] enrichment: cannot access {graph_path}: {exc}",
+                f"[graphify] error: enrichment: cannot access {graph_path}: {exc}",
                 file=sys.stderr,
             )
             sys.exit(2)
@@ -3413,13 +3413,13 @@ def main() -> None:
                 apply_write=opts.apply_dot_graphify_track,
             )
             print(
-                f"[graphify] dot_graphify eligible discoveries: {len(disc)} path(s)",
+                f"[graphify] info: dot_graphify eligible discoveries: {len(disc)} path(s)",
                 file=sys.stderr,
             )
             if added:
                 action = "applied" if opts.apply_dot_graphify_track else "would add"
-                print(f"[graphify] {action} tracked_paths ({len(added)}): {added}", file=sys.stderr)
-            print(f"[graphify] tracked_paths total after merge preview: {len(merged)}", file=sys.stderr)
+                print(f"[graphify] info: {action} tracked_paths ({len(added)}): {added}", file=sys.stderr)
+            print(f"[graphify] info: tracked_paths total after merge preview: {len(merged)}", file=sys.stderr)
             _cli_exit(0)
 
         from graphify.doctor import run_doctor, format_report
@@ -3503,7 +3503,7 @@ def main() -> None:
         )
         opts = _p_uv.parse_args(sys.argv[2:])
         if opts.apply and not opts.plan_id:
-            print("error: --apply requires --plan-id from a preview artifact", file=sys.stderr)
+            print("[graphify] error: --apply requires --plan-id from a preview artifact", file=sys.stderr)
             sys.exit(2)
 
         # --- migrate-legacy dispatch (Plan 04 / D-13) — runs BEFORE normal update-vault ---
@@ -3513,7 +3513,7 @@ def main() -> None:
                 _ml_vault = str(Path.cwd())
             elif not _ml_vault:
                 from graphify.output import EXIT_VAULT_REFUSAL
-                print("error: --vault is required for --migrate-legacy", file=sys.stderr)
+                print("[graphify] error: --vault is required for --migrate-legacy", file=sys.stderr)
                 sys.exit(EXIT_VAULT_REFUSAL)
             _ml_vault_path = Path(_ml_vault)
             from graphify.profile import load_profile as _lp, _deep_merge as _dm, _DEFAULT_PROFILE as _DP
@@ -3545,7 +3545,7 @@ def main() -> None:
             _uv_vault = str(Path.cwd())
         elif not _uv_vault:
             from graphify.output import EXIT_VAULT_REFUSAL
-            print("error: --vault is required (omit only when running from a vault CWD with auto-adopt)", file=sys.stderr)
+            print("[graphify] error: --vault is required (omit only when running from a vault CWD with auto-adopt)", file=sys.stderr)
             sys.exit(EXIT_VAULT_REFUSAL)
         from graphify.migration import format_migration_preview, run_update_vault
 
@@ -3569,13 +3569,13 @@ def main() -> None:
                 _rs_skipped = _rs_result.get("conflicts_skipped", 0)
                 if _rs_skipped:
                     print(
-                        f"[graphify] reverse-sync: {_rs_skipped} conflicts skipped — "
+                        f"[graphify] info: reverse-sync: {_rs_skipped} conflicts skipped — "
                         f"run 'graphify reverse-sync' to resolve",
                         file=sys.stderr,
                     )
             except Exception as _rs_exc:  # D-11: warn-and-continue
                 print(
-                    f"[graphify] reverse-sync: skipped due to error: {_rs_exc}",
+                    f"[graphify] info: reverse-sync: skipped due to error: {_rs_exc}",
                     file=sys.stderr,
                 )
 
@@ -3590,7 +3590,7 @@ def main() -> None:
                 verbose=opts.verbose,
             )
         except ValueError as exc:
-            print(f"error: {exc}", file=sys.stderr)
+            print(f"[graphify] error: {exc}", file=sys.stderr)
             sys.exit(1)
         print(format_migration_preview(result["preview"], verbose=opts.verbose))
         _cli_exit(0)
@@ -3659,7 +3659,7 @@ def main() -> None:
             _vp_vault = str(Path.cwd())
         elif not _vp_vault:
             from graphify.output import EXIT_VAULT_REFUSAL
-            print("error: --vault is required (omit only when running from a vault CWD with auto-adopt)", file=sys.stderr)
+            print("[graphify] error: --vault is required (omit only when running from a vault CWD with auto-adopt)", file=sys.stderr)
             sys.exit(EXIT_VAULT_REFUSAL)
         from graphify.vault_promote import promote
         summary = promote(
@@ -3674,8 +3674,8 @@ def main() -> None:
         print(f"[graphify] vault-promote complete: promoted={promoted_str}; skipped={skipped_str}")
         _cli_exit(0)
     else:
-        print(f"error: unknown command '{cmd}'", file=sys.stderr)
-        print("Run 'graphify --help' for usage.", file=sys.stderr)
+        print(f"[graphify] error: unknown command '{cmd}'", file=sys.stderr)
+        print("[graphify] info: Run 'graphify --help' for usage.", file=sys.stderr)
         sys.exit(1)
 
 

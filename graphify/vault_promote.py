@@ -1396,7 +1396,7 @@ def migrate_legacy(
             new_abs.parent.mkdir(parents=True, exist_ok=True)
             _shutil.move(str(old_abs), str(new_abs))
         except OSError as exc:
-            print(f"[graphify] migrate-legacy: failed to move {old_rel}: {exc}", file=sys.stderr)
+            print(f"[graphify] error: migrate-legacy: failed to move {old_rel}: {exc}", file=sys.stderr)
             failed.append(old_rel)
             continue
 

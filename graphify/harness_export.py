@@ -194,15 +194,14 @@ def _load_sidecars(out_dir: Path) -> dict[str, Any]:
     graph_path = out_dir / "graph.json"
     if not graph_path.exists():
         print(
-            f"error: graph.json not found at {graph_path}",
+            f"[graphify] error: graph.json not found at {graph_path}",
             file=sys.stderr,
         )
         print(
-            "  expected: a node_link JSON produced by 'graphify run .'",
+            "  hint: expected a node_link JSON produced by 'graphify run .'",
             file=sys.stderr,
         )
-        print("  regenerate:", file=sys.stderr)
-        print("    graphify run .", file=sys.stderr)
+        print("  hint: regenerate with: graphify run .", file=sys.stderr)
         raise FileNotFoundError(f"graph.json not found: {graph_path}")
 
     try:

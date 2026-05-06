@@ -495,7 +495,7 @@ def build_all_seeds(
 
     if not auto_kept and not user_candidates and not auto_dropped:
         # Empty-state: still produce empty manifest + info line
-        print("[graphify] diagram-seeds: no auto or user candidates found", file=sys.stderr)
+        print("[graphify] info: diagram-seeds: no auto or user candidates found", file=sys.stderr)
         _save_seeds_manifest([], graphify_out)
         return {
             "seeds_written": 0,

@@ -662,14 +662,14 @@ def load_profile(vault_dir: str | Path | None) -> dict:
     resolved = _resolve_profile_chain(profile_path, Path(vault_dir))
     if resolved.errors:
         for err in resolved.errors:
-            print(f"[graphify] profile error: {err}", file=sys.stderr)
+            print(f"[graphify] error: profile: {err}", file=sys.stderr)
         return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, {}))
 
     errors = _validate_required_v18_user_profile(resolved.composed)
     errors.extend(validate_profile(resolved.composed))
     if errors:
         for err in errors:
-            print(f"[graphify] profile error: {err}", file=sys.stderr)
+            print(f"[graphify] error: profile: {err}", file=sys.stderr)
         return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, {}))
 
     return _apply_taxonomy_folder_mapping(_deep_merge(_DEFAULT_PROFILE, resolved.composed))

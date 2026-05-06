@@ -117,10 +117,10 @@ def _load_dedup_report(out_dir: Path) -> dict[str, str]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        print("[graphify] warning: dedup_report.json could not be parsed; alias map disabled", file=sys.stderr)
+        print("[graphify] info: dedup_report.json could not be parsed; alias map disabled", file=sys.stderr)
         return {}
     except OSError as e:
-        print(f"[graphify] warning: could not read dedup_report.json ({e}); alias map disabled", file=sys.stderr)
+        print(f"[graphify] info: could not read dedup_report.json ({e}); alias map disabled", file=sys.stderr)
         return {}
     alias_map = data.get("alias_map", {}) if isinstance(data, dict) else {}
     # Defensive: ensure all keys/values are strings (reject anything else)
@@ -157,7 +157,7 @@ def _load_enrichment_overlay(G: nx.Graph, out_dir: Path) -> None:
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        print(f"[graphify] serve: enrichment.json unreadable: {exc}", file=sys.stderr)
+        print(f"[graphify] info: serve: enrichment.json unreadable: {exc}", file=sys.stderr)
         return
     if not _validate_enrichment_envelope(data):
         # _validate_enrichment_envelope already logged the reason when relevant
@@ -517,10 +517,10 @@ def _load_graph(graph_path: str) -> nx.Graph:
         except TypeError:
             return json_graph.node_link_graph(data)
     except (ValueError, FileNotFoundError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"[graphify] error: {exc}", file=sys.stderr)
         sys.exit(1)
     except json.JSONDecodeError as exc:
-        print(f"error: graph.json is corrupted ({exc}). Re-run /graphify to rebuild.", file=sys.stderr)
+        print(f"[graphify] error: graph.json is corrupted ({exc}). Re-run /graphify to rebuild.", file=sys.stderr)
         sys.exit(1)
 
 
