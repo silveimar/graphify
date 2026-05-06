@@ -437,3 +437,116 @@ def test_cli_collision(tmp_path: Path):
             found = True
             break
     assert found, f"two-line collision breadcrumb not found in stderr:\n{proc.stderr}"
+
+
+# ---------------------------------------------------------------------------
+# Plan 04 (CFED-05) — GRAPH_REPORT.md Federation section rendering
+# ---------------------------------------------------------------------------
+
+import networkx as _nx
+from graphify.report import generate as _report_generate
+
+
+def _report_aux():
+    """Minimal aux args required by report.generate() — calibration-only test analog."""
+    detection = {"total_files": 4, "total_words": 1000, "needs_graph": True, "warning": None}
+    tokens = {"input": 0, "output": 0}
+    return {0: ["a", "b"]}, {0: 0.8}, {0: "ClusterA"}, [], [], detection, tokens
+
+
+def _build_graph_with_inferred_scores_local(scores: list[float]) -> _nx.Graph:
+    """Mirror tests/test_report_calibration helper — needed so Calibration section renders."""
+    G = _nx.Graph()
+    for i, s in enumerate(scores):
+        a = f"code_{i}"
+        b = f"concept_{i}"
+        G.add_node(a, label=a, file_type="code", source_file=f"{a}.py")
+        G.add_node(b, label=b, file_type="rationale", source_file="doc.md")
+        G.add_edge(
+            a, b, relation="documents", confidence="INFERRED",
+            confidence_score=s, source_file=f"{a}.py", weight=1.0,
+        )
+    return G
+
+
+def _well_distributed_scores() -> list[float]:
+    return [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
+
+
+def _sample_manifest() -> list[dict]:
+    """Two-entry manifest matching D-66.5 schema; entry 1 has tiebreaker, entry 2 does not."""
+    return [
+        {
+            "merged_id": "graphify::token_validator",
+            "contributing": [
+                {"repo": "graphify", "original_id": "token_validator",
+                 "label": "TokenValidator", "source_files": ["auth.py"]},
+                {"repo": "peer_match", "original_id": "token_validator",
+                 "label": "TokenValidator", "source_files": ["auth.py"]},
+            ],
+            "signals": {
+                "label_match": "tokenvalidator",
+                "neighborhood_jaccard": 0.67,
+                "shared_basenames": ["token.py", "auth.py"],
+            },
+            "tiebreaker_score": 0.82,
+        },
+        {
+            "merged_id": "graphify::auth_service",
+            "contributing": [
+                {"repo": "graphify", "original_id": "auth_service",
+                 "label": "AuthService", "source_files": ["auth.py"]},
+                {"repo": "peer_match", "original_id": "auth_service",
+                 "label": "AuthService", "source_files": ["auth.py"]},
+            ],
+            "signals": {
+                "label_match": "authservice",
+                "neighborhood_jaccard": 0.55,
+                "shared_basenames": ["auth.py"],
+            },
+        },
+    ]
+
+
+def test_report_renders_section():
+    """Federation section renders after Communities, with table + columns + Jaccard formatted."""
+    G = _build_graph_with_inferred_scores_local(_well_distributed_scores())
+    communities, cohesion, labels, gods, surprises, detection, tokens = _report_aux()
+    out = _report_generate(
+        G, communities, cohesion, labels, gods, surprises, detection, tokens,
+        "./test", federation_manifest=_sample_manifest(),
+    )
+    assert "## Federation" in out
+    assert out.index("## Federation") > out.index("## Communities")
+    assert "| Merged Concept | Repos | Jaccard | Shared Basenames | Tiebreaker |" in out
+    assert "0.67" in out
+    assert "0.82" in out
+    auth_row = next(
+        ln for ln in out.splitlines()
+        if "auth_service" in ln and ln.startswith("|")
+    )
+    cells = [c.strip() for c in auth_row.strip("|").split("|")]
+    assert len(cells) == 5
+    assert cells[-1] == "", f"expected empty Tiebreaker cell, got {cells[-1]!r}"
+
+
+def test_report_omits_on_zero():
+    """Empty manifest → no `## Federation` heading rendered at all."""
+    G = _build_graph_with_inferred_scores_local(_well_distributed_scores())
+    communities, cohesion, labels, gods, surprises, detection, tokens = _report_aux()
+    out = _report_generate(
+        G, communities, cohesion, labels, gods, surprises, detection, tokens,
+        "./test", federation_manifest=[],
+    )
+    assert "## Federation" not in out
+
+
+def test_report_section_placement():
+    """Calibration < Communities < Federation in source-rendered output (D-66.6)."""
+    G = _build_graph_with_inferred_scores_local(_well_distributed_scores())
+    communities, cohesion, labels, gods, surprises, detection, tokens = _report_aux()
+    out = _report_generate(
+        G, communities, cohesion, labels, gods, surprises, detection, tokens,
+        "./test", federation_manifest=_sample_manifest(),
+    )
+    assert out.index("## Calibration") < out.index("## Communities") < out.index("## Federation")
