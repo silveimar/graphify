@@ -1,0 +1,8 @@
+[graphify] error: vault refused: profile invalid
+  hint: fix profile.yaml
+
+[graphify] info: vault routing
+  hint: see docs
+
+[graphify] info: vault CWD without .graphify/profile.yaml — Option B reroute active
+  hint: outputs → /private/tmp/vault/.graphify-out/
