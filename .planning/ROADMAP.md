@@ -72,7 +72,7 @@
 **Plans**: 4 plans
   - [x] 66-01-PLAN.md — federate.py merge engine: namespacing + AND-gate + tiebreaker + canonical-id (CFED-02, CFED-03) — **wave 1**
   - [x] 66-02-PLAN.md — wire federate into build_from_json + atomic vault-aware manifest writer (CFED-01, CFED-04) — **wave 2** (depends on 66-01)
-  - [ ] 66-03-PLAN.md — graphify federate CLI subcommand with Phase 64 stderr contract (CFED-01) — **wave 2** (depends on 66-01)
+  - [x] 66-03-PLAN.md — graphify federate CLI subcommand with Phase 64 stderr contract (CFED-01) — **wave 2** (depends on 66-01)
   - [ ] 66-04-PLAN.md — GRAPH_REPORT.md Federation section after Communities (CFED-05) — **wave 3** (depends on 66-02)
 
 ### Phase 67: CDRIFT + CQUERY — Edge-Level Drift (`drift.py`) & Parameterized Concept Queries
@@ -140,7 +140,7 @@
 | 63. VOPT | 3/3 | Complete    | 2026-05-06 |
 | 64. AUDIT-A | 3/3 | Complete    | 2026-05-06 |
 | 65. CCONF | 0/0 | Not started | - |
-| 66. CFED | 2/4 | In Progress|  |
+| 66. CFED | 3/4 | In Progress|  |
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
 | 68. AUDIT-B | 0/0 | Not started | - |
 | 69. VPROF | 4/4 | Complete   | 2026-05-05 |
@@ -180,7 +180,7 @@ Total: 27/27 — no orphans, no duplicates.
 **Requirements**: TBD (likely VFIX-01 path resolution + VFIX-02 docs/examples)
 **Depends on:** Phase 70
 **Evidence:** /Users/silveimar/temp-testgph/tmp/
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 - [x] 70.1-01: RED matrix locking cwd × --obsidian-dir × profile.output invariants (VFIX-01 RED) — d64e892
