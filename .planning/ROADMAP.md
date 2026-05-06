@@ -41,7 +41,7 @@
   3. Running `pytest tests/ -q` produces zero unexpected stderr-format diffs across the full suite.
   4. The 7 platform skill files' regex parsers are enumerated in a test fixture so future format changes have a documented contract surface.
 **Plans**: 3 plans
-- [ ] 64-01-PLAN.md — AUDIT-02 stderr snapshot lock (TDD: golden fixture + test) — **wave 1**
+- [x] 64-01-PLAN.md — AUDIT-02 stderr snapshot lock (TDD: golden fixture + test) — **wave 1**
 - [ ] 64-02-PLAN.md — AUDIT-02 stderr outlier sweep (grep-and-migrate + invariant test) — **wave 2** (depends on 64-01: sweep is gated by snapshot existing)
 - [ ] 64-03-PLAN.md — AUDIT-02 skill regex fixture for 7 platforms (TDD) — **wave 2** (depends on 64-01: regex matches assert against `tests/fixtures/stderr_contract.txt`)
 
@@ -131,7 +131,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 63. VOPT | 3/3 | Complete    | 2026-05-06 |
-| 64. AUDIT-A | 0/0 | Not started | - |
+| 64. AUDIT-A | 1/3 | In Progress|  |
 | 65. CCONF | 0/0 | Not started | - |
 | 66. CFED | 0/0 | Not started | - |
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
@@ -173,7 +173,7 @@ Total: 27/27 — no orphans, no duplicates.
 **Requirements**: TBD (likely VFIX-01 path resolution + VFIX-02 docs/examples)
 **Depends on:** Phase 70
 **Evidence:** /Users/silveimar/temp-testgph/tmp/
-**Plans:** 3/3 plans complete
+**Plans:** 1/3 plans executed
 
 Plans:
 - [x] 70.1-01: RED matrix locking cwd × --obsidian-dir × profile.output invariants (VFIX-01 RED) — d64e892
