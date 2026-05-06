@@ -23,6 +23,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import Any
 
 import networkx as nx
@@ -193,11 +194,25 @@ def _normalize_concept_code_edges(nodes: list[dict[str, Any]], edges: list[dict[
     ))
 
 
-def build_from_json(extraction: dict, *, directed: bool = False) -> nx.Graph:
+def build_from_json(
+    extraction: dict,
+    *,
+    directed: bool = False,
+    peers: list[Path] | None = None,
+    local_repo: str = "",
+    resolved_output=None,
+    target_dir: Path | None = None,
+) -> nx.Graph:
     """Build a NetworkX graph from an extraction dict.
 
     directed=True produces a DiGraph that preserves edge direction (source→target).
     directed=False (default) produces an undirected Graph for backward compatibility.
+
+    Phase 66 (CFED-01, CFED-04): when ``peers`` is a non-empty list, run the
+    federation engine after concept↔code edge normalization and before schema
+    validation, then write the manifest atomically through the vault-aware
+    output resolver. When ``peers`` is None or empty, behavior is unchanged
+    (default-off invariant).
     """
     # NetworkX <= 3.1 serialised edges as "links"; remap to "edges" for compatibility.
     if "edges" not in extraction and "links" in extraction:
@@ -211,6 +226,23 @@ def build_from_json(extraction: dict, *, directed: bool = False) -> nx.Graph:
 
     nodes_for_norm = [n for n in extraction["nodes"] if isinstance(n, dict)]
     _normalize_concept_code_edges(nodes_for_norm, extraction["edges"])
+
+    # Phase 66 (CFED-01 / CFED-04): federation runs strictly between
+    # concept↔code normalization and schema validation, so peer-imported nodes
+    # pass validate_extraction alongside local nodes. Lazy import keeps
+    # graphify.federate (and its transitive imports) out of build.py's import
+    # graph when no peers are passed — preserving the default-off invariant.
+    if peers:
+        from .federate import federate, build_manifest, write_manifest
+        merged_extraction, merges = federate(extraction, peers, local_repo=local_repo)
+        extraction["nodes"] = list(merged_extraction.get("nodes", []))
+        extraction["edges"] = [dict(e) for e in merged_extraction.get("edges", [])]
+        manifest = build_manifest(merges)
+        write_manifest(
+            manifest,
+            target_dir or Path.cwd(),
+            resolved=resolved_output,
+        )
 
     errors = validate_extraction(extraction)
     # Dangling edges (stdlib/external imports) are expected - only warn about real schema errors.

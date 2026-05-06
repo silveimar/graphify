@@ -20,13 +20,14 @@ manifest persistence, and report rendering live in Plans 02–04.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Iterable
 
 from graphify.validate import validate_extraction_for_read
 
 
-__all__ = ["federate", "build_manifest", "FederationCollisionError"]
+__all__ = ["federate", "build_manifest", "write_manifest", "FederationCollisionError"]
 
 
 # Concept-typed nodes (everything except executable code) participate in merges.
@@ -380,3 +381,52 @@ def federate(
 def build_manifest(merges: list[dict]) -> list[dict]:
     """Return manifest entries sorted by `merged_id` (deterministic, D-66.5 schema)."""
     return sorted(merges, key=lambda e: e["merged_id"])
+
+
+# --------------------------------------------------------------------------- #
+# Plan 02: Atomic, vault-aware manifest writer (CFED-04)                      #
+# --------------------------------------------------------------------------- #
+
+
+def write_manifest(
+    entries: list[dict],
+    target: Path,
+    *,
+    resolved=None,
+) -> Path:
+    """Atomically write the federation manifest to the resolved artifacts dir.
+
+    Path resolves through ``graphify.output.default_graphify_artifacts_dir`` so
+    that vault-aware (Phase 27/63) routing is honored — never hardcode
+    ``graphify-out/``.
+
+    Atomicity (Phase 64 sidecar pattern, mirrored from
+    ``export.py::_write_repo_identity_sidecar``): write to ``<final>.tmp``,
+    fsync, then ``os.replace``. If ``os.replace`` raises, unlink the tmp file
+    so no orphan remains.
+    """
+    # Lazy import to avoid pulling output.py into federate.py's import set
+    # at module load (keeps Plan 01's no-new-deps AST scan green for callers
+    # who never invoke write_manifest).
+    from graphify.output import default_graphify_artifacts_dir
+
+    artifacts_dir = default_graphify_artifacts_dir(target, resolved=resolved)
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    final_path = artifacts_dir / "federation-manifest.json"
+    tmp_path = final_path.with_suffix(".json.tmp")
+    payload = json.dumps(entries, indent=2, sort_keys=True, separators=(",", ": "))
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, final_path)
+    except OSError:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+        raise
+    return final_path

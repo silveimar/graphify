@@ -240,7 +240,7 @@ def test_no_new_deps():
                 imports.add(alias.name)
     allowed = {
         "__future__", "json", "pathlib", "hashlib", "os", "tempfile", "typing",
-        "graphify.validate", "graphify.security",
+        "graphify.validate", "graphify.security", "graphify.output",
     }
     bad = imports - allowed
     assert not bad, f"federate.py imports unexpected modules: {bad}"
