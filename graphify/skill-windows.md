@@ -54,6 +54,24 @@ graphify update-vault --input work-vault/raw --vault ls-vault
 
 Back up the target vault before apply. Review preview artifacts first, then apply only with a reviewed plan id. Reviewed apply archives legacy `_COMMUNITY_*` files under `graphify-out/migrations/archive/` for rollback evidence and performs no destructive deletion.
 
+### Output destination precedence
+
+Graphify resolves the vault notes destination using a single precedence chain:
+`--output > profile > --obsidian-dir > legacy default (graphify-out/obsidian)`.
+`--output <abs-path>` (when supplied) wins. Otherwise, if the target vault has
+`.graphify/profile.yaml` with an `output:` block, that wins next. `output.path: '.'`
+means **"the vault root itself"** — graphify then composes `taxonomy.root` and
+`graphify_folder_mapping` underneath the vault root (e.g.
+`<vault>/Atlas/Sources/Graphify/...`). If neither applies, `--obsidian-dir <path>`
+is used as-is, and as a final fallback graphify writes to `graphify-out/obsidian/`.
+
+**Common pitfall — Nested vault folder.** Do **not** invoke
+`graphify --obsidian --obsidian-dir <vault-name>` from the vault's *parent*
+directory: that pattern caused the nested-vault-folder bug (graphify wrote
+`<vault>/<vault>/Atlas/...`). Pick one of: (a) `cd` into the vault and omit
+`--obsidian-dir`, (b) pass `--vault <abs-path>` to pin the vault explicitly, or
+(c) pass `--output <abs-path>` to override the destination unambiguously.
+
 <!-- graphify:persistence-contract:v1 -->
 
 ## Mandatory response persistence
