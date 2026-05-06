@@ -118,7 +118,7 @@
 - [x] 70-03-reverse-sync-cmd-PLAN.md — Mode dispatch (always_ask/always_copy/never_copy), Y/n/d/A/Q prompt, --yes flag, CLI subcommand (D-01..D-03, D-12, D-13; VRSYNC-01 §3)
 - [x] 70-04-jsonl-log-PLAN.md — JSONL audit log with 7-key schema, exhaustive action enum, default .graphify/reverse-sync-log.jsonl (D-14, D-15; VRSYNC-01 §2)
 - [x] 70-05-auto-on-run-PLAN.md — auto_on_run hook in graphify run + update-vault; warn-and-continue on failure (D-11; VRSYNC-01 §4)
-- [ ] 70-06-doctor-and-schema-PLAN.md — Profile additive defaults + validation, doctor === Reverse-Sync === section, vault_promote chokepoint augmentation routing (Pitfalls 4 & 8; VPROF-03 + VRSYNC-01)
+- [x] 70-06-doctor-and-schema-PLAN.md — Profile additive defaults + validation, doctor === Reverse-Sync === section, vault_promote chokepoint augmentation routing (Pitfalls 4 & 8; VPROF-03 + VRSYNC-01)
 
 ## Progress
 
@@ -131,7 +131,7 @@
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
 | 68. AUDIT-B | 0/0 | Not started | - |
 | 69. VPROF | 4/4 | Complete   | 2026-05-05 |
-| 70. VRSYNC | 5/6 | In Progress|  |
+| 70. VRSYNC | 6/6 | Complete   | 2026-05-06 |
 
 ## Coverage
 
