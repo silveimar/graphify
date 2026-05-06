@@ -821,3 +821,40 @@ def test_self_ingestion_dirs_constant_excludes_both_spellings():
     assert "graphify_out" in _CORPUS_SELF
     # Catch future divergence between the two intentionally-mirrored copies
     assert _CORPUS_SELF == _DETECT_SELF
+
+
+def test_graphify_out_ignored_in_vault_cwd(tmp_path):
+    """W7 behavior: .graphify-out/ self-emitted artifacts are NOT re-ingested.
+
+    Exercises the real `detect()` discovery API with a `.graphifyignore`
+    containing the Phase 63 default rule, and asserts that:
+      - normal corpus files (vault/doc.md) ARE discovered
+      - self-emitted notes under vault/.graphify-out/obsidian/ are NOT discovered
+    """
+    from graphify.detect import detect, FileType
+    vault = tmp_path / "v"
+    vault.mkdir()
+    (vault / ".obsidian").mkdir()
+    # Real input that should be discovered:
+    (vault / "doc.md").write_text("# real input\n", encoding="utf-8")
+    # Self-emitted output that must NOT be re-ingested:
+    graphify_out = vault / ".graphify-out"
+    (graphify_out / "obsidian").mkdir(parents=True)
+    emitted = graphify_out / "obsidian" / "Generated.md"
+    emitted.write_text("# emitted by graphify — do not re-ingest\n", encoding="utf-8")
+    # Mirror project-default ignore rule so collect treats .graphify-out/ as excluded:
+    (vault / ".graphifyignore").write_text(".graphify-out/\ngraphify-out/\n", encoding="utf-8")
+
+    result = detect(vault)
+    all_found: list[str] = []
+    for ft in (FileType.CODE, FileType.DOCUMENT, FileType.PAPER, FileType.IMAGE):
+        all_found.extend(result["files"].get(ft, []))
+
+    # Real input is discovered:
+    assert any(s.endswith("doc.md") for s in all_found), (
+        f"expected doc.md in discovery, got: {all_found!r}"
+    )
+    # Self-emitted output is NOT discovered (no ingest leak):
+    assert not any(".graphify-out" in s for s in all_found), (
+        f"self-ingest leak from .graphify-out/: {all_found!r}"
+    )

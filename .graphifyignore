@@ -1,0 +1,8 @@
+# graphify project-level ignores
+
+# Phase 63 (VOPT-02): self-ingest prevention.
+# Without these rules, graphify would re-ingest its own emitted notes/JSON
+# from .graphify-out/ (Option B reroute target) and graphify-out/ (legacy
+# pre-v1.13 artifacts dir) into the next graph build — Pitfall 5 / A4.
+.graphify-out/
+graphify-out/

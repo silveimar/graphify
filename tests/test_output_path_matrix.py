@@ -423,3 +423,13 @@ def test_option_b_no_legacy_dir_two_line_breadcrumb(tmp_path, capsys):
     assert len(non_empty_lines) == 2, (
         f"expected 2 non-empty stderr lines without legacy hint, got {non_empty_lines!r}"
     )
+
+
+def test_option_b_graphify_out_in_ignore_default():
+    """VOPT-02 / Pitfall 5: project-shipped .graphifyignore excludes graphify's own outputs."""
+    from pathlib import Path
+    ignore_path = Path(__file__).parent.parent / ".graphifyignore"
+    assert ignore_path.is_file(), f"missing project .graphifyignore at {ignore_path}"
+    text = ignore_path.read_text(encoding="utf-8")
+    assert ".graphify-out/" in text, "missing .graphify-out/ ignore rule"
+    assert "graphify-out/" in text, "missing graphify-out/ legacy ignore rule"
