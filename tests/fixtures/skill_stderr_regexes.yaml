@@ -1,7 +1,27 @@
-claude-code: ""
-codex: ""
-opencode: ""
-openclaw: ""
-factory-droid: ""
-trae: ""
-trae-cn: ""
+# Hand-curated stderr contract regexes — one per platform SKILL.md.
+#
+# Each regex captures the pattern that platform's skill file relies on
+# when parsing graphify's stderr output.  All platforms embed the same
+# Python emitter code (using the [graphify] prefix convention), so all
+# use the shared default contract pattern.
+#
+# Default pattern (used by platforms with no bespoke regex assertion):
+#   ^\[graphify\] (error|info): .+|^  hint: .+
+#
+# Sources:
+#   claude-code  → graphify/skill.md       (default — no bespoke regex)
+#   codex        → graphify/skill-codex.md (default — no bespoke regex)
+#   opencode     → graphify/skill-opencode.md (default — no bespoke regex)
+#   openclaw     → graphify/skill-claw.md  (default — no bespoke regex)
+#   factory-droid→ graphify/skill-droid.md (default — no bespoke regex)
+#   trae         → graphify/skill-trae.md  (default — no bespoke regex)
+#   trae-cn      → MISSING (skill-trae-cn.md not found); permissive default used.
+#                  Deviation documented in 64-03-SUMMARY.md.
+
+claude-code: "^\\[graphify\\] (error|info): .+|^  hint: .+"
+codex: "^\\[graphify\\] (error|info): .+|^  hint: .+"
+opencode: "^\\[graphify\\] (error|info): .+|^  hint: .+"
+openclaw: "^\\[graphify\\] (error|info): .+|^  hint: .+"
+factory-droid: "^\\[graphify\\] (error|info): .+|^  hint: .+"
+trae: "^\\[graphify\\] (error|info): .+|^  hint: .+"
+trae-cn: "^\\[graphify\\] (error|info): .+|^  hint: .+"
