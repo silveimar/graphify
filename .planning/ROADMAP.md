@@ -40,7 +40,10 @@
   2. After the snapshot lands, the remaining one-line stderr outliers (e.g., `__main__.py:~2745`) are migrated to the two-line convention with the snapshot still passing.
   3. Running `pytest tests/ -q` produces zero unexpected stderr-format diffs across the full suite.
   4. The 7 platform skill files' regex parsers are enumerated in a test fixture so future format changes have a documented contract surface.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 64-01-PLAN.md — AUDIT-02 stderr snapshot lock (TDD: golden fixture + test)
+- [ ] 64-02-PLAN.md — AUDIT-02 stderr outlier sweep (grep-and-migrate + invariant test)
+- [ ] 64-03-PLAN.md — AUDIT-02 skill regex fixture for 7 platforms (TDD)
 
 ### Phase 65: CCONF — Per-Edge Confidence + Cache Split + schema_version
 **Goal**: Every concept↔code INFERRED edge carries a per-edge LLM-derived `confidence_score` and `evidence`, persisted via a separate cache namespace that prompt-version bumps invalidate cleanly, with backward-compat reads of pre-v1.13 graphs.
@@ -127,7 +130,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 63. VOPT | 3/3 | Complete   | 2026-05-06 |
+| 63. VOPT | 3/3 | Complete    | 2026-05-06 |
 | 64. AUDIT-A | 0/0 | Not started | - |
 | 65. CCONF | 0/0 | Not started | - |
 | 66. CFED | 0/0 | Not started | - |
