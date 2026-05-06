@@ -84,7 +84,7 @@ def test_validate_profile_empty_vault_exits_0(tmp_path):
 def test_validate_profile_no_arg_exits_2(tmp_path):
     result = _run_cli("--validate-profile")
     assert result.returncode == 2
-    assert "Usage" in result.stderr
+    assert "usage" in result.stderr.lower()
     assert "--validate-profile" in result.stderr
 
 

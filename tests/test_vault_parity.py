@@ -198,7 +198,7 @@ def test_global_local_override_warning_preserved(tmp_path):
         timeout=60,
     )
     # Override is a warning (not an error) — must be present in stderr regardless of doctor exit code
-    assert "[graphify] command --vault / --vault-list overrides global pin" in r.stderr
+    assert "[graphify] info: command --vault / --vault-list overrides global pin" in r.stderr
 
 
 def test_dry_run_mismatch_uses_parity_helper(tmp_path):

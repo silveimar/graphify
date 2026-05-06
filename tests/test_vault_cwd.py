@@ -137,7 +137,7 @@ def test_auto_adopt_notice_emitted_once(tmp_path):
     pytest.importorskip("yaml")
     vault = _make_profile_vault(tmp_path)
     proc = _graphify("run", "--help", cwd=str(vault))
-    notice = "[graphify] auto-adopted vault at"
+    notice = "[graphify] info: auto-adopted vault at"
     occurrences = proc.stderr.count(notice)
     assert occurrences == 1, (
         f"expected exactly 1 auto-adopt notice, got {occurrences}\nstderr:\n{proc.stderr}"
@@ -316,7 +316,7 @@ def test_write_into_vault_yields_to_profile(tmp_path):
     vault = _make_partial_vault(tmp_path, with_profile=True)
     proc = _graphify("--write-into-vault", "run", "--help", cwd=str(vault))
     # Profile present: auto-adopt path takes priority. Notice still appears.
-    assert "[graphify] auto-adopted vault at" in proc.stderr, (
+    assert "[graphify] info: auto-adopted vault at" in proc.stderr, (
         f"--write-into-vault must NOT suppress auto-adopt notice; stderr:\n{proc.stderr}"
     )
 

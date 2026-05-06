@@ -113,7 +113,7 @@ def test_load_profile_invalid_yaml_prints_errors(tmp_path, capsys):
     (profile_dir / "profile.yaml").write_text("unknown_key: 1\n", encoding="utf-8")
     result = load_profile(tmp_path)
     captured = capsys.readouterr()
-    assert "[graphify] profile error:" in captured.err
+    assert "[graphify] error: profile:" in captured.err
     assert "Unknown profile key 'unknown_key'" in captured.err
     # Falls back to defaults
     assert result == _deep_merge(_DEFAULT_PROFILE, {})

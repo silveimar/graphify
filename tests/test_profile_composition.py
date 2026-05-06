@@ -295,7 +295,7 @@ def test_load_profile_cycle_returns_default(tmp_path, capsys):
     # Returns the bare _DEFAULT_PROFILE
     assert result == _deep_merge(_DEFAULT_PROFILE, {})
     captured = capsys.readouterr()
-    assert "[graphify] profile error:" in captured.err
+    assert "[graphify] error: profile:" in captured.err
 
 
 def test_load_profile_path_escape_returns_default(tmp_path, capsys):
@@ -305,7 +305,7 @@ def test_load_profile_path_escape_returns_default(tmp_path, capsys):
     result = load_profile(tmp_path / "vault")
     assert result == _deep_merge(_DEFAULT_PROFILE, {})
     captured = capsys.readouterr()
-    assert "[graphify] profile error:" in captured.err
+    assert "[graphify] error: profile:" in captured.err
 
 
 def test_load_profile_missing_fragment_returns_default(tmp_path, capsys):
@@ -315,7 +315,7 @@ def test_load_profile_missing_fragment_returns_default(tmp_path, capsys):
     result = load_profile(tmp_path / "vault")
     assert result == _deep_merge(_DEFAULT_PROFILE, {})
     captured = capsys.readouterr()
-    assert "[graphify] profile error:" in captured.err
+    assert "[graphify] error: profile:" in captured.err
 
 
 # ---------------------------------------------------------------------------
