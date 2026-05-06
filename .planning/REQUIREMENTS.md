@@ -21,7 +21,7 @@
 - [ ] **CFED-02**: Federation is deterministic — namespaces all node IDs as `{repo}::{id}`; merges only when multi-signal evidence (label + shared neighborhood + source-path overlap) all agree. No embeddings, no LLM arbitration.
 - [ ] **CFED-03**: A federation manifest records per-repo provenance for every merged concept (which repos contributed, which signals matched).
 - [x] **CFED-04**: `graphify/federate.py` runs as a build-time merge step after `_normalize_concept_code_edges` in `build.py` and before `cluster.py`.
-- [ ] **CFED-05**: GRAPH_REPORT.md gains a Federation section listing merged concepts with their provenance entries.
+- [x] **CFED-05**: GRAPH_REPORT.md gains a Federation section listing merged concepts with their provenance entries.
 
 ### CDRIFT — Edge-Level Concept Drift
 - [ ] **CDRIFT-01**: Drift detection compares snapshots via community-membership **Jaccard similarity**, never via community names or IDs (which rename for benign reasons even with stable membership).
