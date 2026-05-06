@@ -1440,3 +1440,10 @@ If vertical scrolling breaks in PowerShell after running graphify, this is cause
 - Always show token cost in the report.
 - Never hide cohesion scores behind symbols - show the raw number.
 - Never run HTML viz on a graph with more than 5,000 nodes without warning the user.
+
+
+<!-- Phase 65 / CCONF prompt-version drift gate (do not remove) -->
+### Confidence scoring (Phase 65, prompt_version 1.13.0)
+For each concept↔code INFERRED edge, score the relationship 0–1 with ≤280-char evidence,
+then write results via `graphify.cache.save_confidence(..., prompt_version="1.13.0", model_id=...)`.
+Bumping `PROMPT_VERSION` in `graphify/prompts.py` MUST be matched here (drift gate test enforces).

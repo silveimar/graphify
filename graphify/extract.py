@@ -14,6 +14,39 @@ from typing import Callable, Any, TYPE_CHECKING
 from graphify.corpus_prune import build_prior_files, dir_prune_reason
 from datetime import datetime, timezone
 from .cache import load_cached, save_cached, file_hash
+from .prompts import PROMPT_VERSION
+from .security import sanitize_label
+
+# Phase 65 (CCONF-02): per-edge evidence cap. sanitize_label() further caps at
+# _MAX_LABEL_LEN=256 + strips control chars; the leading [:280] slice keeps
+# the spec-level cap visible even if sanitize_label's bound is later raised.
+_MAX_EVIDENCE_LEN = 280
+
+
+def _finalize_evidence(raw: str) -> str:
+    """Cap evidence length and strip control chars before persistence."""
+    if not isinstance(raw, str):
+        raw = str(raw or "")
+    truncated = raw[:_MAX_EVIDENCE_LEN]
+    return sanitize_label(truncated)
+
+
+def score_concept_code_edges_for_file(path, edges):
+    """Skill-orchestrated scoring hook (Phase 65, Q1 recommendation).
+
+    Returns one ``(score: float, evidence: str)`` tuple per input edge. The
+    default implementation is a no-op fallback (0.5, "") so unit tests can
+    monkeypatch and the structural pipeline keeps working when the skill
+    layer is not orchestrating scoring. Real per-edge scoring is dispatched
+    by the skill orchestrator (graphify/skill*.md Step 3B); the skill writes
+    results into ``graphify.cache.save_confidence`` and the next library run
+    consumes them via ``load_confidence``.
+
+    NOTE: no Anthropic SDK is added to the Python package
+    (CLAUDE.md "no new required deps"). This hook only defines the shape.
+    """
+    return [(0.5, "") for _ in edges]
+
 
 if TYPE_CHECKING:
     from graphify.output import ResolvedOutput
@@ -2258,6 +2291,37 @@ def _resolve_cross_file_imports(
                 walk_imports(child)
 
         walk_imports(tree.root_node)
+
+    # Phase 65 (CCONF-01/02): score INFERRED concept↔code edges per source file.
+    # Group by source_file so the scoring hook gets one batched call per file
+    # (D-65.03). Default no-op fallback yields (0.5, "") — real scoring is
+    # dispatched by the skill orchestrator and persisted via save_confidence.
+    by_file: dict[str, list[dict]] = {}
+    for e in new_edges:
+        if e.get("confidence") == "INFERRED":
+            by_file.setdefault(e.get("source_file", ""), []).append(e)
+    for sfile, batch in by_file.items():
+        try:
+            scored = score_concept_code_edges_for_file(Path(sfile) if sfile else None, batch)
+        except Exception:
+            scored = [(0.5, "") for _ in batch]
+        if len(scored) != len(batch):
+            scored = [(0.5, "") for _ in batch]
+        for edge, pair in zip(batch, scored):
+            try:
+                score, evidence = pair
+            except (TypeError, ValueError):
+                score, evidence = 0.5, ""
+            try:
+                score_f = float(score)
+            except (TypeError, ValueError):
+                score_f = 0.5
+            if score_f < 0.0:
+                score_f = 0.0
+            elif score_f > 1.0:
+                score_f = 1.0
+            edge["confidence_score"] = score_f
+            edge["evidence"] = _finalize_evidence(evidence)
 
     return new_edges
 

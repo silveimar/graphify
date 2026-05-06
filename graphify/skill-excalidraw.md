@@ -81,3 +81,10 @@ copy this block yourself; graphify never touches that file):
 If the resolved vault path already exists I exit with a clear message naming
 the colliding file and stop. To overwrite, re-invoke me with `force: true`.
 There is no graphify CLI flag for this — `force` is a skill-level argument.
+
+
+<!-- Phase 65 / CCONF prompt-version drift gate (do not remove) -->
+### Confidence scoring (Phase 65, prompt_version 1.13.0)
+For each concept↔code INFERRED edge, score the relationship 0–1 with ≤280-char evidence,
+then write results via `graphify.cache.save_confidence(..., prompt_version="1.13.0", model_id=...)`.
+Bumping `PROMPT_VERSION` in `graphify/prompts.py` MUST be matched here (drift gate test enforces).

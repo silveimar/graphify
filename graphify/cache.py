@@ -110,6 +110,89 @@ def save_cached(
         raise
 
 
+def _sanitize_prompt_version(prompt_version: str) -> str:
+    """Reject path-like prompt_version values (cache poisoning / traversal).
+
+    Mirrors ``_sanitize_model_id``. Phase 65 (CCONF-03): prompt_version is a
+    component of the confidence cache key — must be safe for hashing only,
+    never rendered into a path.
+    """
+    if not prompt_version:
+        raise ValueError("prompt_version must be non-empty")
+    if ".." in prompt_version or "/" in prompt_version or "\\" in prompt_version:
+        raise ValueError("prompt_version must not contain path segments or '..'")
+    if len(prompt_version) > 512:
+        raise ValueError("prompt_version too long")
+    return prompt_version
+
+
+def _confidence_cache_key(prompt_version: str, model_id: str, file_hash_str: str) -> str:
+    """Compose sha256(prompt_version || model_id || file_hash) for the confidence cache.
+
+    The three components are joined with a NUL byte so distinct triples cannot
+    collide via clever boundary choices.
+    """
+    _sanitize_model_id(model_id)
+    _sanitize_prompt_version(prompt_version)
+    blob = f"{prompt_version}\x00{model_id}\x00{file_hash_str}".encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
+
+
+def confidence_cache_dir(root: Path = Path(".")) -> Path:
+    """Return graphify-out/cache/confidence/ — second namespace next to AST cache."""
+    d = Path(root) / "graphify-out" / "cache" / "confidence"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def load_confidence(
+    path: Path,
+    root: Path = Path("."),
+    *,
+    prompt_version: str,
+    model_id: str = "",
+) -> dict | None:
+    """Return cached confidence-scoring result for this file, or None on miss.
+
+    Note: ``file_hash(path, model_id="")`` is used to compute the file digest
+    so that the confidence cache namespace stays orthogonal to the AST cache.
+    The supplied ``model_id`` participates only via ``_confidence_cache_key``.
+    """
+    try:
+        h = file_hash(path, model_id="")
+        key = _confidence_cache_key(prompt_version, model_id, h)
+    except (ValueError, OSError):
+        return None
+    entry = confidence_cache_dir(root) / _cache_json_filename(key)
+    if not entry.exists():
+        return None
+    try:
+        return json.loads(entry.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def save_confidence(
+    path: Path,
+    result: dict,
+    root: Path = Path("."),
+    *,
+    prompt_version: str,
+    model_id: str = "",
+) -> None:
+    """Save a confidence-scoring result keyed on (prompt_version, model_id, file_hash)."""
+    h = file_hash(path, model_id="")
+    key = _confidence_cache_key(prompt_version, model_id, h)
+    entry = confidence_cache_dir(root) / _cache_json_filename(key)
+    tmp = entry.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(result), encoding="utf-8")
+        os.replace(tmp, entry)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def cached_files(root: Path = Path(".")) -> set[str]:
     """Return set of cache key stems present (legacy hex or hashed names)."""
     d = cache_dir(root)
