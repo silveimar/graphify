@@ -3009,7 +3009,7 @@ def main() -> None:
                 from graphify.reverse_sync import run_reverse_sync as _run_reverse_sync
                 _rs_result = _run_reverse_sync(
                     resolved.vault_path,
-                    input_dir_override=target,
+                    input_dir_override=Path(raw_target).resolve(),
                     auto_on_run=True,
                 )
                 _rs_skipped = _rs_result.get("conflicts_skipped", 0)
