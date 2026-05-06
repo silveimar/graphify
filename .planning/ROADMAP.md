@@ -155,3 +155,19 @@ Total: 27/27 — no orphans, no duplicates.
 
 ---
 *Created: 2026-05-05 — graphify v1.13 roadmap.*
+
+### Phase 70.1: VFIX nested vault folder bug and output/obsidian-dir profile output config nested folder bug (INSERTED)
+
+**Goal:** Fix UAT-70 leftover bugs in path resolution and ship the docs + profile-example updates that close them out:
+1. Nested vault folder bug — graphify creates a redundant nested vault directory when `--obsidian-dir` is provided
+2. Profile `output:` config nested folder bug — when profile.yaml provides `output:`, files land in another nested folder (likely cwd vs `--obsidian-dir` vs profile `output:` interaction)
+3. Documentation updates — README/CLI docs/skill files reflect the corrected path-resolution rules
+4. Profile example files — `.graphify/profile.yaml` examples (and any vault-side templates) updated to reflect the fixed behavior, with comments clarifying when to set `output:`
+
+**Requirements**: TBD (likely VFIX-01 path resolution + VFIX-02 docs/examples)
+**Depends on:** Phase 70
+**Evidence:** /Users/silveimar/temp-testgph/tmp/
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 70.1 to break down)

@@ -47,6 +47,11 @@
 ### VRSYNC — Vault → Input Reverse-Sync
 - [x] **VRSYNC-01**: New explicit `graphify reverse-sync` command copies new/changed files from `profile.vault_path` user folders back into `profile.input_path` (raw corpus). Modes: `always_ask` (default, prompts with diff before each copy), `never_copy` (detect-and-log only), `always_copy` (mirror without prompting). `--yes` flag overrides `always_ask` for scripted runs. SHA256-based change detection reuses the `cache.py` hashing primitive. JSONL diff memory at `profile.reverse_sync.memory_path` (default `.graphify/reverse-sync-log.jsonl`) records `{ts, vault_path, input_path, action: new|update|skip, diff_summary, hash_before, hash_after}` per event. `profile.reverse_sync.auto_on_run: false` (default) opts into running reverse-sync implicitly at the start of `graphify run` / `update-vault`.
 
+
+### VFIX — Vault Output Path Resolution Fixes (Phase 70.1, gap-closure for Phase 70 UAT)
+- [ ] **VFIX-01**: Path resolution from `cwd` × `--obsidian-dir` × profile `output:` produces a single, consistent absolute notes-directory regardless of invocation form. Specifically: (a) when CWD is the vault root and `profile.output.path == "."`, notes are written under `<vault>/<folder_mapping[type]>/...` with NO nested vault-name folder; (b) when CWD is the vault's parent and the user passes `--obsidian-dir <vault-name>` (no `--vault`), the resolved write path is identical to (a); (c) when CWD is the vault's parent and `--vault <vault>` is passed (with profile loaded), the resolved write path is identical to (a); (d) `--output <abs>` continues to override profile/--obsidian-dir per D-08. Regression matrix is covered by pure-unit tests in `tests/test_output_path_matrix.py` (no fs side-effects outside `tmp_path`). No regression in existing `tests/test_output.py`.
+- [ ] **VFIX-02**: Documentation accurately describes the precedence chain (`--output > profile.output > --obsidian-dir > legacy default`) and the `output.path: .` convention. README, CLI `--help` text for `--obsidian-dir` and `--output`, and the seven `graphify/skill*.md` variants include a "common pitfalls — nested vault folder" note. The bundled `profile-example.yaml` and `profile-example-complete.yaml` carry inline comments explaining when to set `output.path: .` (vault-root taxonomy) vs. when to set a subdirectory.
+
 ### AUDIT — v1.12 Audit Closure
 - [ ] **AUDIT-01**: Nyquist VALIDATION.md gap-fill for v1.12 phases 59, 59.1, 60, 60.1, 61 — each retroactive entry cites the implementing SHA and the asserting test path; the closure script re-runs the cited tests to prove they still pass.
 - [ ] **AUDIT-02**: Project-wide `[graphify]` stderr two-line format sweep migrates remaining one-line outliers (e.g. `__main__.py:~2745`) to the v1.12 `[graphify] error:` + `  hint:` convention. A stderr-format snapshot test is introduced **before** any reformatting to lock the contract for the 7 platform skill files that regex-parse stderr.
@@ -108,6 +113,8 @@
 | VPROF-03 | Phase 69, Phase 70 | refusal half in 69; augmentation half in 70 |
 | VPROF-04 | Phase 69 | |
 | VRSYNC-01 | Phase 70 | |
+| VFIX-01 | Phase 70.1 | gap-closure for Phase 70 UAT path bugs |
+| VFIX-02 | Phase 70.1 | docs + profile examples |
 
 ---
 
