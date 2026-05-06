@@ -10,7 +10,7 @@
 
 - [x] **Phase 63: VOPT — Vault Option B Silent Reroute & `--explain-paths`** — Vault-CWD reroute to `.graphify-out/` with stderr breadcrumb and a path-resolver flag. (completed 2026-05-06)
 - [x] **Phase 64: AUDIT-A — stderr Format Snapshot Lock & Sweep** — Freeze the `[graphify]` two-line stderr contract via snapshot test, then migrate one-line outliers. (completed 2026-05-06)
-- [ ] **Phase 65: CCONF — Per-Edge Confidence + Cache Split + schema_version** — Load-bearing: per-edge LLM `confidence_score` + `evidence`, second cache namespace, schema-compat with legacy fixture, calibration self-check.
+- [x] **Phase 65: CCONF — Per-Edge Confidence + Cache Split + schema_version** — Load-bearing: per-edge LLM `confidence_score` + `evidence`, second cache namespace, schema-compat with legacy fixture, calibration self-check.
 - [ ] **Phase 66: CFED — Cross-Repo Concept Federation (`federate.py`)** — Opt-in deterministic id-namespacing + multi-signal merge + provenance manifest + report section.
 - [ ] **Phase 67: CDRIFT + CQUERY — Edge-Level Drift (`drift.py`) & Parameterized Concept Queries** — Membership-Jaccard drift classification with snapshot retention, plus `concept_code_hops` parameter filters.
 - [ ] **Phase 68: AUDIT-B — Nyquist Gap-Fill & Seed-SHA Traceability** — Retroactive VALIDATION.md entries with re-run proofs, seed→milestone annotations across REQUIREMENTS.md and PROJECT.md.
@@ -54,7 +54,10 @@
   2. Bumping `prompt_version` invalidates only confidence-cache entries; the existing `extract.py` file-hash cache is untouched and unchanged files still skip extraction.
   3. A frozen v1.10–v1.12 legacy graph fixture passes `validate.py` read validation; new writes require `schema_version`.
   4. `GRAPH_REPORT.md` contains a calibration self-check section that flags suspicious score distributions (e.g., >70% clustered in 0.85±0.05) on a synthetic skewed test corpus.
-**Plans**: TBD
+**Plans**: 3 plans
+  - [x] 65-01-PLAN.md — schema_version read/write split + frozen v1.12 legacy fixture (CCONF-05) — **wave 1**
+  - [x] 65-02-PLAN.md — prompts.py + confidence cache helpers + scored INFERRED emission + 10-skill drift gate (CCONF-01, CCONF-02, CCONF-03) — **wave 2** (depends on 65-01)
+  - [x] 65-03-PLAN.md — GRAPH_REPORT.md calibration self-check histogram + 3 flag rules + skewed fixture (CCONF-04) — **wave 3** (depends on 65-02)
 
 ### Phase 66: CFED — Cross-Repo Concept Federation (`federate.py`)
 **Goal**: A user can opt into deterministic cross-repo federation that merges concepts only on multi-signal evidence, namespaces all node IDs by repo, records per-merge provenance, and reports merges in `GRAPH_REPORT.md`.
