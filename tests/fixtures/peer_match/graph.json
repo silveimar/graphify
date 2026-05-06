@@ -1,0 +1,12 @@
+{
+  "nodes": [
+    {"id": "p_token_validator", "label": "TokenValidator", "file_type": "document", "source_file": "auth.py", "source_location": "L5"},
+    {"id": "p_auth_service", "label": "AuthService", "file_type": "code", "source_file": "auth.py", "source_location": "L20"},
+    {"id": "p_token_store", "label": "TokenStore", "file_type": "code", "source_file": "auth.py", "source_location": "L40"},
+    {"id": "p_other", "label": "OtherThing", "file_type": "code", "source_file": "misc.py", "source_location": "L1"}
+  ],
+  "edges": [
+    {"source": "p_token_validator", "target": "p_auth_service", "relation": "uses", "confidence": "INFERRED", "source_file": "auth.py", "confidence_score": 0.85, "weight": 1.0},
+    {"source": "p_token_validator", "target": "p_token_store", "relation": "uses", "confidence": "INFERRED", "source_file": "auth.py", "confidence_score": 0.85, "weight": 1.0}
+  ]
+}

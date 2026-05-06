@@ -1,0 +1,6 @@
+{
+  "nodes": [
+    {"id": "cb_node", "label": "CollideB", "file_type": "code", "source_file": "y.py", "source_location": "L1"}
+  ],
+  "edges": []
+}

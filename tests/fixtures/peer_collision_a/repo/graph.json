@@ -1,0 +1,6 @@
+{
+  "nodes": [
+    {"id": "ca_node", "label": "CollideA", "file_type": "code", "source_file": "x.py", "source_location": "L1"}
+  ],
+  "edges": []
+}

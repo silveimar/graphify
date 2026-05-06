@@ -1,0 +1,11 @@
+{
+  "nodes": [
+    {"id": "p_token_validator", "label": "TokenValidator", "file_type": "document", "source_file": "billing.py", "source_location": "L5"},
+    {"id": "p_billing", "label": "BillingEngine", "file_type": "code", "source_file": "billing.py", "source_location": "L20"},
+    {"id": "p_invoice", "label": "InvoiceWriter", "file_type": "code", "source_file": "billing.py", "source_location": "L40"}
+  ],
+  "edges": [
+    {"source": "p_token_validator", "target": "p_billing", "relation": "uses", "confidence": "INFERRED", "source_file": "billing.py", "confidence_score": 0.7, "weight": 1.0},
+    {"source": "p_token_validator", "target": "p_invoice", "relation": "uses", "confidence": "INFERRED", "source_file": "billing.py", "confidence_score": 0.7, "weight": 1.0}
+  ]
+}
