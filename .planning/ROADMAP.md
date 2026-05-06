@@ -131,7 +131,7 @@
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
 | 68. AUDIT-B | 0/0 | Not started | - |
 | 69. VPROF | 4/4 | Complete   | 2026-05-05 |
-| 70. VRSYNC | 6/6 | Complete   | 2026-05-06 |
+| 70. VRSYNC | 7/7 | Complete   | 2026-05-06 |
 
 ## Coverage
 
