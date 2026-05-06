@@ -69,7 +69,11 @@
   3. Merged concepts appear in a federation manifest under `graphify-out/` with per-repo provenance entries and the matching signals named.
   4. `federate.py` runs after `_normalize_concept_code_edges` in `build.py` and before `cluster.py`; no embeddings or LLM calls are introduced.
   5. `GRAPH_REPORT.md` gains a Federation section listing each merged concept and its provenance.
-**Plans**: TBD
+**Plans**: 4 plans
+  - [ ] 66-01-PLAN.md — federate.py merge engine: namespacing + AND-gate + tiebreaker + canonical-id (CFED-02, CFED-03) — **wave 1**
+  - [ ] 66-02-PLAN.md — wire federate into build_from_json + atomic vault-aware manifest writer (CFED-01, CFED-04) — **wave 2** (depends on 66-01)
+  - [ ] 66-03-PLAN.md — graphify federate CLI subcommand with Phase 64 stderr contract (CFED-01) — **wave 2** (depends on 66-01)
+  - [ ] 66-04-PLAN.md — GRAPH_REPORT.md Federation section after Communities (CFED-05) — **wave 3** (depends on 66-02)
 
 ### Phase 67: CDRIFT + CQUERY — Edge-Level Drift (`drift.py`) & Parameterized Concept Queries
 **Goal**: Users can detect concept-edge drift between snapshots via stable community-membership Jaccard (never community names/IDs), and the MCP `concept_code_hops` query accepts parameter filters that operate over real per-edge confidence values.
