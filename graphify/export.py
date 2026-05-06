@@ -587,7 +587,18 @@ def to_obsidian(
         _load_manifest,
     )
 
+    # VFIX-01 (Plan 70.1-02): Normalize output_dir to an absolute path up front.
+    # When a relative `output_dir` (e.g. `"uat70-vault"`) is forwarded by the
+    # `--obsidian` dispatcher with cwd at the vault's parent, the relative
+    # `target_path = out / folder / filename` later gets joined inside
+    # `_validate_target` against an *already-resolved* `vault_dir` ending in
+    # the same vault.name segment — producing the doubled `<vault>/<vault>/`
+    # write path observed in the Phase 70 UAT. Resolving `out` once here
+    # ensures every downstream `out / ...` is absolute and `_validate_target`
+    # strips the vault prefix cleanly.
     out = Path(output_dir)
+    if not out.is_absolute():
+        out = out.resolve()
     # Upfront guard: fail loudly with an actionable message when output_dir
     # collides with a non-directory (regular file, symlink, device, etc.).
     # Without this, `out.mkdir(exist_ok=True)` below raises FileExistsError
