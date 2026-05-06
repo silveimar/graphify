@@ -143,9 +143,17 @@ def emit_option_b_breadcrumb(vault_cwd: Path) -> None:
         return
     _OPTION_B_BREADCRUMB_EMITTED = True
     artifacts_dir = (vault_cwd / ".graphify-out").resolve()
+    # Phase 63 D-01 third hint: detect-only signal that pre-v1.13 legacy
+    # `graphify-out/` artifacts coexist with the new Option B reroute target.
+    # No move, no delete, no migration (D-04). Surfaces as advisory `hint:`
+    # so users know to run `graphify doctor`.
+    extra: str | None = None
+    if (vault_cwd / "graphify-out").is_dir():
+        extra = "legacy graphify-out/ detected — run `graphify doctor` to review"
     _emit_vault_info(
         "vault CWD without .graphify/profile.yaml — Option B reroute active",
         f"outputs → {artifacts_dir}/",
+        extra_hint=extra,
     )
 
 
