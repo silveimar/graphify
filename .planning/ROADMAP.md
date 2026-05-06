@@ -167,10 +167,10 @@ Total: 27/27 — no orphans, no duplicates.
 **Requirements**: TBD (likely VFIX-01 path resolution + VFIX-02 docs/examples)
 **Depends on:** Phase 70
 **Evidence:** /Users/silveimar/temp-testgph/tmp/
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 - [x] 70.1-01: RED matrix locking cwd × --obsidian-dir × profile.output invariants (VFIX-01 RED) — d64e892
 - [x] 70.1-02: GREEN fix for dispatch nested-folder bug (VFIX-01 GREEN)
-- [ ] 70.1-03: TBD
+- [x] 70.1-03: TBD
 - [ ] 70.1-04: TBD

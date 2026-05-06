@@ -4,14 +4,14 @@ milestone: v1.13
 milestone_name: milestone
 status: executing
 stopped_at: Phase 70 context gathered
-last_updated: "2026-05-06T04:56:01.389Z"
+last_updated: "2026-05-06T05:05:56.381Z"
 last_activity: 2026-05-06
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 17
-  completed_plans: 15
-  percent: 88
+  completed_plans: 16
+  percent: 94
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: `.planning/PROJECT.md` — **v1.13 milestone planning** (v1.12 shipped 2026
 ## Current Position
 
 Phase: 70.1 (vfix-nested-vault-folder-bug-and-output-obsidian-dir-profile) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-05-06
 
@@ -191,6 +191,7 @@ Locked v1.8 choices:
 - [Phase ?]: Reverse-sync detection uses raw-bytes SHA256, not cache.file_hash
 - [Phase ?]: Phase 70 closure: augmentation routing exposed as helper to preserve Phase 69 refusal invariants
 - [Phase ?]: VFIX-01 root cause was in graphify/export.py to_obsidian (relative output_dir not resolved), not graphify/output.py
+- [Phase ?]: 70.1-03 doc-half VFIX-02: canonical precedence phrase mirrored across README, CLI help, and 7 skill variants
 
 ### Pending Todos
 
@@ -279,6 +280,6 @@ From `.planning/milestones/v1.11-MILESTONE-AUDIT.md` — non-blocking tech debt:
 
 ## Session Continuity
 
-Last session: 2026-05-06T04:55:54.668Z
+Last session: 2026-05-06T05:05:42.267Z
 Stopped at: Phase 70 context gathered
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
