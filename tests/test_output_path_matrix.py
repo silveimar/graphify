@@ -385,3 +385,41 @@ def test_option_b_idempotent_across_calls(tmp_path, capsys):
     assert r1.source == r2.source == "option-b"
     assert r1.notes_dir == r2.notes_dir
     assert r1.artifacts_dir == r2.artifacts_dir
+
+
+def test_option_b_legacy_dir_emits_third_hint(tmp_path, capsys):
+    """VOPT-02 D-01 third hint: legacy graphify-out/ dir present → 3-line breadcrumb."""
+    vault = _make_vault_no_profile(tmp_path, name="legacy-vault")
+    legacy = vault / "graphify-out"
+    legacy.mkdir()  # simulate pre-v1.13 artifacts dir, empty
+    resolved = resolve_output(vault)
+    err = capsys.readouterr().err
+    assert resolved.source == "option-b"
+    assert (
+        "[graphify] info: vault CWD without .graphify/profile.yaml — Option B reroute active"
+        in err
+    )
+    assert "outputs → " in err
+    assert (
+        "  hint: legacy graphify-out/ detected — run `graphify doctor` to review"
+        in err
+    )
+    non_empty_lines = [ln for ln in err.splitlines() if ln.strip()]
+    assert len(non_empty_lines) == 3, (
+        f"expected 3 non-empty stderr lines with legacy hint, got {non_empty_lines!r}"
+    )
+    # D-04 detect-only: legacy dir untouched (still exists, still empty).
+    assert legacy.is_dir()
+    assert list(legacy.iterdir()) == []
+
+
+def test_option_b_no_legacy_dir_two_line_breadcrumb(tmp_path, capsys):
+    """Regression: with no legacy graphify-out/ dir, breadcrumb stays two lines."""
+    vault = _make_vault_no_profile(tmp_path, name="no-legacy-vault")
+    resolve_output(vault)
+    err = capsys.readouterr().err
+    assert "legacy graphify-out/ detected" not in err
+    non_empty_lines = [ln for ln in err.splitlines() if ln.strip()]
+    assert len(non_empty_lines) == 2, (
+        f"expected 2 non-empty stderr lines without legacy hint, got {non_empty_lines!r}"
+    )
