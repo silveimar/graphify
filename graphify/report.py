@@ -7,6 +7,53 @@ import networkx as nx
 from graphify.security import sanitize_label, sanitize_label_md
 
 
+# --- Phase 65 (CCONF-04) calibration self-check thresholds ---
+# Named constants per D-65.10/11 so the reasoning is grep-able from GRAPH_REPORT.md.
+_CALIBRATION_MIN_EDGES: int = 10
+_CALIBRATION_MODE_COLLAPSE_THRESHOLD: float = 0.70
+_CALIBRATION_REFUSAL_THRESHOLD: float = 0.50
+_CALIBRATION_NEGATIVE_FLOOR: float = 0.05
+
+
+def _calibration_histogram(inf_scores: list[float]) -> list[int]:
+    """10-bin histogram over [0.0, 1.0]; 1.0 clamps into the top bin."""
+    bins = [0] * 10
+    for s in inf_scores:
+        idx = min(9, max(0, int(s * 10)))
+        bins[idx] += 1
+    return bins
+
+
+def _calibration_flags(
+    bins: list[int], scores: list[float]
+) -> list[tuple[str, float, float]]:
+    """Return (flag_name, observed_value, threshold) tuples for each rule that fires.
+
+    Rules (D-65.11):
+      - mode_collapse: any single bin > _CALIBRATION_MODE_COLLAPSE_THRESHOLD of total mass
+      - refusal: > _CALIBRATION_REFUSAL_THRESHOLD of scores exactly == 0.5
+      - no_negatives: < _CALIBRATION_NEGATIVE_FLOOR of scores below 0.5
+    """
+    flags: list[tuple[str, float, float]] = []
+    total = sum(bins) or 1
+    max_share = max(bins) / total
+    if max_share > _CALIBRATION_MODE_COLLAPSE_THRESHOLD:
+        flags.append(
+            ("mode_collapse", round(max_share, 3), _CALIBRATION_MODE_COLLAPSE_THRESHOLD)
+        )
+    refusal_share = sum(1 for s in scores if s == 0.5) / total
+    if refusal_share > _CALIBRATION_REFUSAL_THRESHOLD:
+        flags.append(
+            ("refusal", round(refusal_share, 3), _CALIBRATION_REFUSAL_THRESHOLD)
+        )
+    neg_share = sum(1 for s in scores if s < 0.5) / total
+    if neg_share < _CALIBRATION_NEGATIVE_FLOOR:
+        flags.append(
+            ("no_negatives", round(neg_share, 3), _CALIBRATION_NEGATIVE_FLOOR)
+        )
+    return flags
+
+
 def _fmt_source(value) -> str:
     """Render a source_file value as a display string.
 
@@ -114,6 +161,46 @@ def generate(
         + (f" · INFERRED: {len(inf_edges)} edges (avg confidence: {inf_avg})" if inf_avg is not None else ""),
         f"- Token cost: {token_cost.get('input', 0):,} input · {token_cost.get('output', 0):,} output",
     ]
+
+    # --- Phase 65 (CCONF-04) calibration self-check ---
+    # Surface scoring pathologies (mode-collapse, hedging at 0.5, no-negatives)
+    # via a read-only signal in GRAPH_REPORT.md. Histogram is computed over
+    # post-merge confidence_score values (build.py:_normalize_concept_code_edges
+    # takes max(score) on duplicate edges per Phase 53 D-53.05).
+    inf_concept_code_scores = [
+        d.get("confidence_score", 0.5)
+        for _, _, d in G.edges(data=True)
+        if d.get("confidence") == "INFERRED"
+    ]
+    lines += ["", "## Calibration"]
+    if len(inf_concept_code_scores) < _CALIBRATION_MIN_EDGES:
+        lines.append(
+            f"- calibration skipped — insufficient INFERRED edges "
+            f"(n={len(inf_concept_code_scores)}, need ≥{_CALIBRATION_MIN_EDGES})"
+        )
+    else:
+        cal_bins = _calibration_histogram(inf_concept_code_scores)
+        lines.append(
+            "- 10-bin histogram of INFERRED concept↔code confidence_score (post-merge):"
+        )
+        for i, count in enumerate(cal_bins):
+            lo, hi = i / 10, (i + 1) / 10
+            bar = "#" * count
+            lines.append(f"  - [{lo:.1f}, {hi:.1f}): {count:>3}  {bar}")
+        cal_flags = _calibration_flags(cal_bins, inf_concept_code_scores)
+        if cal_flags:
+            lines.append("- flags fired:")
+            for name, observed, threshold in cal_flags:
+                lines.append(
+                    f"  - **{name}**: observed={observed}, threshold={threshold}"
+                )
+        else:
+            lines.append("- no flags fired (distribution looks well-calibrated)")
+        lines.append(
+            "- note: histogram is computed over post-merge scores "
+            "(`build.py:_normalize_concept_code_edges` takes max(score) on "
+            "duplicate edges per Phase 53 D-53.05)"
+        )
 
     # Community hub navigation - links to _COMMUNITY_*.md files in the Obsidian vault.
     # Without these, GRAPH_REPORT.md is a dead-end and the vault splits into disconnected components.
