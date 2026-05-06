@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.13",
+  "nodes": [
+    {"id": "code_a", "label": "module_a", "file_type": "code", "source_file": "a.py", "source_location": "L1"},
+    {"id": "code_b", "label": "module_b", "file_type": "code", "source_file": "b.py", "source_location": "L1"},
+    {"id": "code_c", "label": "module_c", "file_type": "code", "source_file": "c.py", "source_location": "L1"},
+    {"id": "code_d", "label": "module_d", "file_type": "code", "source_file": "d.py", "source_location": "L1"},
+    {"id": "code_e", "label": "module_e", "file_type": "code", "source_file": "e.py", "source_location": "L1"},
+    {"id": "concept_x", "label": "concept x", "file_type": "rationale", "source_file": "doc.md", "source_location": "§1"},
+    {"id": "concept_y", "label": "concept y", "file_type": "rationale", "source_file": "doc.md", "source_location": "§2"}
+  ],
+  "links": [
+    {"source": "code_a", "target": "concept_x", "relation": "documents", "confidence": "INFERRED", "confidence_score": 0.81, "evidence": "match", "source_file": "a.py", "weight": 1.0},
+    {"source": "code_a", "target": "concept_y", "relation": "documents", "confidence": "INFERRED", "confidence_score": 0.82, "evidence": "match", "source_file": "a.py", "weight": 1.0},
+    {"source": "code_b", "target": "concept_x", "relation": "documents", "confidence": "INFERRED", "confidence_score": 0.83, "evidence": "match", "source_file": "b.py", "weight": 1.0},
+    {"source": "code_b", "target": "concept_y", "relation": "documents", "confidence": "INFERRED", "confidence_score": 0.84, "evidence": "match", "source_file": "b.py", "weight": 1.0},
+    {"source": "code_c", "target": "concept_x", "relation": "documents", "confidence": "INFERRED", "confidence_score": 0.85, "evidence": "match", "source_file": "c.py", "weight": 1.0},
+    {"source": "code_c", "target": "concept_y", "relation": "documents", "confidence": "INFERRED", "confidence_score": 0.86, "evidence": "match", "source_file": "c.py", "weight": 1.0},
+    {"source": "code_d", "target": "concept_x", "relation": "documents", "confidence": "INFERRED", "confidence_score": 0.87, "evidence": "match", "source_file": "d.py", "weight": 1.0},
+    {"source": "code_d", "target": "concept_y", "relation": "documents", "confidence": "INFERRED", "confidence_score": 0.88, "evidence": "match", "source_file": "d.py", "weight": 1.0},
+    {"source": "code_e", "target": "concept_x", "relation": "documents", "confidence": "INFERRED", "confidence_score": 0.89, "evidence": "match", "source_file": "e.py", "weight": 1.0},
+    {"source": "code_e", "target": "concept_y", "relation": "documents", "confidence": "INFERRED", "confidence_score": 0.84, "evidence": "match", "source_file": "e.py", "weight": 1.0}
+  ]
+}
