@@ -252,6 +252,102 @@ def test_auto_on_run_conflicts_skipped_summary(
     assert "resolve" in err
 
 
+def test_auto_on_run_uses_raw_target_for_input_dir_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Plan 70-09 (UAT Test 5): auto_on_run hook in `graphify run` must pass
+    the user's pre-D-07 raw_target to run_reverse_sync as input_dir_override,
+    NOT the D-07-rewritten CWD.
+
+    Setup: cwd = vault parent, vault auto-adopts profile (D-07 would force
+    pipeline target=CWD). The user supplies an explicit input dir that is
+    different from cwd. The hook must receive the user input dir.
+    """
+    vault, inp = _setup_vault_input(tmp_path)
+    _write_profile_yaml(
+        vault, auto_on_run=True, mode="always_copy", folders=("People",)
+    )
+    (vault / "People").mkdir(exist_ok=True)
+    (inp / "People").mkdir(exist_ok=True)
+
+    _stub_run_corpus(monkeypatch)
+
+    captured: list[dict] = []
+
+    def _capture(vault_dir, **kwargs):
+        captured.append({"vault_dir": vault_dir, **kwargs})
+        return {
+            "copied": 0,
+            "skipped_user": 0,
+            "skipped_conflict": 0,
+            "skipped_never_copy": 0,
+            "vault_deleted": 0,
+            "conflicts_skipped": 0,
+            "failed": False,
+            "log_path": str(vault / ".graphify" / "reverse-sync-log.jsonl"),
+        }
+
+    monkeypatch.setattr("graphify.reverse_sync.run_reverse_sync", _capture)
+    # cwd = tmp_path (parent of both vault and input). D-07 would force
+    # pipeline target to tmp_path. The hook must NOT receive tmp_path —
+    # it must receive `inp`.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["graphify", "run", "--vault", str(vault), str(inp)],
+    )
+
+    import graphify.__main__ as m
+
+    m.main()
+
+    assert len(captured) == 1, captured
+    override = captured[0].get("input_dir_override")
+    assert override is not None
+    assert Path(override).resolve() == inp.resolve(), (
+        f"hook received {override!r}, expected {inp.resolve()!r} (raw_target)"
+    )
+    # And specifically NOT the cwd / D-07-rewritten path
+    assert Path(override).resolve() != tmp_path.resolve()
+
+
+def test_auto_on_run_copies_vault_only_file_to_user_input_dir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """UAT Test 5 reproduction: vault-only People/Bob.md must land in the
+    user's --input dir when auto_on_run=true, mode=always_copy, and cwd is
+    the parent of vault (i.e., not equal to input dir)."""
+    vault, inp = _setup_vault_input(tmp_path)
+    _write_profile_yaml(
+        vault, auto_on_run=True, mode="always_copy", folders=("People",)
+    )
+    (vault / "People").mkdir(exist_ok=True)
+    (inp / "People").mkdir(exist_ok=True)
+    (vault / "People" / "Bob.md").write_text("bob\n")
+
+    _stub_run_corpus(monkeypatch)
+    monkeypatch.chdir(tmp_path)  # parent of vault — NOT input dir
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["graphify", "run", "--vault", str(vault), str(inp)],
+    )
+
+    import graphify.__main__ as m
+
+    m.main()
+
+    target_file = inp / "People" / "Bob.md"
+    assert target_file.exists(), (
+        f"Bob.md not copied to user input dir {inp}; "
+        f"contents of inp/People: {list((inp / 'People').iterdir())}"
+    )
+    assert target_file.read_bytes() == (vault / "People" / "Bob.md").read_bytes()
+
+
 def test_no_recursion(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
