@@ -43,7 +43,7 @@
 **Plans**: 3 plans
 - [x] 64-01-PLAN.md — AUDIT-02 stderr snapshot lock (TDD: golden fixture + test) — **wave 1**
 - [ ] 64-02-PLAN.md — AUDIT-02 stderr outlier sweep (grep-and-migrate + invariant test) — **wave 2** (depends on 64-01: sweep is gated by snapshot existing)
-- [ ] 64-03-PLAN.md — AUDIT-02 skill regex fixture for 7 platforms (TDD) — **wave 2** (depends on 64-01: regex matches assert against `tests/fixtures/stderr_contract.txt`)
+- [x] 64-03-PLAN.md — AUDIT-02 skill regex fixture for 7 platforms (TDD) — **wave 2** (depends on 64-01: regex matches assert against `tests/fixtures/stderr_contract.txt`)
 
 ### Phase 65: CCONF — Per-Edge Confidence + Cache Split + schema_version
 **Goal**: Every concept↔code INFERRED edge carries a per-edge LLM-derived `confidence_score` and `evidence`, persisted via a separate cache namespace that prompt-version bumps invalidate cleanly, with backward-compat reads of pre-v1.13 graphs.
@@ -131,7 +131,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 63. VOPT | 3/3 | Complete    | 2026-05-06 |
-| 64. AUDIT-A | 1/3 | In Progress|  |
+| 64. AUDIT-A | 2/3 | In Progress|  |
 | 65. CCONF | 0/0 | Not started | - |
 | 66. CFED | 0/0 | Not started | - |
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
@@ -173,7 +173,7 @@ Total: 27/27 — no orphans, no duplicates.
 **Requirements**: TBD (likely VFIX-01 path resolution + VFIX-02 docs/examples)
 **Depends on:** Phase 70
 **Evidence:** /Users/silveimar/temp-testgph/tmp/
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [x] 70.1-01: RED matrix locking cwd × --obsidian-dir × profile.output invariants (VFIX-01 RED) — d64e892
