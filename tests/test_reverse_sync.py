@@ -642,3 +642,68 @@ def test_jsonl_ts_iso8601_utc(tmp_path):
     ts = rec["ts"]
     assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", ts)
     assert ts.endswith("Z") or "+00:00" in ts
+
+
+# ---------------------------------------------------------------------------
+# Plan 70-08: stdout summary (per-file outcome lines + final totals line)
+# ---------------------------------------------------------------------------
+
+
+def _setup_people_dirs(tmp_path: Path) -> tuple[Path, Path]:
+    vault = tmp_path / "vault"
+    inp = tmp_path / "input"
+    (vault / "People").mkdir(parents=True)
+    (inp / "People").mkdir(parents=True)
+    return vault, inp
+
+
+def test_run_reverse_sync_emits_per_file_copied_line(tmp_path, capsys):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_people_dirs(tmp_path)
+    (vault / "People" / "Alice.md").write_text("alice\n")
+    _write_profile_yaml(vault, inp, mode="always_copy", folders=("People",))
+
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp, mode_override="always_copy")
+    out = capsys.readouterr().out
+    assert "[graphify] reverse-sync: copied People/Alice.md" in out
+
+
+def test_run_reverse_sync_emits_totals_line(tmp_path, capsys):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_people_dirs(tmp_path)
+    (vault / "People" / "Alice.md").write_text("alice\n")
+    _write_profile_yaml(vault, inp, mode="always_copy", folders=("People",))
+
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp, mode_override="always_copy")
+    out = capsys.readouterr().out
+    assert (
+        "reverse-sync: totals copied=1 skipped_user=0 skipped_conflict=0 "
+        "skipped_never_copy=0 vault_deleted=0"
+    ) in out
+
+
+def test_run_reverse_sync_silent_on_unchanged(tmp_path, capsys):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_people_dirs(tmp_path)
+    (vault / "People" / "Alice.md").write_text("alice\n")
+    (inp / "People" / "Alice.md").write_text("alice\n")
+    _write_profile_yaml(vault, inp, mode="always_copy", folders=("People",))
+
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp, mode_override="always_copy")
+    out = capsys.readouterr().out
+    assert "copied People/Alice.md" not in out
+    assert (
+        "reverse-sync: totals copied=0 skipped_user=0 skipped_conflict=0 "
+        "skipped_never_copy=0 vault_deleted=0"
+    ) in out
+
+
+def test_run_reverse_sync_emits_skipped_never_copy_line(tmp_path, capsys):
+    from graphify.reverse_sync import run_reverse_sync
+    vault, inp = _setup_people_dirs(tmp_path)
+    (vault / "People" / "Alice.md").write_text("alice\n")
+    _write_profile_yaml(vault, inp, mode="never_copy", folders=("People",))
+
+    run_reverse_sync(vault_dir=vault, input_dir_override=inp, mode_override="never_copy")
+    out = capsys.readouterr().out
+    assert "[graphify] reverse-sync: skipped_never_copy People/Alice.md" in out
