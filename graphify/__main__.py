@@ -3673,10 +3673,135 @@ def main() -> None:
         skipped_str = ", ".join(f"{r}={len(paths)}" for r, paths in skipped.items()) or "none"
         print(f"[graphify] vault-promote complete: promoted={promoted_str}; skipped={skipped_str}")
         _cli_exit(0)
+    elif cmd == "federate":
+        _cmd_federate(sys.argv[2:])
     else:
         print(f"[graphify] error: unknown command '{cmd}'", file=sys.stderr)
         print("[graphify] info: Run 'graphify --help' for usage.", file=sys.stderr)
         sys.exit(1)
+
+
+# ============================================================================
+# Phase 66 (CFED-01) — `graphify federate` subcommand
+# Opt-in cross-repo concept federation. Wraps build_from_json with peers=[...].
+# ----------------------------------------------------------------------------
+# Shape:
+#   graphify federate --federate-with PATH [--federate-with PATH ...] [target]
+# Errors (Phase 64 two-line stderr contract via _emit_vault_error):
+#   - missing peer:   `[graphify] error: peer export not found at <path>`
+#                     `  hint: run \`graphify run\` in the peer repo first`
+#   - basename clash: `[graphify] error: duplicate peer repo basename '<name>'`
+#                     `  hint: rename one peer directory or use distinct paths`
+# `graphify run` (above) is intentionally untouched: CFED-01 default-off.
+# ============================================================================
+def _build_federate_parser():
+    """Build the argparse parser for `graphify federate`.
+
+    Exposed at module scope so tests can introspect the parser shape
+    (`action="append"` → repeatable `--federate-with`).
+    """
+    import argparse as _ap
+
+    p = _ap.ArgumentParser(
+        prog="graphify federate",
+        description="Opt-in cross-repo concept federation (Phase 66 CFED-01)",
+    )
+    p.add_argument(
+        "--federate-with",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="Path to a peer repo's graphify-out/ directory (repeatable)",
+    )
+    p.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="Local corpus path (default: .)",
+    )
+    return p
+
+
+def _cmd_federate(argv: list[str]) -> None:
+    """Handler for `graphify federate`.
+
+    Pre-flight validates each `--federate-with` path: a peer's `graph.json`
+    must exist, and no two peers may resolve to the same repo basename
+    (D-66.3). Both error paths emit the Phase 64 two-line stderr breadcrumb
+    via :func:`graphify.output._emit_vault_error` and exit non-zero.
+
+    On success, runs `run_corpus` to produce extraction, then invokes
+    `build_from_json(extraction, peers=[...], local_repo=...)`. The federation
+    code path inside build.py (Plan 02) writes
+    `federation-manifest.json` via the vault-aware resolver.
+    """
+    from graphify.output import _emit_vault_error
+
+    parser = _build_federate_parser()
+    args = parser.parse_args(argv)
+
+    # Resolve each --federate-with PATH to <PATH>/graph.json (or accept the
+    # file directly). Fail-fast on missing artifact.
+    peer_paths: list[Path] = []
+    for raw in args.federate_with:
+        p = Path(raw)
+        if p.is_file():
+            peer_file = p
+        else:
+            peer_file = p / "graph.json"
+        if not peer_file.is_file():
+            raise _emit_vault_error(
+                f"peer export not found at {peer_file}",
+                "run `graphify run` in the peer repo first",
+                code=2,
+            )
+        peer_paths.append(peer_file)
+
+    # Repo-basename collision pre-flight (D-66.3). Mirror federate.py's
+    # `_repo_label_for_peer` rule: when peer_path.parent.name == "graphify-out",
+    # the label is parent.parent.name; otherwise parent.name.
+    seen: dict[str, Path] = {}
+    for pp in peer_paths:
+        parent = pp.parent
+        label = parent.parent.name if parent.name == "graphify-out" else parent.name
+        if label in seen:
+            raise _emit_vault_error(
+                f"duplicate peer repo basename '{label}'",
+                "rename one peer directory or use distinct paths",
+                code=2,
+            )
+        seen[label] = pp
+
+    # Wire to the engine. Run extraction → build_from_json (which invokes
+    # federate() per Plan 02 wiring) → done. Cluster/report orchestration
+    # is left to the skill driver, matching how `graphify run` defers
+    # downstream stages.
+    target = Path(args.path).resolve()
+    if not target.exists():
+        print(f"[graphify] error: path not found: {target}", file=sys.stderr)
+        sys.exit(2)
+
+    from graphify.pipeline import run_corpus
+    from graphify.build import build_from_json
+    from graphify.federate import FederationCollisionError
+
+    extraction = run_corpus(target, use_router=False)
+    local_repo = target.name or "local"
+    try:
+        build_from_json(
+            extraction,
+            peers=peer_paths,
+            local_repo=local_repo,
+            target_dir=Path.cwd(),
+        )
+    except FederationCollisionError:
+        # Pre-flight above should have caught this, but a peer label may
+        # collide with the local_repo basename. Re-emit in two-line form.
+        raise _emit_vault_error(
+            f"duplicate peer repo basename '{local_repo}'",
+            "rename one peer directory or use distinct paths",
+            code=2,
+        )
 
 
 if __name__ == "__main__":
