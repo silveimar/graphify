@@ -409,6 +409,30 @@ graphify update-vault --input work-vault/raw --vault ls-vault --apply --plan-id 
 
 The adapter works with any Obsidian vault framework — Ideaverse, PARA, custom setups — driven entirely by the declarative profile. No code changes needed.
 
+### Output destination precedence
+
+Graphify resolves the vault notes destination using a single precedence chain:
+
+```
+--output > profile.output > --obsidian-dir > legacy default (graphify-out/obsidian)
+```
+
+`--output <abs-path>` (when supplied) wins. Otherwise, if the target vault has
+`.graphify/profile.yaml` with an `output:` block, that wins next. `output.path: '.'`
+means **"the vault root itself"** — graphify then composes `taxonomy.root` and
+`graphify_folder_mapping` underneath the vault root to place notes (e.g.
+`<vault>/Atlas/Sources/Graphify/...`). If neither `--output` nor a profile applies,
+`--obsidian-dir <path>` is used as-is, and as a final fallback graphify writes to
+`graphify-out/obsidian/` under the current working directory.
+
+**Common pitfall — Nested vault folder.** Do **not** invoke
+`graphify --obsidian --obsidian-dir <vault-name>` from the vault's *parent*
+directory and expect graphify to "find" the vault: that pattern caused the
+nested-vault-folder bug (graphify wrote `<vault>/<vault>/Atlas/...`). Pick one of:
+(a) `cd` into the vault and omit `--obsidian-dir`, (b) pass `--vault <abs-path>`
+to pin the vault explicitly, or (c) pass `--output <abs-path>` to override the
+destination unambiguously.
+
 ### Vault selection for scripting
 
 When the shell’s current directory is not your Obsidian vault, you can pin the vault root for **`run`**, **`--obsidian`**, **`doctor`**, **`elicit`**, and **`import-harness`**. Precedence matches [`graphify/output.py`](graphify/output.py) (module docstring — single source of truth):
