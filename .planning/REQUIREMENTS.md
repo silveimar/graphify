@@ -34,8 +34,8 @@
 - [ ] **CQUERY-02**: Backward compatibility — callers that omit the new parameters receive results identical to the v1.12 implementation.
 
 ### VOPT — Vault Option B Silent Reroute
-- [ ] **VOPT-01**: When CWD is an Obsidian vault (`.obsidian/` present) but no `.graphify/profile.yaml` exists, output reroutes silently to a hidden `.graphify-out/` inside the vault.
-- [ ] **VOPT-02**: An unconditional one-line `[graphify]` stderr breadcrumb explains the reroute on every run that uses Option B.
+- [x] **VOPT-01**: When CWD is an Obsidian vault (`.obsidian/` present) but no `.graphify/profile.yaml` exists, output reroutes silently to a hidden `.graphify-out/` inside the vault.
+- [x] **VOPT-02**: An unconditional one-line `[graphify]` stderr breadcrumb explains the reroute on every run that uses Option B.
 - [ ] **VOPT-03**: A new `--explain-paths` flag dumps the resolved output paths (and active vault profile, if any) without running the pipeline.
 
 ### VPROF — Vault Profile Schema v2 & Profile-Driven Writes

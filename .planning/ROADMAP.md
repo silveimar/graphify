@@ -27,7 +27,7 @@
   3. `graphify --explain-paths` prints resolved output paths and active vault profile (if any) and exits without running the pipeline.
   4. Non-vault CWDs continue to use `default_graphify_artifacts_dir()` unchanged (no regressions on existing routing-audit tests).
 **Plans**: 3 plans
-  - [ ] 63-01-PLAN.md — Option B silent reroute resolver + VCWD-03 gate harmonization (VOPT-01, VOPT-02) — **wave 1**
+  - [x] 63-01-PLAN.md — Option B silent reroute resolver + VCWD-03 gate harmonization (VOPT-01, VOPT-02) — **wave 1**
   - [ ] 63-02-PLAN.md — `--explain-paths` flag with 5-row resolution table (VOPT-03) — **wave 2** (depends on 63-01: tests assert `option-b` resolution label produced by 63-01's resolver branch)
   - [ ] 63-03-PLAN.md — Legacy `graphify-out/` detection third hint line + .graphifyignore + final regression sweep (VOPT-02) — **wave 2** (depends on 63-01: extends `_emit_vault_info(extra_hint=...)`)
 
@@ -127,7 +127,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 63. VOPT | 0/0 | Not started | - |
+| 63. VOPT | 1/3 | In Progress|  |
 | 64. AUDIT-A | 0/0 | Not started | - |
 | 65. CCONF | 0/0 | Not started | - |
 | 66. CFED | 0/0 | Not started | - |
@@ -170,7 +170,7 @@ Total: 27/27 — no orphans, no duplicates.
 **Requirements**: TBD (likely VFIX-01 path resolution + VFIX-02 docs/examples)
 **Depends on:** Phase 70
 **Evidence:** /Users/silveimar/temp-testgph/tmp/
-**Plans:** 4/4 plans complete
+**Plans:** 1/3 plans executed
 
 Plans:
 - [x] 70.1-01: RED matrix locking cwd × --obsidian-dir × profile.output invariants (VFIX-01 RED) — d64e892
