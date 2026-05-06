@@ -374,6 +374,16 @@ def run_reverse_sync(
         if outcome == "quit":
             break
 
+        # Plan 70-08: per-record stdout summary (operator visibility).
+        if outcome in (
+            "copied",
+            "skipped_user",
+            "skipped_conflict",
+            "skipped_never_copy",
+            "vault_deleted",
+        ):
+            print(f"[graphify] reverse-sync: {outcome} {rec.rel_path}")
+
         # Plan 04: log every detected change-set decision.
         try:
             vault_bytes = (
@@ -405,6 +415,16 @@ def run_reverse_sync(
 
         if outcome in counters:
             counters[outcome] += 1
+
+    # Plan 70-08: final totals line (always emitted).
+    print(
+        f"[graphify] reverse-sync: totals "
+        f"copied={counters['copied']} "
+        f"skipped_user={counters['skipped_user']} "
+        f"skipped_conflict={counters['skipped_conflict']} "
+        f"skipped_never_copy={counters['skipped_never_copy']} "
+        f"vault_deleted={counters['vault_deleted']}"
+    )
 
     result = dict(counters)
     result["conflicts_skipped"] = counters["skipped_conflict"]
