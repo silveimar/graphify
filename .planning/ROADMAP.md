@@ -26,7 +26,10 @@
   2. Every Option B run emits exactly one `[graphify]` stderr breadcrumb explaining the reroute.
   3. `graphify --explain-paths` prints resolved output paths and active vault profile (if any) and exits without running the pipeline.
   4. Non-vault CWDs continue to use `default_graphify_artifacts_dir()` unchanged (no regressions on existing routing-audit tests).
-**Plans**: TBD
+**Plans**: 3 plans
+  - [ ] 63-01-PLAN.md — Option B silent reroute resolver + VCWD-03 gate harmonization (VOPT-01, VOPT-02) — **wave 1**
+  - [ ] 63-02-PLAN.md — `--explain-paths` flag with 5-row resolution table (VOPT-03) — **wave 2** (depends on 63-01: tests assert `option-b` resolution label produced by 63-01's resolver branch)
+  - [ ] 63-03-PLAN.md — Legacy `graphify-out/` detection third hint line + .graphifyignore + final regression sweep (VOPT-02) — **wave 2** (depends on 63-01: extends `_emit_vault_info(extra_hint=...)`)
 
 ### Phase 64: AUDIT-A — stderr Format Snapshot Lock & Sweep
 **Goal**: The `[graphify] error:` + `  hint:` two-line stderr contract is locked by an automated snapshot test BEFORE any reformatting touches the codebase, so the 7 platform skills' regex parsers cannot silently break.
