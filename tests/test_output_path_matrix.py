@@ -54,6 +54,17 @@ def _make_vault(tmp_path: Path, name: str = "uat70-vault") -> Path:
     return vault
 
 
+def _make_vault_no_profile(tmp_path: Path, name: str = "vopt-vault") -> Path:
+    """Phase 63: vault directory with .obsidian/ but NO .graphify/profile.yaml.
+
+    Triggers Option B silent reroute in resolve_output() (VOPT-01).
+    """
+    vault = tmp_path / name
+    vault.mkdir()
+    (vault / ".obsidian").mkdir()
+    return vault
+
+
 def _no_doubled_segment(notes_dir: Path, vault_name: str) -> bool:
     """Regression sentinel: vault.name must appear at most once in notes_dir.parts."""
     return [p for p in notes_dir.parts if p == vault_name].count(vault_name) <= 1
@@ -281,3 +292,86 @@ def test_obsidian_dispatch_parent_cwd_with_obsidian_dir_no_doubled_segment(
             f"Things note {p!s} not under {expected_prefix!s} — "
             f"likely doubled vault.name segment (UAT70 nested-folder bug)"
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 63 — VOPT-01/02: Option B silent reroute
+# ---------------------------------------------------------------------------
+
+
+def test_option_b_vault_no_profile_reroutes_to_hidden(tmp_path, capsys):
+    """VOPT-01: vault CWD without profile → source='option-b', hidden .graphify-out/."""
+    vault = _make_vault_no_profile(tmp_path)
+    resolved = resolve_output(vault)
+    capsys.readouterr()
+    assert resolved.source == "option-b"
+    assert resolved.vault_detected is True
+    assert resolved.vault_path == vault.resolve()
+    assert resolved.notes_dir == (vault / ".graphify-out" / "obsidian").resolve()
+    assert resolved.artifacts_dir == (vault / ".graphify-out").resolve()
+    assert _no_doubled_segment(resolved.notes_dir, vault.name)
+
+
+def test_option_b_breadcrumb_shape(tmp_path, capsys):
+    """VOPT-02: exactly two non-empty stderr lines, info: + hint:; VAULT-08 suppressed."""
+    vault = _make_vault_no_profile(tmp_path)
+    resolve_output(vault)
+    err = capsys.readouterr().err
+    assert (
+        "[graphify] info: vault CWD without .graphify/profile.yaml — Option B reroute active"
+        in err
+    )
+    assert f"  hint: outputs → {(vault / '.graphify-out').resolve()}/" in err
+    # VAULT-08 single-line "vault detected at" suppressed on Option B branch:
+    assert "[graphify] vault detected at" not in err
+    # Robust shape (W6): exactly two non-empty stderr lines.
+    non_empty = [ln for ln in err.splitlines() if ln.strip()]
+    assert len(non_empty) == 2, f"expected 2 non-empty stderr lines, got {non_empty!r}"
+
+
+def test_option_b_suppressed_by_cli_output(tmp_path, capsys):
+    """D-02 strict trigger: --output suppresses Option B (yields source='cli-flag')."""
+    vault = _make_vault_no_profile(tmp_path)
+    out = tmp_path / "explicit"
+    resolved = resolve_output(vault, cli_output=str(out))
+    capsys.readouterr()
+    assert resolved.source == "cli-flag"
+
+
+def test_option_b_suppressed_by_obsidian_dir_override(tmp_path):
+    """D-02 strict trigger: obsidian_dir_override=True → legacy refuse semantics."""
+    vault = _make_vault_no_profile(tmp_path)
+    with pytest.raises(SystemExit):
+        resolve_output(vault, obsidian_dir_override=True)
+
+
+def test_option_b_non_vault_cwd_unchanged(tmp_path, capsys):
+    """Regression: non-vault CWD path is untouched (source='default')."""
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    resolved = resolve_output(plain)
+    capsys.readouterr()
+    assert resolved.source == "default"
+    assert resolved.vault_detected is False
+
+
+def test_option_b_paths_are_absolute(tmp_path, capsys):
+    """A1: Option B notes_dir / artifacts_dir are absolute and contain '.graphify-out'."""
+    vault = _make_vault_no_profile(tmp_path)
+    resolved = resolve_output(vault)
+    capsys.readouterr()
+    assert resolved.notes_dir.is_absolute()
+    assert resolved.artifacts_dir.is_absolute()
+    assert ".graphify-out" in resolved.notes_dir.parts
+
+
+def test_option_b_idempotent_across_calls(tmp_path, capsys):
+    """Option B path is stable: two calls on the same vault produce identical
+    notes_dir / artifacts_dir / source values (no hidden state)."""
+    vault = _make_vault_no_profile(tmp_path, name="idem-vault")
+    r1 = resolve_output(vault)
+    r2 = resolve_output(vault)
+    capsys.readouterr()
+    assert r1.source == r2.source == "option-b"
+    assert r1.notes_dir == r2.notes_dir
+    assert r1.artifacts_dir == r2.artifacts_dir

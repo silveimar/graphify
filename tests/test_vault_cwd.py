@@ -59,8 +59,9 @@ READONLY_COMMANDS = [
 
 
 def test_gate_runs_for_each_gated_cmd(tmp_path):
-    """VCWD-01: gated commands invoke the gate from a profile-less vault CWD,
-    yielding exit 2 with two-line stderr (gate refuses)."""
+    """Phase 63 VOPT-01: gated commands from a profile-less vault CWD now silently
+    reroute via Option B (no exit-2 refusal). Each gated branch must emit the
+    `[graphify] info: vault CWD without .graphify/profile.yaml` breadcrumb."""
     vault = _make_partial_vault(tmp_path, with_profile=False)
     # Include flag-style gated commands alongside subcommand-style ones.
     all_gated = list(GATED_COMMANDS) + [
@@ -68,16 +69,17 @@ def test_gate_runs_for_each_gated_cmd(tmp_path):
     ]
     failures = []
     for cmd in all_gated:
-        # Pass --help so command never starts real work; gate runs BEFORE help-parsing
-        # because gate is inserted at the TOP of each dispatch branch, before argparse.
-        # If the gate is wired correctly, exit will be 2 with 'refusing to write'.
-        # If gate is missing for a command, exit will be 0 (help printed) or non-2.
+        # Pass --help so command never starts real work. After Option B harmonization
+        # the gate downgrades to "option-b" rather than raising EXIT_VAULT_GATE,
+        # so every gated branch should reach the resolver and emit the info
+        # breadcrumb (exit code is irrelevant — usually 0 for --help, or 2 for
+        # branches that treat --help as unknown — never the gate's exit-2).
         proc = _graphify(cmd, "--help", cwd=str(vault))
-        if proc.returncode != 2:
-            failures.append((cmd, proc.returncode, proc.stderr[:200]))
-        elif "refusing to write into Obsidian vault" not in proc.stderr:
-            failures.append((cmd, "missing-refusal-msg", proc.stderr[:200]))
-    assert not failures, f"Gate did not fire for: {failures}"
+        if "refusing to write into Obsidian vault" in proc.stderr:
+            failures.append((cmd, "still-refuses", proc.stderr[:200]))
+        elif "info: vault CWD without .graphify/profile.yaml" not in proc.stderr:
+            failures.append((cmd, "missing-info-breadcrumb", proc.stderr[:200]))
+    assert not failures, f"Option B breadcrumb missing for: {failures}"
 
 
 def test_gate_skipped_for_readonly_cmds(tmp_path):
@@ -206,40 +208,49 @@ REFUSAL_MSG_SUFFIX = " — no .graphify/profile.yaml found"
 REFUSAL_HINT_LINE = "  hint: create .graphify/profile.yaml to opt in, pass --output <path> to write outside the vault, or --write-into-vault to override"
 
 
+OPTION_B_INFO_PREFIX = "[graphify] info: vault CWD without .graphify/profile.yaml — Option B reroute active"
+OPTION_B_HINT_PREFIX = "  hint: outputs → "
+
+
 def test_refusal_exit_code_and_format(tmp_path):
-    """VCWD-03: profile-less vault CWD → exit 2 + two-line stderr."""
+    """Phase 63 VOPT-01/02: profile-less vault CWD now silently reroutes via Option B.
+    Stderr carries the two-line info: / hint: breadcrumb; exit code is no longer 2."""
     vault = _make_partial_vault(tmp_path, with_profile=False)
     proc = _graphify("run", cwd=str(vault))
-    assert proc.returncode == 2, f"expected exit 2, got {proc.returncode}\nstderr:\n{proc.stderr}"
-    # Two-line shape: error line + hint line. Allow trailing newline; reject extra non-empty lines.
+    assert proc.returncode != 2, (
+        f"Option B should not exit 2; got {proc.returncode}\nstderr:\n{proc.stderr}"
+    )
     err_lines = [ln for ln in proc.stderr.splitlines() if ln.strip()]
-    # The two VCWD-03 lines must appear consecutively.
-    error_idx = next((i for i, ln in enumerate(err_lines) if ln.startswith(REFUSAL_MSG_PREFIX)), None)
-    assert error_idx is not None, f"missing error line:\n{proc.stderr}"
-    assert err_lines[error_idx + 1] == REFUSAL_HINT_LINE, (
-        f"hint line mismatch.\n"
-        f"  expected: {REFUSAL_HINT_LINE!r}\n"
-        f"  actual:   {err_lines[error_idx + 1]!r}\n"
-        f"full stderr:\n{proc.stderr}"
+    info_idx = next(
+        (i for i, ln in enumerate(err_lines) if ln.startswith(OPTION_B_INFO_PREFIX)),
+        None,
+    )
+    assert info_idx is not None, f"missing info line:\n{proc.stderr}"
+    assert err_lines[info_idx + 1].startswith(OPTION_B_HINT_PREFIX), (
+        f"hint line mismatch.\n  expected prefix: {OPTION_B_HINT_PREFIX!r}\n"
+        f"  actual: {err_lines[info_idx + 1]!r}\nfull stderr:\n{proc.stderr}"
     )
 
 
 def test_refusal_message_text(tmp_path):
-    """VCWD-03: error line MUST match CONTEXT D-04 verbatim (prefix + suffix shape)."""
+    """Phase 63 VOPT-02: hint line points at <vault>/.graphify-out/ (absolute)."""
     vault = _make_partial_vault(tmp_path, with_profile=False)
     proc = _graphify("run", cwd=str(vault))
-    error_line = next(
-        (ln for ln in proc.stderr.splitlines() if ln.startswith(REFUSAL_MSG_PREFIX)),
+    hint_line = next(
+        (ln for ln in proc.stderr.splitlines() if ln.startswith(OPTION_B_HINT_PREFIX)),
         None,
     )
-    assert error_line is not None
-    assert error_line.endswith(REFUSAL_MSG_SUFFIX), f"suffix mismatch: {error_line!r}"
-    # Path between prefix and suffix is the resolved cwd. It MUST be absolute.
-    cwd_in_msg = error_line[len(REFUSAL_MSG_PREFIX):-len(REFUSAL_MSG_SUFFIX)]
-    assert Path(cwd_in_msg).is_absolute(), f"cwd in msg must be absolute: {cwd_in_msg!r}"
-    # Sanity check: the cwd in the message resolves to our test vault.
-    assert Path(cwd_in_msg).resolve() == vault.resolve(), (
-        f"cwd in msg {cwd_in_msg!r} should equal {vault!r}"
+    assert hint_line is not None, f"missing hint line:\n{proc.stderr}"
+    # Hint shape: "  hint: outputs → <abs-path>/"
+    arrow = "outputs → "
+    body = hint_line[len(OPTION_B_HINT_PREFIX):]
+    assert body.endswith("/"), f"hint must end with trailing slash: {hint_line!r}"
+    # The path itself starts after the OPTION_B_HINT_PREFIX in `body` (no arrow inside it).
+    path_str = body.rstrip("/")
+    assert Path(path_str).is_absolute(), f"hint path must be absolute: {path_str!r}"
+    expected = (vault / ".graphify-out").resolve()
+    assert Path(path_str).resolve() == expected, (
+        f"hint path {path_str!r} should equal {expected!r}"
     )
 
 
@@ -343,19 +354,25 @@ def test_doctor_three_outcomes(tmp_path):
     s3 = " ".join(_doctor_section_lines(p3.stdout))
     assert "n/a" in s1, f"plain dir → n/a expected; got: {s1!r}"
     assert "auto-adopt" in s2, f"vault+profile → auto-adopt expected; got: {s2!r}"
-    assert "refuse" in s3, f"vault-no-profile → refuse expected; got: {s3!r}"
+    # Phase 63 VOPT-01: vault-no-profile is now Option B silent reroute, not refuse.
+    assert "option-b" in s3, f"vault-no-profile → option-b expected; got: {s3!r}"
 
 
 def test_doctor_runtime_parity(tmp_path):
-    """VCWD-05 parity contract: doctor's prediction matches runtime gate behavior."""
-    # refuse case
+    """Phase 63 VOPT-01 parity contract: doctor predicts 'option-b' and runtime
+    silently reroutes (no exit-2). Both halves of the parity contract flip."""
     bare = _make_partial_vault(tmp_path, with_profile=False)
     doctor = _graphify("doctor", cwd=str(bare))
     runtime = _graphify("run", cwd=str(bare))
     doc_section = " ".join(_doctor_section_lines(doctor.stdout))
-    assert "refuse" in doc_section
-    assert runtime.returncode == 2 and "refusing to write" in runtime.stderr, (
-        f"doctor predicted refuse; runtime should refuse. runtime stderr:\n{runtime.stderr}"
+    assert "option-b" in doc_section, (
+        f"doctor should predict option-b; got: {doc_section!r}"
+    )
+    assert runtime.returncode != 2, (
+        f"runtime must not exit 2 on Option B path; stderr:\n{runtime.stderr}"
+    )
+    assert "info: vault CWD without .graphify/profile.yaml" in runtime.stderr, (
+        f"runtime should emit Option B info breadcrumb; stderr:\n{runtime.stderr}"
     )
 
 
@@ -473,6 +490,42 @@ def test_update_vault_no_vault_flag_outside_vault_friendly_error(tmp_path):
     assert proc.returncode == 1, (
         f"expected EXIT_VAULT_REFUSAL=1, got {proc.returncode}; stderr: {proc.stderr}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 63 — B2: --output from `graphify run` suppresses Option B globally
+# ---------------------------------------------------------------------------
+
+
+def test_option_b_suppressed_by_cli_output_via_run_subcommand(tmp_path):
+    """B2 strict-trigger: `graphify run --output <path>` from a vault CWD must
+    write to <path> and never trigger the Option B reroute."""
+    vault = tmp_path / "v"
+    vault.mkdir()
+    (vault / ".obsidian").mkdir()
+    # Tiny corpus so `run` has something to ingest.
+    (vault / "doc.md").write_text("# x", encoding="utf-8")
+    explicit = tmp_path / "explicit_out"
+    proc = _graphify(
+        "run", "--no-llm", "--output", str(explicit), str(vault / "doc.md"),
+        cwd=str(vault),
+    )
+    # B2 invariant 1: Option B did NOT fire — no .graphify-out inside the vault.
+    assert not (vault / ".graphify-out").exists(), (
+        f"Option B reroute fired despite --output; stderr:\n{proc.stderr}"
+    )
+    # B2 invariant 2: info breadcrumb did NOT appear (D-02 strict trigger).
+    assert "info: vault CWD without .graphify/profile.yaml" not in proc.stderr, (
+        f"Option B breadcrumb fired despite --output; stderr:\n{proc.stderr}"
+    )
+    # B2 invariant 3: outputs landed at the explicit location (or run produced
+    # at least the directory). We tolerate run's own non-zero exit codes from
+    # missing optional deps (LLM, etc.); the gate / reroute checks above are
+    # the contract this test locks in.
+    if proc.returncode == 0:
+        assert explicit.exists(), (
+            f"explicit out dir not created; stderr:\n{proc.stderr}"
+        )
 
 
 def test_vault_promote_no_vault_flag_outside_vault_friendly_error(tmp_path):
