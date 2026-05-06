@@ -161,6 +161,12 @@ class DoctorReport:
     has_explicit_route: bool = False
     # Plan 04 (D-15): legacy graphify artifacts outside pinned subtree (non-blocking)
     legacy_artifact_paths: list[str] = field(default_factory=list)
+    # Phase 70 (VRSYNC-01): reverse-sync log summary — non-blocking.
+    # Counts skipped_conflict entries across the JSONL log (deeper analytics
+    # deferred per RESEARCH §"Sampling Rate"). Section never alters status.
+    reverse_sync_pending_conflicts: int = 0
+    reverse_sync_log_path: Optional[Path] = None
+    reverse_sync_log_exists: bool = False
 
     def is_misconfigured(self) -> bool:
         """D-35: True iff profile errors / unresolvable dest / would_self_ingest."""
@@ -483,6 +489,40 @@ def run_doctor(
         except Exception:
             pass  # Non-blocking: silently skip on import/IO error
 
+    # Phase 70 (VRSYNC-01): reverse-sync pending-conflict summary — non-blocking.
+    if report.vault_path is not None and report.vault_path.is_dir():
+        try:
+            from graphify.profile import (
+                load_profile as _load_profile2,
+                _deep_merge as _dm2,
+                _DEFAULT_PROFILE as _DP2,
+            )
+            _up = _load_profile2(report.vault_path)
+            _mp = _dm2(_DP2, _up)
+            _mem = (_mp.get("reverse_sync") or {}).get(
+                "memory_path", ".graphify/reverse-sync-log.jsonl"
+            )
+            _log_path = report.vault_path / _mem
+            report.reverse_sync_log_path = _log_path
+            if _log_path.exists():
+                report.reverse_sync_log_exists = True
+                import json as _json
+                _count = 0
+                with _log_path.open("r", encoding="utf-8") as _fh:
+                    for _line in _fh:
+                        _line = _line.strip()
+                        if not _line:
+                            continue
+                        try:
+                            _entry = _json.loads(_line)
+                        except Exception:
+                            continue
+                        if _entry.get("action") == "skipped_conflict":
+                            _count += 1
+                report.reverse_sync_pending_conflicts = _count
+        except Exception:
+            pass  # Non-blocking
+
     return report
 
 
@@ -626,6 +666,21 @@ def format_report(report: DoctorReport) -> str:
         )
     else:
         lines.append("[graphify] no legacy artifacts detected")
+
+    # --- Reverse-Sync (Phase 70 / VRSYNC-01) — non-blocking section --------
+    lines.append("[graphify] === Reverse-Sync ===")
+    if report.reverse_sync_log_exists and report.reverse_sync_log_path is not None:
+        lines.append(f"[graphify] Log: {report.reverse_sync_log_path}")
+    else:
+        lines.append("[graphify] Log: not yet created")
+    _pending = report.reverse_sync_pending_conflicts
+    if _pending > 0:
+        lines.append(
+            f"[graphify] Pending conflicts: {_pending} — "
+            "run `graphify reverse-sync` to resolve"
+        )
+    else:
+        lines.append("[graphify] Pending conflicts: 0")
 
     # --- Recommended Fixes ------------------------------------------------
     lines.append("[graphify] === Recommended Fixes ===")

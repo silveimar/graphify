@@ -449,3 +449,58 @@ def test_dry_run_no_disk_writes(tmp_path):
     run_doctor(vault, dry_run=True)
     after = _snapshot(tmp_path)
     assert before == after, f"dry_run created files: {sorted(after - before)}"
+
+
+# ---------------------------------------------------------------------------
+# Phase 70 (VRSYNC-01): doctor reverse-sync section
+# ---------------------------------------------------------------------------
+
+def test_doctor_reverse_sync_section_present():
+    text = format_report(DoctorReport())
+    assert "=== Reverse-Sync ===" in text
+
+
+def test_doctor_reverse_sync_pending_count_zero():
+    report = DoctorReport()
+    text = format_report(report)
+    assert "Pending conflicts: 0" in text
+
+
+def test_doctor_reverse_sync_pending_count_nonzero(tmp_path):
+    log_path = tmp_path / "log.jsonl"
+    log_path.write_text(
+        '{"action":"skipped_conflict"}\n'
+        '{"action":"skipped_conflict"}\n'
+        '{"action":"copied"}\n'
+        '{"action":"skipped_conflict"}\n',
+        encoding="utf-8",
+    )
+    report = DoctorReport(
+        reverse_sync_log_path=log_path,
+        reverse_sync_log_exists=True,
+        reverse_sync_pending_conflicts=3,
+    )
+    text = format_report(report)
+    assert "Pending conflicts: 3" in text
+    assert "graphify reverse-sync" in text
+
+
+def test_doctor_reverse_sync_log_missing():
+    report = DoctorReport(reverse_sync_log_exists=False)
+    text = format_report(report)
+    assert "Log: not yet created" in text
+
+
+def test_doctor_reverse_sync_section_non_blocking():
+    # Reverse-sync state must not affect is_misconfigured(): two reports
+    # identical except for pending count yield identical misconfig verdict.
+    base = DoctorReport(resolved_output=ResolvedOutput(
+        vault_detected=False, vault_path=None,
+        notes_dir=Path("/tmp/x"), artifacts_dir=Path("/tmp/x"),
+        source="default",
+    ))
+    flooded = DoctorReport(
+        resolved_output=base.resolved_output,
+        reverse_sync_pending_conflicts=99,
+    )
+    assert base.is_misconfigured() == flooded.is_misconfigured()
