@@ -286,6 +286,23 @@ diagram_types:
     output_path: Excalidraw/Diagrams/
 
 # -----------------------------------------------------------------------------
+# Output destination — see README §Output destination precedence
+# -----------------------------------------------------------------------------
+# path: '.' means "vault root" — graphify writes notes under the vault root,
+# using folder_mapping[type] to place each note. This is the correct setting
+# when your taxonomy/folder_mapping values already carry the full subpath
+# (e.g. "Atlas/Sources/Graphify/Things/"), as in this example.
+#
+# Set path: 'SubDir' (no leading slash, no '..') ONLY when you want graphify
+# to anchor ALL writes under <vault>/SubDir/ and your folder_mapping values
+# are relative to that subdir.
+#
+# Common pitfall — nested vault folder:
+#   Do NOT invoke `graphify --obsidian --obsidian-dir <vault-name>` from
+#   the vault's parent directory. Either `cd` into the vault, or pass
+#   `--vault <path>`, or pass `--output <abs>`. The precedence chain is:
+#     --output > profile.output > --obsidian-dir > legacy default
+#
 # Optional: redirect structured export writes (uncomment if you use output pinning).
 # -----------------------------------------------------------------------------
 # output:
