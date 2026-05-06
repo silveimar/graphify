@@ -131,7 +131,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 63. VOPT | 3/3 | Complete    | 2026-05-06 |
-| 64. AUDIT-A | 3/3 | Complete   | 2026-05-06 |
+| 64. AUDIT-A | 3/3 | Complete    | 2026-05-06 |
 | 65. CCONF | 0/0 | Not started | - |
 | 66. CFED | 0/0 | Not started | - |
 | 67. CDRIFT + CQUERY | 0/0 | Not started | - |
