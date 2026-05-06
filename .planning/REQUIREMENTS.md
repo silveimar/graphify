@@ -36,7 +36,7 @@
 ### VOPT — Vault Option B Silent Reroute
 - [x] **VOPT-01**: When CWD is an Obsidian vault (`.obsidian/` present) but no `.graphify/profile.yaml` exists, output reroutes silently to a hidden `.graphify-out/` inside the vault.
 - [x] **VOPT-02**: An unconditional one-line `[graphify]` stderr breadcrumb explains the reroute on every run that uses Option B.
-- [ ] **VOPT-03**: A new `--explain-paths` flag dumps the resolved output paths (and active vault profile, if any) without running the pipeline.
+- [x] **VOPT-03**: A new `--explain-paths` flag dumps the resolved output paths (and active vault profile, if any) without running the pipeline.
 
 ### VPROF — Vault Profile Schema v2 & Profile-Driven Writes
 - [x] **VPROF-01**: Profile schema v2 — `.graphify/profile.yaml` adds `input_path`, `vault_path`, `graphify_folder_mapping` (renamed from `folder_mapping`), `user_only_folders`, `augment.allow_community` (default `false`), `reverse_sync.{mode, memory_path, auto_on_run}`. A one-shot migrator renames `folder_mapping` → `graphify_folder_mapping` on first read so existing vault profiles upgrade silently.
