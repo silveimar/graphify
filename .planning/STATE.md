@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: milestone
-status: verifying
+status: executing
 stopped_at: Phase 70 context gathered
-last_updated: "2026-05-06T04:08:23.623Z"
-last_activity: 2026-05-06
+last_updated: "2026-05-06T04:32:47.023Z"
+last_activity: 2026-05-06 -- Phase 70.1 plan 01 (RED matrix) complete
 progress:
   total_phases: 9
   completed_phases: 2
-  total_plans: 13
+  total_plans: 17
   completed_plans: 13
-  percent: 100
+  percent: 76
 ---
 
 # Project State
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` — **v1.13 milestone planning** (v1.12 shipped 2026
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Phase 70 — vrsync-vault-input-reverse-sync-user-file-augmentation
+**Current focus:** Phase 70.1 — vfix-nested-vault-folder-bug-and-output-obsidian-dir-profile
 
 ## Current Position
 
-Phase: 70 (vrsync-vault-input-reverse-sync-user-file-augmentation) — EXECUTING
-Plan: 6 of 6
-Status: Phase complete — ready for verification
-Last activity: 2026-05-06
+Phase: 70.1 (vfix-nested-vault-folder-bug-and-output-obsidian-dir-profile) — EXECUTING
+Plan: 2 of 4
+Status: Executing Phase 70.1
+Last activity: 2026-05-06 -- Phase 70.1 plan 01 (RED matrix) complete — 6 resolver invariants pass, 1 sentinel fails reproducing UAT70 nested-folder bug
 
 ## Performance Metrics
 
