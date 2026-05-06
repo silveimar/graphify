@@ -132,6 +132,63 @@ def _read_stamp_or_corrupt(version_file: Path) -> str | None:
         return "<corrupt>"
 
 
+def _print_explain_paths_table(
+    *,
+    vault_cli: Path | None = None,
+    env_vault: str | None = None,
+) -> None:
+    """VOPT-03: print resolved-paths introspection table to stdout. No pipeline run.
+
+    Prints exactly 5 key:value rows (D-03 contract):
+
+        cwd:           <abs cwd>
+        vault:         yes|no  (.obsidian/ present)
+        profile:       <abs profile path> | <none>
+        resolved out:  <abs output dir>
+        resolution:    flag-output | profile | option-b (silent reroute) | default
+
+    W4 (mandatory): forwards --vault / GRAPHIFY_VAULT pins to resolve_execution_paths
+    so introspection reflects pinned vault, not just CWD.
+    """
+    import contextlib
+    import io
+
+    from graphify.output import resolve_execution_paths
+
+    cwd = Path.cwd().resolve()
+    profile_path = cwd / ".graphify" / "profile.yaml"
+    vault_present = (cwd / ".obsidian").is_dir()
+    captured = io.StringIO()
+    resolution_label: str
+    out: object
+    try:
+        with contextlib.redirect_stderr(captured):
+            resolved = resolve_execution_paths(
+                cwd,
+                explicit_vault=vault_cli,
+                env_vault=env_vault,
+            )
+        source_to_label = {
+            "cli-flag": "flag-output",
+            "profile": "profile",
+            "vault-cli": "profile",
+            "vault-env": "profile",
+            "vault-list": "profile",
+            "option-b": "option-b (silent reroute)",
+            "default": "default",
+        }
+        resolution_label = source_to_label.get(resolved.source, str(resolved.source))
+        out = resolved.notes_dir
+    except SystemExit:
+        resolution_label = "error (see stderr)"
+        out = "<unresolved>"
+    print(f"cwd:           {cwd}")
+    print(f"vault:         {'yes' if vault_present else 'no'}  (.obsidian/ present)")
+    print(f"profile:       {profile_path if profile_path.exists() else '<none>'}")
+    print(f"resolved out:  {out}")
+    print(f"resolution:    {resolution_label}")
+
+
 def _render_version_block(home: Path | None = None) -> str:
     """Render the multi-line ``graphify --version`` / ``-V`` output (D-07..D-10).
 
@@ -1609,6 +1666,16 @@ def main() -> None:
         print(_render_version_block())
         raise SystemExit(0)
 
+    # VOPT-03: --explain-paths early-exit (top-level, preempts subcommand dispatch).
+    # Honors --vault (g_vault_exp) and GRAPHIFY_VAULT pins per W4 (mandatory).
+    # Must fire before any subcommand dispatch (T-63-08 / W5 mitigation).
+    if "--explain-paths" in sys.argv:
+        _print_explain_paths_table(
+            vault_cli=g_vault_exp,
+            env_vault=os.environ.get("GRAPHIFY_VAULT"),
+        )
+        raise SystemExit(0)
+
     # Check all known skill install locations for a stale version stamp.
     # Skip during install/uninstall (hook writes trigger a fresh check anyway).
     # Skip on -h/--help/--version so usage / introspection stays readable.
@@ -1633,6 +1700,8 @@ def main() -> None:
         print("  GRAPHIFY_VAULT           env pin when --vault is not set")
         print("  Per-command --vault/--vault-list overrides a leading global pin (stderr note).")
         print("  --output composes with vault pin (does not replace profile/vault context).")
+        print("  --explain-paths          print 5-row resolved-paths table to stdout and exit 0")
+        print("                            (no pipeline run; honors --vault / GRAPHIFY_VAULT pins)")
         print("  Output destination precedence: --output > profile > --obsidian-dir > option-b (vault) > default.")
         print("  See README §Output destination precedence (avoids nested-vault-folder pitfall).")
         print()
