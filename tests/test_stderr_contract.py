@@ -133,3 +133,46 @@ def test_strict_prefix_whitelist(capsys: pytest.CaptureFixture[str]) -> None:
             f"Allowed prefixes: '[graphify] error: ', '[graphify] info: ', "
             f"'[graphify] hint: ', '  hint: '"
         )
+
+
+# ============================================================================
+# Phase 66 — federation error breadcrumbs (CFED Plan 03)
+# Both error paths reuse `_emit_vault_error`, so they conform to D-04 by
+# construction. These tests pin the exact wording so reformulation drift is
+# caught alongside the vault-routing snapshots.
+# ============================================================================
+
+def test_federation_missing_peer_breadcrumb(capsys: pytest.CaptureFixture[str]) -> None:
+    """Missing peer breadcrumb: `[graphify] error: peer export not found at <p>` + hint."""
+    peer_path = "/tmp/__nonexistent__/graphify-out/graph.json"
+    with pytest.raises(SystemExit):
+        raise _emit_vault_error(
+            f"peer export not found at {peer_path}",
+            "run `graphify run` in the peer repo first",
+        )
+    captured = capsys.readouterr().err.rstrip("\n")
+    expected = (
+        f"[graphify] error: peer export not found at {peer_path}\n"
+        f"  hint: run `graphify run` in the peer repo first"
+    )
+    assert captured == expected
+    # D-04 prefix whitelist applies.
+    for line in captured.splitlines():
+        assert _PREFIX_RE.match(line), f"federation missing-peer line violates D-04: {line!r}"
+
+
+def test_federation_collision_breadcrumb(capsys: pytest.CaptureFixture[str]) -> None:
+    """Collision breadcrumb: `[graphify] error: duplicate peer repo basename '<n>'` + hint."""
+    with pytest.raises(SystemExit):
+        raise _emit_vault_error(
+            "duplicate peer repo basename 'repo'",
+            "rename one peer directory or use distinct paths",
+        )
+    captured = capsys.readouterr().err.rstrip("\n")
+    expected = (
+        "[graphify] error: duplicate peer repo basename 'repo'\n"
+        "  hint: rename one peer directory or use distinct paths"
+    )
+    assert captured == expected
+    for line in captured.splitlines():
+        assert _PREFIX_RE.match(line), f"federation collision line violates D-04: {line!r}"

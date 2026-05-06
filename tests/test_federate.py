@@ -352,3 +352,88 @@ def test_pipeline_preserves_concept_code_normalization():
     G_no_peers = build_from_json(extraction)
     # Phase 53 normalization collapses duplicates → exactly one edge.
     assert G_no_peers.number_of_edges() == 1
+
+
+# ============================================================================
+# Plan 03 — CLI subcommand tests (CFED-01 user-facing surface)
+# ============================================================================
+
+import re
+import subprocess
+import sys
+
+
+def test_cli_repeatable():
+    """`--federate-with` must be repeatable via argparse `action="append"`.
+
+    Locks the parser shape that `_cmd_federate` builds: two flag invocations
+    yield a list of two paths.
+    """
+    from graphify.__main__ import _build_federate_parser  # type: ignore[attr-defined]
+
+    parser = _build_federate_parser()
+    args = parser.parse_args(["--federate-with", "/tmp/a", "--federate-with", "/tmp/b"])
+    assert args.federate_with == ["/tmp/a", "/tmp/b"]
+
+
+def test_cli_missing_peer(tmp_path: Path):
+    """Missing peer artifact emits Phase 64 two-line stderr and exits non-zero."""
+    missing = tmp_path / "no_such_peer" / "graphify-out"
+    proc = subprocess.run(
+        [sys.executable, "-m", "graphify", "federate", "--federate-with", str(missing)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert proc.returncode != 0
+    stderr_lines = proc.stderr.splitlines()
+    # Find the two-line breadcrumb (other unrelated stderr noise — e.g., skill
+    # version drift — may precede it; just confirm the pair appears in order).
+    found = False
+    for i in range(len(stderr_lines) - 1):
+        line1 = stderr_lines[i]
+        line2 = stderr_lines[i + 1]
+        if (
+            line1.startswith("[graphify] error: peer export not found at ")
+            and str(missing / "graph.json") in line1
+            and line2 == "  hint: run `graphify run` in the peer repo first"
+        ):
+            found = True
+            break
+    assert found, f"two-line peer-missing breadcrumb not found in stderr:\n{proc.stderr}"
+
+
+def test_cli_collision(tmp_path: Path):
+    """Two peer paths with same basename emit Phase 64 two-line stderr and exit non-zero."""
+    # Two distinct parents, same basename "repo".
+    a = tmp_path / "alpha" / "repo" / "graphify-out"
+    b = tmp_path / "beta" / "repo" / "graphify-out"
+    a.mkdir(parents=True)
+    b.mkdir(parents=True)
+    # Minimal valid graph.json so the missing-peer check passes.
+    minimal = json.dumps({"nodes": [], "edges": []})
+    (a / "graph.json").write_text(minimal)
+    (b / "graph.json").write_text(minimal)
+
+    proc = subprocess.run(
+        [
+            sys.executable, "-m", "graphify", "federate",
+            "--federate-with", str(a),
+            "--federate-with", str(b),
+        ],
+        capture_output=True, text=True, cwd=str(tmp_path),
+    )
+    assert proc.returncode != 0
+    stderr_lines = proc.stderr.splitlines()
+    found = False
+    for i in range(len(stderr_lines) - 1):
+        line1 = stderr_lines[i]
+        line2 = stderr_lines[i + 1]
+        if (
+            line1.startswith("[graphify] error: duplicate peer repo basename ")
+            and "'repo'" in line1
+            and line2 == "  hint: rename one peer directory or use distinct paths"
+        ):
+            found = True
+            break
+    assert found, f"two-line collision breadcrumb not found in stderr:\n{proc.stderr}"
