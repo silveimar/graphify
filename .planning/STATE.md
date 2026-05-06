@@ -4,14 +4,14 @@ milestone: v1.13
 milestone_name: milestone
 status: executing
 stopped_at: Phase 70 context gathered
-last_updated: "2026-05-06T04:32:47.023Z"
-last_activity: 2026-05-06 -- Phase 70.1 plan 01 (RED matrix) complete
+last_updated: "2026-05-06T04:56:01.389Z"
+last_activity: 2026-05-06
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 17
-  completed_plans: 13
-  percent: 76
+  completed_plans: 15
+  percent: 88
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: `.planning/PROJECT.md` — **v1.13 milestone planning** (v1.12 shipped 2026
 ## Current Position
 
 Phase: 70.1 (vfix-nested-vault-folder-bug-and-output-obsidian-dir-profile) — EXECUTING
-Plan: 2 of 4
-Status: Executing Phase 70.1
-Last activity: 2026-05-06 -- Phase 70.1 plan 01 (RED matrix) complete — 6 resolver invariants pass, 1 sentinel fails reproducing UAT70 nested-folder bug
+Plan: 3 of 4
+Status: Ready to execute
+Last activity: 2026-05-06
 
 ## Performance Metrics
 
@@ -88,6 +88,7 @@ Last activity: 2026-05-06 -- Phase 70.1 plan 01 (RED matrix) complete — 6 reso
 | Phase 70 P02 | 600 | 2 tasks | 3 files |
 | Phase 70 P05 | 8min | 2 tasks | 2 files |
 | Phase 70 P06 | 25 | 3 tasks | 6 files |
+| Phase 70.1 P02 | 10 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -189,6 +190,7 @@ Locked v1.8 choices:
 - [Phase ?]: detect_legacy_artifacts uses hardcoded globs + graphifyProject ownership marker (D-12, RESEARCH Q1)
 - [Phase ?]: Reverse-sync detection uses raw-bytes SHA256, not cache.file_hash
 - [Phase ?]: Phase 70 closure: augmentation routing exposed as helper to preserve Phase 69 refusal invariants
+- [Phase ?]: VFIX-01 root cause was in graphify/export.py to_obsidian (relative output_dir not resolved), not graphify/output.py
 
 ### Pending Todos
 
@@ -277,6 +279,6 @@ From `.planning/milestones/v1.11-MILESTONE-AUDIT.md` — non-blocking tech debt:
 
 ## Session Continuity
 
-Last session: 2026-05-06T00:28:38.411Z
+Last session: 2026-05-06T04:55:54.668Z
 Stopped at: Phase 70 context gathered
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
