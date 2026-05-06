@@ -16,6 +16,16 @@ from pathlib import Path
 import pytest
 
 from graphify.output import resolve_execution_paths, resolve_output
+from graphify.output import _reset_option_b_breadcrumb_for_tests
+
+
+@pytest.fixture(autouse=True)
+def _reset_option_b_sentinel():
+    """Phase 63: clear the once-per-process Option B breadcrumb sentinel
+    between tests so each unit test starts in a known-emit state."""
+    _reset_option_b_breadcrumb_for_tests()
+    yield
+    _reset_option_b_breadcrumb_for_tests()
 
 
 # ---------------------------------------------------------------------------

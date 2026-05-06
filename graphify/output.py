@@ -38,6 +38,7 @@ ResolvedSource = Literal[
     "vault-cli",
     "vault-env",
     "vault-list",
+    "option-b",
 ]
 
 
@@ -97,6 +98,55 @@ def _emit_vault_error(msg: str, hint: str, *, code: int = EXIT_VAULT_REFUSAL) ->
     print(f"[graphify] error: {msg}", file=sys.stderr)
     print(f"  hint: {hint}", file=sys.stderr)
     return SystemExit(code)
+
+
+_OPTION_B_BREADCRUMB_EMITTED = False
+
+
+def _reset_option_b_breadcrumb_for_tests() -> None:
+    """Reset Option B emission sentinel (test-only helper).
+
+    Phase 63 D-02 emits the Option B info breadcrumb exactly once per process.
+    Unit tests that exercise the resolver multiple times in the same process
+    (e.g., test_option_b_idempotent_across_calls) need to clear the sentinel
+    between assertions. The CLI does not call this — it relies on each
+    subprocess being its own process.
+    """
+    global _OPTION_B_BREADCRUMB_EMITTED
+    _OPTION_B_BREADCRUMB_EMITTED = False
+
+
+def _emit_vault_info(msg: str, hint: str, *, extra_hint: str | None = None) -> None:
+    """Emit two- or three-line ``[graphify] info: ... / hint: ...`` breadcrumb (Phase 63 D-01).
+
+    Used for advisory paths (e.g., Option B silent reroute) where no SystemExit
+    is desired. Mirrors :func:`_emit_vault_error` shape so a future stderr
+    snapshot test (Phase 64 AUDIT-A) can lock both prefixes uniformly.
+    """
+    print(f"[graphify] info: {msg}", file=sys.stderr)
+    print(f"  hint: {hint}", file=sys.stderr)
+    if extra_hint is not None:
+        print(f"  hint: {extra_hint}", file=sys.stderr)
+
+
+def emit_option_b_breadcrumb(vault_cwd: Path) -> None:
+    """Emit the Option B info breadcrumb at most once per process (D-02).
+
+    Used by both ``_check_vault_cwd_gate`` (CLI dispatch path, before any
+    subcommand work runs) and :func:`resolve_output` (direct API path, e.g.,
+    unit tests calling ``resolve_output`` directly). The sentinel ensures
+    ``graphify run`` from a no-profile vault emits exactly two non-empty
+    stderr lines (gate fires → resolver suppresses).
+    """
+    global _OPTION_B_BREADCRUMB_EMITTED
+    if _OPTION_B_BREADCRUMB_EMITTED:
+        return
+    _OPTION_B_BREADCRUMB_EMITTED = True
+    artifacts_dir = (vault_cwd / ".graphify-out").resolve()
+    _emit_vault_info(
+        "vault CWD without .graphify/profile.yaml — Option B reroute active",
+        f"outputs → {artifacts_dir}/",
+    )
 
 
 def _ensure_vault_root(path: Path) -> Path:
@@ -189,6 +239,7 @@ def resolve_execution_paths(
     explicit_vault: Path | None = None,
     env_vault: str | None = None,
     vault_list_file: Path | None = None,
+    obsidian_dir_override: bool = False,
 ) -> ResolvedOutput:
     """Resolve output using optional vault pins before CWD-only detection (Phase 41).
 
@@ -215,9 +266,17 @@ def resolve_execution_paths(
         pin_kind = "vault-list"
 
     if effective_root is None:
-        return resolve_output(cwd, cli_output=cli_output)
+        return resolve_output(
+            cwd,
+            cli_output=cli_output,
+            obsidian_dir_override=obsidian_dir_override,
+        )
 
-    result = resolve_output(effective_root, cli_output=cli_output)
+    result = resolve_output(
+        effective_root,
+        cli_output=cli_output,
+        obsidian_dir_override=obsidian_dir_override,
+    )
     if result.source == "cli-flag":
         return result
     if pin_kind is not None and result.source == "profile":
@@ -285,7 +344,12 @@ def resolve_vault_for_parity(
     }
 
 
-def resolve_output(cwd: Path, *, cli_output: str | None = None) -> ResolvedOutput:
+def resolve_output(
+    cwd: Path,
+    *,
+    cli_output: str | None = None,
+    obsidian_dir_override: bool = False,
+) -> ResolvedOutput:
     """Resolve final output destination per D-06..D-13.
 
     Precedence: cli_output > profile.output > v1.0 default paths.
@@ -352,13 +416,22 @@ def resolve_output(cwd: Path, *, cli_output: str | None = None) -> ResolvedOutpu
             source="default",
         )
 
-    # Vault detected -> require .graphify/profile.yaml (D-05)
+    # Vault detected -> require .graphify/profile.yaml (D-05) ...
+    # ... unless Phase 63 Option B silent reroute applies (D-02 strict trigger).
     profile_yaml = cwd_resolved / ".graphify" / "profile.yaml"
     if not profile_yaml.exists():
-        raise _refuse(
-            f"CWD is an Obsidian vault ({cwd_resolved}) but no .graphify/profile.yaml found. "
-            "Create one (see docs/vault-adapter.md), or pass --output <path> to write outside the vault."
-        )
+        if obsidian_dir_override:
+            # D-02 strict-trigger: --obsidian-dir suppresses Option B; keep legacy refusal.
+            raise _refuse(
+                f"CWD is an Obsidian vault ({cwd_resolved}) but no .graphify/profile.yaml found. "
+                "Create one (see docs/vault-adapter.md), or pass --output <path> to write outside the vault."
+            )
+        # Phase 63 VOPT-01/02: Option B silent reroute to <vault>/.graphify-out/.
+        notes_dir = (cwd_resolved / ".graphify-out" / "obsidian").resolve()
+        artifacts_dir = (cwd_resolved / ".graphify-out").resolve()
+        # Idempotent emission: gate may have already fired the breadcrumb.
+        emit_option_b_breadcrumb(cwd_resolved)
+        return ResolvedOutput(True, cwd_resolved, notes_dir, artifacts_dir, "option-b")
 
     # Function-local imports avoid circular dependency (output -> profile, never reverse)
     try:

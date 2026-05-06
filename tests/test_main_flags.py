@@ -101,12 +101,18 @@ def test_run_in_vault_emits_detection_report(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_run_in_vault_no_profile_refuses(tmp_path):
+    """Phase 63 VOPT-01: vault + no-profile + no explicit path no longer refuses;
+    it silently reroutes via Option B (info: / hint: breadcrumb on stderr,
+    outputs land under <vault>/.graphify-out/).
+    """
     vault = tmp_path / "vault"
     vault.mkdir()
     (vault / ".obsidian").mkdir()
     result = _graphify(["run", "--router"], cwd=vault)
-    assert result.returncode != 0
-    assert "no .graphify/profile.yaml found" in result.stderr
+    # Option B never refuses with the legacy message:
+    assert "no .graphify/profile.yaml found" not in result.stderr
+    # And it surfaces the Option B breadcrumb:
+    assert "Option B reroute active" in result.stderr
 
 
 def test_run_in_vault_profile_no_output_block_refuses(tmp_path):

@@ -570,7 +570,7 @@ def _format_preview(preview: PreviewSection) -> list[str]:
 def _classify_vault_cwd(cwd: Path, *, has_explicit_route: bool) -> str:
     """VCWD-05: pure read-only classifier — mirrors _check_vault_cwd_gate predicates.
 
-    Returns exactly one of "auto-adopt", "refuse", or "n/a".
+    Returns exactly one of "auto-adopt", "option-b", or "n/a" (Phase 63 VOPT-01).
 
     Predicate ordering matches the runtime gate (VCWD-01..04) so that the
     doctor's prediction is always consistent with gate behavior for the same
@@ -592,7 +592,10 @@ def _classify_vault_cwd(cwd: Path, *, has_explicit_route: bool) -> str:
     has_profile = (cwd_resolved / ".graphify" / "profile.yaml").is_file()
     if has_profile:
         return "auto-adopt"
-    return "refuse"
+    # Phase 63 VOPT-01: vault + no-profile + no-explicit-route is now the
+    # Option B silent reroute (was "refuse" in Phase 59 VCWD-05). The runtime
+    # gate downgrades to source='option-b' so doctor's prediction must follow.
+    return "option-b"
 
 
 def format_report(report: DoctorReport) -> str:
@@ -701,10 +704,12 @@ def format_report(report: DoctorReport) -> str:
         lines.append(
             f"[vault-cwd] auto-adopt — vault at {cwd}, profile: {profile_rel}"
         )
-    elif outcome == "refuse":
+    elif outcome == "option-b":
+        # Phase 63 VOPT-01: doctor predicts the Option B silent reroute.
+        artifacts_dir = (cwd / ".graphify-out").resolve()
         lines.append(
-            f"[vault-cwd] refuse — vault at {cwd},"
-            " no .graphify/profile.yaml (override: --write-into-vault)"
+            f"[vault-cwd] option-b — vault at {cwd},"
+            f" no .graphify/profile.yaml; outputs → {artifacts_dir}/"
         )
     else:
         lines.append(f"[vault-cwd] n/a — {cwd} is not an Obsidian vault")

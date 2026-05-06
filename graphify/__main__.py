@@ -1497,8 +1497,14 @@ def _resolve_cli_paths(
     global_list: Path | None,
     local_explicit: Path | None = None,
     local_list: Path | None = None,
+    obsidian_dir_override: bool = False,
 ):
-    """Single vault/output resolution for run, --obsidian, elicit, import-harness, doctor (Phase 41)."""
+    """Single vault/output resolution for run, --obsidian, elicit, import-harness, doctor (Phase 41).
+
+    Phase 63: ``obsidian_dir_override`` threads through so the ``--obsidian``
+    dispatch can suppress Option B silent reroute (D-02 strict trigger) when
+    the user passes ``--obsidian-dir``.
+    """
     from graphify.output import resolve_execution_paths
 
     exp, vlf = _merge_vault_pins(
@@ -1510,7 +1516,24 @@ def _resolve_cli_paths(
         explicit_vault=exp,
         env_vault=os.environ.get("GRAPHIFY_VAULT"),
         vault_list_file=vlf,
+        obsidian_dir_override=obsidian_dir_override,
     )
+
+
+def _has_path_override_in_tokens(tokens: list[str]) -> bool:
+    """Phase 63 B2/B3: pre-parse scan for --output / --obsidian-dir.
+
+    Returns True if either flag is present in *tokens* (with or without ``=``).
+    Used to compute ``cli_path_override`` for ``_check_vault_cwd_gate`` BEFORE
+    each subcommand runs argparse, so D-02 strict-trigger routing is decided
+    in the gate (not after the gate has already exited).
+    """
+    for t in tokens:
+        if t == "--output" or t.startswith("--output="):
+            return True
+        if t == "--obsidian-dir" or t.startswith("--obsidian-dir="):
+            return True
+    return False
 
 
 def _check_vault_cwd_gate(
@@ -1518,6 +1541,7 @@ def _check_vault_cwd_gate(
     *,
     has_explicit_route: bool,
     write_into_vault: bool,
+    cli_path_override: bool = False,
 ) -> str:
     """VCWD-01..04 dispatch gate.
 
@@ -1552,13 +1576,27 @@ def _check_vault_cwd_gate(
         return "auto-adopt"
     if write_into_vault:
         return "n/a"  # VCWD-04 silent opt-in suppresses refusal
-    # Sanitize the cwd path before interpolation (T-59-06: control-char injection).
-    safe_cwd = sanitize_label(str(cwd))
-    raise _emit_vault_error(
-        f"refusing to write into Obsidian vault at {safe_cwd} — no .graphify/profile.yaml found",
-        "create .graphify/profile.yaml to opt in, pass --output <path> to write outside the vault, or --write-into-vault to override",
-        code=EXIT_VAULT_GATE,
-    )
+    # Phase 63 VOPT-01: harmonize gate with resolver. Vault + no-profile + no
+    # write-into-vault no longer raises EXIT_VAULT_GATE here — the resolver
+    # handles the path:
+    #   - override True  → caller passed --output or --obsidian-dir;
+    #     resolver returns source='cli-flag' or refuses (EXIT_VAULT_REFUSAL)
+    #     when --obsidian-dir is set. Gate returns 'n/a' (let resolver decide).
+    #   - override False → Option B silent reroute fires in resolver;
+    #     gate returns 'option-b' for caller diagnostics (e.g., doctor).
+    if cli_path_override:
+        return "n/a"
+    # Suppress unused-import warning for sanitize_label / _emit_vault_error /
+    # EXIT_VAULT_GATE: they remain wired for future hardening (e.g., a
+    # write-into-vault audit emission). Reference once to keep the import live.
+    _ = (sanitize_label, _emit_vault_error, EXIT_VAULT_GATE)
+    # Phase 63 D-02: emit Option B breadcrumb at the gate so subcommands
+    # that exit before reaching resolve_output (e.g., update-vault, enrich,
+    # snapshot --help) still surface the info: / hint: lines. Idempotent —
+    # resolve_output() suppresses re-emission via the same sentinel.
+    from graphify.output import emit_option_b_breadcrumb
+    emit_option_b_breadcrumb(cwd)
+    return "option-b"
 
 
 def main() -> None:
@@ -1595,7 +1633,7 @@ def main() -> None:
         print("  GRAPHIFY_VAULT           env pin when --vault is not set")
         print("  Per-command --vault/--vault-list overrides a leading global pin (stderr note).")
         print("  --output composes with vault pin (does not replace profile/vault context).")
-        print("  Output destination precedence: --output > profile > --obsidian-dir > default.")
+        print("  Output destination precedence: --output > profile > --obsidian-dir > option-b (vault) > default.")
         print("  See README §Output destination precedence (avoids nested-vault-folder pitfall).")
         print()
         print("Commands:")
@@ -1616,7 +1654,7 @@ def main() -> None:
         print("  --obsidian              export an already-built graphify-out/graph.json to an Obsidian vault (MRG-03)")
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
         print("    --obsidian-dir <path>   output vault directory (default graphify-out/obsidian)")
-        print("                            precedence: --output > profile > --obsidian-dir > default")
+        print("                            precedence: --output > profile > --obsidian-dir > option-b (vault) > default")
         print("                            see README §Output destination precedence (avoid nested-vault pitfall)")
         print("    --repo-identity <slug>  override profile/fallback repo identity for generated artifacts")
         print("    --dry-run               print the merge plan via format_merge_plan without writing files")
@@ -1829,6 +1867,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(args),
         )
         if gate == "auto-adopt":
             lv_vault = lv_vault or Path.cwd()
@@ -1858,19 +1897,25 @@ def main() -> None:
                 sys.exit(2)
 
         # Phase 27/41: resolve vault-aware output destination (pins + CWD).
+        # Phase 63: thread obsidian_dir_override so --obsidian-dir suppresses
+        # Option B silent reroute (D-02 strict trigger).
         resolved = _resolve_cli_paths(
             cli_output,
             global_explicit=g_vault_exp,
             global_list=g_vault_list,
             local_explicit=lv_vault,
             local_list=lv_vlist,
+            obsidian_dir_override=user_passed_obsidian_dir,
         )
 
-        # Precedence (D-08): --output > profile > --obsidian-dir > legacy default
+        # Precedence (D-08): --output > profile > option-b (vault) > --obsidian-dir > legacy default
         _od_profile = None  # VFIX-01: optional profile sourced from a --obsidian-dir vault
         if cli_output is not None:
             obsidian_dir = str(resolved.notes_dir)
         elif resolved.vault_detected and resolved.source in _PROFILE_DRIVEN_SOURCES:
+            obsidian_dir = str(resolved.notes_dir)
+        elif resolved.source == "option-b":
+            # Phase 63 D-02: Option B silent reroute → write into <vault>/.graphify-out/obsidian
             obsidian_dir = str(resolved.notes_dir)
         elif user_passed_obsidian_dir:
             # VFIX-01 (Plan 70.1-02): Resolve --obsidian-dir to an absolute path
@@ -1988,6 +2033,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         graph_path = "graphify-out/graph.json"
         vault_path: Path | None = None
@@ -2049,6 +2095,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         vault_arg: str | None = None
         force_flag = False
@@ -2105,6 +2152,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         # gate == "auto-adopt": no vault routing in --dedup; CWD is the corpus root
         from graphify.dedup import dedup as _dedup, write_dedup_reports
@@ -2245,6 +2293,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         # gate == "auto-adopt": no vault routing in snapshot; writes to graphify-out/ by default
         graph_path = "graphify-out/graph.json"
@@ -2374,6 +2423,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         # gate == "auto-adopt": no vault routing in approve; operates on graphify-out/ by default
         args = sys.argv[2:]
@@ -2658,6 +2708,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         # gate == "auto-adopt": no vault routing in save-result; writes to --memory-dir
         import argparse as _ap
@@ -2703,6 +2754,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         import argparse as _ap
 
@@ -2801,6 +2853,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         # gate == "auto-adopt": no vault routing in harness export; writes to --out or cwd
         rest = list(sys.argv[2:])
@@ -2872,6 +2925,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         import argparse as _ap
         import json as _json
@@ -2975,6 +3029,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(rest),
         )
         if gate == "auto-adopt":
             lv_vault = lv_vault or Path.cwd()
@@ -3106,6 +3161,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         # gate == "auto-adopt": no vault routing in enrich; operates on graphify-out/ by default
         import argparse as _ap
@@ -3340,6 +3396,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         import argparse as _ap
 
@@ -3507,6 +3564,7 @@ def main() -> None:
                 or (os.environ.get("GRAPHIFY_VAULT") or "").strip()
             ),
             write_into_vault=bool(g_write_into_vault or lv_write_into_vault),
+            cli_path_override=_has_path_override_in_tokens(sys.argv[2:]),
         )
         import argparse as _ap
 

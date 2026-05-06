@@ -83,9 +83,20 @@ def test_resolve_output_no_vault_default_paths(tmp_path, capsys):
 # ---------------------------------------------------------------------------
 
 def test_resolve_output_vault_no_profile_refuses(tmp_path, capsys):
+    """Phase 63 VOPT-01: vault + no-profile no longer refuses by default — it
+    silently reroutes via Option B. Refusal is preserved when the caller passes
+    ``obsidian_dir_override=True`` (D-02 strict trigger)."""
     (tmp_path / ".obsidian").mkdir()
+    # Default path: Option B silent reroute (no SystemExit).
+    from graphify.output import _reset_option_b_breadcrumb_for_tests
+    _reset_option_b_breadcrumb_for_tests()
+    resolved = resolve_output(tmp_path)
+    captured = capsys.readouterr()
+    assert resolved.source == "option-b"
+    assert "Option B reroute active" in captured.err
+    # Strict-trigger path: --obsidian-dir override keeps legacy refusal.
     with pytest.raises(SystemExit):
-        resolve_output(tmp_path)
+        resolve_output(tmp_path, obsidian_dir_override=True)
     captured = capsys.readouterr()
     assert "no .graphify/profile.yaml found" in captured.err
 

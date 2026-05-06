@@ -260,11 +260,15 @@ def test_refusal_message_text(tmp_path):
 
 
 def test_write_into_vault_suppresses_refusal(tmp_path):
-    """VCWD-04: per-command --write-into-vault suppresses VCWD-03 refusal."""
+    """VCWD-04: per-command --write-into-vault suppresses VCWD-03 refusal.
+
+    Phase 63 update: pass an existing corpus dir (``.``) so ``run`` does not
+    misinterpret ``--help`` as a missing path (post-Option-B the resolver no
+    longer short-circuits with exit-1 before path validation).
+    """
     vault = _make_partial_vault(tmp_path, with_profile=False)
-    proc = _graphify("run", "--write-into-vault", "--help", cwd=str(vault))
-    # No exit-2 refusal: the flag suppresses it. exit code 0 (help) or another
-    # non-2 value is acceptable; the assertion is that VCWD-03 stderr does NOT appear.
+    (vault / "doc.md").write_text("# x", encoding="utf-8")
+    proc = _graphify("run", "--write-into-vault", str(vault / "doc.md"), cwd=str(vault))
     assert "refusing to write into Obsidian vault" not in proc.stderr, (
         f"--write-into-vault should suppress refusal; got:\n{proc.stderr}"
     )
@@ -272,9 +276,13 @@ def test_write_into_vault_suppresses_refusal(tmp_path):
 
 
 def test_global_write_into_vault_suppresses_refusal(tmp_path):
-    """VCWD-04: leading global --write-into-vault (before subcommand) suppresses refusal."""
+    """VCWD-04: leading global --write-into-vault (before subcommand) suppresses refusal.
+
+    Phase 63 update: pass an existing corpus path (see sibling test).
+    """
     vault = _make_partial_vault(tmp_path, with_profile=False)
-    proc = _graphify("--write-into-vault", "run", "--help", cwd=str(vault))
+    (vault / "doc.md").write_text("# x", encoding="utf-8")
+    proc = _graphify("--write-into-vault", "run", str(vault / "doc.md"), cwd=str(vault))
     assert "refusing to write into Obsidian vault" not in proc.stderr, (
         f"global --write-into-vault should suppress refusal; got:\n{proc.stderr}"
     )
