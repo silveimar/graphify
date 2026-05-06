@@ -1,5 +1,15 @@
+import json
+from pathlib import Path
+
 import pytest
-from graphify.validate import validate_extraction, assert_valid
+from graphify.validate import (
+    assert_valid,
+    validate_extraction,
+    validate_extraction_for_read,
+    validate_extraction_for_write,
+)
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 VALID = {
     "nodes": [
@@ -134,3 +144,31 @@ def test_merged_from_not_list():
     }
     errors = validate_extraction(data)
     assert any("merged_from" in e for e in errors)
+
+
+# ---- Phase 65-01: schema_version read/write split (CCONF-05) ----
+
+def _load_legacy_v1_12() -> dict:
+    return json.loads((FIXTURES / "legacy_v1_12_graph.json").read_text())
+
+
+def test_legacy_v1_12_passes_read():
+    """Pre-1.13 graphs (no schema_version key) must pass read validation."""
+    data = _load_legacy_v1_12()
+    assert "schema_version" not in data, "fixture must NOT carry schema_version"
+    assert validate_extraction_for_read(data) == []
+
+
+def test_write_requires_schema_version():
+    """Write validation must reject graphs missing schema_version."""
+    data = _load_legacy_v1_12()
+    errors = validate_extraction_for_write(data)
+    assert errors, "expected non-empty error list when schema_version is absent"
+    assert any("schema_version" in e for e in errors)
+
+
+def test_write_accepts_with_schema_version():
+    """Write validation must accept graphs that carry schema_version='1.13'."""
+    data = _load_legacy_v1_12()
+    data["schema_version"] = "1.13"
+    assert validate_extraction_for_write(data) == []

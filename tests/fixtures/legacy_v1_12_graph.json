@@ -1,0 +1,86 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "MultiHeadAttention",
+      "file_type": "code",
+      "source_file": "model.py",
+      "source_location": "L10",
+      "id": "n_attention",
+      "community": 0
+    },
+    {
+      "label": "LayerNorm",
+      "file_type": "code",
+      "source_file": "model.py",
+      "source_location": "L20",
+      "id": "n_layernorm",
+      "community": 1
+    },
+    {
+      "label": "Transformer",
+      "file_type": "code",
+      "source_file": "model.py",
+      "source_location": "L1",
+      "id": "n_transformer",
+      "community": 1
+    },
+    {
+      "label": "attention mechanism",
+      "file_type": "document",
+      "source_file": "paper.md",
+      "source_location": "\u00a73.1",
+      "id": "n_concept_attn",
+      "community": 0
+    }
+  ],
+  "links": [
+    {
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "source_file": "model.py",
+      "weight": 0.8,
+      "_src": "n_attention",
+      "_tgt": "n_concept_attn",
+      "source": "n_attention",
+      "target": "n_concept_attn",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "model.py",
+      "weight": 1.0,
+      "_src": "n_transformer",
+      "_tgt": "n_attention",
+      "source": "n_attention",
+      "target": "n_transformer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "referenced",
+      "confidence": "AMBIGUOUS",
+      "source_file": "paper.md",
+      "weight": 0.5,
+      "_src": "n_layernorm",
+      "_tgt": "n_concept_attn",
+      "source": "n_layernorm",
+      "target": "n_concept_attn",
+      "confidence_score": 0.2
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "model.py",
+      "weight": 1.0,
+      "_src": "n_transformer",
+      "_tgt": "n_layernorm",
+      "source": "n_layernorm",
+      "target": "n_transformer",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": []
+}

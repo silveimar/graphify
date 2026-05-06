@@ -573,3 +573,32 @@ def test_to_obsidian_code_collision_paths_are_order_independent(tmp_path):
     assert len(forward_basenames) == 2
     assert all(name.startswith("CODE_graphify_Auth_Service_") for name in forward_basenames)
     assert all(name.endswith(".md") for name in forward_basenames)
+
+
+# ---- Phase 65-01: schema_version emission in to_json (CCONF-05) ----
+
+def test_to_json_emits_schema_version(tmp_path):
+    """Fresh writes via to_json must include schema_version='1.13' at top level."""
+    G = nx.Graph()
+    G.add_node("n1", label="A", file_type="code", source_file="a.py")
+    G.add_node("n2", label="B", file_type="code", source_file="b.py")
+    G.add_edge("n1", "n2", relation="calls", confidence="EXTRACTED",
+               source_file="a.py", weight=1.0)
+    out = tmp_path / "out.json"
+    to_json(G, {}, str(out))
+    data = json.loads(out.read_text())
+    assert data.get("schema_version") == "1.13"
+
+
+def test_to_json_round_trips_g_graph_attr(tmp_path):
+    """If G.graph['schema_version'] is set, to_json must preserve it (no overwrite)."""
+    G = nx.Graph()
+    G.graph["schema_version"] = "1.12"
+    G.add_node("n1", label="A", file_type="code", source_file="a.py")
+    G.add_node("n2", label="B", file_type="code", source_file="b.py")
+    G.add_edge("n1", "n2", relation="calls", confidence="EXTRACTED",
+               source_file="a.py", weight=1.0)
+    out = tmp_path / "out.json"
+    to_json(G, {}, str(out))
+    data = json.loads(out.read_text())
+    assert data.get("schema_version") == "1.12"
