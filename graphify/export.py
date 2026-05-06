@@ -326,6 +326,10 @@ def to_json(G: nx.Graph, communities: dict[int, list[str]], output_path: str) ->
             conf = link.get("confidence", "EXTRACTED")
             link["confidence_score"] = _CONFIDENCE_SCORE_DEFAULTS.get(conf, 1.0)
     data["hyperedges"] = getattr(G, "graph", {}).get("hyperedges", [])
+    # Phase 65 (CCONF-05): every new write carries an explicit schema_version.
+    # If G.graph already has one (e.g. round-tripped from a loaded graph), preserve
+    # it; otherwise stamp this fresh write as 1.13.
+    data["schema_version"] = getattr(G, "graph", {}).get("schema_version", "1.13")
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     # MANIFEST-02: runtime manifest alongside graph.json (same success path).

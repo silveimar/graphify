@@ -226,3 +226,34 @@ def assert_valid(data: dict) -> None:
     if errors:
         msg = f"Extraction JSON has {len(errors)} error(s):\n" + "\n".join(f"  • {e}" for e in errors)
         raise ValueError(msg)
+
+
+# ---- Phase 65 (CCONF-05): read/write split for schema_version ----------------
+#
+# Pre-1.13 graphs (v1.10–v1.12) were written without a `schema_version` key.
+# To protect those user graphs from breaking on load while still forcing every
+# new write to carry an explicit version stamp, validation is split into two
+# entry points (per D-65.08, Open Question Q5):
+#
+#   * validate_extraction_for_read  — schema_version absent is OK (legacy)
+#   * validate_extraction_for_write — schema_version REQUIRED
+#
+# `validate_extraction` itself is unchanged and remains the read-mode alias for
+# all existing callers (backward compat).
+
+
+def validate_extraction_for_read(data: dict) -> list[str]:
+    """Read-mode: schema_version absent is OK (pre-1.13 legacy graphs)."""
+    return validate_extraction(data)
+
+
+def validate_extraction_for_write(data: dict) -> list[str]:
+    """Write-mode: schema_version REQUIRED (every new graph must be stamped)."""
+    errors = validate_extraction(data)
+    if not isinstance(data, dict):
+        # validate_extraction already reported the shape error; nothing to add.
+        return errors
+    sv = data.get("schema_version")
+    if not isinstance(sv, str) or not sv:
+        errors.append("Missing required key 'schema_version' (write-mode)")
+    return errors
