@@ -723,3 +723,107 @@ def test_tag_writeback_routed_only_through_compute_merge_plan():
                 f"{len(matches)} time(s). Tag write-back must route through "
                 f"graphify.merge.compute_merge_plan."
             )
+
+
+# ===== Phase 71-03: currently-valid edge filter (D-7) =====
+
+def _make_temporal_graph():
+    """Two source nodes A,B both connected to hub H. A--H is current; B--H is superseded."""
+    G = nx.Graph()
+    G.add_node("a", label="A", source_file="a.py", file_type="code")
+    G.add_node("b", label="B", source_file="b.py", file_type="code")
+    G.add_node("h", label="H", source_file="h.py", file_type="code")
+    G.add_node("x", label="X", source_file="x.py", file_type="code")
+    # Current edges
+    G.add_edge("a", "h", relation="calls", confidence="EXTRACTED",
+               source_file="a.py", valid_until=None)
+    G.add_edge("h", "x", relation="calls", confidence="EXTRACTED",
+               source_file="h.py", valid_until=None)
+    # Superseded edge (should be excluded from analytics)
+    G.add_edge("b", "h", relation="calls", confidence="INFERRED",
+               source_file="b.py", valid_until="2026-04-01T00:00:00+00:00")
+    return G
+
+
+def test_god_nodes_excludes_superseded():
+    G = _make_temporal_graph()
+    result = god_nodes(G, top_n=10)
+    by_id = {r["id"]: r["edges"] for r in result}
+    # h has 3 raw edges, but only 2 currently-valid → degree should be 2
+    assert by_id.get("h") == 2
+    # b only had a superseded edge → degree 0 in current view → excluded or degree 0
+    assert by_id.get("b", 0) == 0
+
+
+def test_surprising_connections_excludes_superseded():
+    G = nx.Graph()
+    # Two communities; cross-community edge is superseded
+    G.add_node("u1", label="U1", source_file="u.py", file_type="code")
+    G.add_node("u2", label="U2", source_file="u.py", file_type="code")
+    G.add_node("v1", label="V1", source_file="v.py", file_type="code")
+    G.add_node("v2", label="V2", source_file="v.py", file_type="code")
+    G.add_edge("u1", "u2", relation="calls", confidence="EXTRACTED",
+               source_file="u.py", valid_until=None)
+    G.add_edge("v1", "v2", relation="calls", confidence="EXTRACTED",
+               source_file="v.py", valid_until=None)
+    # Superseded cross-file/community edge
+    G.add_edge("u1", "v1", relation="references", confidence="INFERRED",
+               source_file="u.py", valid_until="2026-04-01T00:00:00+00:00")
+    communities = {0: ["u1", "u2"], 1: ["v1", "v2"]}
+    out = surprising_connections(G, communities=communities, top_n=10)
+    pairs = {(r.get("source"), r.get("target")) for r in out}
+    pairs |= {(r.get("target"), r.get("source")) for r in out}
+    assert ("u1", "v1") not in pairs
+    assert ("v1", "u1") not in pairs
+
+
+def test_cross_community_pass_excludes_superseded():
+    # _cross_community_surprises is the second pass — must also filter
+    G = nx.Graph()
+    G.add_node("a", label="A", source_file="a.py", file_type="code")
+    G.add_node("b", label="B", source_file="b.py", file_type="code")
+    G.add_edge("a", "b", relation="references", confidence="INFERRED",
+               source_file="a.py", valid_until="2026-04-01T00:00:00+00:00")
+    communities = {0: ["a"], 1: ["b"]}
+    out = _cross_community_surprises(G, communities)
+    assert all(not (
+        (r.get("source") == "a" and r.get("target") == "b") or
+        (r.get("source") == "b" and r.get("target") == "a")
+    ) for r in out)
+
+
+def test_knowledge_gaps_excludes_superseded():
+    """suggested_questions/knowledge_gaps iterates edges for AMBIGUOUS confidence questions."""
+    from graphify.analyze import suggested_questions
+    G = nx.Graph()
+    G.add_node("a", label="A", source_file="a.py", file_type="code")
+    G.add_node("b", label="B", source_file="b.py", file_type="code")
+    # Superseded AMBIGUOUS edge — should NOT generate a question
+    G.add_edge("a", "b", relation="related", confidence="AMBIGUOUS",
+               source_file="a.py", valid_until="2026-04-01T00:00:00+00:00")
+    qs = suggested_questions(G, communities={0: ["a", "b"]})
+    ambiguous_qs = [q for q in qs if q.get("type") == "ambiguous_edge"]
+    assert ambiguous_qs == []
+
+
+def test_current_filter_is_default():
+    # No flag/parameter should be required — just calling with default args excludes superseded.
+    G = _make_temporal_graph()
+    # Default invocation
+    result = god_nodes(G)
+    by_id = {r["id"]: r["edges"] for r in result}
+    assert by_id.get("h") == 2  # superseded b-h not counted
+
+
+def test_legacy_graph_no_valid_until_field():
+    """Edges without valid_until key (legacy v1.13) treated as currently-valid."""
+    G = nx.Graph()
+    G.add_node("a", label="A", source_file="a.py", file_type="code")
+    G.add_node("b", label="B", source_file="b.py", file_type="code")
+    G.add_node("c", label="C", source_file="c.py", file_type="code")
+    # No valid_until key at all — legacy
+    G.add_edge("a", "b", relation="calls", confidence="EXTRACTED", source_file="a.py")
+    G.add_edge("b", "c", relation="calls", confidence="EXTRACTED", source_file="b.py")
+    result = god_nodes(G, top_n=10)
+    by_id = {r["id"]: r["edges"] for r in result}
+    assert by_id.get("b") == 2  # both edges counted
