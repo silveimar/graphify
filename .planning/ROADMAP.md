@@ -177,6 +177,18 @@ Total: 27/27 — no orphans, no duplicates.
 ---
 *Created: 2026-05-05 — graphify v1.13 roadmap.*
 
+### Phase 70.2: Address v1.13 audit tech debt: stderr regex blind spot + non-compliant build.py:251, in-memory schema_version gap (CCONF-05/CFED-03), VFIX-02 docs option-b precedence omission (INSERTED)
+
+**Goal:** Close three v1.13 audit tech debt items: AUDIT-02 stderr contract regex blind spot + non-compliant build.py:251; CCONF-05/CFED-03 in-memory schema_version stamping gap (single SCHEMA_VERSION constant in build.py, stamped by build() and build_from_json(), reused by export.py); VFIX-02 docs option-b precedence drift (canonical string `--output > profile > option-b (vault) > --obsidian-dir > legacy default` propagated to 9 doc sites with an invariant test).
+**Requirements**: AUDIT-02, CCONF-05, CFED-03, VFIX-02
+**Depends on:** Phase 70
+**Plans:** 3 plans
+
+Plans:
+- [ ] 70.2-01-PLAN.md — AUDIT-02: tighten stderr contract regex (D-02) and rewrite build.py:251 (D-10)
+- [ ] 70.2-02-PLAN.md — CCONF-05/CFED-03: SCHEMA_VERSION constant + stamp build()/build_from_json() + refactor export.py (D-04..D-07)
+- [ ] 70.2-03-PLAN.md — VFIX-02: docs precedence invariant test (D-09) + propagate canonical string to 9 doc sites (D-08)
+
 ### Phase 70.1: VFIX nested vault folder bug and output/obsidian-dir profile output config nested folder bug (INSERTED)
 
 **Goal:** Fix UAT-70 leftover bugs in path resolution and ship the docs + profile-example updates that close them out:
