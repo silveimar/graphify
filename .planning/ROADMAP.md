@@ -85,11 +85,11 @@
   3. Drift snapshots persist under `graphify-out/cache/snapshots/` and respect the count- or age-based retention policy chosen at planning time.
   4. `concept_code_hops(min_confidence=…, relations=[…], confidence_band=…)` filters BFS results accordingly, and callers omitting the new parameters receive results byte-identical to v1.12 behavior on a frozen fixture.
 **Plans**: 5 plans
-- [ ] 67-01-PLAN.md — drift.py core: Jaccard match + classify_edges + snapshot delegation (TDD)
+- [x] 67-01-PLAN.md — drift.py core: Jaccard match + classify_edges + snapshot delegation (TDD)
 - [x] 67-02-PLAN.md — CQUERY validators + AND-semantic filter predicate (TDD)
 - [ ] 67-03-PLAN.md — Frozen v1.12 fixture + golden output for CQUERY-02 byte-identity
-- [ ] 67-04-PLAN.md — Wire CQUERY into BFS + MCP schema; assert byte-identity vs golden
-- [ ] 67-05-PLAN.md — Drift section in report.py + CLI orchestration in __main__.run; CDRIFT-02 rename E2E
+- [x] 67-04-PLAN.md — Wire CQUERY into BFS + MCP schema; assert byte-identity vs golden
+- [x] 67-05-PLAN.md — Drift section in report.py + CLI orchestration in __main__.run; CDRIFT-02 rename E2E
 
 ### Phase 68: AUDIT-B — Nyquist Gap-Fill & Seed-SHA Traceability
 **Goal**: Every v1.12 phase deferred from Nyquist sampling has a retroactive VALIDATION.md entry that re-runs and passes, and every shipped seed is annotated with the milestone(s) that consumed it.
@@ -146,7 +146,7 @@
 | 64. AUDIT-A | 3/3 | Complete    | 2026-05-06 |
 | 65. CCONF | 0/0 | Not started | - |
 | 66. CFED | 4/4 | Complete   | 2026-05-06 |
-| 67. CDRIFT + CQUERY | 1/5 | In Progress|  |
+| 67. CDRIFT + CQUERY | 4/5 | In Progress|  |
 | 68. AUDIT-B | 0/0 | Not started | - |
 | 69. VPROF | 4/4 | Complete   | 2026-05-05 |
 | 70. VRSYNC | 7/7 | Complete   | 2026-05-06 |
@@ -185,7 +185,7 @@ Total: 27/27 — no orphans, no duplicates.
 **Requirements**: TBD (likely VFIX-01 path resolution + VFIX-02 docs/examples)
 **Depends on:** Phase 70
 **Evidence:** /Users/silveimar/temp-testgph/tmp/
-**Plans:** 1/5 plans executed
+**Plans:** 4/5 plans executed
 
 Plans:
 - [x] 70.1-01: RED matrix locking cwd × --obsidian-dir × profile.output invariants (VFIX-01 RED) — d64e892

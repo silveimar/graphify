@@ -24,10 +24,10 @@
 - [x] **CFED-05**: GRAPH_REPORT.md gains a Federation section listing merged concepts with their provenance entries.
 
 ### CDRIFT — Edge-Level Concept Drift
-- [ ] **CDRIFT-01**: Drift detection compares snapshots via community-membership **Jaccard similarity**, never via community names or IDs (which rename for benign reasons even with stable membership).
-- [ ] **CDRIFT-02**: Each `implements` / `documents` / `tests` edge is classified across snapshots as one of: `stable` / `community-renamed` / `community-resharded` / `orphaned`.
-- [ ] **CDRIFT-03**: GRAPH_REPORT.md gains a Drift section when a prior snapshot exists; absent snapshot ⇒ section omitted (no spurious output).
-- [ ] **CDRIFT-04**: Drift snapshots persist under `graphify-out/cache/snapshots/` with a count- or age-based retention policy decided at planning time.
+- [x] **CDRIFT-01**: Drift detection compares snapshots via community-membership **Jaccard similarity**, never via community names or IDs (which rename for benign reasons even with stable membership).
+- [x] **CDRIFT-02**: Each `implements` / `documents` / `tests` edge is classified across snapshots as one of: `stable` / `community-renamed` / `community-resharded` / `orphaned`.
+- [x] **CDRIFT-03**: GRAPH_REPORT.md gains a Drift section when a prior snapshot exists; absent snapshot ⇒ section omitted (no spurious output).
+- [x] **CDRIFT-04**: Drift snapshots persist under `graphify-out/cache/snapshots/` with a count- or age-based retention policy decided at planning time.
 
 ### CQUERY — Parameterized Concept Queries
 - [x] **CQUERY-01**: MCP `concept_code_hops` accepts `min_confidence`, `relations`, and `confidence_band` parameters and applies them as filters on the BFS traversal.
