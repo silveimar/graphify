@@ -142,6 +142,34 @@ def _merge_edge_fields(primary: dict[str, Any], secondary: dict[str, Any]) -> di
     except (TypeError, ValueError):
         out["weight"] = wt_b
 
+    # Phase 71-04 Task 2 (Pitfall 5): temporal-aware merge.
+    # Without this block, the deterministic (source,target,relation) sort
+    # picks an arbitrary winner whenever two merged edges disagree on
+    # temporal status. We canonicalize:
+    #   * valid_from   → earliest (ISO-8601 UTC sorts lexicographically)
+    #   * valid_until  → None if ANY input is current, else latest
+    #   * decay_weight → max(inputs) (current/highest-confidence dominates)
+    valid_froms = [e["valid_from"] for e in (base, other)
+                   if isinstance(e, dict) and "valid_from" in e]
+    if valid_froms:
+        out["valid_from"] = min(valid_froms)
+    valid_until_present = [e for e in (base, other)
+                           if isinstance(e, dict) and "valid_until" in e]
+    if valid_until_present:
+        if any(e.get("valid_until") is None for e in valid_until_present):
+            out["valid_until"] = None
+        else:
+            out["valid_until"] = max(e["valid_until"] for e in valid_until_present)
+    dws: list[float] = []
+    for e in (base, other):
+        if isinstance(e, dict) and "decay_weight" in e:
+            try:
+                dws.append(float(e["decay_weight"]))
+            except (TypeError, ValueError):
+                pass
+    if dws:
+        out["decay_weight"] = max(dws)
+
     return out
 
 
