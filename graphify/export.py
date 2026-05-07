@@ -365,9 +365,27 @@ def to_cypher(G: nx.Graph, output_path: str) -> None:
         conf = _cypher_escape(data.get("confidence", "EXTRACTED"))
         u_esc = _cypher_escape(u)
         v_esc = _cypher_escape(v)
+        # Phase 71-04 Task 3: emit temporal fields when present. ISO timestamps
+        # are quoted single-quoted strings; valid_until=None becomes the Cypher
+        # literal `null` (NOT the string "None").
+        props = [f"confidence: '{conf}'"]
+        if "valid_from" in data and data["valid_from"] is not None:
+            props.append(f"valid_from: '{_cypher_escape(str(data['valid_from']))}'")
+        if "valid_until" in data:
+            vu = data["valid_until"]
+            if vu is None:
+                props.append("valid_until: null")
+            else:
+                props.append(f"valid_until: '{_cypher_escape(str(vu))}'")
+        if "decay_weight" in data and data["decay_weight"] is not None:
+            try:
+                props.append(f"decay_weight: {float(data['decay_weight'])}")
+            except (TypeError, ValueError):
+                pass
+        prop_str = ", ".join(props)
         lines.append(
             f"MATCH (a {{id: '{u_esc}'}}), (b {{id: '{v_esc}'}}) "
-            f"MERGE (a)-[:{rel} {{confidence: '{conf}'}}]->(b);"
+            f"MERGE (a)-[:{rel} {{{prop_str}}}]->(b);"
         )
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -1109,12 +1127,19 @@ def to_graphml(
     node_community = _node_community_map(communities)
     for node_id in H.nodes():
         H.nodes[node_id]["community"] = node_community.get(node_id, -1)
-    # Phase 71-02: GraphML rejects None values (e.g., valid_until=None on
-    # currently-valid edges). Replace None with empty string on edge/node attrs.
+    # Phase 71-04 (Pitfall 4): GraphML rejects None values. For temporal
+    # `valid_until=None` (currently-valid edges) we DROP the attribute entirely
+    # so the GraphML round-trip preserves "no valid_until" semantics — coercing
+    # to "" would round-trip as the literal empty string and confuse readers.
+    # Other None-valued attrs still fall back to "" to preserve Phase 71-02
+    # robustness for unrelated nullable fields.
     for _u, _v, _data in H.edges(data=True):
         for _k, _val in list(_data.items()):
             if _val is None:
-                _data[_k] = ""
+                if _k == "valid_until":
+                    _data.pop(_k, None)
+                else:
+                    _data[_k] = ""
     for _n, _data in H.nodes(data=True):
         for _k, _val in list(_data.items()):
             if _val is None:
