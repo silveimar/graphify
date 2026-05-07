@@ -13,7 +13,7 @@
 - [x] **Phase 65: CCONF — Per-Edge Confidence + Cache Split + schema_version** — Load-bearing: per-edge LLM `confidence_score` + `evidence`, second cache namespace, schema-compat with legacy fixture, calibration self-check.
 - [x] **Phase 66: CFED — Cross-Repo Concept Federation (`federate.py`)** — Opt-in deterministic id-namespacing + multi-signal merge + provenance manifest + report section. (completed 2026-05-06)
 - [x] **Phase 67: CDRIFT + CQUERY — Edge-Level Drift (`drift.py`) & Parameterized Concept Queries** — Membership-Jaccard drift classification with snapshot retention, plus `concept_code_hops` parameter filters.
-- [ ] **Phase 68: AUDIT-B — Nyquist Gap-Fill & Seed-SHA Traceability** — Retroactive VALIDATION.md entries with re-run proofs, seed→milestone annotations across REQUIREMENTS.md and PROJECT.md.
+- [x] **Phase 68: AUDIT-B — Nyquist Gap-Fill & Seed-SHA Traceability** — Retroactive VALIDATION.md entries with re-run proofs, seed→milestone annotations across REQUIREMENTS.md and PROJECT.md. (completed 2026-05-07)
 
 ## Phase Details
 
@@ -102,8 +102,8 @@
   4. The audit closure leaves no v1.12-deferred audit item open in MILESTONES.md.
 **Plans**: 3 plans
 - [x] 68-01-PLAN.md — Register audit_v112 marker, decorate 5 v1.12 tests, ship scripts/audit_b_closure.py with drift cross-check (TDD) — **wave 1**
-- [ ] 68-02-PLAN.md — Author consolidated .planning/milestones/v1.12-VALIDATION.md (5 sections per D-02) — **wave 1**
-- [ ] 68-03-PLAN.md — SEED bullet patches in PROJECT.md + AUDIT checkbox flips in REQUIREMENTS.md + new ## v1.12 section in MILESTONES.md (D-03, D-05) — **wave 2** (depends on 68-01, 68-02: closure script must exist and pass; v1.12-VALIDATION.md must be referenced)
+- [x] 68-02-PLAN.md — Author consolidated .planning/milestones/v1.12-VALIDATION.md (5 sections per D-02) — **wave 1**
+- [x] 68-03-PLAN.md — SEED bullet patches in PROJECT.md + AUDIT checkbox flips in REQUIREMENTS.md + new ## v1.12 section in MILESTONES.md (D-03, D-05) — **wave 2** (depends on 68-01, 68-02: closure script must exist and pass; v1.12-VALIDATION.md must be referenced)
 
 ### Phase 69: VPROF — Vault Profile-Driven Folder Resolution & User-Namespace Guard
 **Goal**: `graphify update-vault` and `graphify vault-promote --write-into-vault` resolve every write target via `profile.graphify_folder_mapping` (default `Atlas/Sources/Graphify/<type>/`), refuse to write under `profile.user_only_folders`, and surface legacy graphify-shaped artifacts outside the pinned subtree via `graphify doctor` + `--migrate-legacy`.
@@ -150,7 +150,7 @@
 | 65. CCONF | 0/0 | Not started | - |
 | 66. CFED | 4/4 | Complete   | 2026-05-06 |
 | 67. CDRIFT + CQUERY | 4/5 | In Progress|  |
-| 68. AUDIT-B | 1/3 | In Progress|  |
+| 68. AUDIT-B | 3/3 | Complete   | 2026-05-07 |
 | 69. VPROF | 4/4 | Complete   | 2026-05-05 |
 | 70. VRSYNC | 7/7 | Complete   | 2026-05-06 |
 
@@ -188,7 +188,7 @@ Total: 27/27 — no orphans, no duplicates.
 **Requirements**: TBD (likely VFIX-01 path resolution + VFIX-02 docs/examples)
 **Depends on:** Phase 70
 **Evidence:** /Users/silveimar/temp-testgph/tmp/
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 70.1-01: RED matrix locking cwd × --obsidian-dir × profile.output invariants (VFIX-01 RED) — d64e892
