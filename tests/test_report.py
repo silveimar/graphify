@@ -708,3 +708,66 @@ def test_drift_section_placement_after_federation():
     assert "## Federation" in out
     assert "## Drift" in out
     assert out.index("## Federation") < out.index("## Drift")
+
+
+# --- Phase 71-05 Temporal Health subsection (TEMP-04, D-10 minimal counts-only) ---
+
+def _empty_inputs(G):
+    communities = {}
+    cohesion = {}
+    labels = {}
+    gods = []
+    surprises = []
+    detection = {"total_files": 0, "total_words": 0, "needs_graph": False, "warning": "tiny"}
+    tokens = {"input": 0, "output": 0}
+    return communities, cohesion, labels, gods, surprises, detection, tokens
+
+
+def test_temporal_health_section():
+    G = nx.Graph()
+    G.add_node("a", label="a", file_type="code", source_file="x.py")
+    G.add_node("b", label="b", file_type="code", source_file="x.py")
+    G.add_node("c", label="c", file_type="code", source_file="x.py")
+    G.add_edge("a", "b", relation="calls", confidence="EXTRACTED", source_file="x.py")
+    G.add_edge("b", "c", relation="calls", confidence="INFERRED", source_file="x.py",
+               valid_until="2026-05-07T12:00:00+00:00")
+    args = _empty_inputs(G)
+    out = generate(G, *args, "./project")
+    assert "## Temporal Health" in out
+    assert "Currently valid edges: 1" in out
+    assert "Superseded edges: 1" in out
+    assert "Superseded share: 50.0%" in out
+
+
+def test_temporal_health_zero_superseded():
+    G = nx.Graph()
+    G.add_node("a", label="a", file_type="code", source_file="x.py")
+    G.add_node("b", label="b", file_type="code", source_file="x.py")
+    G.add_edge("a", "b", relation="calls", confidence="EXTRACTED", source_file="x.py")
+    args = _empty_inputs(G)
+    out = generate(G, *args, "./project")
+    assert "## Temporal Health" in out
+    assert "Currently valid edges: 1" in out
+    assert "Superseded edges: 0" in out
+    assert "Superseded share: 0.0%" in out
+
+
+def test_temporal_health_zero_total_no_division():
+    G = nx.Graph()
+    args = _empty_inputs(G)
+    out = generate(G, *args, "./project")  # MUST NOT raise ZeroDivisionError
+    assert "## Temporal Health" in out
+    assert "Currently valid edges: 0" in out
+    assert "Superseded edges: 0" in out
+    assert "Superseded share: 0.0%" in out
+
+
+def test_temporal_health_after_existing_sections():
+    G = nx.Graph()
+    G.add_node("a", label="a", file_type="code", source_file="x.py")
+    G.add_node("b", label="b", file_type="code", source_file="x.py")
+    G.add_edge("a", "b", relation="calls", confidence="EXTRACTED", source_file="x.py")
+    args = _empty_inputs(G)
+    out = generate(G, *args, "./project")
+    assert "## Summary" in out
+    assert out.index("## Summary") < out.index("## Temporal Health")
