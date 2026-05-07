@@ -12,7 +12,7 @@
 - [x] **Phase 64: AUDIT-A — stderr Format Snapshot Lock & Sweep** — Freeze the `[graphify]` two-line stderr contract via snapshot test, then migrate one-line outliers. (completed 2026-05-06)
 - [x] **Phase 65: CCONF — Per-Edge Confidence + Cache Split + schema_version** — Load-bearing: per-edge LLM `confidence_score` + `evidence`, second cache namespace, schema-compat with legacy fixture, calibration self-check.
 - [x] **Phase 66: CFED — Cross-Repo Concept Federation (`federate.py`)** — Opt-in deterministic id-namespacing + multi-signal merge + provenance manifest + report section. (completed 2026-05-06)
-- [ ] **Phase 67: CDRIFT + CQUERY — Edge-Level Drift (`drift.py`) & Parameterized Concept Queries** — Membership-Jaccard drift classification with snapshot retention, plus `concept_code_hops` parameter filters.
+- [x] **Phase 67: CDRIFT + CQUERY — Edge-Level Drift (`drift.py`) & Parameterized Concept Queries** — Membership-Jaccard drift classification with snapshot retention, plus `concept_code_hops` parameter filters.
 - [ ] **Phase 68: AUDIT-B — Nyquist Gap-Fill & Seed-SHA Traceability** — Retroactive VALIDATION.md entries with re-run proofs, seed→milestone annotations across REQUIREMENTS.md and PROJECT.md.
 
 ## Phase Details
