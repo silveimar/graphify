@@ -185,3 +185,108 @@ def test_predicate_missing_confidence_score_with_band():
     pred = _build_concept_hops_filter(confidence_band="medium")
     assert pred is not None
     assert pred({"relation": "x"}) is False
+
+
+# ---------------------------------------------------------------------------
+# Phase 67 Plan 04 — CQUERY-01 BFS integration + CQUERY-02 byte-identity oracle
+# ---------------------------------------------------------------------------
+
+import json
+from pathlib import Path
+
+import networkx as nx
+from networkx.readwrite import json_graph
+
+from graphify.serve import _run_concept_code_hops, QUERY_GRAPH_META_SENTINEL
+
+
+_FIXTURE_DIR = Path(__file__).parent / "fixtures" / "cquery_v1_12"
+
+
+def _load_fixture_graph() -> nx.Graph:
+    with open(_FIXTURE_DIR / "graph.json") as f:
+        data = json.load(f)
+    return json_graph.node_link_graph(data, edges="links")
+
+
+def _invoke(arguments: dict) -> tuple[str, dict]:
+    G = _load_fixture_graph()
+    raw = _run_concept_code_hops(G, {}, arguments)
+    text_body, _, meta_json = raw.partition(QUERY_GRAPH_META_SENTINEL)
+    return text_body, json.loads(meta_json)
+
+
+def test_v1_12_byte_identity():
+    """CQUERY-02: with no new kwargs, output is deep-equal to the frozen golden."""
+    G = _load_fixture_graph()
+    raw = _run_concept_code_hops(G, {}, {"entity": "Authentication"})
+    text_body, _, meta_json = raw.partition(QUERY_GRAPH_META_SENTINEL)
+    meta = json.loads(meta_json)
+    with open(_FIXTURE_DIR / "golden_concept_code_hops.json") as f:
+        golden = json.load(f)
+    result = {"text_body": text_body, "meta": meta}
+    expected = {"text_body": golden["text_body"], "meta": golden["meta"]}
+    assert result == expected
+
+
+def test_min_confidence_filters_low_score_edge():
+    args_low = {
+        "entity": "Authentication",
+        "relations": ["implements", "documents"],
+        "min_confidence": 0.7,
+    }
+    _, meta = _invoke(args_low)
+    # auth.md (documents, 0.65) should be excluded by min_confidence=0.7
+    assert "file_auth_md" not in meta["reachable_node_ids"]
+
+
+def test_relations_filter_empty_returns_zero_edges():
+    args = {"entity": "Authentication", "relations_filter": []}
+    _, meta = _invoke(args)
+    # zero-match: only the start node remains
+    assert meta["reachable_node_ids"] == ["concept_auth"]
+    assert meta["traversal_steps"] == 0
+
+
+def test_relations_filter_whitelist_only_tests():
+    args = {
+        "entity": "Authentication",
+        "relations": ["implements", "tests"],
+        "relations_filter": ["tests"],
+    }
+    _, meta = _invoke(args)
+    # tests edge needs file_auth_py reachable first via implements; that
+    # implements edge is excluded by relations_filter=['tests'], so only the
+    # start node remains.
+    assert meta["reachable_node_ids"] == ["concept_auth"]
+
+
+def test_confidence_band_high_keeps_only_high_edges():
+    args = {
+        "entity": "Authentication",
+        "relations": ["implements", "documents", "tests"],
+        "confidence_band": "high",
+    }
+    _, meta = _invoke(args)
+    assert "file_auth_py" in meta["reachable_node_ids"]
+    assert "file_auth_md" not in meta["reachable_node_ids"]
+
+
+def test_AND_semantics_min_confidence_and_band():
+    # min_confidence=0.9 + confidence_band="high" excludes the 0.85 tests edge
+    # (passes band high>=0.8 but fails min_confidence>=0.9).
+    args = {
+        "entity": "Authentication",
+        "relations": ["implements", "tests"],
+        "min_confidence": 0.9,
+        "confidence_band": "high",
+    }
+    _, meta = _invoke(args)
+    assert "file_auth_py" in meta["reachable_node_ids"]
+    assert "file_test_auth_py" not in meta["reachable_node_ids"]
+
+
+def test_invalid_confidence_band_raises():
+    args = {"entity": "Authentication", "confidence_band": "BOGUS"}
+    with pytest.raises(ValueError):
+        _invoke(args)
