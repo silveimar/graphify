@@ -150,7 +150,7 @@
 | 65. CCONF | 0/0 | Not started | - |
 | 66. CFED | 4/4 | Complete   | 2026-05-06 |
 | 67. CDRIFT + CQUERY | 4/5 | In Progress|  |
-| 68. AUDIT-B | 3/3 | Complete   | 2026-05-07 |
+| 68. AUDIT-B | 3/3 | Complete    | 2026-05-07 |
 | 69. VPROF | 4/4 | Complete   | 2026-05-05 |
 | 70. VRSYNC | 7/7 | Complete   | 2026-05-06 |
 
