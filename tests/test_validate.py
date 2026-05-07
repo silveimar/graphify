@@ -289,3 +289,99 @@ def test_base_validate_does_not_require_temporal_71():
     for k in ("valid_from", "valid_until", "decay_weight"):
         data["edges"][0].pop(k, None)
     assert validate_extraction(data) == []
+
+
+# ---------------- Phase 72 (REAS): reasoning relations ----------------------
+
+def _reas_nodes():
+    return [
+        {"id": "adr_a", "label": "ADR-A", "file_type": "document", "source_file": "a.md"},
+        {"id": "adr_b", "label": "ADR-B", "file_type": "document", "source_file": "b.md"},
+    ]
+
+
+def test_reasoning_relations_accepted():
+    """REAS-01: doc->doc supersedes EXTRACTED is accepted."""
+    data = {
+        "nodes": _reas_nodes(),
+        "edges": [
+            {"source": "adr_a", "target": "adr_b", "relation": "supersedes",
+             "confidence": "EXTRACTED", "source_file": "a.md"},
+        ],
+    }
+    errors = validate_extraction(data)
+    assert errors == [], errors
+
+
+def test_reasoning_rejects_code_endpoint():
+    """REAS-01 D-72.05: code endpoint on a reasoning edge must be rejected."""
+    data = {
+        "nodes": [
+            {"id": "auth_py", "label": "auth.py", "file_type": "code", "source_file": "auth.py"},
+            {"id": "adr_b", "label": "ADR-B", "file_type": "document", "source_file": "b.md"},
+        ],
+        "edges": [
+            {"source": "auth_py", "target": "adr_b", "relation": "supports",
+             "confidence": "EXTRACTED", "source_file": "auth.py"},
+        ],
+    }
+    errors = validate_extraction(data)
+    assert any("non-code endpoints" in e for e in errors), errors
+
+
+def test_reasoning_inferred_score():
+    """REAS-01 D-72.03/06: INFERRED reasoning edge requires confidence_score in [0,1]."""
+    # Missing score
+    data = {
+        "nodes": _reas_nodes(),
+        "edges": [
+            {"source": "adr_a", "target": "adr_b", "relation": "contradicts",
+             "confidence": "INFERRED", "source_file": "a.md"},
+        ],
+    }
+    errors = validate_extraction(data)
+    assert any("confidence_score" in e for e in errors), errors
+
+    # Out-of-range
+    data2 = {
+        "nodes": _reas_nodes(),
+        "edges": [
+            {"source": "adr_a", "target": "adr_b", "relation": "contradicts",
+             "confidence": "INFERRED", "confidence_score": 1.5, "source_file": "a.md"},
+        ],
+    }
+    errors2 = validate_extraction(data2)
+    assert any("confidence_score" in e for e in errors2), errors2
+
+    # In-range passes
+    data3 = {
+        "nodes": _reas_nodes(),
+        "edges": [
+            {"source": "adr_a", "target": "adr_b", "relation": "contradicts",
+             "confidence": "INFERRED", "confidence_score": 0.7, "source_file": "a.md"},
+        ],
+    }
+    assert validate_extraction(data3) == []
+
+
+def test_legacy_no_reasoning_loads():
+    """REAS-01: legacy extraction without reasoning edges loads cleanly via read-mode."""
+    legacy = {
+        "nodes": [
+            {"id": "n1", "label": "Foo", "file_type": "code", "source_file": "foo.py"},
+            {"id": "n2", "label": "Bar", "file_type": "document", "source_file": "bar.md"},
+        ],
+        "edges": [
+            {"source": "n1", "target": "n2", "relation": "references",
+             "confidence": "EXTRACTED", "source_file": "foo.py"},
+        ],
+    }
+    errors = validate_extraction_for_read(legacy)
+    assert errors == [], errors
+
+
+def test_reasoning_fixture_loads():
+    """REAS-01: shipped fixture validates clean."""
+    fixture = json.loads((FIXTURES / "extraction_with_reasoning.json").read_text())
+    errors = validate_extraction(fixture)
+    assert errors == [], errors

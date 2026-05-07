@@ -39,6 +39,12 @@ KNOWN_EDGE_RELATIONS: frozenset[str] = frozenset({
     "derived_shortcut",
     "related",
     "related_to",
+    # Phase 72 (REAS): reasoning relations
+    "supports",
+    "contradicts",
+    "supersedes",
+    "evolved_into",
+    "depends_on",
 })
 
 # Hyperedge relation vocabulary (separate from edge relations). Kept permissive for skill payloads.
@@ -57,6 +63,18 @@ NEW_CONCEPT_CODE_RELATIONS: frozenset[str] = frozenset({
     "tests",
     "realizes",
     "instantiates",
+})
+
+# Phase 72 (REAS): REASONING_RELATIONS encode claims about ideas/documents
+# (not code). Both endpoints must be non-`code` file_type (D-72.05). INFERRED
+# edges in REASONING_RELATIONS require `confidence_score ∈ [0.0, 1.0]` per
+# CCONF v1.13 (D-72.03/06). See docs/RELATIONS.md for orientation rules.
+REASONING_RELATIONS: frozenset[str] = frozenset({
+    "supports",
+    "contradicts",
+    "supersedes",
+    "evolved_into",
+    "depends_on",
 })
 
 # Allowed values for the conditional `evidence` field. Additive — extend in a
@@ -167,7 +185,11 @@ def validate_extraction(data: dict) -> list[str]:
     elif not isinstance(edge_list, list):
         errors.append("'edges' must be a list")
     else:
-        node_ids = {n["id"] for n in data.get("nodes", []) if isinstance(n, dict) and "id" in n}
+        node_types: dict[str, str] = {
+            n["id"]: str(n.get("file_type", ""))
+            for n in data.get("nodes", []) if isinstance(n, dict) and "id" in n
+        }
+        node_ids = set(node_types)
         for i, edge in enumerate(edge_list):
             if not isinstance(edge, dict):
                 errors.append(f"Edge {i} must be an object")
@@ -210,6 +232,28 @@ def validate_extraction(data: dict) -> list[str]:
                             f"'confidence_score' in [0.0, 1.0]"
                         )
                 # AMBIGUOUS: permitted without evidence/score (D-53.09).
+            # Phase 72 (REAS): reasoning relations require non-code endpoints (D-72.05)
+            # and INFERRED requires confidence_score ∈ [0.0, 1.0] (D-72.03/06).
+            if rel in REASONING_RELATIONS:
+                src_t = node_types.get(edge.get("source", ""), "")
+                tgt_t = node_types.get(edge.get("target", ""), "")
+                if src_t == "code" or tgt_t == "code":
+                    errors.append(
+                        f"Edge {i} relation={rel!r} requires non-code endpoints; "
+                        f"got source.file_type={src_t!r}, target.file_type={tgt_t!r}"
+                    )
+                if conf == "INFERRED":
+                    raw = edge.get("confidence_score")
+                    score_r: float | None
+                    try:
+                        score_r = float(raw) if raw is not None else None
+                    except (TypeError, ValueError):
+                        score_r = None
+                    if score_r is None or not (0.0 <= score_r <= 1.0):
+                        errors.append(
+                            f"Edge {i} relation={rel!r} confidence=INFERRED requires "
+                            f"'confidence_score' in [0.0, 1.0]"
+                        )
             if "source" in edge and node_ids and edge["source"] not in node_ids:
                 errors.append(f"Edge {i} source '{edge['source']}' does not match any node id")
             if "target" in edge and node_ids and edge["target"] not in node_ids:

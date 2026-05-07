@@ -1,0 +1,15 @@
+{
+  "schema_version": "2.0",
+  "nodes": [
+    {"id": "adr_0028", "label": "ADR-0028", "file_type": "document", "source_file": "docs/adr/0028.md"},
+    {"id": "adr_0042", "label": "ADR-0042", "file_type": "document", "source_file": "docs/adr/0042.md"},
+    {"id": "concept_x", "label": "Concept X", "file_type": "document", "source_file": "docs/concepts/x.md"}
+  ],
+  "edges": [
+    {"source": "adr_0042", "target": "adr_0028", "relation": "supersedes",
+     "confidence": "EXTRACTED", "source_file": "docs/adr/0042.md", "weight": 1.0},
+    {"source": "concept_x", "target": "adr_0042", "relation": "supports",
+     "confidence": "INFERRED", "confidence_score": 0.8,
+     "source_file": "docs/concepts/x.md", "weight": 1.0}
+  ]
+}
