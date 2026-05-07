@@ -9,6 +9,13 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
+def pinned_run_ts(monkeypatch):
+    """Phase 71 — pin the temporal run-clock for deterministic tests (D-1)."""
+    monkeypatch.setenv("GRAPHIFY_RUN_TS", "2026-05-07T12:00:00+00:00")
+    return "2026-05-07T12:00:00+00:00"
+
+
+@pytest.fixture
 def fake_encoder():
     """Deterministic mock encoder — same label always produces the same L2-normalized vector.
 
