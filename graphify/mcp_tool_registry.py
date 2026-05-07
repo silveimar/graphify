@@ -352,6 +352,31 @@ def build_mcp_tools():
                             "['implements'] (Phase 47 behavior)."
                         ),
                     },
+                    "min_confidence": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "description": (
+                            "AND-combined with confidence_band; filters edges by "
+                            "per-edge confidence_score (Phase 67 CQUERY-01)."
+                        ),
+                    },
+                    "relations_filter": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Whitelist of edge relation strings; [] means zero-match "
+                            "(Phase 67 D-12)."
+                        ),
+                    },
+                    "confidence_band": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low"],
+                        "description": (
+                            "Cutpoints high>=0.8, medium 0.5<=x<0.8, low<0.5 "
+                            "(Phase 67 D-10)."
+                        ),
+                    },
                 },
                 "required": ["entity"],
             },

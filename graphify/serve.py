@@ -2400,6 +2400,7 @@ def _bfs_concept_code_from(
     max_hops: int,
     direction: str,
     relations: frozenset[str],
+    edge_filter: Callable[[dict], bool] | None = None,
 ) -> tuple[dict[str, int], dict[str, str], dict[str, int], int, bool]:
     """Concept↔code BFS factored out of ``_run_concept_code_hops`` (Plan 54-03).
 
@@ -2444,6 +2445,10 @@ def _bfs_concept_code_from(
             )
             if allowed is None:
                 continue
+            if edge_filter is not None:
+                edge_data = G.get_edge_data(u, v) or {}
+                if not edge_filter(edge_data):
+                    continue
             rel_name, kind = allowed
             steps_by_relation[rel_name] = steps_by_relation.get(rel_name, 0) + 1
             traversals += 1
@@ -2460,6 +2465,10 @@ def _run_concept_code_hops(
     G: nx.Graph,
     alias_map: dict[str, str],
     arguments: dict,
+    *,
+    min_confidence: float | None = None,
+    relations_filter: list[str] | None = None,
+    confidence_band: str | None = None,
 ) -> str:
     """Pure helper for concept_code_hops MCP tool (Phase 47 CCODE-03/04).
 
@@ -2562,9 +2571,20 @@ def _run_concept_code_hops(
         return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
 
     start_id = live_matches[0]
+    # CQUERY (Phase 67): pull filter args from kwargs (preferred) or fall back
+    # to ``arguments`` so MCP callers can pass them through the standard dict.
+    _mc = min_confidence if min_confidence is not None else arguments.get("min_confidence")
+    _rf = relations_filter if relations_filter is not None else arguments.get("relations_filter")
+    _cb = confidence_band if confidence_band is not None else arguments.get("confidence_band")
+    _edge_filter = _build_concept_hops_filter(
+        min_confidence=_mc,
+        relations=_rf,
+        confidence_band=_cb,
+    )
     depth_map, hop_labels, steps_by_relation, traversals, truncated = (
         _bfs_concept_code_from(
             G, start_id, max_hops, direction, requested_relations,
+            edge_filter=_edge_filter,
         )
     )
 
@@ -3677,6 +3697,37 @@ def serve(graph_path: str = "graphify-out/graph.json") -> None:
             }
             text = "No graph found at graphify-out/graph.json. Run /graphify to build one."
             return text + QUERY_GRAPH_META_SENTINEL + json.dumps(meta, ensure_ascii=False)
+
+        # Phase 67 CQUERY-01: validate the three new optional filters (D-10/D-12/D-13).
+        def _cquery_error(msg: str, hint: str) -> str:
+            print(f"[graphify] error: {msg}", file=sys.stderr)
+            print(f"  hint: {hint}", file=sys.stderr)
+            meta_err: dict = {
+                "status": "error",
+                "error": msg,
+                "layer": 1,
+                "search_strategy": "concept_code_hops",
+                "cardinality_estimate": None,
+                "continuation_token": None,
+            }
+            return "" + QUERY_GRAPH_META_SENTINEL + json.dumps(meta_err, ensure_ascii=False)
+
+        mc = arguments.get("min_confidence")
+        if mc is not None:
+            if not isinstance(mc, (int, float)) or isinstance(mc, bool) or not (0.0 <= float(mc) <= 1.0):
+                return _cquery_error(
+                    "min_confidence must be a number in [0.0, 1.0] or omitted",
+                    "pass e.g. min_confidence=0.7 to drop edges with confidence_score < 0.7",
+                )
+        try:
+            _validate_relations_filter_arg(arguments.get("relations_filter"))
+        except ValueError as exc:
+            return _cquery_error(str(exc), "pass relations_filter as a list of strings, [] for zero-match, or omit")
+        try:
+            _resolve_confidence_band(arguments.get("confidence_band"))
+        except ValueError as exc:
+            return _cquery_error(str(exc), 'confidence_band must be one of "high", "medium", "low" or omitted')
+
         return _run_concept_code_hops(G, _alias_map, arguments)
 
     def _tool_get_focus_context(arguments: dict) -> str:
