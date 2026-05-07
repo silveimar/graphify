@@ -55,7 +55,7 @@ Major-version schema upgrade adding temporal edge validity and reasoning-relatio
   3. GRAPH_REPORT.md contains a "Contradictions and Supersession Chains" section listing detected pairs and chains (longest first) with source citations and confidence scores; isolated reasoning-edge nodes do not appear in the knowledge gaps list
   4. Obsidian export preserves reasoning relations as typed wikilinks distinguishable from structural relations in note frontmatter; wiki articles render supersession chains (e.g. "ADR-0042 supersedes ADR-0028 (confidence 0.91)") as first-class inline relations
 **Plans**: 4 plans
-- [ ] 72-01-PLAN.md — validate.py REASONING_RELATIONS frozenset + endpoint type rule + docs/RELATIONS.md taxonomy section
+- [x] 72-01-PLAN.md — validate.py REASONING_RELATIONS frozenset + endpoint type rule + docs/RELATIONS.md taxonomy section
 - [ ] 72-02-PLAN.md — Skill prompt extension across all 10 skill*.md files + PROMPT_VERSION bump + drift gate
 - [ ] 72-03-PLAN.md — build.py two-pass reasoning-target resolver + supersedes outbound auto-stamp
 - [ ] 72-04-PLAN.md — analyze.py contradictions_and_chains + knowledge_gaps fix + report/wiki/Obsidian rendering
@@ -101,7 +101,7 @@ Recommended sequence: 71 → 72 (depends on 71) with 73 and 74 running in parall
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 71. TEMP | 4/5 | In Progress|  |
-| 72. REAS | 0/4 | Not started | - |
+| 72. REAS | 1/4 | In Progress|  |
 | 73. DEDUP | 0/TBD | Not started | - |
 | 74. VBUG | 0/TBD | Not started | - |
 | 75. PKG | 0/TBD | Not started | - |

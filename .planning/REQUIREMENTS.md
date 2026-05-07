@@ -19,7 +19,7 @@
 
 ### Reasoning-Relation Edge Types (REAS)
 
-- [ ] **REAS-01**: `validate.py` accepts five new reasoning relations on document/concept-typed nodes: `supports`, `contradicts`, `supersedes`, `evolved_into`, `depends_on`; rejects them on code-typed nodes (whose relations remain structural: `calls`/`imports`/`contains`/`defines_*`).
+- [x] **REAS-01**: `validate.py` accepts five new reasoning relations on document/concept-typed nodes: `supports`, `contradicts`, `supersedes`, `evolved_into`, `depends_on`; rejects them on code-typed nodes (whose relations remain structural: `calls`/`imports`/`contains`/`defines_*`).
 - [ ] **REAS-02**: `extract.py` semantic-extraction prompts for documents (md/txt/rst), papers (PDF), and rationales emit reasoning-relation edges with `confidence` (`EXTRACTED`/`INFERRED`/`AMBIGUOUS`) and per-edge `confidence_score` (continuing the CCONF v1.13 contract); the prompts include explicit examples for ADR supersession and contradiction detection.
 - [ ] **REAS-03**: `analyze.py` produces a new "Contradictions and Supersession Chains" analysis section listing detected contradiction pairs and supersession chains (longest first), each with source-node citations and confidence scores; isolated reasoning-edge nodes are NOT misclassified as knowledge gaps.
 - [ ] **REAS-04**: `report.py` GRAPH_REPORT.md and `wiki.py` per-community articles render reasoning chains (e.g. "ADR-0042 supersedes ADR-0028 (confidence 0.91)") as first-class relations alongside structural ones; Obsidian export preserves them as typed wikilinks distinguishable from structural relations in the rendered note frontmatter.
@@ -62,7 +62,7 @@
 | TEMP-02 | Phase 71 | Complete |
 | TEMP-03 | Phase 71 | Complete |
 | TEMP-04 | Phase 71 | Pending |
-| REAS-01 | Phase 72 | Pending |
+| REAS-01 | Phase 72 | Complete |
 | REAS-02 | Phase 72 | Pending |
 | REAS-03 | Phase 72 | Pending |
 | REAS-04 | Phase 72 | Pending |
