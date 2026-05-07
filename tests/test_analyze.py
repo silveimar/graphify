@@ -785,7 +785,7 @@ def test_cross_community_pass_excludes_superseded():
     G.add_edge("a", "b", relation="references", confidence="INFERRED",
                source_file="a.py", valid_until="2026-04-01T00:00:00+00:00")
     communities = {0: ["a"], 1: ["b"]}
-    out = _cross_community_surprises(G, communities)
+    out = _cross_community_surprises(G, communities, top_n=10)
     assert all(not (
         (r.get("source") == "a" and r.get("target") == "b") or
         (r.get("source") == "b" and r.get("target") == "a")
@@ -794,14 +794,14 @@ def test_cross_community_pass_excludes_superseded():
 
 def test_knowledge_gaps_excludes_superseded():
     """suggested_questions/knowledge_gaps iterates edges for AMBIGUOUS confidence questions."""
-    from graphify.analyze import suggested_questions
+    from graphify.analyze import suggest_questions
     G = nx.Graph()
     G.add_node("a", label="A", source_file="a.py", file_type="code")
     G.add_node("b", label="B", source_file="b.py", file_type="code")
     # Superseded AMBIGUOUS edge — should NOT generate a question
     G.add_edge("a", "b", relation="related", confidence="AMBIGUOUS",
                source_file="a.py", valid_until="2026-04-01T00:00:00+00:00")
-    qs = suggested_questions(G, communities={0: ["a", "b"]})
+    qs = suggest_questions(G, communities={0: ["a", "b"]}, community_labels={0: "C0"})
     ambiguous_qs = [q for q in qs if q.get("type") == "ambiguous_edge"]
     assert ambiguous_qs == []
 

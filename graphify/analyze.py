@@ -78,8 +78,19 @@ def god_nodes(G: nx.Graph, top_n: int = 10) -> list[dict]:
 
     File-level hub nodes are excluded: they accumulate import/contains edges
     mechanically and don't represent meaningful architectural abstractions.
+
+    Phase 71-03 / D-7: degree counts only currently-valid edges
+    (`valid_until is None`). Superseded edges are excluded via an
+    `edge_subgraph` view; edges without the `valid_until` key (legacy v1.13)
+    are treated as currently-valid (`data.get(...) is None`).
     """
-    degree = dict(G.degree())
+    current_edges = [
+        (u, v) for u, v, d in G.edges(data=True) if d.get("valid_until") is None
+    ]
+    # edge_subgraph drops isolated nodes; rebuild degree over ALL nodes so
+    # zero-degree nodes still surface (preserves pre-71-03 god_nodes contract).
+    G_current = G.edge_subgraph(current_edges)
+    degree = {n: G_current.degree(n) if n in G_current else 0 for n in G.nodes()}
     sorted_nodes = sorted(degree.items(), key=lambda x: x[1], reverse=True)
     result = []
     for node_id, deg in sorted_nodes:
@@ -244,6 +255,9 @@ def _cross_file_surprises(G: nx.Graph, communities: dict[int, list[str]], top_n:
     candidates = []
 
     for u, v, data in G.edges(data=True):
+        # Phase 71-03 / D-7: skip superseded edges (legacy edges have no key → None → kept).
+        if data.get("valid_until") is not None:
+            continue
         relation = data.get("relation", "")
         if relation in ("imports", "imports_from", "contains", "method"):
             continue
@@ -334,6 +348,9 @@ def _cross_community_surprises(
 
     surprises = []
     for u, v, data in G.edges(data=True):
+        # Phase 71-03 / D-7: skip superseded edges in cross-community pass.
+        if data.get("valid_until") is not None:
+            continue
         cid_u = node_community.get(u)
         cid_v = node_community.get(v)
         if cid_u is None or cid_v is None or cid_u == cid_v:
@@ -406,6 +423,9 @@ def suggest_questions(
 
     # 1. AMBIGUOUS edges → unresolved relationship questions
     for u, v, data in G.edges(data=True):
+        # Phase 71-03 / D-7: skip superseded edges in knowledge-gap question synthesis.
+        if data.get("valid_until") is not None:
+            continue
         if data.get("confidence") == "AMBIGUOUS":
             ul = G.nodes[u].get("label", u)
             vl = G.nodes[v].get("label", v)
