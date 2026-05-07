@@ -212,6 +212,7 @@ OPTION_B_INFO_PREFIX = "[graphify] info: vault CWD without .graphify/profile.yam
 OPTION_B_HINT_PREFIX = "  hint: outputs → "
 
 
+@pytest.mark.audit_v112
 def test_refusal_exit_code_and_format(tmp_path):
     """Phase 63 VOPT-01/02: profile-less vault CWD now silently reroutes via Option B.
     Stderr carries the two-line info: / hint: breadcrumb; exit code is no longer 2."""

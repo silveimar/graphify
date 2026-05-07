@@ -122,6 +122,7 @@ def test_module_docstring_mentions_elicitation() -> None:
     assert hi.__doc__ and "elicitation" in hi.__doc__.lower()
 
 
+@pytest.mark.audit_v112
 def test_import_refuses_vault_rooted_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     vault = tmp_path / "myvault"
     (vault / ".obsidian").mkdir(parents=True)  # makes it a vault per is_obsidian_vault()

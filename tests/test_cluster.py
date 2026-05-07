@@ -1,5 +1,6 @@
 import json
 import sys
+import pytest
 import networkx as nx
 from pathlib import Path
 from graphify.build import build_from_json
@@ -76,6 +77,7 @@ def test_cluster_does_not_write_to_stderr(capsys):
         assert "\x1b" not in line, f"cluster() wrote ANSI to stderr: {line!r}"
 
 
+@pytest.mark.audit_v112
 def test_cluster_is_deterministic_across_runs():
     """Two cluster() calls on independently built graphs must produce identical partitions.
 

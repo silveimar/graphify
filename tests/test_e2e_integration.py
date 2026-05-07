@@ -288,6 +288,7 @@ def test_e2e_compose_override_ladder(tmp_path: Path) -> None:
 # -- E2E-02 ---------------------------------------------------------------
 
 
+@pytest.mark.audit_v112
 def test_e2e_elicit_then_update_vault(tmp_path: Path) -> None:
     """E2E-02: elicit sidecar → update-vault merge → rendered notes contain elicitation contributions.
 

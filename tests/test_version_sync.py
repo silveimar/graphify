@@ -22,6 +22,7 @@ def _make_skill_dst(tmp_path: Path) -> Path:
     return skill_dst
 
 
+@pytest.mark.audit_v112
 def test_heal_happy_path_silent(tmp_path, capsys):
     """D-16: stamp older than running package is silently rewritten to __version__."""
     skill_dst = _make_skill_dst(tmp_path)
