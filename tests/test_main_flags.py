@@ -215,8 +215,8 @@ def test_run_repo_identity_flag_overrides_profile(tmp_path):
         cwd=vault,
     )
 
-    assert "[graphify] repo identity: cli-repo (source=cli-flag)" in result.stderr
-    assert result.stderr.count("[graphify] repo identity:") == 1
+    assert "[graphify] info: repo identity: cli-repo (source=cli-flag)" in result.stderr
+    assert result.stderr.count("[graphify] info: repo identity:") == 1
     assert "profile-repo (source=profile)" not in result.stderr
 
 
@@ -239,8 +239,8 @@ def test_run_profile_repo_identity_used_without_flag(tmp_path):
         cwd=vault,
     )
 
-    assert "[graphify] repo identity: profile-repo (source=profile)" in result.stderr
-    assert result.stderr.count("[graphify] repo identity:") == 1
+    assert "[graphify] info: repo identity: profile-repo (source=profile)" in result.stderr
+    assert result.stderr.count("[graphify] info: repo identity:") == 1
 
 
 def test_obsidian_repo_identity_flag_overrides_profile(tmp_path):
@@ -271,8 +271,8 @@ def test_obsidian_repo_identity_flag_overrides_profile(tmp_path):
         cwd=vault,
     )
 
-    assert "[graphify] repo identity: cli-repo (source=cli-flag)" in result.stderr
-    assert result.stderr.count("[graphify] repo identity:") == 1
+    assert "[graphify] info: repo identity: cli-repo (source=cli-flag)" in result.stderr
+    assert result.stderr.count("[graphify] info: repo identity:") == 1
     assert "profile-repo (source=profile)" not in result.stderr
 
 
@@ -303,8 +303,8 @@ def test_obsidian_profile_repo_identity_used_without_flag(tmp_path):
         cwd=vault,
     )
 
-    assert "[graphify] repo identity: profile-repo (source=profile)" in result.stderr
-    assert result.stderr.count("[graphify] repo identity:") == 1
+    assert "[graphify] info: repo identity: profile-repo (source=profile)" in result.stderr
+    assert result.stderr.count("[graphify] info: repo identity:") == 1
     assert "source=cli-flag" not in result.stderr
 
 
@@ -575,7 +575,7 @@ def test_cli_version_stdout(tmp_path):
     line = result.stdout.strip()
     assert line.startswith("graphify ")
     assert len(line) > len("graphify ")
-    assert "[graphify] version" not in result.stderr
+    assert "[graphify] info: version" not in result.stderr
 
 
 def test_cli_version_alias_v(tmp_path):
@@ -587,4 +587,4 @@ def test_cli_version_alias_v(tmp_path):
 def test_cli_validate_profile_success_includes_version_footer(tmp_path):
     result = _graphify(["--validate-profile", str(tmp_path)], cwd=tmp_path)
     assert result.returncode == 0
-    assert "[graphify] version" in result.stderr
+    assert "[graphify] info: version" in result.stderr

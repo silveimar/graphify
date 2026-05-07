@@ -136,7 +136,7 @@ def resolve_repo_identity(
     cli_result = _accepted_explicit_identity(cli_identity, "cli-flag", warnings)
     if cli_result is not None:
         identity, raw_value = cli_result
-        print(f"[graphify] repo identity: {identity} (source=cli-flag)", file=sys.stderr)
+        print(f"[graphify] info: repo identity: {identity} (source=cli-flag)", file=sys.stderr)
         return ResolvedRepoIdentity(identity, "cli-flag", raw_value, tuple(warnings))
 
     profile_identity = None
@@ -147,14 +147,14 @@ def resolve_repo_identity(
         profile_result = _accepted_explicit_identity(profile_identity, "profile", warnings)
         if profile_result is not None:
             identity, raw_value = profile_result
-            print(f"[graphify] repo identity: {identity} (source=profile)", file=sys.stderr)
+            print(f"[graphify] info: repo identity: {identity} (source=profile)", file=sys.stderr)
             return ResolvedRepoIdentity(identity, "profile", raw_value, tuple(warnings))
 
     git_result = _repo_slug_from_git_config(cwd)
     if git_result is not None:
         identity, raw_value = git_result
         print(
-            f"[graphify] repo identity: {identity} (source=fallback-git-remote)",
+            f"[graphify] info: repo identity: {identity} (source=fallback-git-remote)",
             file=sys.stderr,
         )
         return ResolvedRepoIdentity(
@@ -167,7 +167,7 @@ def resolve_repo_identity(
     raw_value = Path(cwd).name
     identity = normalize_repo_identity(raw_value)
     print(
-        f"[graphify] repo identity: {identity} (source=fallback-directory)",
+        f"[graphify] info: repo identity: {identity} (source=fallback-directory)",
         file=sys.stderr,
     )
     return ResolvedRepoIdentity(identity, "fallback-directory", raw_value, tuple(warnings))

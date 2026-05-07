@@ -188,8 +188,8 @@ def test_repo_identity_cli_wins(tmp_path, capsys, monkeypatch):
         warnings=(),
     )
     captured = capsys.readouterr()
-    assert "[graphify] repo identity: cli-repo (source=cli-flag)" in captured.err
-    assert captured.err.count("[graphify] repo identity:") == 1
+    assert "[graphify] info: repo identity: cli-repo (source=cli-flag)" in captured.err
+    assert captured.err.count("[graphify] info: repo identity:") == 1
 
 
 def test_repo_identity_profile_wins(tmp_path, capsys, monkeypatch):
@@ -203,8 +203,8 @@ def test_repo_identity_profile_wins(tmp_path, capsys, monkeypatch):
     assert result.source == "profile"
     assert result.raw_value == "work-vault"
     captured = capsys.readouterr()
-    assert "[graphify] repo identity: work-vault (source=profile)" in captured.err
-    assert captured.err.count("[graphify] repo identity:") == 1
+    assert "[graphify] info: repo identity: work-vault (source=profile)" in captured.err
+    assert captured.err.count("[graphify] info: repo identity:") == 1
 
 
 def test_repo_identity_fallback_git_remote_then_cwd(tmp_path, capsys, monkeypatch):
@@ -230,8 +230,8 @@ def test_repo_identity_fallback_git_remote_then_cwd(tmp_path, capsys, monkeypatc
     assert cwd_result.source == "fallback-directory"
 
     captured = capsys.readouterr()
-    assert "[graphify] repo identity: graphify-fork (source=fallback-git-remote)" in captured.err
-    assert "[graphify] repo identity: work-vault (source=fallback-directory)" in captured.err
+    assert "[graphify] info: repo identity: graphify-fork (source=fallback-git-remote)" in captured.err
+    assert "[graphify] info: repo identity: work-vault (source=fallback-directory)" in captured.err
     assert "origin" in (git_dir / "config").read_text(encoding="utf-8")
 
 

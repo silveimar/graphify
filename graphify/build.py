@@ -248,7 +248,7 @@ def build_from_json(
     # Dangling edges (stdlib/external imports) are expected - only warn about real schema errors.
     real_errors = [e for e in errors if "does not match any node id" not in e]
     if real_errors:
-        print(f"[graphify] Extraction warning ({len(real_errors)} issues): {real_errors[0]}", file=sys.stderr)
+        print(f"[graphify] hint: extraction warning ({len(real_errors)} issues): {real_errors[0]}", file=sys.stderr)
     G: nx.Graph = nx.DiGraph() if directed else nx.Graph()
     # Phase 53 (D-53.06 / W2): insert nodes in canonical-edge-source order so that
     # NetworkX undirected edge iteration matches the (source, target, relation)
