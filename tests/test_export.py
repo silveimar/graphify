@@ -587,7 +587,7 @@ def test_to_json_emits_schema_version(tmp_path):
     out = tmp_path / "out.json"
     to_json(G, {}, str(out))
     data = json.loads(out.read_text())
-    assert data.get("schema_version") == "1.13"
+    assert data.get("schema_version") == "2.0"
 
 
 def test_to_json_round_trips_g_graph_attr(tmp_path):

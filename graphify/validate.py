@@ -256,4 +256,22 @@ def validate_extraction_for_write(data: dict) -> list[str]:
     sv = data.get("schema_version")
     if not isinstance(sv, str) or not sv:
         errors.append("Missing required key 'schema_version' (write-mode)")
+
+    # Phase 71 (TEMP): write-mode requires per-edge temporal fields. NOT added to
+    # REQUIRED_EDGE_FIELDS — read-mode must still accept legacy v1.13 graphs that
+    # predate the temporal schema (T-71-05 mitigation).
+    edge_list = data.get("edges") if "edges" in data else data.get("links")
+    if isinstance(edge_list, list):
+        for i, edge in enumerate(edge_list):
+            if not isinstance(edge, dict):
+                continue
+            if "valid_from" not in edge:
+                errors.append(f"Edge {i} missing required field 'valid_from' (write-mode)")
+            dw = edge.get("decay_weight")
+            if not isinstance(dw, (int, float)) or isinstance(dw, bool) or not (0.0 <= float(dw) <= 1.0):
+                errors.append(
+                    f"Edge {i} 'decay_weight' must be float in [0.0, 1.0] (write-mode)"
+                )
+            # valid_until: None OR ISO string — both accepted; absent is also OK
+            # for write-mode (None is the canonical "still valid" value).
     return errors

@@ -168,9 +168,21 @@ def test_write_requires_schema_version():
 
 
 def test_write_accepts_with_schema_version():
-    """Write validation must accept graphs that carry schema_version='1.13'."""
+    """Write validation must accept graphs that carry schema_version + temporal fields.
+
+    Phase 71 (TEMP, D-8) bumped schema_version to '2.0' and made write-mode strictly
+    require per-edge temporal fields (valid_from + decay_weight). Read-mode still
+    tolerates legacy v1.13 graphs without these fields — verified separately by
+    test_legacy_graph_loads_71.
+    """
     data = _load_legacy_v1_12()
-    data["schema_version"] = "1.13"
+    data["schema_version"] = "2.0"
+    # Stamp temporal fields on every edge (write-mode contract per D-8).
+    # Fixture uses node_link "links" key — write validator falls back to "links".
+    for edge in data.get("edges", data.get("links", [])):
+        edge.setdefault("valid_from", "2026-05-07T12:00:00+00:00")
+        edge.setdefault("valid_until", None)
+        edge.setdefault("decay_weight", 1.0)
     assert validate_extraction_for_write(data) == []
 
 

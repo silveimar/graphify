@@ -34,7 +34,7 @@ from .validate import validate_extraction
 # Stamped on every graph constructed via build() / build_from_json() so MCP server,
 # query tooling, and downstream callers see schema_version even without going through
 # export. export.py imports this constant — do not duplicate the literal there.
-SCHEMA_VERSION = "1.13"
+SCHEMA_VERSION = "2.0"
 
 _CONF_RANK = {"EXTRACTED": 3, "INFERRED": 2, "AMBIGUOUS": 1}
 

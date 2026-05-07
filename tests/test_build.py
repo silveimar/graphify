@@ -63,8 +63,8 @@ def _minimal_extraction():
 
 
 def test_schema_version_constant_value():
-    """SCHEMA_VERSION is locked to '1.13' for backward compat with prior writes."""
-    assert build_mod.SCHEMA_VERSION == "1.13"
+    """SCHEMA_VERSION bumped to '2.0' by Phase 71 (TEMP, D-8) for temporal schema."""
+    assert build_mod.SCHEMA_VERSION == "2.0"
 
 
 def test_build_from_json_stamps_schema_version():
