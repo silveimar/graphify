@@ -1,0 +1,38 @@
+{
+  "_invocation": {
+    "alias_map": {},
+    "arguments": {
+      "entity": "Authentication"
+    },
+    "note": "Result string = text_body + sentinel + json.dumps(meta, ensure_ascii=False)",
+    "sentinel": "\n---GRAPHIFY-META---\n"
+  },
+  "meta": {
+    "cardinality_estimate": 1,
+    "continuation_token": null,
+    "depth_by_id": {
+      "concept_auth": 0,
+      "file_auth_py": 1
+    },
+    "direction": "both",
+    "implements_traversal_steps": 2,
+    "layer": 1,
+    "max_hops": 3,
+    "reachable_node_ids": [
+      "concept_auth",
+      "file_auth_py"
+    ],
+    "relations": [
+      "implements"
+    ],
+    "search_strategy": "concept_code_hops",
+    "start_id": "concept_auth",
+    "status": "ok",
+    "steps_by_relation": {
+      "implements": 2
+    },
+    "traversal_steps": 2,
+    "truncated": false
+  },
+  "text_body": "## Concept\u2194code hops (implements)\n\n**Start:** Authentication (`concept_auth`)\n**Direction filter:** both\n**Max hops:** 3\n\n**Reachable nodes:**\n\n- `file_auth_py` \u2014 auth.py (depth 1, hop concept_to_code)"
+}

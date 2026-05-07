@@ -1,0 +1,146 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "schema_version": "1.12",
+    "cache_version": "1.12"
+  },
+  "nodes": [
+    {
+      "id": "concept_auth",
+      "label": "Authentication",
+      "file_type": "rationale",
+      "source_file": "docs/auth.md",
+      "source_location": "L1",
+      "community": 0
+    },
+    {
+      "id": "file_auth_py",
+      "label": "auth.py",
+      "file_type": "code",
+      "source_file": "auth.py",
+      "source_location": "L1",
+      "community": 0
+    },
+    {
+      "id": "file_auth_md",
+      "label": "auth.md",
+      "file_type": "document",
+      "source_file": "docs/auth.md",
+      "source_location": "L1",
+      "community": 0
+    },
+    {
+      "id": "file_test_auth_py",
+      "label": "test_auth.py",
+      "file_type": "code",
+      "source_file": "tests/test_auth.py",
+      "source_location": "L1",
+      "community": 0
+    },
+    {
+      "id": "file_token_py",
+      "label": "token.py",
+      "file_type": "code",
+      "source_file": "token.py",
+      "source_location": "L1",
+      "community": 1
+    },
+    {
+      "id": "file_session_py",
+      "label": "session.py",
+      "file_type": "code",
+      "source_file": "session.py",
+      "source_location": "L1",
+      "community": 1
+    },
+    {
+      "id": "concept_session",
+      "label": "Session",
+      "file_type": "rationale",
+      "source_file": "docs/session.md",
+      "source_location": "L1",
+      "community": 1
+    }
+  ],
+  "links": [
+    {
+      "source": "file_auth_py",
+      "target": "concept_auth",
+      "_src": "file_auth_py",
+      "_tgt": "concept_auth",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "auth.py",
+      "weight": 1.0
+    },
+    {
+      "source": "file_auth_md",
+      "target": "concept_auth",
+      "_src": "file_auth_md",
+      "_tgt": "concept_auth",
+      "relation": "documents",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "docs/auth.md",
+      "weight": 0.65
+    },
+    {
+      "source": "file_test_auth_py",
+      "target": "file_auth_py",
+      "_src": "file_test_auth_py",
+      "_tgt": "file_auth_py",
+      "relation": "tests",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "tests/test_auth.py",
+      "weight": 0.85
+    },
+    {
+      "source": "file_auth_py",
+      "target": "file_token_py",
+      "_src": "file_auth_py",
+      "_tgt": "file_token_py",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "auth.py",
+      "weight": 1.0
+    },
+    {
+      "source": "file_auth_py",
+      "target": "file_session_py",
+      "_src": "file_auth_py",
+      "_tgt": "file_session_py",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.45,
+      "source_file": "auth.py",
+      "weight": 0.45
+    },
+    {
+      "source": "file_session_py",
+      "target": "concept_session",
+      "_src": "file_session_py",
+      "_tgt": "concept_session",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "session.py",
+      "weight": 1.0
+    },
+    {
+      "source": "file_token_py",
+      "target": "concept_session",
+      "_src": "file_token_py",
+      "_tgt": "concept_session",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "token.py",
+      "weight": 0.75
+    }
+  ],
+  "hyperedges": []
+}
