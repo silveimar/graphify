@@ -1,0 +1,11 @@
+# Phase 71 (TEMP) — default per-relation decay parameters.
+# Overridable per-call by passing an explicit path to load_decay_config().
+default:
+  function: exponential
+  half_life_days: 30
+  floor: 0.1
+
+semantically_similar_to:
+  function: exponential
+  half_life_days: 14
+  floor: 0.1
