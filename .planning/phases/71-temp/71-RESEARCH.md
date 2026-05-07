@@ -407,20 +407,20 @@ nx.write_graphml(H, output_path)
 | A4 | AMBIGUOUS edges should decay like INFERRED | Pitfall 6 | LOW — locked decisions are silent; documenting choice is sufficient |
 | A5 | NetworkX preserves arbitrary edge attrs through `node_link_data` round-trip | Code Examples / Persistence | HIGH if wrong — but VERIFIED by inspection of existing `confidence_score` round-trip (export.py:326–329); same mechanism extends |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Per-relation half-life defaults beyond a single global default?**
    - What we know: locked decisions specify exponential half-life, default 30d, floor 0.1.
    - What's unclear: whether `semantically_similar_to` (LLM-derived, more volatile) should decay faster than `references` (mechanical doc-link, more stable).
-   - Recommendation: Ship a single `default:` entry plus a stub `semantically_similar_to: {half_life_days: 14}` and document for follow-up tuning. Backlog item already exists.
+   - RESOLVED: Ship a single `default:` entry plus a stub `semantically_similar_to: {half_life_days: 14}` and document for follow-up tuning. Backlog item already exists.
 
 2. **Vault-output supersession path:**
    - When user runs with `--obsidian` against a vault, does the prior `graph.json` live in the vault subdir or in the cwd `graphify-out/`?
-   - Recommendation: Use `ResolvedOutput.source` to choose the prior-graph path identically to where `to_json` will write the new one. Add a test for both default and vault modes.
+   - RESOLVED: Use `ResolvedOutput.source` to choose the prior-graph path identically to where `to_json` will write the new one. Add a test for both default and vault modes.
 
 3. **Wiki rendering depends on per-community edge enumeration:**
    - `wiki.py:_community_article` iterates `G.edges[nid, neighbor]` for each node in the community. To render `## Historical relations`, a second pass is needed filtering `valid_until != None`.
-   - Recommendation: Pass `historical_only=True` flag to `_community_article` (or split into two helpers). Trivial; mention in plan.
+   - RESOLVED: Pass `historical_only=True` flag to `_community_article` (or split into two helpers). Trivial; mention in plan.
 
 ## Environment Availability
 
