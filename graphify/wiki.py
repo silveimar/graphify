@@ -1,6 +1,7 @@
 # Wiki export - Wikipedia-style markdown articles from the knowledge graph
 # Generates an agent-crawlable wiki: index.md + one article per community + god node articles
 from __future__ import annotations
+import html
 from collections import Counter
 from pathlib import Path
 import networkx as nx
@@ -84,6 +85,33 @@ def _community_article(
         pct = round(n / total_edges * 100)
         lines.append(f"- {conf}: {n} ({pct}%)")
     lines.append("")
+
+    # --- Phase 71-05 (TEMP-04, D-11) Historical relations ---
+    # Second filtered pass over edges incident to this community: any edge with
+    # valid_until set is rendered as `- [[neighbor_label]] (until <valid_until>)`.
+    # Heading omitted entirely when empty (D-11). valid_until is html.escape'd
+    # and 64-char-capped (T-71-15 / T-71-19) as defense in depth even though
+    # build-time stamping controls the value.
+    historical: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for nid in nodes:
+        for neighbor in G.neighbors(nid):
+            ed = G.edges[nid, neighbor]
+            vu = ed.get("valid_until")
+            if vu is None:
+                continue
+            key = tuple(sorted((nid, neighbor)))
+            if key in seen:
+                continue
+            seen.add(key)
+            neighbor_label = G.nodes[neighbor].get("label", neighbor)
+            historical.append((neighbor_label, str(vu)))
+    if historical:
+        lines += ["## Historical relations", ""]
+        for neighbor_label, vu in historical:
+            vu_safe = html.escape(vu)[:64]
+            lines.append(f"- [[{neighbor_label}]] (until {vu_safe})")
+        lines.append("")
 
     lines += ["---", "", "*Part of the graphify knowledge wiki. See [[index]] to navigate.*"]
     return "\n".join(lines)
