@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: milestone
-status: executing
+status: verifying
 stopped_at: Phase 67 context gathered
-last_updated: "2026-05-07T01:58:02.844Z"
-last_activity: 2026-05-07 -- Phase 67 planning complete
+last_updated: "2026-05-07T02:09:10.205Z"
+last_activity: 2026-05-07
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 35
-  completed_plans: 30
-  percent: 86
+  completed_plans: 31
+  percent: 89
 ---
 
 # Project State
@@ -28,8 +28,8 @@ See: `.planning/PROJECT.md` — **v1.13 milestone planning** (v1.12 shipped 2026
 
 Phase: 65 — COMPLETE
 Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-05-07 -- Phase 67 planning complete
+Status: Phase complete — ready for verification
+Last activity: 2026-05-07
 
 ## Performance Metrics
 
@@ -199,6 +199,7 @@ Locked v1.8 choices:
 - [Phase ?]: Phase 63-01: Option B silent reroute via gate-emitted idempotent breadcrumb + pre-argparse token scan.
 - [Phase ?]: Phase 63 Plan 03 VOPT-02 closed: legacy graphify-out/ third hint via extra_hint; .graphifyignore self-ingest guard
 - [Phase ?]: D-66.6: Federation section placed after Communities in GRAPH_REPORT.md; omit-on-zero policy enforced
+- [Phase ?]: CQUERY-01 validators added as siblings; legacy _validate_relations_arg preserved byte-identical (D-12 revised)
 
 ### Pending Todos
 
@@ -287,6 +288,6 @@ From `.planning/milestones/v1.11-MILESTONE-AUDIT.md` — non-blocking tech debt:
 
 ## Session Continuity
 
-Last session: 2026-05-07T00:00:17.990Z
+Last session: 2026-05-07T02:09:04.314Z
 Stopped at: Phase 67 context gathered
 Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process

@@ -30,7 +30,7 @@
 - [ ] **CDRIFT-04**: Drift snapshots persist under `graphify-out/cache/snapshots/` with a count- or age-based retention policy decided at planning time.
 
 ### CQUERY — Parameterized Concept Queries
-- [ ] **CQUERY-01**: MCP `concept_code_hops` accepts `min_confidence`, `relations`, and `confidence_band` parameters and applies them as filters on the BFS traversal.
+- [x] **CQUERY-01**: MCP `concept_code_hops` accepts `min_confidence`, `relations`, and `confidence_band` parameters and applies them as filters on the BFS traversal.
 - [ ] **CQUERY-02**: Backward compatibility — callers that omit the new parameters receive results identical to the v1.12 implementation.
 
 ### VOPT — Vault Option B Silent Reroute
