@@ -608,3 +608,103 @@ def test_generate_dedup_section_truncates_above_10():
     section_start = out.index("## Entity Dedup")
     section = out[section_start:]
     assert "Label14" not in section
+
+
+# ---------------------------------------------------------------------------
+# Phase 67 (CDRIFT) — Drift section tests
+# ---------------------------------------------------------------------------
+
+def _drift_summary(stable=0, renamed=0, resharded=0, orphaned=0, edges=None):
+    return {
+        "counts": {
+            "stable": stable,
+            "community-renamed": renamed,
+            "community-resharded": resharded,
+            "orphaned": orphaned,
+        },
+        "edges": edges or [],
+    }
+
+
+def test_drift_section_omitted_when_summary_is_none():
+    G, communities, cohesion, labels, gods, surprises, detection, tokens = make_inputs()
+    out = generate(
+        G, communities, cohesion, labels, gods, surprises, detection, tokens,
+        "./project", drift_summary=None,
+    )
+    assert "## Drift" not in out
+
+
+def test_drift_section_renders_summary_table():
+    G, communities, cohesion, labels, gods, surprises, detection, tokens = make_inputs()
+    summary = _drift_summary(
+        stable=3, renamed=1, resharded=2, orphaned=1,
+        edges=[
+            {"source": "a", "target": "b", "relation": "implements", "classification": "community-renamed"},
+            {"source": "c", "target": "d", "relation": "documents", "classification": "community-resharded"},
+            {"source": "e", "target": "f", "relation": "tests", "classification": "orphaned"},
+            {"source": "g", "target": "h", "relation": "implements", "classification": "community-resharded"},
+        ],
+    )
+    out = generate(
+        G, communities, cohesion, labels, gods, surprises, detection, tokens,
+        "./project", drift_summary=summary,
+    )
+    assert "## Drift" in out
+    drift_section = out[out.index("## Drift"):]
+    assert "| stable | 3 |" in drift_section
+    assert "| community-renamed | 1 |" in drift_section
+    assert "| community-resharded | 2 |" in drift_section
+    assert "| orphaned | 1 |" in drift_section
+
+
+def test_drift_section_empty_graph_with_snapshot():
+    G, communities, cohesion, labels, gods, surprises, detection, tokens = make_inputs()
+    summary = _drift_summary()  # all zeros, no edges
+    out = generate(
+        G, communities, cohesion, labels, gods, surprises, detection, tokens,
+        "./project", drift_summary=summary,
+    )
+    assert "## Drift" in out
+    drift_section = out[out.index("## Drift"):]
+    assert "| stable | 0 |" in drift_section
+    assert "| community-renamed | 0 |" in drift_section
+    assert "| community-resharded | 0 |" in drift_section
+    assert "| orphaned | 0 |" in drift_section
+    assert "no drift edges to classify" in drift_section.lower()
+
+
+def test_drift_section_per_class_top_10():
+    G, communities, cohesion, labels, gods, surprises, detection, tokens = make_inputs()
+    edges = [
+        {"source": f"src{i}", "target": f"dst{i}", "relation": "implements",
+         "classification": "community-renamed"}
+        for i in range(15)
+    ]
+    summary = _drift_summary(renamed=15, edges=edges)
+    out = generate(
+        G, communities, cohesion, labels, gods, surprises, detection, tokens,
+        "./project", drift_summary=summary,
+    )
+    drift_section = out[out.index("## Drift"):]
+    # Only 10 of 15 should appear in the listing
+    listed = sum(1 for i in range(15) if f"src{i}" in drift_section)
+    assert listed == 10, f"expected 10 listed, got {listed}"
+
+
+def test_drift_section_placement_after_federation():
+    G, communities, cohesion, labels, gods, surprises, detection, tokens = make_inputs()
+    fed = [{
+        "merged_id": "concept_x",
+        "contributing": [{"repo": "r1"}, {"repo": "r2"}],
+        "signals": {"neighborhood_jaccard": 0.85, "shared_basenames": ["a.py"]},
+        "tiebreaker_score": 0.9,
+    }]
+    summary = _drift_summary(stable=1)
+    out = generate(
+        G, communities, cohesion, labels, gods, surprises, detection, tokens,
+        "./project", federation_manifest=fed, drift_summary=summary,
+    )
+    assert "## Federation" in out
+    assert "## Drift" in out
+    assert out.index("## Federation") < out.index("## Drift")
