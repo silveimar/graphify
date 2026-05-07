@@ -128,6 +128,7 @@ def generate(
     usage_data: dict | None = None,
     dedup_report: dict | None = None,  # Phase 10, D-04
     federation_manifest: list[dict] | None = None,  # Phase 66 (CFED-05)
+    drift_summary: dict | None = None,  # Phase 67 (CDRIFT-03)
 ) -> str:
     today = date.today().isoformat()
 
@@ -287,6 +288,34 @@ def generate(
             lines.append(
                 f"| {entry.get('merged_id', '')} | {repos} | {jacc} | {basenames} | {tb} |"
             )
+
+    # --- Phase 67 (CDRIFT-03) Drift section ---
+    # Placement per D-06: AFTER the Federation section.
+    # Omit-on-no-snapshot per D-09: drift_summary is None ⇒ no `## Drift` heading.
+    # Empty-graph-with-snapshot per D-08: 0/0/0/0 table still renders.
+    _DRIFT_TOP_N = 10
+    if drift_summary is not None:
+        counts = drift_summary.get("counts", {}) or {}
+        edges_d = drift_summary.get("edges", []) or []
+        _DRIFT_CLASSES = ("stable", "community-renamed", "community-resharded", "orphaned")
+        lines += ["", "## Drift"]
+        lines.append("| Class | Edges |")
+        lines.append("|---|---|")
+        for cls in _DRIFT_CLASSES:
+            lines.append(f"| {cls} | {int(counts.get(cls, 0))} |")
+        if not edges_d:
+            lines += ["", "_No drift edges to classify._"]
+        else:
+            for cls in ("community-renamed", "community-resharded", "orphaned"):
+                cls_edges = [e for e in edges_d if e.get("classification") == cls]
+                if not cls_edges:
+                    continue
+                lines += ["", f"### {cls} (top {_DRIFT_TOP_N})"]
+                for e in cls_edges[:_DRIFT_TOP_N]:
+                    src = sanitize_label_md(str(e.get("source", "")))
+                    dst = sanitize_label_md(str(e.get("target", "")))
+                    rel = sanitize_label_md(str(e.get("relation", "")))
+                    lines.append(f"- `{src}` → `{dst}`  ({rel})")
 
     ambiguous = [(u, v, d) for u, v, d in G.edges(data=True) if d.get("confidence") == "AMBIGUOUS"]
     if ambiguous:
