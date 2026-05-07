@@ -82,3 +82,117 @@ def test_build_stamps_schema_version():
 def test_export_uses_build_schema_version():
     """export.py must source SCHEMA_VERSION from build (no duplicate literal)."""
     assert getattr(export_mod, "SCHEMA_VERSION", None) is build_mod.SCHEMA_VERSION
+
+
+# ---------------------------------------------------------------------------
+# Phase 71-02 (TEMP-01 / TEMP-02): build-time temporal stamping.
+# ---------------------------------------------------------------------------
+
+def _temporal_extraction(confidence: str = "EXTRACTED", relation: str = "contains",
+                         valid_from: str | None = None) -> dict:
+    edge = {
+        "source": "n1",
+        "target": "n2",
+        "relation": relation,
+        "confidence": confidence,
+        "source_file": "a.py",
+        "weight": 1.0,
+    }
+    if valid_from is not None:
+        edge["valid_from"] = valid_from
+    return {
+        "nodes": [
+            {"id": "n1", "label": "A", "file_type": "code", "source_file": "a.py"},
+            {"id": "n2", "label": "B", "file_type": "code", "source_file": "a.py"},
+        ],
+        "edges": [edge],
+        "input_tokens": 0,
+        "output_tokens": 0,
+    }
+
+
+def test_build_stamps_valid_from(pinned_run_ts):
+    G = build_from_json(_temporal_extraction())
+    for _, _, data in G.edges(data=True):
+        assert data["valid_from"] == pinned_run_ts
+
+
+def test_build_valid_until_none_default(pinned_run_ts):
+    G = build_from_json(_temporal_extraction())
+    for _, _, data in G.edges(data=True):
+        assert data["valid_until"] is None
+
+
+def test_build_extracted_decay_one(pinned_run_ts):
+    G = build_from_json(_temporal_extraction(confidence="EXTRACTED"))
+    for _, _, data in G.edges(data=True):
+        assert data["decay_weight"] == 1.0
+
+
+def test_build_inferred_decays(pinned_run_ts):
+    # Edge pre-stamped 60 days before pinned_run_ts → INFERRED should decay
+    old_ts = "2026-03-08T12:00:00+00:00"
+    G = build_from_json(_temporal_extraction(
+        confidence="INFERRED", relation="references", valid_from=old_ts
+    ))
+    for _, _, data in G.edges(data=True):
+        assert 0.0 <= data["decay_weight"] < 1.0
+
+
+def test_build_ambiguous_decays_like_inferred(pinned_run_ts):
+    # Pitfall 6 / Assumption A4: AMBIGUOUS decays just like INFERRED.
+    old_ts = "2026-03-08T12:00:00+00:00"
+    G = build_from_json(_temporal_extraction(
+        confidence="AMBIGUOUS", relation="references", valid_from=old_ts
+    ))
+    for _, _, data in G.edges(data=True):
+        assert 0.0 <= data["decay_weight"] < 0.5
+
+
+def test_schema_version_2_0_in_memory(pinned_run_ts):
+    G1 = build_from_json(_temporal_extraction())
+    assert G1.graph["schema_version"] == "2.0"
+    G2 = build([_temporal_extraction()])
+    assert G2.graph["schema_version"] == "2.0"
+
+
+def test_run_now_computed_once(pinned_run_ts, monkeypatch):
+    """Pitfall 3 / D-1: run_now_iso must be called exactly once per build_from_json."""
+    counter = {"n": 0}
+    real = build_mod.run_now_iso
+
+    def counting():
+        counter["n"] += 1
+        return real()
+
+    monkeypatch.setattr(build_mod, "run_now_iso", counting)
+    # Multi-edge extraction to ensure the call is not inside the per-edge loop.
+    ext = {
+        "nodes": [
+            {"id": "n1", "label": "A", "file_type": "code", "source_file": "a.py"},
+            {"id": "n2", "label": "B", "file_type": "code", "source_file": "a.py"},
+            {"id": "n3", "label": "C", "file_type": "code", "source_file": "a.py"},
+        ],
+        "edges": [
+            {"source": "n1", "target": "n2", "relation": "contains",
+             "confidence": "EXTRACTED", "source_file": "a.py", "weight": 1.0},
+            {"source": "n2", "target": "n3", "relation": "contains",
+             "confidence": "INFERRED", "source_file": "a.py", "weight": 1.0},
+            {"source": "n1", "target": "n3", "relation": "references",
+             "confidence": "AMBIGUOUS", "source_file": "a.py", "weight": 1.0},
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+    }
+    build_from_json(ext)
+    assert counter["n"] == 1
+
+
+def test_existing_temporal_fields_preserved(pinned_run_ts):
+    """T-71-08: pre-stamped valid_from must NOT be overwritten (setdefault, not assign)."""
+    pre_ts = "2025-01-01T00:00:00+00:00"
+    G = build_from_json(_temporal_extraction(
+        confidence="EXTRACTED", valid_from=pre_ts
+    ))
+    for _, _, data in G.edges(data=True):
+        assert data["valid_from"] == pre_ts
