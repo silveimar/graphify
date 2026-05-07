@@ -19,6 +19,47 @@ def _numeric_version_prefix_tuple(s: str) -> tuple[int, ...]:
     return tuple(nums) if nums else (0,)
 
 
+# Phase 67 (CDRIFT-03/04) — CLI orchestration helper -----------------------
+def _run_drift_pipeline(
+    G,
+    communities,
+    *,
+    project_root,
+    when: str,
+    cap: int = 10,
+):
+    """Run one half of the drift pipeline around ``report.generate(...)``.
+
+    The drift lifecycle splits across the report-write step:
+
+    * ``when="before-report"`` → compute the drift_summary against the most
+      recent prior snapshot via ``drift.compute_edge_drift`` and return it
+      so callers can pass it as ``drift_summary=`` to ``report.generate``.
+      Returns ``None`` when no prior snapshot exists (D-09 omit-on-first-run).
+    * ``when="after-report"`` → persist the *new* snapshot via
+      ``drift.write_drift_snapshot`` with FIFO ``cap=10`` (D-01, D-02). The
+      snapshot is written AFTER ``report.generate`` so the snapshot for this
+      run cannot influence the report it accompanies.
+
+    Snapshots live under ``graphify-out/snapshots/`` (D-01 — never under
+    ``cache/snapshots/``).
+    """
+    from graphify import drift as _drift
+
+    if when == "before-report":
+        # compute_edge_drift returns the drift_summary dict, or None on first run.
+        return _drift.compute_edge_drift(G, communities, project_root=project_root)
+    if when == "after-report":
+        try:
+            return _drift.write_drift_snapshot(
+                G, communities, project_root=project_root, cap=cap,
+            )
+        except Exception as exc:  # non-fatal — drift.py already logged the error
+            print(f"[graphify] info: drift snapshot skipped: {exc}", file=sys.stderr)
+            return None
+    raise ValueError(f"_run_drift_pipeline: unknown when={when!r}")
+
+
 def _check_skill_version(skill_dst: Path) -> None:
     """Silently auto-heal the installed skill stamp on drift.
 

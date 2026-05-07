@@ -103,6 +103,7 @@ def _rebuild_code(watch_path: Path, *, follow_symlinks: bool = False) -> bool:
         from graphify.analyze import god_nodes, surprising_connections, suggest_questions
         from graphify.report import generate
         from graphify.export import to_json
+        from graphify.__main__ import _run_drift_pipeline  # Phase 67 (CDRIFT-03/04)
 
         detected = detect(watch_path, follow_symlinks=follow_symlinks)
         code_files = [Path(f) for f in detected['files']['code']]
@@ -151,10 +152,21 @@ def _rebuild_code(watch_path: Path, *, follow_symlinks: bool = False) -> bool:
 
         out.mkdir(exist_ok=True)
 
+        # Phase 67 (CDRIFT-03/04): compute drift against prior snapshot BEFORE
+        # writing the new snapshot, so the snapshot for *this* run does not
+        # influence its own drift report. Helper lives in __main__.py per the
+        # plan's CLI-orchestration requirement.
+        _drift_summary = _run_drift_pipeline(
+            G, communities, project_root=watch_path, when="before-report",
+        )
         report = generate(G, communities, cohesion, labels, gods, surprises, detection,
-                          {"input": 0, "output": 0}, str(watch_path), suggested_questions=questions)
+                          {"input": 0, "output": 0}, str(watch_path), suggested_questions=questions,
+                          drift_summary=_drift_summary)
         (out / "GRAPH_REPORT.md").write_text(report, encoding="utf-8")
         to_json(G, communities, str(out / "graph.json"))
+        # Persist the new snapshot AFTER report.generate has finished (D-01,
+        # cap=10 per D-02 FIFO retention).
+        _run_drift_pipeline(G, communities, project_root=watch_path, when="after-report")
 
         # clear stale needs_update flag if present
         flag = out / "needs_update"

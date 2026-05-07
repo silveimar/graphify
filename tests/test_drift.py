@@ -197,3 +197,40 @@ def test_compute_edge_drift_summary_after_snapshot(tmp_path):
     assert "counts" in result
     assert "edges" in result
     assert result["counts"]["stable"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 67 Plan 05 — CDRIFT-02 rename E2E anchor
+# ---------------------------------------------------------------------------
+
+def test_rename_yields_community_renamed_not_orphaned(tmp_path):
+    """End-to-end: renaming a community (membership unchanged) must classify
+    affected implements/documents/tests edges as ``community-renamed``,
+    never ``orphaned``.
+
+    This is the CDRIFT-02 anchor — proves the comparator keys on Jaccard
+    membership rather than community names/IDs.
+    """
+    # Build a graph with two communities and at least 2 implements edges.
+    G = _make_graph([
+        ("a", "b", "implements"),
+        ("c", "d", "implements"),
+        ("a", "c", "contains"),  # excluded — relation filter
+    ])
+    communities_old = {0: ["a", "b"], 1: ["c", "d"]}
+    drift.write_drift_snapshot(G, communities_old, project_root=tmp_path)
+
+    # Rename communities (swap integer cids) but keep membership identical.
+    # Same nodes, same partitioning — only the cid labels change.
+    communities_new = {7: ["a", "b"], 9: ["c", "d"]}
+
+    summary = drift.compute_edge_drift(G, communities_new, project_root=tmp_path)
+
+    assert summary is not None
+    counts = summary["counts"]
+    assert counts["community-renamed"] >= 1, (
+        f"expected >=1 community-renamed, got {counts}"
+    )
+    assert counts["orphaned"] == 0, (
+        f"membership-preserving rename must NOT classify as orphaned, got {counts}"
+    )
