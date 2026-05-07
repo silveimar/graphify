@@ -431,6 +431,25 @@ def generate(
         if len(merges) > 10:
             lines.append(f"  (+{len(merges) - 10} more — see dedup_report.json)")
 
+    # --- Phase 71-05 (TEMP-04, D-10) Temporal Health subsection ---
+    # Minimal counts-only renderer: currently-valid edge count, superseded count,
+    # and superseded share. Guarded against ZeroDivisionError on empty graphs
+    # (T-71-20). Placement at end of report per D-10.
+    _temp_total = G.number_of_edges()
+    _temp_superseded = sum(
+        1 for _, _, _d in G.edges(data=True) if _d.get("valid_until") is not None
+    )
+    _temp_current = _temp_total - _temp_superseded
+    _temp_pct = (_temp_superseded / _temp_total * 100.0) if _temp_total else 0.0
+    lines += [
+        "",
+        "## Temporal Health",
+        "",
+        f"- Currently valid edges: {_temp_current}",
+        f"- Superseded edges: {_temp_superseded}",
+        f"- Superseded share: {_temp_pct:.1f}%",
+    ]
+
     return "\n".join(lines)
 
 
