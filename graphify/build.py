@@ -28,6 +28,7 @@ from typing import Any
 
 import networkx as nx
 
+from .temporal import compute_decay_weight, load_decay_config, run_now_iso
 from .validate import validate_extraction
 
 # Phase 70.2-02 (CCONF-05 / CFED-03): single source of truth for graph schema version.
@@ -232,6 +233,27 @@ def build_from_json(
 
     nodes_for_norm = [n for n in extraction["nodes"] if isinstance(n, dict)]
     _normalize_concept_code_edges(nodes_for_norm, extraction["edges"])
+
+    # Phase 71-02 (TEMP-01 / TEMP-02, D-1 / D-2, RESEARCH Pitfall 3):
+    # Stamp temporal fields on every edge. run_now is computed ONCE per build —
+    # never inside the loop. setdefault preserves any pre-stamped fields
+    # (e.g., supersession test cases or upstream-stamped edges; T-71-08).
+    run_now = run_now_iso()
+    decay_cfg = load_decay_config()
+    for e in extraction["edges"]:
+        e.setdefault("valid_from", run_now)
+        e.setdefault("valid_until", None)
+        if "decay_weight" not in e:
+            if e.get("confidence") == "EXTRACTED":
+                e["decay_weight"] = 1.0
+            else:
+                # INFERRED and AMBIGUOUS both decay (Pitfall 6 / Assumption A4).
+                e["decay_weight"] = compute_decay_weight(
+                    relation=e.get("relation", ""),
+                    valid_from=e["valid_from"],
+                    run_now=run_now,
+                    config=decay_cfg,
+                )
 
     # Phase 66 (CFED-01 / CFED-04): federation runs strictly between
     # concept↔code normalization and schema validation, so peer-imported nodes

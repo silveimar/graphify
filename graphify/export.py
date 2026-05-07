@@ -1109,6 +1109,16 @@ def to_graphml(
     node_community = _node_community_map(communities)
     for node_id in H.nodes():
         H.nodes[node_id]["community"] = node_community.get(node_id, -1)
+    # Phase 71-02: GraphML rejects None values (e.g., valid_until=None on
+    # currently-valid edges). Replace None with empty string on edge/node attrs.
+    for _u, _v, _data in H.edges(data=True):
+        for _k, _val in list(_data.items()):
+            if _val is None:
+                _data[_k] = ""
+    for _n, _data in H.nodes(data=True):
+        for _k, _val in list(_data.items()):
+            if _val is None:
+                _data[_k] = ""
     nx.write_graphml(H, output_path)
 
 
