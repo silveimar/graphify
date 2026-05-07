@@ -196,3 +196,175 @@ def test_existing_temporal_fields_preserved(pinned_run_ts):
     ))
     for _, _, data in G.edges(data=True):
         assert data["valid_from"] == pre_ts
+
+
+# ---------------------------------------------------------------------------
+# Phase 71-04 Task 1: stamp_supersessions integration into build_from_json
+# ---------------------------------------------------------------------------
+
+
+def _write_prior_graph(out_dir: Path, edges: list[dict], nodes: list[dict] | None = None) -> Path:
+    """Write a prior graphify-out/graph.json under out_dir with the given edges."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "directed": False,
+        "multigraph": False,
+        "graph": {"schema_version": "2.0"},
+        "nodes": nodes or [
+            {"id": "a", "label": "A", "file_type": "code", "source_file": "f1.py"},
+            {"id": "b", "label": "B", "file_type": "code", "source_file": "f1.py"},
+        ],
+        "links": edges,
+        "schema_version": "2.0",
+    }
+    p = out_dir / "graph.json"
+    p.write_text(json.dumps(payload), encoding="utf-8")
+    return p
+
+
+def _ext_two_nodes(extra_edges: list[dict] | None = None) -> dict:
+    return {
+        "nodes": [
+            {"id": "a", "label": "A", "file_type": "code", "source_file": "f1.py"},
+            {"id": "b", "label": "B", "file_type": "code", "source_file": "f1.py"},
+        ],
+        "edges": list(extra_edges or []),
+        "input_tokens": 0,
+        "output_tokens": 0,
+    }
+
+
+def test_supersession_inferred_integration(pinned_run_ts, tmp_path):
+    """D-4 / D-6: prior INFERRED edge missing in new run → stamped with valid_until=run_now."""
+    prior_edge = {
+        "source": "a", "target": "b", "relation": "calls",
+        "confidence": "INFERRED", "source_file": "f1.py", "weight": 1.0,
+        "valid_from": "2025-12-01T00:00:00+00:00", "valid_until": None,
+        "decay_weight": 0.7,
+    }
+    _write_prior_graph(tmp_path / "graphify-out", [prior_edge])
+    # New run does NOT contain (a,b,calls).
+    G = build_from_json(_ext_two_nodes(extra_edges=[]), target_dir=tmp_path)
+    # Edge must persist in graph with valid_until set (D-6 history retained).
+    assert G.has_edge("a", "b")
+    data = G.get_edge_data("a", "b")
+    assert data["valid_until"] == pinned_run_ts
+    assert data["confidence"] == "INFERRED"
+
+
+def test_supersession_extracted_not_stamped_integration(pinned_run_ts, tmp_path):
+    """D-4: prior EXTRACTED edge missing in new run → NOT stamped, NOT appended."""
+    prior_edge = {
+        "source": "a", "target": "b", "relation": "calls",
+        "confidence": "EXTRACTED", "source_file": "f1.py", "weight": 1.0,
+        "valid_from": "2025-12-01T00:00:00+00:00", "valid_until": None,
+        "decay_weight": 1.0,
+    }
+    _write_prior_graph(tmp_path / "graphify-out", [prior_edge])
+    G = build_from_json(_ext_two_nodes(extra_edges=[]), target_dir=tmp_path)
+    # EXTRACTED prior is never carried forward as superseded.
+    assert not G.has_edge("a", "b")
+
+
+def test_supersession_global_rule_integration(pinned_run_ts, tmp_path):
+    """D-5: prior (a,b,calls) from f1.py; new run produces same tuple from f2.py → NO supersession."""
+    prior_edge = {
+        "source": "a", "target": "b", "relation": "calls",
+        "confidence": "INFERRED", "source_file": "f1.py", "weight": 1.0,
+        "valid_from": "2025-12-01T00:00:00+00:00", "valid_until": None,
+        "decay_weight": 0.7,
+    }
+    _write_prior_graph(tmp_path / "graphify-out", [prior_edge])
+    new_edge = {
+        "source": "a", "target": "b", "relation": "calls",
+        "confidence": "INFERRED", "source_file": "f2.py", "weight": 1.0,
+    }
+    G = build_from_json(_ext_two_nodes(extra_edges=[new_edge]), target_dir=tmp_path)
+    # Single edge remains current — no superseded duplicate.
+    assert G.has_edge("a", "b")
+    data = G.get_edge_data("a", "b")
+    assert data["valid_until"] is None
+
+
+def test_supersession_persists_in_graph(pinned_run_ts, tmp_path):
+    """D-6: superseded edge appears in nx.Graph result with valid_until set."""
+    prior_edge = {
+        "source": "a", "target": "b", "relation": "calls",
+        "confidence": "INFERRED", "source_file": "f1.py", "weight": 1.0,
+        "valid_from": "2025-12-01T00:00:00+00:00", "valid_until": None,
+        "decay_weight": 0.7,
+    }
+    _write_prior_graph(tmp_path / "graphify-out", [prior_edge])
+    G = build_from_json(_ext_two_nodes(extra_edges=[]), target_dir=tmp_path)
+    # graph contains the edge (history not deleted)
+    assert G.number_of_edges() == 1
+    data = G.get_edge_data("a", "b")
+    assert data["valid_until"] == pinned_run_ts
+
+
+def test_supersession_no_prior_graph(pinned_run_ts, tmp_path):
+    """Pitfall 1: first-ever run (no prior graph.json) → no supersession, no error."""
+    new_edge = {
+        "source": "a", "target": "b", "relation": "calls",
+        "confidence": "INFERRED", "source_file": "f1.py", "weight": 1.0,
+    }
+    # No prior graph.json exists under tmp_path.
+    G = build_from_json(_ext_two_nodes(extra_edges=[new_edge]), target_dir=tmp_path)
+    assert G.has_edge("a", "b")
+    data = G.get_edge_data("a", "b")
+    assert data["valid_until"] is None
+
+
+def test_supersession_path_resolution_default_mode(pinned_run_ts, tmp_path, monkeypatch):
+    """Default mode: prior path = target_dir/graphify-out/graph.json (mirrors __main__.py)."""
+    prior_edge = {
+        "source": "a", "target": "b", "relation": "calls",
+        "confidence": "INFERRED", "source_file": "f1.py", "weight": 1.0,
+        "valid_from": "2025-12-01T00:00:00+00:00", "valid_until": None,
+        "decay_weight": 0.7,
+    }
+    _write_prior_graph(tmp_path / "graphify-out", [prior_edge])
+    monkeypatch.chdir(tmp_path)
+    # No target_dir, no resolved_output → cwd/graphify-out/graph.json
+    G = build_from_json(_ext_two_nodes(extra_edges=[]))
+    assert G.has_edge("a", "b")
+    assert G.get_edge_data("a", "b")["valid_until"] == pinned_run_ts
+
+
+def test_supersession_path_resolution_vault_mode(pinned_run_ts, tmp_path):
+    """Pitfall 1: vault output mode resolves prior graph path via ResolvedOutput.artifacts_dir."""
+    from graphify.output import ResolvedOutput
+    artifacts_dir = tmp_path / "vault" / ".graphify"
+    prior_edge = {
+        "source": "a", "target": "b", "relation": "calls",
+        "confidence": "INFERRED", "source_file": "f1.py", "weight": 1.0,
+        "valid_from": "2025-12-01T00:00:00+00:00", "valid_until": None,
+        "decay_weight": 0.7,
+    }
+    # In vault mode, prior graph.json lives directly under artifacts_dir, not under
+    # artifacts_dir/graphify-out (artifacts_dir IS the graphify-out equivalent).
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    (artifacts_dir / "graph.json").write_text(
+        json.dumps({
+            "directed": False,
+            "multigraph": False,
+            "graph": {"schema_version": "2.0"},
+            "nodes": [
+                {"id": "a", "label": "A", "file_type": "code", "source_file": "f1.py"},
+                {"id": "b", "label": "B", "file_type": "code", "source_file": "f1.py"},
+            ],
+            "links": [prior_edge],
+            "schema_version": "2.0",
+        }),
+        encoding="utf-8",
+    )
+    resolved = ResolvedOutput(
+        vault_detected=True,
+        vault_path=tmp_path / "vault",
+        notes_dir=tmp_path / "vault",
+        artifacts_dir=artifacts_dir,
+        source="vault",
+    )
+    G = build_from_json(_ext_two_nodes(extra_edges=[]), resolved_output=resolved)
+    assert G.has_edge("a", "b")
+    assert G.get_edge_data("a", "b")["valid_until"] == pinned_run_ts
