@@ -28,7 +28,7 @@ from typing import Any
 
 import networkx as nx
 
-from .temporal import compute_decay_weight, load_decay_config, run_now_iso
+from .temporal import compute_decay_weight, load_decay_config, run_now_iso, stamp_supersessions
 from .validate import validate_extraction
 
 # Phase 70.2-02 (CCONF-05 / CFED-03): single source of truth for graph schema version.
@@ -62,6 +62,30 @@ def _edge_priority(edge: dict[str, Any]) -> tuple[int, float]:
     except (TypeError, ValueError):
         score = -1.0
     return (rank, score)
+
+
+def _prior_graph_path(
+    target_dir: Path | None = None,
+    *,
+    resolved_output: Any = None,
+) -> Path:
+    """Resolve the on-disk path of the prior ``graph.json`` for supersession diff.
+
+    Phase 71-04 (RESEARCH Pitfall 1): the supersession diff in ``build_from_json``
+    must look in the SAME location where ``to_json`` will write the new graph.json,
+    otherwise a vault-mode build silently sees no prior history and skips
+    supersession. Mirror the resolution logic ``__main__.py`` uses around
+    line 3215 (``default_graphify_artifacts_dir`` for non-vault, else
+    ``resolved.artifacts_dir``):
+
+      * vault / option-b / vault-list / cli-flag → ``resolved.artifacts_dir / "graph.json"``
+      * default (no resolved_output, or source == "default") →
+        ``(target_dir or cwd) / "graphify-out" / "graph.json"``
+    """
+    if resolved_output is not None and getattr(resolved_output, "source", None) and resolved_output.source != "default":
+        return Path(resolved_output.artifacts_dir) / "graph.json"
+    base = Path(target_dir) if target_dir else Path.cwd()
+    return base / "graphify-out" / "graph.json"
 
 
 def _merge_edge_fields(primary: dict[str, Any], secondary: dict[str, Any]) -> dict[str, Any]:
@@ -254,6 +278,18 @@ def build_from_json(
                     run_now=run_now,
                     config=decay_cfg,
                 )
+
+    # Phase 71-04 (TEMP-03, D-4 / D-5 / D-6, Pitfall 1): supersession diff
+    # against the prior on-disk graph.json. Shared path resolution with
+    # __main__.py:~1962 / ~3215 (default vs. vault) via _prior_graph_path,
+    # so vault-mode builds see vault-mode priors. INFERRED-only stamping +
+    # global tuple match are owned by graphify.temporal.stamp_supersessions
+    # (Plan 71-01); call site is integration only.
+    extraction["edges"] = stamp_supersessions(
+        new_edges=extraction["edges"],
+        prior_graph_path=_prior_graph_path(target_dir, resolved_output=resolved_output),
+        run_now=run_now,
+    )
 
     # Phase 66 (CFED-01 / CFED-04): federation runs strictly between
     # concept↔code normalization and schema validation, so peer-imported nodes
