@@ -56,7 +56,7 @@ Back up the target vault before apply. Review preview artifacts first, then appl
 ### Output destination precedence
 
 Graphify resolves the vault notes destination using a single precedence chain:
-`--output > profile > --obsidian-dir > legacy default (graphify-out/obsidian)`.
+`--output > profile > option-b (vault) > --obsidian-dir > legacy default (graphify-out/obsidian)`.
 `--output <abs-path>` (when supplied) wins. Otherwise, if the target vault has
 `.graphify/profile.yaml` with an `output:` block, that wins next. `output.path: '.'`
 means **"the vault root itself"** — graphify then composes `taxonomy.root` and

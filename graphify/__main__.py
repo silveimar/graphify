@@ -136,7 +136,7 @@ def _suppress_success_version_footer(argv: list[str]) -> bool:
 
 def _cli_exit(code: int) -> None:
     if code == 0 and not _suppress_success_version_footer(sys.argv):
-        print(f"[graphify] version {package_version()}", file=sys.stderr)
+        print(f"[graphify] info: version {package_version()}", file=sys.stderr)
     raise SystemExit(code)
 
 
@@ -1743,7 +1743,7 @@ def main() -> None:
         print("  --output composes with vault pin (does not replace profile/vault context).")
         print("  --explain-paths          print 5-row resolved-paths table to stdout and exit 0")
         print("                            (no pipeline run; honors --vault / GRAPHIFY_VAULT pins)")
-        print("  Output destination precedence: --output > profile > --obsidian-dir > option-b (vault) > default.")
+        print("  Output destination precedence: --output > profile > option-b (vault) > --obsidian-dir > legacy default.")
         print("  See README §Output destination precedence (avoids nested-vault-folder pitfall).")
         print()
         print("Commands:")
@@ -1764,7 +1764,7 @@ def main() -> None:
         print("  --obsidian              export an already-built graphify-out/graph.json to an Obsidian vault (MRG-03)")
         print("    --graph <path>          path to graph.json (default graphify-out/graph.json)")
         print("    --obsidian-dir <path>   output vault directory (default graphify-out/obsidian)")
-        print("                            precedence: --output > profile > --obsidian-dir > option-b (vault) > default")
+        print("                            precedence: --output > profile > option-b (vault) > --obsidian-dir > legacy default")
         print("                            see README §Output destination precedence (avoid nested-vault pitfall)")
         print("    --repo-identity <slug>  override profile/fallback repo identity for generated artifacts")
         print("    --dry-run               print the merge plan via format_merge_plan without writing files")

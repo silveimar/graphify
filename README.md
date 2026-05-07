@@ -414,7 +414,7 @@ The adapter works with any Obsidian vault framework — Ideaverse, PARA, custom 
 Graphify resolves the vault notes destination using a single precedence chain:
 
 ```
---output > profile > --obsidian-dir > legacy default (graphify-out/obsidian)
+--output > profile > option-b (vault) > --obsidian-dir > legacy default (graphify-out/obsidian)
 ```
 
 `--output <abs-path>` (when supplied) wins. Otherwise, if the target vault has
