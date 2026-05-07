@@ -65,6 +65,45 @@ def _community_article(
         lines.append(f"- *... and {remaining} more nodes in this community*")
     lines.append("")
 
+    # --- Phase 72-04 (REAS-04, D-14) Reasoning Relations subsection ---
+    # Per-community pass over outbound reasoning edges (supports / contradicts /
+    # supersedes / evolved_into / depends_on). Placed BEFORE both
+    # `## Relationships` and `## Historical relations`. Omitted entirely when
+    # no qualifying edges exist (omit-when-empty rule). Neighbor labels are
+    # html.escape'd and 64-char-capped (T-72-11 / T-71-15 precedent).
+    from .validate import REASONING_RELATIONS
+    reasoning: list[tuple[str, str, float | None]] = []
+    seen_r: set[tuple[str, str, str]] = set()
+    for nid in nodes:
+        for neighbor in G.neighbors(nid):
+            ed = G.edges[nid, neighbor]
+            rel = ed.get("relation")
+            if rel not in REASONING_RELATIONS:
+                continue
+            # Honor _src/_tgt for direction recovery; only emit outbound edges
+            # whose source is a node in this community.
+            src = ed.get("_src", nid)
+            if src != nid:
+                continue
+            tgt = ed.get("_tgt", neighbor)
+            tgt_label = G.nodes[tgt].get("label", tgt) if tgt in G else tgt
+            score = ed.get("confidence_score")
+            score_f: float | None = None
+            if isinstance(score, (int, float)):
+                score_f = float(score)
+            key = (rel, str(src), str(tgt))
+            if key in seen_r:
+                continue
+            seen_r.add(key)
+            reasoning.append((rel, str(tgt_label), score_f))
+    if reasoning:
+        lines += ["## Reasoning Relations", ""]
+        for rel, tgt_label, score_f in reasoning:
+            safe_label = html.escape(str(tgt_label))[:64]
+            score_str = f" (confidence {score_f:.2f})" if score_f is not None else ""
+            lines.append(f"- {rel}: [[{safe_label}]]{score_str}")
+        lines.append("")
+
     lines += ["## Relationships", ""]
     if cross:
         for other_label, count in cross[:12]:

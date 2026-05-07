@@ -784,6 +784,42 @@ def to_obsidian(
         ]
         per_community[cid] = updated_ctx
 
+    # ---- Phase 72-04 (REAS-04, D-15) reasoning_relations injection ----
+    # For each per-node ctx, walk the node's outbound REASONING_RELATIONS edges
+    # and stamp a `reasoning_relations: [{type, target, confidence_score}]`
+    # list onto the ctx. render_note in templates.py reads this key and emits
+    # the YAML list in the note's frontmatter. Direction is recovered via the
+    # `_src` / `_tgt` edge attributes.
+    from graphify.validate import REASONING_RELATIONS
+    for node_id, ctx in list(per_node.items()):
+        if not isinstance(ctx, dict) or node_id not in G:
+            continue
+        reasoning_items: list[dict] = []
+        seen_rr: set[tuple[str, str, str]] = set()
+        for nb in G.neighbors(node_id):
+            ed = G.edges[node_id, nb]
+            rel = ed.get("relation")
+            if rel not in REASONING_RELATIONS:
+                continue
+            src = ed.get("_src", node_id)
+            if src != node_id:
+                continue
+            tgt = ed.get("_tgt", nb)
+            tgt_label = G.nodes[tgt].get("label", tgt) if tgt in G else str(tgt)
+            key = (str(rel), str(node_id), str(tgt))
+            if key in seen_rr:
+                continue
+            seen_rr.add(key)
+            item: dict = {"type": str(rel), "target": str(tgt_label)}
+            score = ed.get("confidence_score")
+            if isinstance(score, (int, float)):
+                item["confidence_score"] = float(score)
+            reasoning_items.append(item)
+        if reasoning_items:
+            updated = dict(ctx)
+            updated["reasoning_relations"] = reasoning_items
+            per_node[node_id] = updated
+
     rendered_notes: dict[str, RenderedNote] = {}
 
     # ---- Per-node notes (thing / statement / person / source) ----

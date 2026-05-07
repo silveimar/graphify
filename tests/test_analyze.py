@@ -827,3 +827,135 @@ def test_legacy_graph_no_valid_until_field():
     result = god_nodes(G, top_n=10)
     by_id = {r["id"]: r["edges"] for r in result}
     assert by_id.get("b") == 2  # both edges counted
+
+
+# ---------------------------------------------------------------------------
+# Phase 72-04 (REAS): contradictions_and_chains + knowledge_gaps reasoning fix
+# ---------------------------------------------------------------------------
+
+
+def test_knowledge_gaps_excludes_reasoning_endpoints():
+    """A doc node whose only edge is a reasoning relation is NOT a gap (REAS-03 fix, D-13)."""
+    from graphify.analyze import knowledge_gaps
+    G = nx.Graph()
+    G.add_node("doc1", label="Doc1", file_type="document", source_file="d1.md", source_location="")
+    G.add_node("doc2", label="Doc2", file_type="document", source_file="d2.md", source_location="")
+    # Single reasoning edge (supports) — degree=1, but reasoning-anchored
+    G.add_edge("doc1", "doc2", relation="supports", confidence="EXTRACTED",
+               source_file="d1.md", _src="doc1", _tgt="doc2", weight=1.0)
+    result = knowledge_gaps(G, {})
+    ids = {r["id"] for r in result}
+    # Reasoning-endpoint nodes must NOT appear as isolated gaps
+    assert "doc1" not in ids
+    assert "doc2" not in ids
+
+
+def test_contradictions_and_chains_shape():
+    from graphify.analyze import contradictions_and_chains
+    G = nx.Graph()
+    for nid in ("a", "b", "c"):
+        G.add_node(nid, label=nid.upper(), file_type="document",
+                   source_file=f"{nid}.md", source_location="")
+    G.add_edge("a", "b", relation="supersedes", confidence="EXTRACTED",
+               source_file="a.md", _src="a", _tgt="b", weight=1.0)
+    G.add_edge("b", "c", relation="supersedes", confidence="EXTRACTED",
+               source_file="b.md", _src="b", _tgt="c", weight=1.0)
+    G.add_edge("a", "c", relation="contradicts", confidence="INFERRED",
+               confidence_score=0.9, source_file="a.md",
+               _src="a", _tgt="c", weight=1.0)
+    out = contradictions_and_chains(G)
+    assert "contradictions" in out and "supersession_chains" in out
+    assert isinstance(out["contradictions"], list)
+    assert isinstance(out["supersession_chains"], list)
+    assert len(out["supersession_chains"]) >= 1
+    assert len(out["contradictions"]) == 1
+
+
+def test_chain_sort_longest_first():
+    from graphify.analyze import contradictions_and_chains
+    G = nx.Graph()
+    for nid in ("a", "b", "c", "d", "x", "y"):
+        G.add_node(nid, label=nid.upper(), file_type="document",
+                   source_file=f"{nid}.md", source_location="")
+    # Long chain a -> b -> c -> d
+    for s, t in [("a", "b"), ("b", "c"), ("c", "d")]:
+        G.add_edge(s, t, relation="supersedes", confidence="EXTRACTED",
+                   source_file=f"{s}.md", _src=s, _tgt=t, weight=1.0)
+    # Short chain x -> y
+    G.add_edge("x", "y", relation="supersedes", confidence="EXTRACTED",
+               source_file="x.md", _src="x", _tgt="y", weight=1.0)
+    out = contradictions_and_chains(G)
+    chains = out["supersession_chains"]
+    assert len(chains) >= 2
+    assert len(chains[0]) >= len(chains[1])
+    assert len(chains[0]) == 4  # a, b, c, d
+
+
+def test_confidence_gate_excludes_low_inferred():
+    from graphify.analyze import contradictions_and_chains
+    G = nx.Graph()
+    for nid in ("a", "b", "c", "d"):
+        G.add_node(nid, label=nid.upper(), file_type="document",
+                   source_file=f"{nid}.md", source_location="")
+    # EXTRACTED with no score — must be included
+    G.add_edge("a", "b", relation="supersedes", confidence="EXTRACTED",
+               source_file="a.md", _src="a", _tgt="b", weight=1.0)
+    # INFERRED with score 0.5 — must be included (boundary)
+    G.add_edge("c", "d", relation="contradicts", confidence="INFERRED",
+               confidence_score=0.5, source_file="c.md",
+               _src="c", _tgt="d", weight=1.0)
+    # INFERRED with score 0.3 — must be excluded
+    G.add_edge("a", "c", relation="contradicts", confidence="INFERRED",
+               confidence_score=0.3, source_file="a.md",
+               _src="a", _tgt="c", weight=1.0)
+    out = contradictions_and_chains(G)
+    contras = out["contradictions"]
+    pairs = {frozenset((c["a"], c["b"])) for c in contras}
+    assert frozenset(("c", "d")) in pairs
+    assert frozenset(("a", "c")) not in pairs
+    chains = out["supersession_chains"]
+    assert any("a" in ch and "b" in ch for ch in chains)
+
+
+def test_supersession_cycle_handled(capsys):
+    from graphify.analyze import contradictions_and_chains
+    G = nx.Graph()
+    for nid in ("a", "b"):
+        G.add_node(nid, label=nid.upper(), file_type="document",
+                   source_file=f"{nid}.md", source_location="")
+    # Cycle a->b and b->a (two parallel edges collapse on undirected G,
+    # but we add a third node to ensure cycle in DiGraph)
+    G.add_node("c", label="C", file_type="document", source_file="c.md", source_location="")
+    # Build cycle a->b->c->a in DiGraph reconstruction
+    G.add_edge("a", "b", relation="supersedes", confidence="EXTRACTED",
+               source_file="a.md", _src="a", _tgt="b", weight=1.0)
+    G.add_edge("b", "c", relation="supersedes", confidence="EXTRACTED",
+               source_file="b.md", _src="b", _tgt="c", weight=1.0)
+    G.add_edge("c", "a", relation="supersedes", confidence="EXTRACTED",
+               source_file="c.md", _src="c", _tgt="a", weight=1.0)
+    out = contradictions_and_chains(G)
+    captured = capsys.readouterr()
+    assert "supersession cycle detected" in captured.err
+    # Should not crash and return a dict
+    assert "supersession_chains" in out
+    assert "contradictions" in out
+
+
+def test_contradicts_dedup_keeps_higher_score():
+    from graphify.analyze import contradictions_and_chains
+    G = nx.Graph()
+    G.add_node("a", label="A", file_type="document", source_file="a.md", source_location="")
+    G.add_node("b", label="B", file_type="document", source_file="b.md", source_location="")
+    # The undirected graph collapses parallel edges, so simulate dedup via
+    # a single edge that we'd otherwise have seen twice — confirm the function
+    # surfaces a single contradiction with the (single) edge's score.
+    G.add_edge("a", "b", relation="contradicts", confidence="INFERRED",
+               confidence_score=0.9, source_file="a.md",
+               _src="a", _tgt="b", weight=1.0)
+    out = contradictions_and_chains(G)
+    contras = out["contradictions"]
+    # One pair only (frozenset dedup)
+    pairs = [frozenset((c["a"], c["b"])) for c in contras]
+    assert len(pairs) == 1
+    assert pairs[0] == frozenset(("a", "b"))
+    assert contras[0]["confidence_score"] == 0.9

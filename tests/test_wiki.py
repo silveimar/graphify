@@ -221,3 +221,69 @@ def test_currently_valid_pass_unchanged(tmp_path):
     assert "## Relationships" in parsing
     assert "## Audit Trail" in parsing
     assert "## Historical relations" not in parsing
+
+
+# ---------------------------------------------------------------------------
+# Phase 72-04 (REAS-04, D-14) Reasoning Relations subsection
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_relations_subsection(tmp_path):
+    """Community whose nodes have outbound reasoning edges produces a
+    `## Reasoning Relations` subsection BEFORE both `## Relationships`
+    and `## Historical relations`."""
+    G = nx.Graph()
+    G.add_node("a", label="A", file_type="document", source_file="a.md", community=0)
+    G.add_node("b", label="B", file_type="document", source_file="b.md", community=0)
+    G.add_node("c", label="C", file_type="document", source_file="c.md", community=1)
+    G.add_edge("a", "b", relation="supports", confidence="INFERRED",
+               confidence_score=0.85, source_file="a.md",
+               _src="a", _tgt="b", weight=1.0)
+    # Cross-community plain edge so Relationships section also renders
+    G.add_edge("a", "c", relation="references", confidence="EXTRACTED",
+               source_file="a.md", weight=1.0)
+    # Historical edge (valid_until) for ordering check
+    G.add_edge("b", "c", relation="related", confidence="EXTRACTED",
+               source_file="b.md", weight=1.0,
+               valid_until="2026-04-01T00:00:00+00:00")
+    article = _community_article(
+        G, 0, ["a", "b"], "Doc Cluster",
+        {0: "Doc Cluster", 1: "Other"}, 0.9,
+    )
+    assert "## Reasoning Relations" in article
+    assert "supports" in article
+    assert "[[B]]" in article
+    # Order: Reasoning Relations < Relationships < Historical relations
+    i_reason = article.find("## Reasoning Relations")
+    i_rel = article.find("## Relationships")
+    i_hist = article.find("## Historical relations")
+    assert i_reason >= 0 and i_rel >= 0 and i_hist >= 0
+    assert i_reason < i_rel
+    assert i_reason < i_hist
+
+    # T-72-11: HTML-escaped neighbor labels
+    G2 = nx.Graph()
+    G2.add_node("a", label="A", file_type="document", source_file="a.md", community=0)
+    G2.add_node("b", label="<script>alert(1)</script>", file_type="document",
+                source_file="b.md", community=0)
+    G2.add_edge("a", "b", relation="supports", confidence="EXTRACTED",
+                source_file="a.md", _src="a", _tgt="b", weight=1.0)
+    article2 = _community_article(G2, 0, ["a", "b"], "C", {0: "C"}, 0.5)
+    rr_start = article2.find("## Reasoning Relations")
+    rr_end = article2.find("\n## ", rr_start + 2)
+    rr_block = article2[rr_start:rr_end] if rr_end != -1 else article2[rr_start:]
+    assert "<script>" not in rr_block
+    assert "&lt;script&gt;" in rr_block
+
+
+def test_reasoning_relations_omit_when_empty(tmp_path):
+    """Community with no reasoning edges produces an article that does NOT
+    contain the `## Reasoning Relations` header (omit-when-empty)."""
+    G = nx.Graph()
+    G.add_node("a", label="A", file_type="code", source_file="a.py", community=0)
+    G.add_node("b", label="B", file_type="code", source_file="b.py", community=0)
+    G.add_edge("a", "b", relation="calls", confidence="EXTRACTED",
+               source_file="a.py", weight=1.0)
+    article = _community_article(G, 0, ["a", "b"], "Code Cluster",
+                                  {0: "Code Cluster"}, 0.9)
+    assert "## Reasoning Relations" not in article

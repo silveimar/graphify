@@ -450,6 +450,34 @@ def generate(
         f"- Superseded share: {_temp_pct:.1f}%",
     ]
 
+    # --- Phase 72-04 (REAS-04, D-16) Contradictions and Supersession Chains ---
+    # Top-level section produced by analyze.contradictions_and_chains. Omitted
+    # entirely when both the contradictions list and the supersession_chains
+    # list are empty (omit-when-empty rule, mirrors Phase 71-05 precedent).
+    from .analyze import contradictions_and_chains
+    _cc = contradictions_and_chains(G)
+    if _cc["contradictions"] or _cc["supersession_chains"]:
+        lines += ["", "## Contradictions and Supersession Chains", ""]
+        if _cc["supersession_chains"]:
+            lines += ["### Supersession Chains (longest first)", ""]
+            for chain in _cc["supersession_chains"]:
+                labels_chain = [
+                    _sanitize_md(str(G.nodes[n].get("label", n))) for n in chain
+                ]
+                lines.append(f"- {' → '.join(labels_chain)}")
+            lines.append("")
+        if _cc["contradictions"]:
+            lines += ["### Contradiction Pairs (highest confidence first)", ""]
+            for c in _cc["contradictions"]:
+                la = _sanitize_md(str(G.nodes.get(c["a"], {}).get("label", c["a"])))
+                lb = _sanitize_md(str(G.nodes.get(c["b"], {}).get("label", c["b"])))
+                score = c.get("confidence_score")
+                score_str = f" (confidence {score:.2f})" if isinstance(score, (int, float)) else ""
+                src = _sanitize_md(str(c.get("source_file", "")))
+                src_str = f" — `{src}`" if src else ""
+                lines.append(f"- {la} ⇄ {lb}{score_str}{src_str}")
+            lines.append("")
+
     return "\n".join(lines)
 
 

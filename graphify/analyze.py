@@ -143,6 +143,21 @@ def surprising_connections(
         return _cross_community_surprises(G, communities or {}, top_n)
 
 
+def _has_reasoning_edge(G: nx.Graph, n: str) -> bool:
+    """Return True if any edge incident to ``n`` is in REASONING_RELATIONS.
+
+    Used by knowledge_gaps (REAS-03 / D-13): a node whose only neighbors
+    are connected via reasoning relations (`supports`, `contradicts`,
+    `supersedes`, `evolved_into`, `depends_on`) is intentionally
+    anchored — it must NOT be classified as an isolated knowledge gap.
+    """
+    from .validate import REASONING_RELATIONS
+    return any(
+        G.edges[n, m].get("relation") in REASONING_RELATIONS
+        for m in G.neighbors(n)
+    )
+
+
 def _is_concept_node(G: nx.Graph, node_id: str) -> bool:
     """
     Return True if this node is a manually-injected semantic concept node
@@ -679,9 +694,17 @@ def knowledge_gaps(
         seen.add(nid)
         results.append({"id": nid, "label": G.nodes[nid].get("label", nid), "reason": reason})
 
-    # Isolated: degree <= 1, not a file/concept node
+    # Isolated: degree <= 1, not a file/concept node, not reasoning-anchored
+    # (REAS-03 / D-13: a node whose only edge is a reasoning relation —
+    # supports/contradicts/supersedes/evolved_into/depends_on — is intentional
+    # claim structure, not a knowledge gap).
     for n in G.nodes():
-        if G.degree(n) <= 1 and not _is_file_node(G, n) and not _is_concept_node(G, n):
+        if (
+            G.degree(n) <= 1
+            and not _is_file_node(G, n)
+            and not _is_concept_node(G, n)
+            and not _has_reasoning_edge(G, n)
+        ):
             _push(n, "isolated")
 
     # Thin communities: fewer than 3 members
@@ -702,6 +725,146 @@ def knowledge_gaps(
                         _push(n, "high_ambiguity_context")
 
     return results
+
+
+def contradictions_and_chains(G: "nx.Graph") -> dict:
+    """Surface reasoning-relation structure: contradiction pairs and supersession chains.
+
+    Phase 72-04 (REAS-03). Output shape:
+        {
+          "contradictions": [{"a": str, "b": str, "confidence_score": float | None,
+                              "source_file": str}, ...],
+          "supersession_chains": [[node_id, ...], ...],
+        }
+
+    Confidence gate (D-11): an edge is included iff
+        confidence == "EXTRACTED"  OR  (confidence_score is not None
+                                        AND float(confidence_score) >= 0.5).
+
+    Direction is recovered via the `_src` / `_tgt` edge attributes that
+    build.py stamps on every edge (Phase 53 W2 invariant).
+
+    Sorting (D-12): supersession_chains sorted by length DESC; contradictions
+    sorted by confidence_score DESC (None treated as 0.0). No top-N cap.
+
+    Cycle handling (T-72-10): a `supersedes` cycle in the reconstructed
+    DiGraph is guarded by per-path membership checks; a stderr warning is
+    emitted and accumulated chains are returned.
+
+    Contradicts dedup (Open Question 3): pairs deduped by frozenset({a, b}),
+    keeping the higher confidence_score on collision.
+    """
+    import sys
+    from .validate import REASONING_RELATIONS
+
+    def _passes_gate(d: dict) -> bool:
+        if d.get("confidence") == "EXTRACTED":
+            return True
+        score = d.get("confidence_score")
+        if score is None:
+            return False
+        try:
+            return float(score) >= 0.5
+        except (TypeError, ValueError):
+            return False
+
+    # ---- Collect contradicts pairs (deduped by frozenset) ----
+    contradicts_by_pair: dict[frozenset, dict] = {}
+    # ---- Collect supersedes edges as a directed graph ----
+    sup = nx.DiGraph()
+
+    for u, v, d in G.edges(data=True):
+        rel = d.get("relation")
+        if rel not in REASONING_RELATIONS:
+            continue
+        if not _passes_gate(d):
+            continue
+        src = d.get("_src", u)
+        tgt = d.get("_tgt", v)
+        if rel == "contradicts":
+            key = frozenset((src, tgt))
+            score = d.get("confidence_score")
+            try:
+                score_f = float(score) if score is not None else None
+            except (TypeError, ValueError):
+                score_f = None
+            existing = contradicts_by_pair.get(key)
+            if existing is None or (
+                (score_f is not None)
+                and (existing.get("confidence_score") is None
+                     or score_f > existing["confidence_score"])
+            ):
+                contradicts_by_pair[key] = {
+                    "a": src,
+                    "b": tgt,
+                    "confidence_score": score_f,
+                    "source_file": d.get("source_file", ""),
+                }
+        elif rel == "supersedes":
+            sup.add_edge(src, tgt)
+
+    # ---- Build supersession chains via DFS from in-degree-0 heads ----
+    chains: list[list[str]] = []
+    cycle_warned = False
+
+    def _walk(start: str) -> None:
+        nonlocal cycle_warned
+        # iterative DFS with per-path memo
+        stack: list[tuple[str, list[str]]] = [(start, [start])]
+        while stack:
+            node, path = stack.pop()
+            successors = list(sup.successors(node))
+            if not successors:
+                if len(path) >= 2:
+                    chains.append(list(path))
+                continue
+            for s in successors:
+                if s in path:
+                    if not cycle_warned:
+                        print(
+                            "[graphify] supersession cycle detected — chain output truncated",
+                            file=sys.stderr,
+                        )
+                        cycle_warned = True
+                    # emit accumulated path so far (length >= 2) before bailing
+                    if len(path) >= 2:
+                        chains.append(list(path))
+                    continue
+                stack.append((s, path + [s]))
+
+    try:
+        heads = [n for n in sup.nodes() if sup.in_degree(n) == 0]
+        if not heads and sup.number_of_nodes() > 0:
+            # fully cyclic component — warn and start from any node
+            print(
+                "[graphify] supersession cycle detected — chain output truncated",
+                file=sys.stderr,
+            )
+            cycle_warned = True
+            heads = list(sup.nodes())[:1]
+        for h in heads:
+            _walk(h)
+    except nx.NetworkXUnfeasible:
+        if not cycle_warned:
+            print(
+                "[graphify] supersession cycle detected — chain output truncated",
+                file=sys.stderr,
+            )
+
+    # Dedup chains (a longer path may include a shorter prefix as a separate
+    # chain when the shorter has no further successors; keep maximal only).
+    chains_sorted = sorted(chains, key=lambda c: -len(c))
+
+    # ---- Sort contradictions by confidence_score DESC (None => 0.0) ----
+    contradictions = sorted(
+        contradicts_by_pair.values(),
+        key=lambda c: -(c.get("confidence_score") or 0.0),
+    )
+
+    return {
+        "contradictions": contradictions,
+        "supersession_chains": chains_sorted,
+    }
 
 
 def detect_user_seeds(G: nx.Graph) -> dict[str, list[dict]]:

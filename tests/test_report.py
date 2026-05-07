@@ -771,3 +771,37 @@ def test_temporal_health_after_existing_sections():
     out = generate(G, *args, "./project")
     assert "## Summary" in out
     assert out.index("## Summary") < out.index("## Temporal Health")
+
+
+def test_contradictions_section():
+    """Phase 72-04 (REAS-04 / D-16): GRAPH_REPORT.md gains a top-level
+    'Contradictions and Supersession Chains' section when reasoning relations
+    exist; omitted entirely when none."""
+    # Case 1: graph with both a 3-node supersession chain and a contradiction
+    G = nx.Graph()
+    for nid in ("a", "b", "c"):
+        G.add_node(nid, label=nid.upper(), file_type="document",
+                   source_file=f"{nid}.md", source_location="")
+    G.add_edge("a", "b", relation="supersedes", confidence="EXTRACTED",
+               source_file="a.md", _src="a", _tgt="b", weight=1.0)
+    G.add_edge("b", "c", relation="supersedes", confidence="EXTRACTED",
+               source_file="b.md", _src="b", _tgt="c", weight=1.0)
+    G.add_node("p", label="P", file_type="document", source_file="p.md", source_location="")
+    G.add_node("q", label="Q", file_type="document", source_file="q.md", source_location="")
+    G.add_edge("p", "q", relation="contradicts", confidence="INFERRED",
+               confidence_score=0.85, source_file="p.md",
+               _src="p", _tgt="q", weight=1.0)
+    args = _empty_inputs(G)
+    out = generate(G, *args, "./project")
+    assert "## Contradictions and Supersession Chains" in out
+    assert "### Supersession Chains (longest first)" in out
+    assert "### Contradiction Pairs (highest confidence first)" in out
+
+    # Case 2: graph without reasoning edges — section must be omitted
+    G2 = nx.Graph()
+    G2.add_node("x", label="x", file_type="code", source_file="x.py")
+    G2.add_node("y", label="y", file_type="code", source_file="y.py")
+    G2.add_edge("x", "y", relation="calls", confidence="EXTRACTED", source_file="x.py")
+    args2 = _empty_inputs(G2)
+    out2 = generate(G2, *args2, "./project")
+    assert "Contradictions and Supersession Chains" not in out2
