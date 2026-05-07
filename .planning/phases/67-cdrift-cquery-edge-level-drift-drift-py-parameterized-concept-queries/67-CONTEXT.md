@@ -19,9 +19,9 @@ Out of scope: new edge classes for drift; surfacing drift via MCP/CLI query tool
 ## Implementation Decisions
 
 ### Snapshot lifecycle (CDRIFT-04)
-- **D-01:** Auto-snapshot on every successful `graphify run` — write the snapshot to `graphify-out/cache/snapshots/` at end of pipeline. Zero-friction drift accumulation; no opt-in flag required.
-- **D-02:** FIFO retention — keep the last 10 snapshots by mtime. Older snapshots are removed by `drift.py` after writing the new one. No age-based policy.
-- **D-03:** Snapshot writes use the same atomic `fsync + os.replace` pattern as Phase 66 `federate.write_manifest` — no partial files on crash.
+- **D-01:** Auto-snapshot on every successful `graphify run` — write the snapshot to `graphify-out/snapshots/` (reuse the existing Phase 11 path + `graphify/snapshot.py::save_snapshot` API; do NOT introduce a parallel `cache/snapshots/` directory). Zero-friction drift accumulation; no opt-in flag required. *(Revised 2026-05-06 after Phase 67 research surfaced the Phase 11 collision — see 67-RESEARCH.md Assumptions Log A1.)*
+- **D-02:** FIFO retention — keep the last 10 snapshots by mtime. Reuse the existing FIFO-10 prune in `snapshot.py`; `drift.py` does not duplicate the eviction logic. No age-based policy.
+- **D-03:** Snapshot writes use the existing atomic write path in `snapshot.py` (already `os.replace`-based); `drift.py` adds an explicit `fsync` to match Phase 66 `federate.write_manifest` durability. No partial files on crash.
 
 ### Community matching (CDRIFT-01, CDRIFT-02)
 - **D-04:** Cross-snapshot community matching uses **set Jaccard** on community membership (node-id sets). Threshold is **0.7 hardcoded** — communities matching ≥ 0.7 are treated as `community-renamed`; below threshold they are `community-resharded`. Edges whose endpoints disappear entirely are `orphaned`. Edges whose endpoints stay in matched communities are `stable`.
@@ -36,7 +36,7 @@ Out of scope: new edge classes for drift; surfacing drift via MCP/CLI query tool
 ### CQUERY parameters (CQUERY-01)
 - **D-10:** `confidence_band` is an **enum** with values `"high"` / `"medium"` / `"low"`. Cutpoints: `high` ≥ 0.8, `medium` 0.5 ≤ x < 0.8, `low` < 0.5. Discoverable via MCP schema. (Final cutpoints to be confirmed against Phase 65 confidence distribution during research; values above are the planning-time default.)
 - **D-11:** When both `min_confidence` and `confidence_band` are supplied, both must pass — **AND semantics**. Either may be `None`/omitted independently.
-- **D-12:** `relations` is a **whitelist** of relation strings. Default `None` = no filter (all relations traverse). Empty list `[]` = explicit "no relations match" → zero results. Strict semantics: empty-list does not silently mean "all".
+- **D-12:** `relations` is a **whitelist** of relation strings. Default `None` = no filter (all relations traverse). Empty list `[]` = explicit "no relations match" → zero results. Strict semantics: empty-list does not silently mean "all". **Implementation note (revised 2026-05-06):** the existing `_validate_relations_arg` at `serve.py:2246` rejects `[]` for the legacy parameter. Do NOT modify that validator. Add a new validator (e.g. `_validate_relations_filter_arg`) for the CQUERY param that accepts `[]` as a valid zero-match filter, preserving v1.12 behavior on the legacy code path. *(See 67-RESEARCH.md Assumptions Log A2.)*
 - **D-13:** All three parameters are optional and default to `None`; the BFS code path when all three are `None` MUST be byte-identical to v1.12 (CQUERY-02). Validation reuses the existing `concept_code_hops` validator pattern at `graphify/serve.py:2246`.
 
 ### Backward-compatibility regression test (CQUERY-02)
