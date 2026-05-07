@@ -14,7 +14,7 @@
 
 - [x] **TEMP-01**: Edges produced by `build.py` carry `valid_from` (timestamp of run that observed the edge) and optional `valid_until` (null = currently valid) attributes; emitted by `validate.py` as part of the edge schema and persisted in `graph.json` exports.
 - [x] **TEMP-02**: Edges carry a `decay_weight` float in `[0.0, 1.0]` whose default is `1.0` for `EXTRACTED` edges (no decay) and decays per-relation for `INFERRED` edges according to `valid_from` age, configurable per relation type.
-- [ ] **TEMP-03**: When `cache.py` re-runs against a corpus and an INFERRED edge from a prior run is no longer produced, the edge's `valid_until` is stamped with the current run timestamp instead of the edge being silently dropped; superseded edges remain in the on-disk graph for history but are excluded from `analyze.py` god-node and surprising-connection scoring by default.
+- [x] **TEMP-03**: When `cache.py` re-runs against a corpus and an INFERRED edge from a prior run is no longer produced, the edge's `valid_until` is stamped with the current run timestamp instead of the edge being silently dropped; superseded edges remain in the on-disk graph for history but are excluded from `analyze.py` god-node and surprising-connection scoring by default.
 - [ ] **TEMP-04**: `report.py` GRAPH_REPORT.md surfaces a "Temporal Health" sub-section showing counts of currently-valid vs superseded edges and the decay-weight distribution; `wiki.py` per-community articles flag edges with `valid_until` set as historical context rather than current relations.
 
 ### Reasoning-Relation Edge Types (REAS)
@@ -60,7 +60,7 @@
 |--------|-------|--------|
 | TEMP-01 | Phase 71 | Complete |
 | TEMP-02 | Phase 71 | Complete |
-| TEMP-03 | Phase 71 | Pending |
+| TEMP-03 | Phase 71 | Complete |
 | TEMP-04 | Phase 71 | Pending |
 | REAS-01 | Phase 72 | Pending |
 | REAS-02 | Phase 72 | Pending |

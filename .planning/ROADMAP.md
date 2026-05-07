@@ -96,7 +96,7 @@ Recommended sequence: 71 → 72 (depends on 71) with 73 and 74 running in parall
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 71. TEMP | 0/TBD | Not started | - |
+| 71. TEMP | 4/5 | In Progress|  |
 | 72. REAS | 0/TBD | Not started | - |
 | 73. DEDUP | 0/TBD | Not started | - |
 | 74. VBUG | 0/TBD | Not started | - |
