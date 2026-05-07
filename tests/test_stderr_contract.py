@@ -104,11 +104,19 @@ def test_no_outlier_stderr_prefixes_in_source() -> None:
     import subprocess
     import re as _re
     repo = Path(__file__).resolve().parents[1]
+    # AUDIT-02 / D-02: the previous regex used `[^)]*file=sys\.stderr` and stopped
+    # at the first `)`, so single-line calls like
+    #   print(f"[graphify] Extraction warning ({len(x)} issues): ...", file=sys.stderr)
+    # slipped past undetected because the inner `)` of `len(x)` / `(... issues)`
+    # terminated the character class. Use a greedy `.*` instead — every print(
+    # call we care about is on a single line, and grep matches per-line, so
+    # `.*file=sys.stderr` correctly walks across nested parens within the line.
+    pattern = r"print\(.*file=sys\.stderr"
     out = subprocess.check_output(
-        ["grep", "-rEn", r"print\([^)]*file=sys\.stderr", "graphify/", "--include=*.py"],
+        ["grep", "-rEn", pattern, "graphify/", "--include=*.py"],
         cwd=repo, text=True,
     )
-    allowed = _re.compile(r'(f?"\[graphify\] (error|info): |f?"  hint: )')
+    allowed = _re.compile(r'(f?"\[graphify\] (error|info|hint): |f?"  hint: )')
     offenders = []
     for line in out.splitlines():
         path = line.split(":", 1)[0]
