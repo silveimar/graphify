@@ -368,3 +368,66 @@ def test_supersession_path_resolution_vault_mode(pinned_run_ts, tmp_path):
     G = build_from_json(_ext_two_nodes(extra_edges=[]), resolved_output=resolved)
     assert G.has_edge("a", "b")
     assert G.get_edge_data("a", "b")["valid_until"] == pinned_run_ts
+
+
+# ---------------------------------------------------------------------------
+# Phase 71-04 Task 2: _merge_edge_fields temporal awareness (Pitfall 5)
+# ---------------------------------------------------------------------------
+
+from graphify.build import _merge_edge_fields  # noqa: E402
+
+
+def _base_edge(**kw):
+    e = {
+        "source": "a", "target": "b", "relation": "calls",
+        "confidence": "INFERRED", "source_file": "f1.py", "weight": 1.0,
+    }
+    e.update(kw)
+    return e
+
+
+def test_merge_mixed_temporal_status_current_wins():
+    """Pitfall 5: any input with valid_until=None → merged result is None (current wins)."""
+    e1 = _base_edge(valid_from="2025-01-01T00:00:00+00:00", valid_until=None)
+    e2 = _base_edge(valid_from="2025-06-01T00:00:00+00:00",
+                    valid_until="2026-01-01T00:00:00+00:00")
+    merged = _merge_edge_fields(e1, e2)
+    assert merged["valid_until"] is None
+
+
+def test_merge_preserves_earliest_valid_from():
+    """Earliest valid_from preserved (lex sort works for ISO-8601 UTC)."""
+    e1 = _base_edge(valid_from="2025-06-01T00:00:00+00:00", valid_until=None)
+    e2 = _base_edge(valid_from="2025-01-01T00:00:00+00:00", valid_until=None)
+    merged = _merge_edge_fields(e1, e2)
+    assert merged["valid_from"] == "2025-01-01T00:00:00+00:00"
+
+
+def test_merge_both_superseded_keeps_latest_valid_until():
+    """When ALL inputs have valid_until set, result keeps the LATEST."""
+    e1 = _base_edge(valid_from="2025-01-01T00:00:00+00:00",
+                    valid_until="2025-12-01T00:00:00+00:00")
+    e2 = _base_edge(valid_from="2025-02-01T00:00:00+00:00",
+                    valid_until="2026-03-01T00:00:00+00:00")
+    merged = _merge_edge_fields(e1, e2)
+    assert merged["valid_until"] == "2026-03-01T00:00:00+00:00"
+
+
+def test_merge_preserves_decay_weight_max():
+    """decay_weight = max(inputs) — current/highest-confidence dominates merge."""
+    e1 = _base_edge(decay_weight=0.3)
+    e2 = _base_edge(decay_weight=0.9)
+    merged = _merge_edge_fields(e1, e2)
+    assert merged["decay_weight"] == 0.9
+
+
+def test_merge_no_temporal_fields():
+    """Regression guard: legacy merge path (no temporal fields) is unaffected."""
+    e1 = _base_edge()
+    e2 = _base_edge(source_file="f2.py")
+    merged = _merge_edge_fields(e1, e2)
+    assert "valid_from" not in merged
+    assert "valid_until" not in merged
+    assert "decay_weight" not in merged
+    # Existing semantics still hold:
+    assert "f1.py" in merged["source_file"] and "f2.py" in merged["source_file"]
