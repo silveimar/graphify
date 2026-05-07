@@ -1,34 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.13
-milestone_name: "audit tech debt: stderr regex blind spot + non-compliant build.py:251, in-memory schema_version gap"
-status: executing
-stopped_at: Phase 70.2 context gathered
-last_updated: "2026-05-07T04:47:22.775Z"
+milestone: none
+milestone_name: "between milestones — v1.13 shipped 2026-05-07; v1.14 unscoped"
+status: between_milestones
+stopped_at: v1.13 archived and tagged
+last_updated: "2026-05-07T05:58:00.000Z"
 last_activity: 2026-05-07
 progress:
-  total_phases: 10
-  completed_phases: 8
-  total_plans: 38
-  completed_plans: 37
-  percent: 97
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` — **v1.13 milestone planning** (v1.12 shipped 2026-05-04).
+See: `.planning/PROJECT.md` — **v1.13 shipped 2026-05-07**. No active milestone.
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Phase 68 — audit-b-nyquist-gap-fill-seed-sha-traceability
+**Current focus:** Between milestones. Run `/gsd-new-milestone` to scope v1.14.
 
 ## Current Position
 
-Phase: 69
-Plan: Not started
-Status: Ready to execute
+Phase: —
+Plan: —
+Status: Between milestones (v1.13 archived; next phase numbering continues from 71)
 Last activity: 2026-05-07
 
 ## Performance Metrics
@@ -71,6 +71,6 @@ Milestone-close acknowledgments (v1.8 → v1.11) archived to `.planning/state/ar
 
 ## Session Continuity
 
-Last session: 2026-05-07T04:47:22.771Z
-Stopped at: Phase 70.2 context gathered
-Next action: review diff, commit/PR, or `/gsd-ship` / milestone close per project process
+Last session: 2026-05-07T05:58:00.000Z
+Stopped at: v1.13 archived (28/28 reqs, 41 plans, 10 phases) and tagged
+Next action: `/gsd-new-milestone` to scope v1.14

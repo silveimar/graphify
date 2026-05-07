@@ -1,5 +1,30 @@
 # Milestones
 
+## v1.13 Concept Intelligence & Audit Closure (Shipped: 2026-05-07)
+
+**Phases completed:** 10 phases (63, 64, 65, 66, 67, 68, 69, 70, 70.1, 70.2), 41 plans
+**Test growth:** ~2139 → **2400** passing on Python 3.10/3.12
+**Audit status:** `passed` after Phase 70.2 closure (28/28 requirements; see `.planning/milestones/v1.13-MILESTONE-AUDIT.md`)
+**Diff:** 307 files changed, +32,205 / −12,760
+
+**Key deliverables:**
+
+- **Concept Intelligence:**
+  - **CCONF (Phase 65):** Per-edge LLM `confidence_score` + `evidence`; separate cache namespace keyed on `prompt_version + model + edge_signature`; `schema_version` field with legacy-fixture compat; calibration self-check in GRAPH_REPORT.md.
+  - **CFED (Phase 66):** Cross-repo concept federation via `federate.py` — opt-in deterministic id-namespacing, multi-signal merge, provenance manifest, federation report section.
+  - **CDRIFT + CQUERY (Phase 67):** `drift.py` membership-Jaccard edge classification with snapshot retention; parameterized `concept_code_hops` (relation/confidence filters) anchored to a frozen v1.12 byte-identity oracle.
+- **Vault Hygiene:**
+  - **VOPT (Phase 63):** Vault-CWD silent Option B reroute to `.graphify-out/` with stderr breadcrumb; `--explain-paths` flag for offline path introspection.
+  - **VPROF (Phase 69):** Profile-driven folder resolution + user-namespace guard preventing graphify writes from clobbering user-authored notes.
+  - **VRSYNC (Phase 70):** Bidirectional vault → input reverse-sync — auto-on-run pipeline, JSONL log, doctor/schema, augmentation chokepoint wiring (9 plans).
+  - **VFIX (Phase 70.1):** Nested-vault folder bug + output/obsidian-dir profile precedence fix.
+- **Audit Hygiene:**
+  - **AUDIT-A (Phase 64):** Stderr two-line format snapshot lock + outlier sweep.
+  - **AUDIT-B (Phase 68):** Nyquist VALIDATION.md gap-fill across legacy phases + seed-SHA traceability annotations.
+  - **Phase 70.2 (audit tech debt closure):** Tightened stderr regex to catch nested-paren f-strings (AUDIT-02); single `SCHEMA_VERSION` constant in `build.py` stamped at both `build()` and `build_from_json()`, imported by `export.py` (CCONF-05 / CFED-03 in-memory gap closed); canonical precedence string `--output > profile > option-b (vault) > --obsidian-dir > legacy default` propagated verbatim across 9 doc sites with CI invariant test (VFIX-02).
+
+**Phase numbering:** 63 → 70.2 (10 phases). Next milestone continues from **71**.
+
 ## v1.12 Vault Awareness, Pipeline Integration (Shipped: 2026-05-04)
 
 **Phases completed:** 5 phases (59, 59.1, 60, 60.1, 61), extended by Phase 62.1 (argparse fix)

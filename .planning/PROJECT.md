@@ -8,36 +8,15 @@ A configurable output adapter for graphify that injects knowledge graph data (no
 
 Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, custom fusions, or future frameworks — without code changes, driven entirely by a declarative vault-side profile.
 
-## Current Milestone: v1.13 Concept Intelligence & Audit Closure
-
-**Goal:** Promote concept↔code edges from a structural feature to a knowledge-reasoning tool (cross-repo identity, semantic confidence, drift detection, parameterized queries), close the remaining vault-CWD seed bullet, and resolve all v1.12 audit-deferred items.
-
-**Target features:**
-
-*Concept Intelligence (SEED-bidirectional-concept-code-links — remaining 35%):*
-- Cross-repo concept identity federation — dedupe MOCs across `repo_identity` boundaries; unify `implements` edges
-- Per-edge LLM confidence scoring — replace uniform `confidence_score=1.0` with semantic scoring (schema already supports it)
-- Edge-level concept drift detection — surface when community renames orphan `implements` edges
-- Parameterized `concept_code_hops` — filter by relation type / confidence threshold; enables "concept coverage" lens
-
-*Vault Hygiene (SEED-vault-root-aware-cli — remaining 20%):*
-- Silent reroute Option B — when CWD is a vault but no `.graphify/profile.yaml`, optionally route output to hidden `.graphify-out/`
-
-*Audit Closure (v1.12 deferred items):*
-- Nyquist VALIDATION.md gap-fill across phases 59 / 59.1 / 60 / 60.1 / 61
-- Project-wide `[graphify]` stderr two-line format sweep (`__main__.py:~2745` and other outliers)
-- Retroactive seed traceability — annotate REQUIREMENTS.md / PROJECT.md with which milestone consumed each seed
-
-**Out of scope:**
-- Concept-edge schema breaking changes (already shipped in prior milestones)
-- New language extractors
-- Multi-vault federation beyond concept identity
-
 ## Current State
 
-**Last shipped:** v1.12 Vault Awareness, Pipeline Integration & Error Hygiene (2026-05-04) — 2139+ tests passing on Python 3.10/3.12. 7 phases (59, 59.1, 60, 60.1, 61, 62, 62.1), 18 plans, 13/13 requirements satisfied. Archives: `.planning/milestones/v1.12-*`.
+**Last shipped:** v1.13 Concept Intelligence & Audit Closure (2026-05-07) — 2400 tests passing on Python 3.10/3.12. 10 phases (63, 64, 65, 66, 67, 68, 69, 70, 70.1, 70.2), 41 plans, 28/28 requirements satisfied. Archives: `.planning/milestones/v1.13-*`.
 
-**Active milestone:** v1.13 — phase numbering continues from **63**.
+**Active milestone:** _None_ — run `/gsd-new-milestone` to start the next cycle. Next phase numbering will continue from **71**.
+
+## Shipped: v1.13 Concept Intelligence & Audit Closure (2026-05-07)
+
+Per-edge LLM confidence scoring (`confidence_score` + `evidence`, separate cache namespace, calibration self-check) (**CCONF-01..05**); deterministic cross-repo concept federation (`federate.py`, id-namespacing, multi-signal merge, provenance manifest) (**CFED-01..04**); edge-level drift detection (`drift.py`, membership-Jaccard classification, snapshot retention) (**CDRIFT-01..03**); parameterized `concept_code_hops` queries (relation/confidence filters with v1.12 byte-identity oracle) (**CQUERY-01..03**); vault Option B silent reroute + `--explain-paths` (**VOPT-01..03**); vault profile-driven folder resolution + user-namespace guard (**VPROF-01..04**); vault → input reverse-sync with auto-on-run, JSONL log, doctor/schema (**VRSYNC-01..09**); stderr format snapshot lock + sweep, regex blind-spot fix (**AUDIT-A**, **AUDIT-02**); Nyquist gap-fill + seed-SHA traceability (**AUDIT-B**); nested vault folder bug fix (**VFIX-01..02**); single SCHEMA_VERSION constant in build.py (**CCONF-05/CFED-03 closure**). **28/28** requirements. Archives: `.planning/milestones/v1.13-*`.
 
 ## Shipped: v1.12 Vault Awareness, Pipeline Integration & Error Hygiene (2026-05-04)
 
