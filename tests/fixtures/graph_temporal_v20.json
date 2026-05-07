@@ -1,0 +1,26 @@
+{
+  "schema_version": "2.0",
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {"id": "alpha", "label": "alpha", "file_type": "code", "source_file": "alpha.py"},
+    {"id": "beta", "label": "beta", "file_type": "code", "source_file": "beta.py"},
+    {"id": "gamma", "label": "gamma", "file_type": "code", "source_file": "gamma.py"}
+  ],
+  "edges": [
+    {"source": "alpha", "target": "beta", "relation": "calls",
+     "confidence": "EXTRACTED", "source_file": "alpha.py",
+     "valid_from": "2026-05-07T12:00:00+00:00", "valid_until": null,
+     "decay_weight": 1.0},
+    {"source": "beta", "target": "gamma", "relation": "uses",
+     "confidence": "INFERRED", "source_file": "beta.py", "confidence_score": 0.7,
+     "valid_from": "2026-05-07T12:00:00+00:00", "valid_until": null,
+     "decay_weight": 0.5},
+    {"source": "alpha", "target": "gamma", "relation": "semantically_similar_to",
+     "confidence": "INFERRED", "source_file": "alpha.py", "confidence_score": 0.6,
+     "valid_from": "2026-04-01T00:00:00+00:00",
+     "valid_until": "2026-04-01T00:00:00+00:00",
+     "decay_weight": 0.3}
+  ]
+}

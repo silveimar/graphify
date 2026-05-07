@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.13",
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {"id": "alpha", "label": "alpha", "file_type": "code", "source_file": "alpha.py"},
+    {"id": "beta", "label": "beta", "file_type": "code", "source_file": "beta.py"},
+    {"id": "gamma", "label": "gamma", "file_type": "code", "source_file": "gamma.py"}
+  ],
+  "edges": [
+    {"source": "alpha", "target": "beta", "relation": "calls",
+     "confidence": "EXTRACTED", "source_file": "alpha.py"},
+    {"source": "beta", "target": "gamma", "relation": "uses",
+     "confidence": "INFERRED", "source_file": "beta.py", "confidence_score": 0.7}
+  ]
+}
