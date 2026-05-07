@@ -14,6 +14,8 @@ from networkx.readwrite import json_graph
 from graphify.security import sanitize_label
 from graphify.analyze import _node_community_map, _fmt_source_file
 from graphify.profile import safe_filename, safe_frontmatter_value, safe_tag
+# Phase 70.2-02 (CCONF-05 / CFED-03): single source of truth lives in build.py.
+from .build import SCHEMA_VERSION
 
 COMMUNITY_COLORS = [
     "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
@@ -329,7 +331,7 @@ def to_json(G: nx.Graph, communities: dict[int, list[str]], output_path: str) ->
     # Phase 65 (CCONF-05): every new write carries an explicit schema_version.
     # If G.graph already has one (e.g. round-tripped from a loaded graph), preserve
     # it; otherwise stamp this fresh write as 1.13.
-    data["schema_version"] = getattr(G, "graph", {}).get("schema_version", "1.13")
+    data["schema_version"] = getattr(G, "graph", {}).get("schema_version", SCHEMA_VERSION)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     # MANIFEST-02: runtime manifest alongside graph.json (same success path).

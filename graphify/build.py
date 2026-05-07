@@ -30,6 +30,12 @@ import networkx as nx
 
 from .validate import validate_extraction
 
+# Phase 70.2-02 (CCONF-05 / CFED-03): single source of truth for graph schema version.
+# Stamped on every graph constructed via build() / build_from_json() so MCP server,
+# query tooling, and downstream callers see schema_version even without going through
+# export. export.py imports this constant — do not duplicate the literal there.
+SCHEMA_VERSION = "1.13"
+
 _CONF_RANK = {"EXTRACTED": 3, "INFERRED": 2, "AMBIGUOUS": 1}
 
 # Phase 53 (D-53.02): all five concept↔code relations are oriented code → concept.
@@ -303,6 +309,9 @@ def build_from_json(
     hyperedges = extraction.get("hyperedges", [])
     if hyperedges:
         G.graph["hyperedges"] = hyperedges
+    # Phase 70.2-02 (CCONF-05 / CFED-03): stamp schema_version at construction time
+    # so in-memory consumers (MCP, query, downstream callers) see it without export.
+    G.graph["schema_version"] = SCHEMA_VERSION
     return G
 
 
@@ -336,4 +345,8 @@ def build(
         combined["hyperedges"].extend(ext.get("hyperedges", []))
         combined["input_tokens"] += ext.get("input_tokens", 0)
         combined["output_tokens"] += ext.get("output_tokens", 0)
-    return build_from_json(combined, directed=directed)
+    G = build_from_json(combined, directed=directed)
+    # Phase 70.2-02 (CCONF-05 / CFED-03): explicit stamp at the build() boundary too,
+    # independent of build_from_json()'s stamp, so future refactors can't silently drop it.
+    G.graph["schema_version"] = SCHEMA_VERSION
+    return G
