@@ -1910,7 +1910,44 @@ graphify claude uninstall  # remove the section
 
 
 <!-- Phase 65 / CCONF prompt-version drift gate (do not remove) -->
-### Confidence scoring (Phase 65, prompt_version 1.13.0)
+### Confidence scoring (Phase 65, prompt_version 1.14.0)
 For each concept↔code INFERRED edge, score the relationship 0–1 with ≤280-char evidence,
-then write results via `graphify.cache.save_confidence(..., prompt_version="1.13.0", model_id=...)`.
+then write results via `graphify.cache.save_confidence(..., prompt_version="1.14.0", model_id=...)`.
 Bumping `PROMPT_VERSION` in `graphify/prompts.py` MUST be matched here (drift gate test enforces).
+
+<!-- BEGIN: phase-72-reas reasoning-relations block -->
+### Reasoning relations (documents/papers/rationales only)
+
+When extracting from documents (md/txt/rst), papers (PDF), or rationale notes, also emit reasoning-relation edges using these 5 relation types:
+
+- `supports` — Source asserts evidence in favor of target.
+- `contradicts` — Source asserts target is false or incompatible.
+- `supersedes` — Source replaces target as canonical. **Orientation: newer -> older. Target is the superseded (deprecated) node.**
+- `evolved_into` — Source is an earlier version that became target. Direction: older -> newer.
+- `depends_on` — Source's claim relies on target's claim.
+
+**Endpoint constraint:** Both `source` and `target` MUST be document/paper/rationale nodes (or document-derived concept nodes). DO NOT emit reasoning relations on code-typed nodes — they will be rejected by validate.py.
+
+**Confidence rules (CCONF v1.13):** Emit `confidence` (`EXTRACTED` / `INFERRED` / `AMBIGUOUS`). For `INFERRED`, emit `confidence_score` as a float in `[0.0, 1.0]`. EXTRACTED reasoning edges may omit `confidence_score`.
+
+**Worked example 1 — ADR supersession (newer -> older):**
+```
+Input fragment (in docs/adr/0042-new-auth.md):
+  "This ADR supersedes ADR-0028 (token-based auth)."
+Emit:
+  {"source": "adr_0042", "target": "adr_0028", "relation": "supersedes",
+   "confidence": "EXTRACTED", "source_file": "docs/adr/0042-new-auth.md"}
+```
+
+**Worked example 2 — ADR contradiction:**
+```
+Input fragment (in docs/adr/0050-revisit.md):
+  "This proposal directly contradicts ADR-0042's claim that JWTs cannot be revoked."
+Emit:
+  {"source": "adr_0050", "target": "adr_0042", "relation": "contradicts",
+   "confidence": "INFERRED", "confidence_score": 0.85,
+   "source_file": "docs/adr/0050-revisit.md"}
+```
+
+**Resolution note:** If the textual reference (e.g. `ADR-0028`) does not match a node id, the build layer will resolve it by label or substring. Emit the human-readable label or partial id as `target` — do not invent ids.
+<!-- END: phase-72-reas reasoning-relations block -->

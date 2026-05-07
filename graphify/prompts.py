@@ -7,7 +7,7 @@ in tests/test_skill_prompt_drift.py).
 """
 from __future__ import annotations
 
-PROMPT_VERSION: str = "1.13.0"
+PROMPT_VERSION: str = "1.14.0"
 
 SCORING_PROMPT_TEMPLATE: str = (
     "Score the relationship between the concept and the code excerpt below "
