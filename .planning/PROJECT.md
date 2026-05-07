@@ -12,7 +12,29 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 **Last shipped:** v1.13 Concept Intelligence & Audit Closure (2026-05-07) — 2400 tests passing on Python 3.10/3.12. 10 phases (63, 64, 65, 66, 67, 68, 69, 70, 70.1, 70.2), 41 plans, 28/28 requirements satisfied. Archives: `.planning/milestones/v1.13-*`.
 
-**Active milestone:** _None_ — run `/gsd-new-milestone` to start the next cycle. Next phase numbering will continue from **71**.
+**Active milestone:** **v2.0 — Graph Schema Deepening** (started 2026-05-07). Phase numbering continues from **71**. See `## Current Milestone: v2.0` below.
+
+## Current Milestone: v2.0 Graph Schema Deepening
+
+**Goal:** Major-version schema upgrade — add temporal edge validity (`valid_from`, `valid_until`, `decay_weight`) and reasoning-relation edge types (`supports`, `contradicts`, `supersedes`, `evolved_into`, `depends_on`) for document/concept nodes — with a measurement-gated content-fingerprint dedup spike, the carryover vault-cwd-gate-argparse-required debug fix, and a coordinated `graphifyy` PyPI 2.0.0 package version bump.
+
+**Target features:**
+
+- **Temporal edge validity** — `valid_from`, `valid_until`, `decay_weight` columns on edges; `cache.py` marks prior-run INFERRED edges as superseded rather than dropped; `analyze.py` weighs decayed edges in god-node / surprising-connection scoring.
+- **Reasoning-relation edge types** — `supports`, `contradicts`, `supersedes`, `evolved_into`, `depends_on` for document/concept nodes; `validate.py` taxonomy extension; `extract.py` semantic-prompt updates; `analyze.py` surfaces contradiction/supersession chains as a new analysis category; `report.py` + `wiki.py` render reasoning chains.
+- **Content-fingerprint dedup spike** — measurement-only phase resolving `Q-2026-05-07-01` (`.planning/research/questions.md`). Output is a ship/defer decision; implementation lands only if the spike clears the >5% near-duplicate threshold on a representative multi-source corpus.
+- **Vault-cwd-gate fix** — resolve `.planning/debug/vault-cwd-gate-argparse-required.md` (pending since v1.12 Phase 62-03). Apply the chosen approach (inject `--vault <cwd>` into argv before parse, OR drop `required=True` and enforce at resolution layer) across every gated command with the same defect.
+- **Package version bump** — `graphifyy` PyPI version → `2.0.0`; reinstall with `[mcp,pdf,watch]`; sync `mcp/server.json` (manifest hash includes `graphify_version`); skill-stamp refresh; full test sweep on Python 3.10 + 3.12.
+
+**Why v2.0 (not v1.14):** Reasoning-relation taxonomy + temporal columns change INFERRED-edge semantics. New graph.json reads must remain backward-compatible (legacy fixtures without temporal columns load fine — the precedent from CCONF `schema_version`), but new outputs are not equivalent to v1.x outputs. The major version signals the break.
+
+**Hard non-goals (decisions, not omissions):**
+
+- ❌ No embeddings in clustering — preserve Leiden topology-only design (`cluster.py`).
+- ❌ No Postgres / Supabase backend — preserve filesystem JSON + optional Neo4j export shape.
+- ❌ No OB1 (Open Brain) integration in v2.0 — `SEED-ob1-recipe-repo-graphify` and the MCP tool-surface alignment with `ob-graph` carry forward to v2.1+ as a seed.
+
+**Provenance:** Scope derived from `/gsd-explore` OB1 comparison (2026-05-07), `SEED-temporal-edges-and-reasoning-relations` (consumed by this milestone), and the carried-over debug session.
 
 ## Shipped: v1.13 Concept Intelligence & Audit Closure (2026-05-07)
 
@@ -297,7 +319,7 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-*v1.13 is active — goals are listed under **Current Milestone: v1.13** at the top of this file.*
+*v2.0 is active — goals are listed under **Current Milestone: v2.0** at the top of this file.*
 
 ---
-*Last updated: 2026-05-05 — Started milestone **v1.13** (Concept Intelligence & Audit Closure); phase numbering from **63**.*
+*Last updated: 2026-05-07 — Started milestone **v2.0** (Graph Schema Deepening); phase numbering from **71**.*

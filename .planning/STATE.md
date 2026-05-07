@@ -1,10 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: "between milestones — v1.13 shipped 2026-05-07; v1.14 unscoped"
-status: between_milestones
-stopped_at: v1.13 archived and tagged
-last_updated: "2026-05-07T05:58:00.000Z"
+milestone: v2.0
+milestone_name: Graph Schema Deepening
+status: planning
+last_updated: "2026-05-07T17:24:39.119Z"
 last_activity: 2026-05-07
 progress:
   total_phases: 0
@@ -26,10 +25,10 @@ See: `.planning/PROJECT.md` — **v1.13 shipped 2026-05-07**. No active mileston
 
 ## Current Position
 
-Phase: —
+Phase: Not started (defining requirements)
 Plan: —
-Status: Between milestones (v1.13 archived; next phase numbering continues from 71)
-Last activity: 2026-05-07
+Status: Defining requirements
+Last activity: 2026-05-07 — Milestone v2.0 started
 
 ## Performance Metrics
 
