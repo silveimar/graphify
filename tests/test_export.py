@@ -716,3 +716,90 @@ def test_obsidian_no_edge_frontmatter_change(tmp_path):
             frontmatter = parts[1]
             assert "valid_until:" not in frontmatter
             assert "decay_weight:" not in frontmatter
+
+
+# ---------------------------------------------------------------------------
+# Phase 72-04 (REAS-04, D-15) Obsidian frontmatter reasoning_relations
+# ---------------------------------------------------------------------------
+
+
+def test_obsidian_reasoning_relations_frontmatter(tmp_path):
+    """to_obsidian emits a `reasoning_relations` YAML list in the per-node
+    frontmatter when the node has outbound REASONING_RELATIONS edges; nodes
+    without such edges have no `reasoning_relations` key.
+
+    Items are JSON-encoded scalar strings (T-72-12: pre-coerced to
+    str/float, then JSON-encoded — defense against YAML object injection).
+    """
+    from graphify.export import to_obsidian
+    from graphify.merge import split_rendered_note
+    import networkx as nx
+    import json
+
+    G = nx.Graph()
+    G.add_node("doc_a", label="Doc A", file_type="document",
+               source_file="a.md", community=0)
+    G.add_node("doc_b", label="Doc B", file_type="document",
+               source_file="b.md", community=0)
+    G.add_node("doc_c", label="ADR-0028", file_type="document",
+               source_file="c.md", community=0)
+    G.add_node("doc_lonely", label="Doc Lonely", file_type="document",
+               source_file="x.md", community=0)
+    # doc_a -- supports --> doc_b (INFERRED, score 0.8)
+    G.add_edge("doc_a", "doc_b", relation="supports", confidence="INFERRED",
+               confidence_score=0.8, source_file="a.md",
+               _src="doc_a", _tgt="doc_b", weight=1.0)
+    # doc_a -- supersedes --> doc_c (EXTRACTED, no score)
+    G.add_edge("doc_a", "doc_c", relation="supersedes", confidence="EXTRACTED",
+               source_file="a.md", _src="doc_a", _tgt="doc_c", weight=1.0)
+    # doc_lonely has no reasoning edges — still need at least one structural edge
+    # so it is not orphaned out of mapping. Use a plain reference.
+    G.add_edge("doc_lonely", "doc_b", relation="references",
+               confidence="EXTRACTED", source_file="x.md", weight=1.0)
+
+    obsidian_dir = tmp_path / "obsidian"
+    obsidian_dir.mkdir()
+    plan, rendered_notes, profile, manifest_path, manifest = to_obsidian(
+        G,
+        communities={0: ["doc_a", "doc_b", "doc_c", "doc_lonely"]},
+        output_dir=str(obsidian_dir),
+        dry_run=True,
+        return_render_context=True,
+    )
+
+    # doc_a should have reasoning_relations with both items
+    a_note = rendered_notes.get("doc_a")
+    assert a_note is not None, f"doc_a not in rendered_notes: {list(rendered_notes)}"
+    fm_fields = a_note["frontmatter_fields"]
+    assert "reasoning_relations" in fm_fields
+    rr = fm_fields["reasoning_relations"]
+    assert isinstance(rr, list)
+    assert len(rr) == 2
+    parsed = [json.loads(item) for item in rr]
+    types = {p["type"] for p in parsed}
+    targets = {p["target"] for p in parsed}
+    assert types == {"supports", "supersedes"}
+    assert "Doc B" in targets and "ADR-0028" in targets
+    # confidence_score present for the INFERRED supports edge, absent for EXTRACTED
+    by_type = {p["type"]: p for p in parsed}
+    assert by_type["supports"]["confidence_score"] == 0.8
+    assert "confidence_score" not in by_type["supersedes"]
+
+    # doc_lonely (no reasoning edges) has NO reasoning_relations key
+    lonely_note = rendered_notes.get("doc_lonely")
+    if lonely_note is not None:
+        assert "reasoning_relations" not in lonely_note["frontmatter_fields"]
+
+    # Round-trip: split_rendered_note on the full rendered text preserves
+    # the field as a list of strings (T-72-12 / round-trip without loss).
+    # Render the note text manually since RenderedNote stores fields + body.
+    from graphify.profile import _dump_frontmatter
+    rendered_text = _dump_frontmatter(fm_fields) + "\n" + a_note["body"]
+    parsed_fm, body = split_rendered_note(rendered_text)
+    assert "reasoning_relations" in parsed_fm
+    assert isinstance(parsed_fm["reasoning_relations"], list)
+    assert len(parsed_fm["reasoning_relations"]) == 2
+    # Each round-tripped item is still json-decodable to a dict with the keys
+    rt_parsed = [json.loads(item) for item in parsed_fm["reasoning_relations"]]
+    rt_types = {p["type"] for p in rt_parsed}
+    assert rt_types == {"supports", "supersedes"}

@@ -1398,6 +1398,30 @@ def render_note(
     )
     if note_type == "code" and isinstance(repo_identity, str) and repo_identity:
         frontmatter_fields["repo"] = safe_frontmatter_value(repo_identity)
+    # Phase 72-04 (REAS-04, D-15): inject `reasoning_relations` YAML list
+    # from the per-node ctx (populated by export.to_obsidian). Each item is
+    # a JSON-encoded scalar string {"type", "target", "confidence_score"}
+    # which round-trips losslessly through `_parse_frontmatter` /
+    # `split_rendered_note` (T-72-12 mitigation: values pre-coerced to
+    # str / float, then JSON-encoded — no raw YAML object emission).
+    if isinstance(ctx, dict):
+        rr_items = ctx.get("reasoning_relations") or []
+        if rr_items:
+            import json as _json
+            rr_serialized: list[str] = []
+            for it in rr_items:
+                if not isinstance(it, dict):
+                    continue
+                payload = {
+                    "type": str(it.get("type", "")),
+                    "target": str(it.get("target", "")),
+                }
+                score = it.get("confidence_score")
+                if isinstance(score, (int, float)):
+                    payload["confidence_score"] = float(score)
+                rr_serialized.append(_json.dumps(payload, sort_keys=True))
+            if rr_serialized:
+                frontmatter_fields["reasoning_relations"] = rr_serialized
     if isinstance(ctx, dict) and ctx.get("filename_collision"):
         frontmatter_fields["filename_collision"] = True
         collision_hash = ctx.get("filename_collision_hash")
