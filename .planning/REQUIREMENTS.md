@@ -56,20 +56,18 @@
 
 ## Traceability
 
-*To be filled in by the roadmapper. Each REQ-ID will map to exactly one phase under v2.0.*
-
 | REQ-ID | Phase | Status |
-|---|---|---|
-| TEMP-01 | TBD | Active |
-| TEMP-02 | TBD | Active |
-| TEMP-03 | TBD | Active |
-| TEMP-04 | TBD | Active |
-| REAS-01 | TBD | Active |
-| REAS-02 | TBD | Active |
-| REAS-03 | TBD | Active |
-| REAS-04 | TBD | Active |
-| DEDUP-01 | TBD | Active |
-| VBUG-01 | TBD | Active |
-| VBUG-02 | TBD | Active |
-| PKG-01 | TBD | Active |
-| PKG-02 | TBD | Active |
+|--------|-------|--------|
+| TEMP-01 | Phase 71 | Pending |
+| TEMP-02 | Phase 71 | Pending |
+| TEMP-03 | Phase 71 | Pending |
+| TEMP-04 | Phase 71 | Pending |
+| REAS-01 | Phase 72 | Pending |
+| REAS-02 | Phase 72 | Pending |
+| REAS-03 | Phase 72 | Pending |
+| REAS-04 | Phase 72 | Pending |
+| DEDUP-01 | Phase 73 | Pending |
+| VBUG-01 | Phase 74 | Pending |
+| VBUG-02 | Phase 74 | Pending |
+| PKG-01 | Phase 75 | Pending |
+| PKG-02 | Phase 75 | Pending |

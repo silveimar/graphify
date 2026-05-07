@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Graph Schema Deepening
-status: planning
-last_updated: "2026-05-07T17:24:39.119Z"
+status: ready
+last_updated: "2026-05-07T17:33:00.000Z"
 last_activity: 2026-05-07
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,22 +17,39 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` — **v1.13 shipped 2026-05-07**. No active milestone.
+See: `.planning/PROJECT.md` — **v1.13 shipped 2026-05-07**. Active milestone: v2.0.
 
 **Core value:** Graphify can inject knowledge into any Obsidian vault framework driven entirely by a declarative vault-side profile.
 
-**Current focus:** Between milestones. Run `/gsd-new-milestone` to scope v1.14.
+**Current focus:** Phase 71 — TEMP (temporal edge validity)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 71 of 75 (TEMP)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-07 — Milestone v2.0 started
+Status: Ready to plan
+Last activity: 2026-05-07 — v2.0 roadmap created, 5 phases, 13/13 requirements mapped
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
-Historical phase-by-phase baselines moved to `.planning/metrics/historical-baselines.md` (frees STATE.md from validator phase-mismatch warnings).
+**Velocity:**
+- Total plans completed: 0
+- Average duration: —
+- Total execution time: —
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+**Recent Trend:**
+- Last 5 plans: —
+- Trend: —
+
+*Updated after each plan completion*
 
 ## Accumulated Context
 
@@ -44,6 +61,11 @@ Cross-milestone roadmap evolution archived to `.planning/state/archived-context.
 
 ### Decisions
 
+- **Backward-compat read**: Legacy graph.json files without temporal columns or reasoning relations must load without error — follow CCONF schema_version precedent (v1.13 Phase 65).
+- **DEDUP is measurement-only**: Phase 73 ships a spike artifact and recommendation only; implementation requires the >5% threshold AND genuine collision confirmation.
+- **Phase 75 is gated**: PKG bump depends on all of 71, 72, 73, 74 completing first.
+- **Parallel execution available**: Phases 73 and 74 are independent of 72 and can run concurrently.
+
 Cross-milestone decisions archived to `.planning/state/archived-context.md`.
 
 ### Pending Todos
@@ -52,24 +74,20 @@ None.
 
 ### Blockers/Concerns
 
-Research flags for planning:
-
 - Any LLM naming plan must preserve offline behavior, budget gates, cache stability, and sanitization.
 
 Cross-milestone research flags (v1.8/v1.12) archived to `.planning/state/archived-context.md`.
 
 ## Deferred Items
 
-Milestone-close acknowledgments (v1.8 → v1.11) archived to `.planning/state/archived-context.md`.
-
-## Quick Tasks Completed
-
-| Date (UTC) | Slug | Summary |
-|------------|------|---------|
-| 2026-04-30 | docs-folder-and-guide-refresh | Moved INSTALLATION, MIGRATION_V1_8, PROFILE-CONFIGURATION, CONFIGURING_V1_5, ARCHITECTURE into `docs/`; refreshed README index and cross-links; aligned CONFIGURING with `mcp_tool_registry.py` + alias behavior; `tests/test_docs.py` path updated |
+| Category | Item | Status | Deferred At |
+|----------|------|--------|-------------|
+| OB1 | OB1-RECIPE-01..04 — Ship graphify as recipes/repo-graphify | Deferred to seed | v2.0 scope |
+| OB1 | MCP-ALIGN-01..02 — Align serve.py with ob-graph's 10 tools | Deferred to seed | v2.0 scope |
+| DEDUP | DEDUP-02..N — Implement node-level dedup | Gated on DEDUP-01 spike | v2.0 scope |
 
 ## Session Continuity
 
-Last session: 2026-05-07T05:58:00.000Z
-Stopped at: v1.13 archived (28/28 reqs, 41 plans, 10 phases) and tagged
-Next action: `/gsd-new-milestone` to scope v1.14
+Last session: 2026-05-07T17:33:00.000Z
+Stopped at: v2.0 roadmap written — 5 phases (71–75), 13/13 requirements mapped
+Next action: `/gsd-plan-phase 71`
