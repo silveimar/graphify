@@ -137,3 +137,87 @@ def test_community_article_truncation_notice(tmp_path):
     to_wiki(G, communities, tmp_path, community_labels={0: "Big Community"})
     article = (tmp_path / "Big_Community.md").read_text()
     assert "and 5 more nodes" in article
+
+
+# --- Phase 71-05 Historical relations subsection (TEMP-04, D-11 omit-when-empty) ---
+
+def _make_graph_with_history():
+    """Community 0 has 1 historical edge (n1->n5) and current edges. Community 1 has none."""
+    G = nx.Graph()
+    G.add_node("n1", label="parse", file_type="code", source_file="parser.py", community=0)
+    G.add_node("n2", label="validate", file_type="code", source_file="parser.py", community=0)
+    G.add_node("n3", label="render", file_type="code", source_file="renderer.py", community=1)
+    G.add_node("n4", label="stream", file_type="code", source_file="renderer.py", community=1)
+    G.add_node("n5", label="legacy_helper", file_type="code", source_file="parser.py", community=0)
+    G.add_edge("n1", "n2", relation="calls", confidence="EXTRACTED", weight=1.0, valid_until=None)
+    G.add_edge("n3", "n4", relation="calls", confidence="EXTRACTED", weight=1.0, valid_until=None)
+    G.add_edge("n1", "n5", relation="calls", confidence="INFERRED", weight=1.0,
+               valid_until="2026-05-07T12:00:00+00:00")
+    return G
+
+
+def test_historical_relations_section(tmp_path):
+    G = _make_graph_with_history()
+    communities = {0: ["n1", "n2", "n5"], 1: ["n3", "n4"]}
+    labels = {0: "Parsing Layer", 1: "Rendering Layer"}
+    to_wiki(G, communities, tmp_path, community_labels=labels)
+    parsing = (tmp_path / "Parsing_Layer.md").read_text()
+    assert "## Historical relations" in parsing
+
+
+def test_historical_relations_omitted_when_empty(tmp_path):
+    G = _make_graph_with_history()
+    communities = {0: ["n1", "n2", "n5"], 1: ["n3", "n4"]}
+    labels = {0: "Parsing Layer", 1: "Rendering Layer"}
+    to_wiki(G, communities, tmp_path, community_labels=labels)
+    rendering = (tmp_path / "Rendering_Layer.md").read_text()
+    assert "## Historical relations" not in rendering
+
+
+def test_historical_relations_format(tmp_path):
+    G = _make_graph_with_history()
+    communities = {0: ["n1", "n2", "n5"], 1: ["n3", "n4"]}
+    labels = {0: "Parsing Layer", 1: "Rendering Layer"}
+    to_wiki(G, communities, tmp_path, community_labels=labels)
+    parsing = (tmp_path / "Parsing_Layer.md").read_text()
+    # Format: - [[neighbor]] (until <valid_until>)
+    assert "[[n5]]" in parsing or "[[legacy_helper]]" in parsing
+    assert "(until 2026-05-07T12:00:00+00:00)" in parsing
+
+
+def test_historical_relations_security_escape(tmp_path):
+    G = nx.Graph()
+    G.add_node("n1", label="x", file_type="code", source_file="x.py", community=0)
+    G.add_node("n2", label="y", file_type="code", source_file="x.py", community=0)
+    G.add_edge("n1", "n2", relation="calls", confidence="INFERRED", weight=1.0,
+               valid_until="<script>alert(1)</script>")
+    communities = {0: ["n1", "n2"]}
+    to_wiki(G, communities, tmp_path, community_labels={0: "C"})
+    art = (tmp_path / "C.md").read_text()
+    assert "<script>" not in art
+    assert "&lt;script&gt;" in art
+
+
+def test_historical_relations_length_cap(tmp_path):
+    G = nx.Graph()
+    long_vu = "A" * 200
+    G.add_node("n1", label="x", file_type="code", source_file="x.py", community=0)
+    G.add_node("n2", label="y", file_type="code", source_file="x.py", community=0)
+    G.add_edge("n1", "n2", relation="calls", confidence="INFERRED", weight=1.0,
+               valid_until=long_vu)
+    communities = {0: ["n1", "n2"]}
+    to_wiki(G, communities, tmp_path, community_labels={0: "C"})
+    art = (tmp_path / "C.md").read_text()
+    # 64-char cap
+    assert "A" * 64 in art
+    assert "A" * 65 not in art
+
+
+def test_currently_valid_pass_unchanged(tmp_path):
+    """Regression: existing relationship/audit-trail rendering unchanged when no historical edges."""
+    G = _make_graph()  # original fixture, no valid_until
+    to_wiki(G, COMMUNITIES, tmp_path, community_labels=LABELS)
+    parsing = (tmp_path / "Parsing_Layer.md").read_text()
+    assert "## Relationships" in parsing
+    assert "## Audit Trail" in parsing
+    assert "## Historical relations" not in parsing
