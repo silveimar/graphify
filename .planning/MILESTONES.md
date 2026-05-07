@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.12 Vault Awareness, Pipeline Integration (Shipped: 2026-05-04)
+
+**Phases completed:** 5 phases (59, 59.1, 60, 60.1, 61), extended by Phase 62.1 (argparse fix)
+**Audit status:** `tech_debt` at close — Nyquist VALIDATION.md gap and SEED traceability annotations deferred to Phase 68 AUDIT-B
+**Audit-closure agent:** Phase 68 (audit-b-nyquist-gap-fill-seed-sha-traceability) — closed AUDIT-01 (Nyquist VALIDATION.md retroactive entries with SHA + test citations) and AUDIT-03 (seed-SHA traceability annotations in REQUIREMENTS.md and PROJECT.md)
+
+**Key deliverables:**
+- VCWD-01..05: vault-root-aware CLI (`--vault` flag, argparse refactor, Phase 59)
+- Pipeline integration and harness error UX finalization (Phase 61)
+- Silent reroute Option B scoped forward to v1.13
+
+**Deferred items resolved in v1.13 Phase 68:**
+- AUDIT-01: retroactive v1.12-VALIDATION.md with 5 Nyquist sections, each citing implementing SHA and asserting test path
+- AUDIT-03: SEED-vault-root-aware-cli and SEED-bidirectional-concept-code-links annotated with consuming milestone and v1.13 closure
+
 ## v1.11 Templates, Graph Semantics & Vault Depth (Shipped: 2026-05-03)
 
 **Phases completed:** 6 phases (53–58), 27 plans
