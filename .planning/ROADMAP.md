@@ -100,7 +100,10 @@
   2. A closure script re-executes every cited test and reports green; the script is checked in and runnable from a clean checkout.
   3. REQUIREMENTS.md and PROJECT.md annotate each seed with its consuming milestone (SEED-001 → v1.9, SEED-002 → v1.4, SEED-vault-root-aware-cli → v1.12 + v1.13 closes Option B, SEED-bidirectional-concept-code-links → v1.10 / v1.11 / v1.13 closes remainder).
   4. The audit closure leaves no v1.12-deferred audit item open in MILESTONES.md.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 68-01-PLAN.md — Register audit_v112 marker, decorate 5 v1.12 tests, ship scripts/audit_b_closure.py with drift cross-check (TDD) — **wave 1**
+- [ ] 68-02-PLAN.md — Author consolidated .planning/milestones/v1.12-VALIDATION.md (5 sections per D-02) — **wave 1**
+- [ ] 68-03-PLAN.md — SEED bullet patches in PROJECT.md + AUDIT checkbox flips in REQUIREMENTS.md + new ## v1.12 section in MILESTONES.md (D-03, D-05) — **wave 2** (depends on 68-01, 68-02: closure script must exist and pass; v1.12-VALIDATION.md must be referenced)
 
 ### Phase 69: VPROF — Vault Profile-Driven Folder Resolution & User-Namespace Guard
 **Goal**: `graphify update-vault` and `graphify vault-promote --write-into-vault` resolve every write target via `profile.graphify_folder_mapping` (default `Atlas/Sources/Graphify/<type>/`), refuse to write under `profile.user_only_folders`, and surface legacy graphify-shaped artifacts outside the pinned subtree via `graphify doctor` + `--migrate-legacy`.
