@@ -55,7 +55,7 @@
 ### AUDIT — v1.12 Audit Closure
 - [x] **AUDIT-01**: Nyquist VALIDATION.md gap-fill for v1.12 phases 59, 59.1, 60, 60.1, 61 — each retroactive entry cites the implementing SHA and the asserting test path; the closure script re-runs the cited tests to prove they still pass.
 - [x] **AUDIT-02**: Project-wide `[graphify]` stderr two-line format sweep migrates remaining one-line outliers (e.g. `__main__.py:~2745`) to the v1.12 `[graphify] error:` + `  hint:` convention. A stderr-format snapshot test is introduced **before** any reformatting to lock the contract for the 7 platform skill files that regex-parse stderr.
-- [ ] **AUDIT-03**: Retroactive seed-SHA traceability — REQUIREMENTS.md and PROJECT.md are annotated with the milestone that consumed each seed (SEED-001 → v1.9, SEED-002 → v1.4, SEED-vault-root-aware-cli → v1.12 + v1.13 closes Option B, SEED-bidirectional-concept-code-links → v1.10 / v1.11 / v1.13 closes remainder).
+- [x] **AUDIT-03**: Retroactive seed-SHA traceability — REQUIREMENTS.md and PROJECT.md are annotated with the milestone that consumed each seed (SEED-001 → v1.9, SEED-002 → v1.4, SEED-vault-root-aware-cli → v1.12 + v1.13 closes Option B, SEED-bidirectional-concept-code-links → v1.10 / v1.11 / v1.13 closes remainder).
 
 ---
 

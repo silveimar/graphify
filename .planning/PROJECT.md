@@ -49,8 +49,8 @@ A v1.13-pre audit confirmed prior milestones silently consumed three of four see
 
 - **SEED-001 Tacit-to-Explicit Elicitation Engine** — CONSUMED by **v1.9** (`graphify/elicit.py`, `__main__.py:2671`, ELIC-01..04 phases 39–44).
 - **SEED-002 Harness Memory Export** — CONSUMED by **v1.4** (`harness_export.py` Phase 13; `harness_import.py` Phase 40); v1.11 Phase 57 added `--allow-vault-write` gate; v1.12 Phase 61 finalized error UX.
-- **SEED-vault-root-aware-cli** — 80% CONSUMED by **v1.12** (VCWD-01..05 Phase 59; argparse fix Phase 62.1). Remaining: silent reroute Option B → scoped into v1.13.
-- **SEED-bidirectional-concept-code-links** — 65% CONSUMED by **v1.10/v1.11** (Phase 46 CCODE schema; Phase 53/54 CGRAPH typed edges + `/trace` integration). Remaining 35% (cross-repo identity, per-edge confidence, drift, parameterized queries) → scoped into v1.13.
+- **SEED-vault-root-aware-cli** — 80% CONSUMED by **v1.12** (VCWD-01..05 Phase 59; argparse fix Phase 62.1). Remaining: silent reroute Option B → scoped into v1.13. **CLOSED by v1.13** (Phase 68 AUDIT-B audit-closure: Option B confirmed consumed; AUDIT-03 marked complete).
+- **SEED-bidirectional-concept-code-links** — 65% CONSUMED by **v1.10/v1.11** (Phase 46 CCODE schema; Phase 53/54 CGRAPH typed edges + `/trace` integration). Remaining 35% (cross-repo identity, per-edge confidence, drift, parameterized queries) → scoped into v1.13. **CLOSED by v1.13** (Phase 68 AUDIT-B audit-closure: per-edge confidence shipped Phase 65; CFED federation Phase 66; CDRIFT + CQUERY Phase 67; AUDIT-03 marked complete).
 
 ## Shipped: v1.11 Templates, Graph Semantics & Vault Depth (2026-05-03)
 
