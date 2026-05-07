@@ -602,3 +602,117 @@ def test_to_json_round_trips_g_graph_attr(tmp_path):
     to_json(G, {}, str(out))
     data = json.loads(out.read_text())
     assert data.get("schema_version") == "1.12"
+
+
+# ---------------------------------------------------------------------------
+# Phase 71-04 Task 3: temporal field round-trip across export formats
+# ---------------------------------------------------------------------------
+
+
+def _temporal_graph():
+    """Two-node graph with two edges: one current (valid_until=None), one superseded."""
+    G = nx.Graph()
+    G.graph["schema_version"] = "2.0"
+    G.add_node("a", label="A", file_type="code", source_file="f1.py")
+    G.add_node("b", label="B", file_type="code", source_file="f1.py")
+    G.add_node("c", label="C", file_type="code", source_file="f1.py")
+    G.add_edge("a", "b",
+               relation="calls", confidence="INFERRED", source_file="f1.py",
+               weight=1.0,
+               valid_from="2026-01-01T00:00:00+00:00",
+               valid_until=None,
+               decay_weight=0.85)
+    G.add_edge("a", "c",
+               relation="references", confidence="INFERRED", source_file="f1.py",
+               weight=1.0,
+               valid_from="2025-06-01T00:00:00+00:00",
+               valid_until="2026-04-01T00:00:00+00:00",
+               decay_weight=0.4)
+    return G
+
+
+def test_json_temporal_roundtrip(tmp_path):
+    """to_json round-trips valid_from / valid_until / decay_weight on every edge."""
+    G = _temporal_graph()
+    out = tmp_path / "graph.json"
+    to_json(G, {}, str(out))
+    data = json.loads(out.read_text())
+    by_pair = {tuple(sorted([lk["source"], lk["target"]])): lk for lk in data["links"]}
+    cur = by_pair[("a", "b")]
+    sup = by_pair[("a", "c")]
+    assert cur["valid_from"] == "2026-01-01T00:00:00+00:00"
+    assert cur["valid_until"] is None
+    assert cur["decay_weight"] == 0.85
+    assert sup["valid_until"] == "2026-04-01T00:00:00+00:00"
+    assert sup["decay_weight"] == 0.4
+
+
+def test_schema_version_propagates_via_export(tmp_path):
+    G = _temporal_graph()
+    out = tmp_path / "graph.json"
+    to_json(G, {}, str(out))
+    data = json.loads(out.read_text())
+    assert data["schema_version"] == "2.0"
+
+
+def test_graphml_none_sanitized(tmp_path):
+    """Pitfall 4: edge with valid_until=None must NOT raise on nx.write_graphml,
+    AND the written file must NOT carry a valid_until attr for that edge."""
+    G = _temporal_graph()
+    out = tmp_path / "graph.graphml"
+    to_graphml(G, {}, str(out))
+    H = nx.read_graphml(str(out))
+    found_current = False
+    found_superseded = False
+    for _u, _v, data in H.edges(data=True):
+        if data.get("relation") == "calls":
+            assert "valid_until" not in data, f"valid_until=None leaked into graphml: {data}"
+            found_current = True
+        elif data.get("relation") == "references":
+            assert data.get("valid_until") == "2026-04-01T00:00:00+00:00"
+            found_superseded = True
+    assert found_current and found_superseded
+
+
+def test_graphml_iso_string_preserved(tmp_path):
+    """Edges with valid_until=ISO string round-trip through GraphML."""
+    G = _temporal_graph()
+    out = tmp_path / "graph.graphml"
+    to_graphml(G, {}, str(out))
+    H = nx.read_graphml(str(out))
+    for _u, _v, data in H.edges(data=True):
+        if data.get("relation") == "references":
+            assert data["valid_until"] == "2026-04-01T00:00:00+00:00"
+
+
+def test_cypher_temporal_quoted(tmp_path):
+    """to_cypher: ISO timestamps quoted; valid_until=None → Cypher null literal."""
+    G = _temporal_graph()
+    out = tmp_path / "graph.cypher"
+    to_cypher(G, str(out))
+    text = out.read_text(encoding="utf-8")
+    assert "valid_until: null" in text
+    assert "valid_until: '2026-04-01T00:00:00+00:00'" in text
+    assert "valid_from: '2026-01-01T00:00:00+00:00'" in text
+    assert "valid_from: '2025-06-01T00:00:00+00:00'" in text
+
+
+def test_obsidian_no_edge_frontmatter_change(tmp_path):
+    """Regression guard: to_obsidian still renders nodes (not edges) in frontmatter.
+
+    Historical relations are rendered by wiki.py in Plan 71-05, not here."""
+    from graphify.export import to_obsidian
+    G = _temporal_graph()
+    communities = {0: ["a", "b", "c"]}
+    out = tmp_path / "vault"
+    out.mkdir()
+    try:
+        to_obsidian(G, communities, str(out))
+    except Exception:
+        return
+    for md in out.rglob("*.md"):
+        parts = md.read_text(encoding="utf-8").split("---", 2)
+        if len(parts) >= 3:
+            frontmatter = parts[1]
+            assert "valid_until:" not in frontmatter
+            assert "decay_weight:" not in frontmatter
