@@ -29,7 +29,82 @@ from typing import Any
 import networkx as nx
 
 from .temporal import compute_decay_weight, load_decay_config, run_now_iso, stamp_supersessions
-from .validate import validate_extraction
+from .validate import REASONING_RELATIONS, validate_extraction
+
+
+def _resolve_reasoning_targets(
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """D-04: Resolve raw target strings on reasoning edges.
+
+    Pass-2 walks reasoning edges and tries:
+      a) target already matches a node["id"] → no-op
+      b) target matches a node["label"] (case-insensitive) → rewrite to that node["id"]
+      c) target appears as substring of any node["id"] (lex-sorted, deterministic) → rewrite
+      d) otherwise drop with a stderr warning.
+
+    Returns a NEW filtered edges list. Does not mutate input.
+    """
+    by_id = {n["id"]: n for n in nodes if isinstance(n, dict) and "id" in n}
+    label_to_id: dict[str, str] = {}
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        lbl = n.get("label")
+        if isinstance(lbl, str) and lbl:
+            label_to_id.setdefault(lbl.lower(), n["id"])
+    out: list[dict[str, Any]] = []
+    for e in edges:
+        if e.get("relation") not in REASONING_RELATIONS:
+            out.append(e)
+            continue
+        tgt = e.get("target", "")
+        if tgt in by_id:
+            out.append(e)
+            continue
+        resolved = label_to_id.get(str(tgt).lower())
+        if resolved is None:
+            cands = sorted(nid for nid in by_id if str(tgt).lower() in nid.lower())
+            resolved = cands[0] if cands else None
+        if resolved is None:
+            print(
+                f"[graphify] dangling reasoning edge {e.get('source','?')} "
+                f"-{e.get('relation')}-> {tgt!r}: no matching node, dropping",
+                file=sys.stderr,
+            )
+            continue
+        e2 = dict(e)
+        e2["target"] = resolved
+        out.append(e2)
+    return out
+
+
+def _stamp_supersession_outbound(
+    edges: list[dict[str, Any]],
+    run_now: str,
+) -> None:
+    """D-07/D-08/D-09/D-10: For every `A supersedes B`, stamp valid_until=run_now
+    on every other outbound edge of B (the TARGET — newer→older orientation).
+
+    Mutates ``edges`` in place. Idempotent: skips edges whose ``valid_until`` is
+    already set. Does NOT create new edges.
+    """
+    # Newer → older orientation: target is the SUPERSEDED node.
+    superseded_ids = {
+        str(e["target"])
+        for e in edges
+        if e.get("relation") == "supersedes" and "target" in e
+    }
+    if not superseded_ids:
+        return
+    for e in edges:
+        if e.get("relation") == "supersedes":
+            continue  # never stamp supersedes edges themselves
+        if str(e.get("source", "")) not in superseded_ids:
+            continue
+        if e.get("valid_until") is None:  # D-09 idempotent
+            e["valid_until"] = run_now
 
 # Phase 70.2-02 (CCONF-05 / CFED-03): single source of truth for graph schema version.
 # Stamped on every graph constructed via build() / build_from_json() so MCP server,
@@ -283,6 +358,10 @@ def build_from_json(
     if hyper_in is not None:
         extraction["hyperedges"] = [dict(h) for h in hyper_in]
 
+    # Phase 72 (REAS, D-04): two-pass reasoning-target resolution.
+    # Runs BEFORE _normalize_concept_code_edges so canonical sort sees resolved targets.
+    extraction["edges"] = _resolve_reasoning_targets(extraction["nodes"], extraction["edges"])
+
     nodes_for_norm = [n for n in extraction["nodes"] if isinstance(n, dict)]
     _normalize_concept_code_edges(nodes_for_norm, extraction["edges"])
 
@@ -318,6 +397,10 @@ def build_from_json(
         prior_graph_path=_prior_graph_path(target_dir, resolved_output=resolved_output),
         run_now=run_now,
     )
+
+    # Phase 72 (REAS, D-07/D-08/D-09/D-10): supersedes auto-stamp on outbound edges.
+    # Runs AFTER stamp_supersessions (Phase 71) so disjoint trigger conditions don't conflict.
+    _stamp_supersession_outbound(extraction["edges"], run_now)
 
     # Phase 66 (CFED-01 / CFED-04): federation runs strictly between
     # concept↔code normalization and schema validation, so peer-imported nodes
