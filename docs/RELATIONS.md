@@ -202,3 +202,26 @@ Adds to the trace meta:
 - Tool body: `graphify/serve.py:_run_concept_code_hops`.
 - `entity_trace` extension: `graphify/serve.py:_run_entity_trace`.
 
+
+
+## Reasoning relations (Phase 72)
+
+Reasoning relations encode claims about ideas/documents (not code). Both endpoints must be document- or concept-typed; code-typed endpoints are rejected by `validate.py`.
+
+| Relation | Definition | Direction | Confidence |
+|----------|-----------|-----------|------------|
+| `supports` | Source asserts evidence in favor of target. | `supporter -> claim` | EXTRACTED, INFERRED (with `confidence_score` in [0.0, 1.0]), or AMBIGUOUS |
+| `contradicts` | Source asserts target is false or incompatible. | symmetric semantically; emitted with stable `(source, target)` ordering by extractor | EXTRACTED, INFERRED (with `confidence_score` in [0.0, 1.0]), or AMBIGUOUS |
+| `supersedes` | Source replaces target as canonical. **Orientation: newer -> older. The TARGET is the superseded (deprecated) node.** | `replacement -> deprecated` | EXTRACTED, INFERRED (with `confidence_score` in [0.0, 1.0]), or AMBIGUOUS |
+| `evolved_into` | Source is an earlier version that became target. (Note: opposite orientation from `supersedes`.) | `older -> newer` | EXTRACTED, INFERRED (with `confidence_score` in [0.0, 1.0]), or AMBIGUOUS |
+| `depends_on` | Source's claim relies on target's claim. | `dependent -> prerequisite` | EXTRACTED, INFERRED (with `confidence_score` in [0.0, 1.0]), or AMBIGUOUS |
+
+All five relations may be emitted with confidence `EXTRACTED`, `INFERRED` (with `confidence_score` in [0.0, 1.0] per CCONF v1.13), or `AMBIGUOUS`.
+
+### Auto-stamping interaction with Phase 71 temporal layer
+
+When `A supersedes B` lands, `build.py` stamps `valid_until = run_now` on every other outbound edge of B. The behavior is idempotent (skipped when `valid_until` is already set). Rationale: once B is superseded, all its outbound claims become historical and surface in the wiki's `## Historical relations` subsection.
+
+#### Worked example (ADR supersession)
+
+`ADR-0042 supersedes ADR-0028` -> auto-stamps outbound edges of `adr_0028` with `valid_until = run_now`. Subsequent runs leave already-stamped edges unchanged.
