@@ -10,6 +10,7 @@ import re
 import time
 import uuid
 from collections import deque
+from typing import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 import networkx as nx
@@ -2278,6 +2279,119 @@ def _validate_relations_arg(raw: object) -> tuple[frozenset[str], str | None]:
                 f"Allowed values: {allowed_sorted}"
             )
     return frozenset(raw), None
+
+
+# ---------------------------------------------------------------------------
+# Phase 67 Plan 02 — CQUERY-01 validators + filter predicate factory
+#
+# These helpers are siblings of the legacy ``_validate_relations_arg`` above;
+# the legacy function is preserved BYTE-IDENTICAL because v1.12 callers depend
+# on its (set, err) shape and its rejection of ``[]``. The CQUERY MCP param is
+# a NEW optional kwarg with different semantics (D-12 revised 2026-05-06).
+# ---------------------------------------------------------------------------
+
+# D-10 cutpoints: high covers x >= 0.8; medium covers 0.5 <= x < 0.8;
+# low covers x < 0.5. We encode each band as a half-open ``[lo, hi)`` range so
+# the predicate factory can use a uniform ``lo <= x < hi`` test.
+_CONFIDENCE_BAND_CUTPOINTS: dict[str, tuple[float, float]] = {
+    "high": (0.8, float("inf")),
+    "medium": (0.5, 0.8),
+    "low": (0.0, 0.5),
+}
+
+
+def _validate_relations_filter_arg(value: object) -> list[str] | None:
+    """CQUERY (Phase 67, D-12) relations whitelist for ``concept_code_hops``.
+
+    Distinct from the legacy ``_validate_relations_arg`` (line 2245) which
+    rejects ``[]``. This new validator accepts ``[]`` as an explicit
+    zero-match filter — the BFS predicate uses it to drop every edge.
+
+    Returns
+    -------
+    None
+        When ``value`` is None (no relation gate applied).
+    list[str]
+        A copy of the validated whitelist (possibly empty).
+
+    Raises
+    ------
+    ValueError
+        If ``value`` is not a list/None, or if any member is not a string.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError(
+            "relations filter must be a list of strings or None; "
+            f"got {type(value).__name__}"
+        )
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(
+                "relations filter members must be strings; "
+                f"got {type(item).__name__}"
+            )
+    return list(value)
+
+
+def _resolve_confidence_band(band: str | None) -> tuple[float, float] | None:
+    """Map a Phase 67 D-10 band name to a half-open ``[lo, hi)`` range.
+
+    ``high`` → ``(0.8, +inf)``  (i.e. x >= 0.8)
+    ``medium`` → ``(0.5, 0.8)`` (0.5 <= x < 0.8)
+    ``low`` → ``(0.0, 0.5)``    (x < 0.5)
+    ``None`` → ``None``         (no band gate)
+    """
+    if band is None:
+        return None
+    if band not in _CONFIDENCE_BAND_CUTPOINTS:
+        allowed = sorted(_CONFIDENCE_BAND_CUTPOINTS)
+        raise ValueError(
+            f"confidence_band must be one of {allowed}; got {band!r}"
+        )
+    return _CONFIDENCE_BAND_CUTPOINTS[band]
+
+
+def _build_concept_hops_filter(
+    min_confidence: float | None = None,
+    relations: list[str] | None = None,
+    confidence_band: str | None = None,
+) -> Callable[[dict], bool] | None:
+    """Build an AND-semantic edge predicate for ``concept_code_hops`` BFS.
+
+    Per D-11 the three optional gates compose with AND semantics. Per D-13,
+    when ALL three arguments are ``None`` we return ``None`` so the caller can
+    skip the predicate entirely and preserve v1.12 byte-identity.
+
+    Per D-12, ``relations=[]`` is a strict zero-match: every edge is rejected.
+    """
+    if min_confidence is None and relations is None and confidence_band is None:
+        return None
+
+    band_range = _resolve_confidence_band(confidence_band)
+    rel_filter = _validate_relations_filter_arg(relations)
+
+    def predicate(edge_data: dict) -> bool:
+        score = edge_data.get("confidence_score")
+        if min_confidence is not None:
+            if score is None or score < min_confidence:
+                return False
+        if band_range is not None:
+            if score is None:
+                return False
+            lo, hi = band_range
+            if not (lo <= score < hi):
+                return False
+        if rel_filter is not None:
+            if not rel_filter:
+                # D-12: empty list is an explicit zero-match — drop everything.
+                return False
+            if edge_data.get("relation") not in rel_filter:
+                return False
+        return True
+
+    return predicate
 
 
 def _bfs_concept_code_from(
