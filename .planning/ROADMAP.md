@@ -77,7 +77,13 @@ Major-version schema upgrade adding temporal edge validity and reasoning-relatio
   1. `graphify update-vault` (and every other command sharing _check_vault_cwd_gate with required=True) completes without exit code 2 when invoked from a vault CWD with no --vault flag; the auto-adopt notice is printed to stderr
   2. `tests/test_vault_cwd_gate.py` exercises every gated subcommand from a fixture vault CWD without --vault and all assertions pass on both Python 3.10 and 3.12
   3. The debug session file `.planning/debug/vault-cwd-gate-argparse-required.md` status field reads resolved with the fix-phase reference recorded
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+**Wave 1**
+- [ ] 74-01-PLAN.md — Flip update-vault and vault-promote --vault to required=False with tightened post-parse guard (VBUG-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 74-02-PLAN.md — Create tests/test_vault_cwd_gate.py with 15-branch parametrized coverage and resolve debug session (VBUG-02)
 
 ### Phase 75: PKG
 **Goal**: graphifyy 2.0.0 ships with a coherent version stamp across pyproject.toml, mcp/server.json, and all platform SKILL.md files, with the full test suite green on Python 3.10 and 3.12
