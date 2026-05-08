@@ -25,7 +25,7 @@ Major-version schema upgrade adding temporal edge validity and reasoning-relatio
 - Decimal phases: Urgent insertions only (via /gsd-insert-phase)
 
 - [ ] **Phase 71: TEMP** - Temporal edge validity columns: valid_from, valid_until, decay_weight, supersession stamping, and report/wiki temporal-health rendering
-- [ ] **Phase 72: REAS** - Reasoning-relation edge types, classifier prompts, contradiction/supersession analysis, and full render pipeline
+- [x] **Phase 72: REAS** - Reasoning-relation edge types, classifier prompts, contradiction/supersession analysis, and full render pipeline (completed 2026-05-07)
 - [ ] **Phase 73: DEDUP** - Measurement-only dedup spike: near-duplicate concept-node rate survey and ship/defer recommendation
 - [ ] **Phase 74: VBUG** - Vault-cwd-gate argparse-required fix and regression test coverage
 - [ ] **Phase 75: PKG** - Coordinated graphifyy 2.0.0 PyPI version bump, mcp/server.json sync, skill-stamp refresh, and full test sweep
@@ -56,9 +56,9 @@ Major-version schema upgrade adding temporal edge validity and reasoning-relatio
   4. Obsidian export preserves reasoning relations as typed wikilinks distinguishable from structural relations in note frontmatter; wiki articles render supersession chains (e.g. "ADR-0042 supersedes ADR-0028 (confidence 0.91)") as first-class inline relations
 **Plans**: 4 plans
 - [x] 72-01-PLAN.md — validate.py REASONING_RELATIONS frozenset + endpoint type rule + docs/RELATIONS.md taxonomy section
-- [ ] 72-02-PLAN.md — Skill prompt extension across all 10 skill*.md files + PROMPT_VERSION bump + drift gate
-- [ ] 72-03-PLAN.md — build.py two-pass reasoning-target resolver + supersedes outbound auto-stamp
-- [ ] 72-04-PLAN.md — analyze.py contradictions_and_chains + knowledge_gaps fix + report/wiki/Obsidian rendering
+- [x] 72-02-PLAN.md — Skill prompt extension across all 10 skill*.md files + PROMPT_VERSION bump + drift gate
+- [x] 72-03-PLAN.md — build.py two-pass reasoning-target resolver + supersedes outbound auto-stamp
+- [x] 72-04-PLAN.md — analyze.py contradictions_and_chains + knowledge_gaps fix + report/wiki/Obsidian rendering
 
 ### Phase 73: DEDUP
 **Goal**: A concrete, data-backed ship/defer recommendation on content-fingerprint dedup exits as the deliverable — no implementation ships unless the spike clears the threshold
@@ -101,7 +101,7 @@ Recommended sequence: 71 → 72 (depends on 71) with 73 and 74 running in parall
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 71. TEMP | 4/5 | In Progress|  |
-| 72. REAS | 1/4 | In Progress|  |
+| 72. REAS | 4/4 | Complete    | 2026-05-08 |
 | 73. DEDUP | 0/TBD | Not started | - |
 | 74. VBUG | 0/TBD | Not started | - |
 | 75. PKG | 0/TBD | Not started | - |
