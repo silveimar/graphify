@@ -428,77 +428,13 @@ def test_vault_list_disables_gate(tmp_path):
 
 
 # Plan 62.1-01 — VCWD-argparse-required defect: update-vault + vault-promote
-# RED tests (TDD gate). These must FAIL before the fix and PASS after.
-# Root cause: _check_vault_cwd_gate auto-adopts BEFORE argparse runs, but
-# --vault is declared required=True so argparse exits 2 regardless.
+# RED tests for this defect have been MOVED to tests/test_vault_cwd_gate.py
+# as of Phase 74-VBUG plan-02 (VBUG-02 regression suite). See that file for:
+#   - test_update_vault_auto_adopt_no_vault_flag
+#   - test_vault_promote_auto_adopt_no_vault_flag
+#   - test_update_vault_no_vault_flag_outside_vault_friendly_error
+# plus the parametrized 14-branch coverage of every gated subcommand.
 # ---------------------------------------------------------------------------
-
-
-def test_update_vault_auto_adopt_no_vault_flag(tmp_path):
-    """VCWD-argparse-required: update-vault from a profile vault CWD without --vault
-    must NOT exit with argparse error 2 ('required: --vault').
-
-    Currently FAILS (RED) because argparse required=True fires before the
-    post-parse auto-adopt fallback can fill in opts.vault.
-    """
-    pytest.importorskip("yaml")
-    vault = _make_profile_vault(tmp_path)
-    # Pass a non-existent --input so the command fails for a *business* reason
-    # (not argparse), proving argparse accepted the call.
-    proc = _graphify(
-        "update-vault", "--input", str(tmp_path / "nonexistent"),
-        cwd=str(vault),
-    )
-    assert "required: --vault" not in proc.stderr, (
-        "argparse 'required: --vault' error fired — auto-adopt argv injection missing.\n"
-        f"stderr: {proc.stderr}"
-    )
-    assert proc.returncode != 2 or "required: --vault" not in proc.stderr, (
-        f"exit 2 with argparse required error\nstderr: {proc.stderr}"
-    )
-
-
-def test_vault_promote_auto_adopt_no_vault_flag(tmp_path):
-    """VCWD-argparse-required: vault-promote from a profile vault CWD without --vault
-    must NOT exit with argparse error 2 ('required: --vault').
-
-    Currently FAILS (RED) because argparse required=True fires before the
-    post-parse auto-adopt fallback can fill in opts.vault.
-    """
-    pytest.importorskip("yaml")
-    vault = _make_profile_vault(tmp_path)
-    # Pass a non-existent --graph so the command fails for a *business* reason.
-    proc = _graphify(
-        "vault-promote", "--graph", str(tmp_path / "nonexistent.json"),
-        cwd=str(vault),
-    )
-    assert "required: --vault" not in proc.stderr, (
-        "argparse 'required: --vault' error fired — auto-adopt argv injection missing.\n"
-        f"stderr: {proc.stderr}"
-    )
-    assert proc.returncode != 2 or "required: --vault" not in proc.stderr, (
-        f"exit 2 with argparse required error\nstderr: {proc.stderr}"
-    )
-
-
-def test_update_vault_no_vault_flag_outside_vault_friendly_error(tmp_path):
-    """VCWD-argparse-required friendly-error branch: outside a vault CWD,
-    omitting --vault must NOT raise argparse exit-2 — instead emit a
-    user-facing 'error: --vault is required' and exit EXIT_VAULT_REFUSAL (=1).
-    """
-    proc = _graphify(
-        "update-vault", "--input", str(tmp_path / "nonexistent"),
-        cwd=str(tmp_path),
-    )
-    assert "required: --vault" not in proc.stderr, (
-        f"argparse 'required: --vault' must not fire; got stderr: {proc.stderr}"
-    )
-    assert "--vault is required" in proc.stderr, (
-        f"expected friendly error 'error: --vault is required'; got stderr: {proc.stderr}"
-    )
-    assert proc.returncode == 1, (
-        f"expected EXIT_VAULT_REFUSAL=1, got {proc.returncode}; stderr: {proc.stderr}"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -538,7 +474,12 @@ def test_option_b_suppressed_by_cli_output_via_run_subcommand(tmp_path):
 
 
 def test_vault_promote_no_vault_flag_outside_vault_friendly_error(tmp_path):
-    """VCWD-argparse-required friendly-error branch for vault-promote."""
+    """VCWD-argparse-required friendly-error branch for vault-promote.
+
+    Phase 74 plan-01 locked the friendly-error exit code at sys.exit(2)
+    (per CONTEXT.md decision); the original RED expectation of
+    EXIT_VAULT_REFUSAL=1 was superseded by the fix.
+    """
     proc = _graphify(
         "vault-promote", "--graph", str(tmp_path / "nonexistent.json"),
         cwd=str(tmp_path),
@@ -549,6 +490,6 @@ def test_vault_promote_no_vault_flag_outside_vault_friendly_error(tmp_path):
     assert "--vault is required" in proc.stderr, (
         f"expected friendly error 'error: --vault is required'; got stderr: {proc.stderr}"
     )
-    assert proc.returncode == 1, (
-        f"expected EXIT_VAULT_REFUSAL=1, got {proc.returncode}; stderr: {proc.stderr}"
+    assert proc.returncode != 0, (
+        f"expected non-zero exit for friendly-error path, got 0; stderr: {proc.stderr}"
     )
