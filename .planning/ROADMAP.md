@@ -102,6 +102,6 @@ Recommended sequence: 71 → 72 (depends on 71) with 73 and 74 running in parall
 |-------|----------------|--------|-----------|
 | 71. TEMP | 4/5 | In Progress|  |
 | 72. REAS | 4/4 | Complete    | 2026-05-08 |
-| 73. DEDUP | 0/TBD | Not started | - |
+| 73. DEDUP | 1/2 | In Progress|  |
 | 74. VBUG | 0/TBD | Not started | - |
 | 75. PKG | 0/TBD | Not started | - |

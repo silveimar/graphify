@@ -20,13 +20,13 @@
 ### Reasoning-Relation Edge Types (REAS)
 
 - [x] **REAS-01**: `validate.py` accepts five new reasoning relations on document/concept-typed nodes: `supports`, `contradicts`, `supersedes`, `evolved_into`, `depends_on`; rejects them on code-typed nodes (whose relations remain structural: `calls`/`imports`/`contains`/`defines_*`).
-- [ ] **REAS-02**: `extract.py` semantic-extraction prompts for documents (md/txt/rst), papers (PDF), and rationales emit reasoning-relation edges with `confidence` (`EXTRACTED`/`INFERRED`/`AMBIGUOUS`) and per-edge `confidence_score` (continuing the CCONF v1.13 contract); the prompts include explicit examples for ADR supersession and contradiction detection.
-- [ ] **REAS-03**: `analyze.py` produces a new "Contradictions and Supersession Chains" analysis section listing detected contradiction pairs and supersession chains (longest first), each with source-node citations and confidence scores; isolated reasoning-edge nodes are NOT misclassified as knowledge gaps.
-- [ ] **REAS-04**: `report.py` GRAPH_REPORT.md and `wiki.py` per-community articles render reasoning chains (e.g. "ADR-0042 supersedes ADR-0028 (confidence 0.91)") as first-class relations alongside structural ones; Obsidian export preserves them as typed wikilinks distinguishable from structural relations in the rendered note frontmatter.
+- [x] **REAS-02**: `extract.py` semantic-extraction prompts for documents (md/txt/rst), papers (PDF), and rationales emit reasoning-relation edges with `confidence` (`EXTRACTED`/`INFERRED`/`AMBIGUOUS`) and per-edge `confidence_score` (continuing the CCONF v1.13 contract); the prompts include explicit examples for ADR supersession and contradiction detection.
+- [x] **REAS-03**: `analyze.py` produces a new "Contradictions and Supersession Chains" analysis section listing detected contradiction pairs and supersession chains (longest first), each with source-node citations and confidence scores; isolated reasoning-edge nodes are NOT misclassified as knowledge gaps.
+- [x] **REAS-04**: `report.py` GRAPH_REPORT.md and `wiki.py` per-community articles render reasoning chains (e.g. "ADR-0042 supersedes ADR-0028 (confidence 0.91)") as first-class relations alongside structural ones; Obsidian export preserves them as typed wikilinks distinguishable from structural relations in the rendered note frontmatter.
 
 ### Content-Fingerprint Dedup Spike (DEDUP)
 
-- [ ] **DEDUP-01**: A measurement-only spike resolves `Q-2026-05-07-01` (`.planning/research/questions.md`) by running graphify against a representative multi-source corpus (≥1 code repo + ≥1 doc-heavy directory + ≥1 PDF/paper set), reporting the near-duplicate concept-node rate using SHA-256 fingerprinting of normalized labels/descriptions, and producing a ship/defer recommendation with concrete numbers. Implementation lands ONLY if the spike clears the >5% threshold AND duplicates are confirmed genuine collisions; otherwise the spike artifact is the deliverable and dedup is deferred to a future milestone.
+- [x] **DEDUP-01**: A measurement-only spike resolves `Q-2026-05-07-01` (`.planning/research/questions.md`) by running graphify against a representative multi-source corpus (≥1 code repo + ≥1 doc-heavy directory + ≥1 PDF/paper set), reporting the near-duplicate concept-node rate using SHA-256 fingerprinting of normalized labels/descriptions, and producing a ship/defer recommendation with concrete numbers. Implementation lands ONLY if the spike clears the >5% threshold AND duplicates are confirmed genuine collisions; otherwise the spike artifact is the deliverable and dedup is deferred to a future milestone.
 
 ### Vault-CWD Argparse Fix (VBUG)
 
@@ -63,10 +63,10 @@
 | TEMP-03 | Phase 71 | Complete |
 | TEMP-04 | Phase 71 | Pending |
 | REAS-01 | Phase 72 | Complete |
-| REAS-02 | Phase 72 | Pending |
-| REAS-03 | Phase 72 | Pending |
-| REAS-04 | Phase 72 | Pending |
-| DEDUP-01 | Phase 73 | Pending |
+| REAS-02 | Phase 72 | Complete |
+| REAS-03 | Phase 72 | Complete |
+| REAS-04 | Phase 72 | Complete |
+| DEDUP-01 | Phase 73 | Complete |
 | VBUG-01 | Phase 74 | Pending |
 | VBUG-02 | Phase 74 | Pending |
 | PKG-01 | Phase 75 | Pending |
