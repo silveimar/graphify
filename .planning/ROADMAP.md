@@ -26,7 +26,7 @@ Major-version schema upgrade adding temporal edge validity and reasoning-relatio
 
 - [ ] **Phase 71: TEMP** - Temporal edge validity columns: valid_from, valid_until, decay_weight, supersession stamping, and report/wiki temporal-health rendering
 - [x] **Phase 72: REAS** - Reasoning-relation edge types, classifier prompts, contradiction/supersession analysis, and full render pipeline (completed 2026-05-07)
-- [ ] **Phase 73: DEDUP** - Measurement-only dedup spike: near-duplicate concept-node rate survey and ship/defer recommendation
+- [x] **Phase 73: DEDUP** - Measurement-only dedup spike: near-duplicate concept-node rate survey and ship/defer recommendation (completed 2026-05-08)
 - [ ] **Phase 74: VBUG** - Vault-cwd-gate argparse-required fix and regression test coverage
 - [ ] **Phase 75: PKG** - Coordinated graphifyy 2.0.0 PyPI version bump, mcp/server.json sync, skill-stamp refresh, and full test sweep
 
@@ -102,6 +102,6 @@ Recommended sequence: 71 → 72 (depends on 71) with 73 and 74 running in parall
 |-------|----------------|--------|-----------|
 | 71. TEMP | 4/5 | In Progress|  |
 | 72. REAS | 4/4 | Complete    | 2026-05-08 |
-| 73. DEDUP | 1/2 | In Progress|  |
+| 73. DEDUP | 2/2 | Complete   | 2026-05-08 |
 | 74. VBUG | 0/TBD | Not started | - |
 | 75. PKG | 0/TBD | Not started | - |
