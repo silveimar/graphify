@@ -1,10 +1,11 @@
 ---
 slug: vault-cwd-gate-argparse-required
-status: diagnosed-pending-fix-phase
+status: resolved
+resolved_in: phase-74-vbug
 trigger: |
   graphify update-vault from a vault CWD with no --vault: _check_vault_cwd_gate at __main__.py:3286 auto-adopts and prints the notice, but argparse at __main__.py:3358 declares --vault required=True so the call still exits 2. Find every gated command with the same defect and design a fix (likely: gate injects --vault <cwd> into argv before parse, OR required=False + resolution-layer enforcement). Out of scope for Phase 62 cleanup — needs its own fix phase.
 created: 2026-05-04
-updated: 2026-05-04
+updated: 2026-05-08
 ---
 
 # Debug Session: vault-cwd-gate-argparse-required
