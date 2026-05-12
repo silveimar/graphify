@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Graph Schema Deepening
-status: complete
-stopped_at: Phase 75 PKG complete — v2.0.0 release stamp coherent across pyproject.toml, server.json, and active platform .graphify_version stamps; D3 CI-as-contract for the pytest-matrix gate
-last_updated: "2026-05-12T07:06:00-06:00"
-last_activity: 2026-05-12 -- Phase 75 PKG closed: bump dance executed, two D6 atomic commits landed (chore(75) + docs(75)); local pytest red signal verified env-leak (pre-bump) and deferred to a future test-triage phase
+milestone: none
+milestone_name: ""
+status: between-milestones
+stopped_at: v2.0 milestone archived 2026-05-12; awaiting /gsd-new-milestone
+last_updated: "2026-05-12T07:55:00-06:00"
+last_activity: 2026-05-12 -- v2.0 milestone closed: ROADMAP collapsed, REQUIREMENTS archived, audit passed, PROJECT.md updated; ready for next milestone
 progress:
   total_phases: 5
   completed_phases: 5

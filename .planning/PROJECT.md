@@ -10,9 +10,12 @@ Graphify can inject knowledge into any Obsidian vault framework — Ideaverse, c
 
 ## Current State
 
-**Last shipped:** v1.13 Concept Intelligence & Audit Closure (2026-05-07) — 2400 tests passing on Python 3.10/3.12. 10 phases (63, 64, 65, 66, 67, 68, 69, 70, 70.1, 70.2), 41 plans, 28/28 requirements satisfied. Archives: `.planning/milestones/v1.13-*`.
+**Last shipped:** v2.0 Graph Schema Deepening (2026-05-12) — major-version schema upgrade. Temporal edge validity (`valid_from`/`valid_until`/`decay_weight`), reasoning-relation edge types (5 typed relations on doc/concept nodes), measurement-only DEDUP spike (18.78% rate, ship recommendation), vault-cwd argparse fix, coordinated `graphifyy` 2.0.0 PyPI version bump. 5 phases (71–75), 15 plans, 13/13 requirements satisfied, milestone audit `passed` (5/5 integration). Archives: `.planning/milestones/v2.0-*`.
 
-**Active milestone:** **v2.0 — Graph Schema Deepening** (started 2026-05-07). Phase numbering continues from **71**. See `## Current Milestone: v2.0` below.
+**Active milestone:** _None._ Run `/gsd-new-milestone` to start the next cycle.
+
+<details>
+<summary>Archived: v2.0 Graph Schema Deepening (shipped 2026-05-12)</summary>
 
 ## Current Milestone: v2.0 Graph Schema Deepening
 
@@ -293,7 +296,9 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
-## Current State
+</details>
+
+## Shipped History
 
 **Shipped v1.0** (2026-04-11) — Configurable Obsidian vault adapter. 5 phases, 22 plans, 31/31 requirements, 872 tests. See `.planning/milestones/v1.0-*`.
 
@@ -317,9 +322,19 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Shipped v1.10** (2026-05-01) — See **Shipped: v1.10** section above and `.planning/milestones/v1.10-*`.
 
+**Shipped v1.13** (2026-05-07) — Concept Intelligence & Audit Closure. Per-edge LLM confidence, cross-repo federation, edge-level drift, parameterized concept queries, vault profile-driven writes, vault↔input reverse-sync, audit hygiene. 10 phases (63–70.2), 41 plans, 28/28 requirements. Archives under `.planning/milestones/v1.13-*`.
+
+**Shipped v2.0** (2026-05-12) — Graph Schema Deepening. Major-version schema upgrade: temporal edge validity (`valid_from`/`valid_until`/`decay_weight` + INFERRED supersession stamping), reasoning-relation edge types (`supports`/`contradicts`/`supersedes`/`evolved_into`/`depends_on` on doc/concept nodes with ADR-aware prompts), DEDUP measurement spike (18.78% rate → ship rec), vault-cwd argparse fix + 14-branch regression suite, coordinated `graphifyy` 2.0.0 PyPI bump. 5 phases (71–75), 15 plans, 13/13 requirements, audit `passed` (5/5 integration). Backward-compat read of legacy graph.json preserved (CCONF `schema_version` precedent). Archives under `.planning/milestones/v2.0-*`.
+
 ## Next Milestone Goals
 
-*v2.0 is active — goals are listed under **Current Milestone: v2.0** at the top of this file.*
+*No active milestone. Run `/gsd-new-milestone` to scope the next cycle.*
+
+Candidate themes surfaced during v2.0 (not yet committed):
+- **OB1 integration** — Ship graphify as `recipes/repo-graphify` for OB1; align `serve.py` MCP surface with ob-graph's 10 tools (deferred seeds: `SEED-ob1-recipe-repo-graphify`)
+- **DEDUP implementation** — Activated by Phase 73's ship recommendation; node-level content-fingerprint dedup (was DEDUP-02..N)
+- **Test environment hygiene** — `test_vault_cwd_gate` subprocesses leak into real developer vault; needs isolation fix
+- **Doc fixes** — CLAUDE.md `mcp/server.json` → `server.json` reference (Phase 75 D5 deferral)
 
 ---
-*Last updated: 2026-05-07 — Started milestone **v2.0** (Graph Schema Deepening); phase numbering from **71**.*
+*Last updated: 2026-05-12 — Shipped milestone **v2.0** (Graph Schema Deepening); awaiting next milestone scope.*
