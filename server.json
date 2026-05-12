@@ -2,13 +2,13 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-11-25/server.schema.json",
   "name": "graphify",
   "title": "Graphify",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "MCP stdio server exposing graphify knowledge-graph tools (see graphify/serve.py).",
   "packages": [
     {
       "registry_type": "pypi",
       "identifier": "graphifyy",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "transport": {
         "type": "stdio",
         "command": "python",
@@ -22,7 +22,7 @@
     }
   ],
   "_meta": {
-    "manifest_content_hash": "ac31ce60c04bee38a58ec5c3d9c4a800ab893da22eb67895f74ebbc516c048a7",
+    "manifest_content_hash": "1bc8765726576fd0cb6c4e2e536e13396b19f0e6250396f6d7f76a000fa3c330",
     "tool_count": 27,
     "regenerate_command": "graphify capability --stdout > server.json"
   }
