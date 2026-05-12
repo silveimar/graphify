@@ -24,7 +24,7 @@ Major-version schema upgrade adding temporal edge validity and reasoning-relatio
 - Integer phases (71–75): Planned milestone work
 - Decimal phases: Urgent insertions only (via /gsd-insert-phase)
 
-- [ ] **Phase 71: TEMP** - Temporal edge validity columns: valid_from, valid_until, decay_weight, supersession stamping, and report/wiki temporal-health rendering
+- [x] **Phase 71: TEMP** - Temporal edge validity columns: valid_from, valid_until, decay_weight, supersession stamping, and report/wiki temporal-health rendering (completed 2026-05-07)
 - [x] **Phase 72: REAS** - Reasoning-relation edge types, classifier prompts, contradiction/supersession analysis, and full render pipeline (completed 2026-05-07)
 - [x] **Phase 73: DEDUP** - Measurement-only dedup spike: near-duplicate concept-node rate survey and ship/defer recommendation (completed 2026-05-08)
 - [ ] **Phase 74: VBUG** - Vault-cwd-gate argparse-required fix and regression test coverage
@@ -43,7 +43,12 @@ Major-version schema upgrade adding temporal edge validity and reasoning-relatio
   2. INFERRED edges have a decay_weight < 1.0 after the configured age threshold; EXTRACTED edges always show decay_weight 1.0; the per-relation decay config is readable and documented
   3. Re-running graphify against a corpus where a previously-INFERRED edge is no longer produced stamps that edge's valid_until rather than dropping it silently; the edge is excluded from god-node and surprising-connection scoring by default
   4. GRAPH_REPORT.md contains a "Temporal Health" sub-section showing counts of currently-valid vs superseded edges and the decay-weight distribution; wiki per-community articles mark edges with valid_until set as historical context rather than current relations
-**Plans**: TBD
+**Plans**: 5 plans
+- [x] 71-01-PLAN.md — Temporal columns on edges (valid_from, valid_until) + read/write validator split
+- [x] 71-02-PLAN.md — temporal_config.yaml + compute_decay_weight + per-relation override
+- [x] 71-03-PLAN.md — stamp_supersessions (INFERRED-only, global tuple, history retained)
+- [x] 71-04-PLAN.md — analyze.py 4-site valid_until filter (god_nodes, surprises, suggestions)
+- [x] 71-05-PLAN.md — Temporal Health in GRAPH_REPORT.md + Historical relations in wiki
 
 ### Phase 72: REAS
 **Goal**: Documents and concept nodes carry typed reasoning-relation edges extracted by classifier prompts, with full contradiction/supersession analysis and render pipeline
@@ -106,7 +111,7 @@ Recommended sequence: 71 → 72 (depends on 71) with 73 and 74 running in parall
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 71. TEMP | 4/5 | In Progress|  |
+| 71. TEMP | 5/5 | Complete    | 2026-05-07 |
 | 72. REAS | 4/4 | Complete    | 2026-05-08 |
 | 73. DEDUP | 2/2 | Complete   | 2026-05-08 |
 | 74. VBUG | 0/TBD | Not started | - |
