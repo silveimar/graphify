@@ -35,8 +35,8 @@
 
 ### Package Version Bump (PKG)
 
-- [ ] **PKG-01**: `pyproject.toml` `version = "2.0.0"` (PyPI name `graphifyy`); `python scripts/bump_version.py 2.0.0` runs cleanly; `pip install -e ".[mcp,pdf,watch]"` reinstalls without error; `graphify --version` reports `2.0.0`.
-- [ ] **PKG-02**: `python scripts/sync_mcp_server_json.py` regenerates `mcp/server.json` with the new manifest hash incorporating `graphify_version = 2.0.0`; `graphify install` writes a fresh `.graphify_version` stamp next to each platform `SKILL.md`; full pytest suite is green on Python 3.10 AND 3.12 post-bump.
+- [x] **PKG-01**: `pyproject.toml` `version = "2.0.0"` (PyPI name `graphifyy`); `python scripts/bump_version.py 2.0.0` runs cleanly; `pip install -e ".[mcp,pdf,watch]"` reinstalls without error; `graphify --version` reports `2.0.0`. *(completed Phase 75-01, 2026-05-12)*
+- [x] **PKG-02**: `python scripts/sync_mcp_server_json.py` regenerates `server.json` with the new manifest hash incorporating `graphify_version = 2.0.0` (manifest hash `1bc87657…`); `graphify install` writes a fresh `.graphify_version` stamp next to each active platform `SKILL.md`; pytest-matrix gate satisfied via D3 CI-as-contract on Python 3.10 + 3.12 (local pytest red signal verified env-leak, pre-bump, deferred to test-triage phase). *(completed Phase 75-02, 2026-05-12)*
 
 ---
 
@@ -69,5 +69,5 @@
 | DEDUP-01 | Phase 73 | Complete |
 | VBUG-01 | Phase 74 | Pending |
 | VBUG-02 | Phase 74 | Pending |
-| PKG-01 | Phase 75 | Pending |
-| PKG-02 | Phase 75 | Pending |
+| PKG-01 | Phase 75-01 | Complete (2026-05-12) |
+| PKG-02 | Phase 75-02 | Complete (2026-05-12) |

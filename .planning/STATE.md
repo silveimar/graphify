@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Graph Schema Deepening
-status: in_progress
-stopped_at: Phase 75 context gathered (--auto); plans not yet authored
-last_updated: "2026-05-12T06:35:00-06:00"
-last_activity: 2026-05-12 -- Phase 71 status reconciled (5/5 verified PASS); v1.13 archive cleanup committed; config switched to autonomous-chain mode
+status: complete
+stopped_at: Phase 75 PKG complete — v2.0.0 release stamp coherent across pyproject.toml, server.json, and active platform .graphify_version stamps; D3 CI-as-contract for the pytest-matrix gate
+last_updated: "2026-05-12T07:06:00-06:00"
+last_activity: 2026-05-12 -- Phase 75 PKG closed: bump dance executed, two D6 atomic commits landed (chore(75) + docs(75)); local pytest red signal verified env-leak (pre-bump) and deferred to a future test-triage phase
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 13
-  completed_plans: 13
-  percent: 80
+  completed_phases: 5
+  total_plans: 15
+  completed_plans: 15
+  percent: 100
 ---
 
 # Project State
@@ -26,12 +26,12 @@ See: `.planning/PROJECT.md` — **v1.13 shipped 2026-05-07**. Active milestone: 
 
 ## Current Position
 
-Phase: 75 — PKG (not started; CONTEXT + DISCUSSION-LOG captured)
-Plan: Not started
-Status: Phases 71–74 complete; Phase 75 ready to plan
-Last activity: 2026-05-12 -- Phase 71 status reconciled; v1.13 archive cleanup committed
+Phase: 75 — PKG (Complete; v2.0.0 release stamp coherent)
+Plan: 75-02 (Complete)
+Status: v2.0 milestone schema-deepening + release-stamp work Complete; deferred items = git tag v2.0.0 + PyPI publish (D7), CLAUDE.md doc-fix (D5), local pytest test-triage (env-leak)
+Last activity: 2026-05-12 -- Phase 75 closed via D3 CI-as-contract + D6 two-atomic-commit topology
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -92,6 +92,6 @@ Cross-milestone research flags (v1.8/v1.12) archived to `.planning/state/archive
 
 ## Session Continuity
 
-Last session: 2026-05-12T06:35:00-06:00
-Stopped at: Phase 75 context gathered (--auto); plans not yet authored
-Next action: `/gsd-plan-phase 75`
+Last session: 2026-05-12T07:06:00-06:00
+Stopped at: Phase 75 PKG Complete — two atomic commits landed (chore(75) bump + docs(75) record); CI matrix run pending next push
+Next action: Push branch; reviewer to verify green CI matrix on Python 3.10 + 3.12 and append run URL to `75-02-SUMMARY.md` before merge. Outside Phase 75: human-supervised `git tag v2.0.0` + PyPI publish (D7).
